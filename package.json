@@ -1,7 +1,7 @@
 {
   "private": true,
   "name": "hrms",
-  "description": "Open Source HR & Payroll System powered by the Frappe Framework",
+  "description": "HR & Payroll System for Staff Pro BPO",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/frappe/hrms.git"

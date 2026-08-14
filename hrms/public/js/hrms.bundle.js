@@ -7,3 +7,5 @@ import "./utils/payroll_utils";
 import "./utils/leave_utils";
 import "./utils/telemetry.js";
 import "./salary_slip_deductions_report_filters.js";
+import "./desk_topbar.js";
+import "./desk_sidebar.js";

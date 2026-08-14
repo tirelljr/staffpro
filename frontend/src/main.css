@@ -1,5 +1,58 @@
 @import "frappe-ui/src/style.css";
 
+:root {
+	--sp-navy: #16607a;
+	--sp-cyan: #00a6e8;
+	--sp-lime: #8cc040;
+	--sp-ink: #1e3a4c;
+	--sp-black: #000000;
+	--app-topbar-height: calc(4rem + env(safe-area-inset-top, 0px));
+}
+
+ion-app.app-has-topbar > ion-router-outlet > ion-page,
+ion-app.app-has-topbar > ion-router-outlet > .ion-page {
+	top: var(--app-topbar-height);
+}
+
+ion-modal {
+	--height: auto;
+}
+
+input:disabled {
+	--webkit-text-fill-color: var(--tw-text-color);
+	opacity: 0.9; /* required on iOS */
+	color: var(--tw-text-color);
+}
+
+/* For Webkit-based browsers (Chrome, Safari and Opera) */
+input::-webkit-date-and-time-value {
+	text-align: left;
+}
+
+body {
+	-webkit-tap-highlight-color: transparent;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+	display: none;
+}
+
+/* For IE, Edge and Firefox */
+.hide-scrollbar {
+	-ms-overflow-style: none; /* IE and Edge */
+	scrollbar-width: none; /* Firefox */
+}
+
+.btn-brand {
+	background-color: var(--sp-cyan) !important;
+	color: #ffffff !important;
+}
+
+.btn-brand:hover {
+	background-color: #0092cc !important;
+}
+
+
 ion-modal {
 	--height: auto;
 }

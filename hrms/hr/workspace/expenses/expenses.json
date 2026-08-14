@@ -15,7 +15,7 @@
  "hide_custom": 1,
  "icon": "receipt-text",
  "idx": 0,
- "is_hidden": 0,
+ "is_hidden": 1,
  "label": "Expenses",
  "links": [
   {
@@ -257,14 +257,14 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-03 13:44:08.158384",
+ "modified": "2026-08-14 12:41:18.272421",
  "modified_by": "Administrator",
  "module": "HR",
  "name": "Expenses",
  "number_cards": [],
  "owner": "Administrator",
  "parent_page": "",
- "public": 1,
+ "public": 0,
  "quick_lists": [],
  "roles": [],
  "sequence_id": 6.0,
@@ -273,19 +273,7 @@
   {
    "child": 0,
    "collapsible": 1,
-   "icon": "house",
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Home",
-   "link_to": "Expenses",
-   "link_type": "Workspace",
-   "open_in_new_tab": 1,
-   "show_arrow": 0,
-   "type": "Link"
-  },
-  {
-   "child": 0,
-   "collapsible": 1,
+   "default_workspace": 0,
    "icon": "layout-dashboard",
    "indent": 0,
    "keep_closed": 0,
@@ -299,6 +287,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "upload",
    "indent": 0,
    "keep_closed": 0,
@@ -312,6 +301,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "arrow-down-from-line",
    "indent": 0,
    "keep_closed": 0,
@@ -325,6 +315,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "plane",
    "indent": 1,
    "keep_closed": 1,
@@ -337,6 +328,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -350,6 +342,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -363,6 +356,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -376,6 +370,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "coins",
    "indent": 1,
    "keep_closed": 1,
@@ -388,6 +383,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -401,6 +397,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -414,6 +411,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "notepad-text",
    "indent": 1,
    "keep_closed": 1,
@@ -426,6 +424,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -439,6 +438,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -452,6 +452,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -465,6 +466,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -478,6 +480,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -491,6 +494,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "database",
    "indent": 1,
    "keep_closed": 1,
@@ -503,6 +507,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -516,6 +521,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -529,6 +535,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -542,6 +549,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "settings",
    "indent": 0,
    "keep_closed": 0,

@@ -2,6 +2,7 @@
 	<BaseLayout pageTitle="Attendance">
 		<template #body>
 			<div class="flex flex-col mt-7 mb-7 p-4 gap-7">
+				<CheckInPanel />
 				<AttendanceCalendar />
 				<div class="w-full">
 					<router-link :to="{ name: 'AttendanceRequestFormView' }" v-slot="{ navigate }">
@@ -55,6 +56,7 @@ import { computed, inject, markRaw } from "vue"
 import { createResource } from "frappe-ui"
 
 import BaseLayout from "@/components/BaseLayout.vue"
+import CheckInPanel from "@/components/CheckInPanel.vue"
 import AttendanceRequestItem from "@/components/AttendanceRequestItem.vue"
 import ShiftRequestItem from "@/components/ShiftRequestItem.vue"
 import ShiftAssignmentItem from "@/components/ShiftAssignmentItem.vue"

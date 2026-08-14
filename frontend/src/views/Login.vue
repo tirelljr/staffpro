@@ -1,6 +1,6 @@
 <template>
 	<ion-page>
-		<ion-content class="ion-padding">
+		<ion-content :fullscreen="true" class="ion-no-padding" style="--background: #000000">
 			<div
 				v-if="resetPassword.showDialog"
 				class="flex h-screen w-screen flex-col bg-white"
@@ -22,7 +22,7 @@
 						{{ __("Your password has expired. Please reset your password to continue") }}
 					</p>
 					<a
-						class="mt-6 inline-flex items-center justify-center gap-2 transition-colors focus:outline-none text-white bg-gray-900 hover:bg-gray-800 active:bg-gray-700 focus-visible:ring focus-visible:ring-gray-400 h-9 text-base px-4 rounded"
+						class="mt-6 inline-flex items-center justify-center gap-2 transition-colors focus:outline-none text-white bg-brand-cyan hover:bg-[#0092cc] active:bg-[#007fb3] focus-visible:ring focus-visible:ring-brand-cyan h-9 text-base px-4 rounded"
 						:href="resetPassword.link"
 						target="_blank"
 					>
@@ -31,15 +31,20 @@
 				</div>
 			</div>
 
-			<div v-else class="flex h-screen w-screen flex-col justify-center bg-white">
-				<div class="flex flex-col mx-auto gap-3 items-center">
-					<FrappeHRLogo class="h-8 w-8" />
-					<div class="text-3xl font-semibold text-gray-900 text-center">
-						{{ __("Login to Frappe HR") }}
+			<div v-else class="flex h-screen w-screen flex-col justify-center bg-black">
+				<div class="flex flex-col mx-auto gap-3 items-center px-6">
+					<img
+						src="/assets/hrms/images/staff-pro-bpo-logo.png"
+						alt="Staff Pro BPO"
+						class="h-28 w-auto"
+					/>
+					<div class="text-2xl font-semibold text-white text-center">
+						{{ __("Login to Staff Pro BPO") }}
 					</div>
 				</div>
 
-				<div class="mx-auto mt-10 w-full px-8 sm:w-96">
+				<div class="mx-auto mt-8 w-full px-8 sm:w-96">
+					<div class="bg-white rounded-xl p-6">
 					<form v-if="!user_pass_login_disabled.data" class="flex flex-col space-y-4" @submit.prevent="submit">
 						<Input
 							:label="__('Email')"
@@ -59,14 +64,14 @@
 						<Button
 							:loading="session.login.loading"
 							variant="solid"
-							class="disabled:bg-gray-700 disabled:text-white !mt-6"
+							class="btn-brand disabled:bg-gray-700 disabled:text-white !mt-6"
 						>
 							{{ __("Login") }}
 						</Button>
 						<div class="text-center mt-4">
 							<router-link
 								:to="{ name: 'ForgotPassword', query: email ? { email } : {} }"
-								class="text-sm text-gray-600 hover:text-gray-900 underline"
+								class="text-sm text-gray-600 hover:text-brand-navy underline"
 							>
 								{{ __("Forgot Password?") }}
 							</router-link>
@@ -89,6 +94,7 @@
 					</template>
 
 					<div v-else-if="user_pass_login_disabled.data" class="text-center text-gray-600 py-8">{{ __("No login methods are available. Please contact your administrator.") }}</div>
+					</div>
 				</div>
 			</div>
 			<Dialog v-model="otp.showDialog">
@@ -112,7 +118,7 @@
 						<Button
 							:loading="session.otp.loading"
 							variant="solid"
-							class="disabled:bg-gray-700 disabled:text-white !mt-6"
+							class="btn-brand disabled:bg-gray-700 disabled:text-white !mt-6"
 						>
 							{{ __("Verify") }}
 						</Button>
@@ -127,8 +133,6 @@
 import { IonPage, IonContent } from "@ionic/vue"
 import { inject, reactive, ref } from "vue"
 import { Input, Button, ErrorMessage, Dialog, createResource } from "frappe-ui"
-
-import FrappeHRLogo from "@/components/icons/FrappeHRLogo.vue"
 
 const email = ref(null)
 const password = ref(null)

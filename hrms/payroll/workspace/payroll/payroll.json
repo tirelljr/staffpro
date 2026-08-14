@@ -15,7 +15,7 @@
  "hide_custom": 0,
  "icon": "wallet",
  "idx": 2,
- "is_hidden": 0,
+ "is_hidden": 1,
  "label": "Payroll",
  "links": [
   {
@@ -376,33 +376,19 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-11 15:13:53.803768",
+ "modified": "2026-08-14 12:41:18.880159",
  "modified_by": "Administrator",
  "module": "Payroll",
  "name": "Payroll",
  "number_cards": [],
  "owner": "Administrator",
  "parent_page": "",
- "public": 1,
+ "public": 0,
  "quick_lists": [],
  "roles": [],
  "sequence_id": 9.0,
  "shortcuts": [],
  "sidebar_items": [
-  {
-   "child": 0,
-   "collapsible": 1,
-   "default_workspace": 0,
-   "icon": "house",
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Home",
-   "link_to": "Payroll",
-   "link_type": "Workspace",
-   "open_in_new_tab": 1,
-   "show_arrow": 0,
-   "type": "Link"
-  },
   {
    "child": 0,
    "collapsible": 1,

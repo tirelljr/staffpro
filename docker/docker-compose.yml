@@ -1,4 +1,5 @@
-version: "3.8" # Updated version
+name: staff-pro
+
 services:
   mariadb:
     image: mariadb:10.8
@@ -23,9 +24,14 @@ services:
     working_dir: /home/frappe
     volumes:
       - .:/workspace
+      - ..:/workspace/hrms
+      - bench-data:/home/frappe
     ports:
       - 8000:8000
       - 9000:9000
 
 volumes:
   mariadb-data:
+    name: staff-pro-mariadb-data
+  bench-data:
+    name: staff-pro-bench-data

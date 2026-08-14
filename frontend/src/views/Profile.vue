@@ -1,8 +1,8 @@
 <template>
 	<ion-page>
 		<ion-content class="ion-padding">
-			<div class="flex flex-col h-screen w-screen">
-				<div class="w-full sm:w-96">
+			<div class="flex flex-col h-full w-full">
+				<div class="w-full">
 					<header
 						class="flex flex-row bg-white shadow-sm py-4 px-3 items-center justify-between border-b sticky top-0 z-10"
 					>
@@ -91,6 +91,25 @@
 										class="h-5 w-5 text-gray-500"
 									/>
 								</router-link>
+								<a
+									v-if="showDeskLink"
+									:href="DESK_HOME"
+									class="flex flex-row cursor-pointer flex-start p-4 items-center justify-between border-b"
+								>
+									<div class="flex flex-row items-center gap-3 grow">
+										<FeatherIcon
+											name="monitor"
+											class="h-5 w-5 text-gray-500"
+										/>
+										<div class="text-base font-normal text-gray-800">
+											{{ __("Open Desk") }}
+										</div>
+									</div>
+									<FeatherIcon
+										name="external-link"
+										class="h-5 w-5 text-gray-500"
+									/>
+								</a>
 							</div>
 						</div>
 
@@ -149,6 +168,7 @@ import { formatCurrency } from "@/utils/formatters"
 import ProfileInfoModal from "@/components/ProfileInfoModal.vue"
 
 import { arePushNotificationsEnabled } from "@/data/notifications"
+import { canOpenDesk, DESK_HOME } from "@/utils/deskAccess"
 
 const DOCTYPE = "Employee"
 
@@ -159,6 +179,8 @@ const employee = inject("$employee")
 const __ = inject("$translate")
 
 const router = useRouter()
+
+const showDeskLink = computed(() => canOpenDesk(user.data))
 
 const profileLinks = [
 	{

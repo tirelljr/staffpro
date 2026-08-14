@@ -10,7 +10,7 @@
  "hide_custom": 0,
  "icon": "tree-palm",
  "idx": 0,
- "is_hidden": 0,
+ "is_hidden": 1,
  "label": "Leaves",
  "links": [
   {
@@ -186,7 +186,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-03 13:44:08.045734",
+ "modified": "2026-08-14 12:41:19.338136",
  "modified_by": "Administrator",
  "module": "HR",
  "name": "Leaves",
@@ -206,7 +206,7 @@
  ],
  "owner": "Administrator",
  "parent_page": "",
- "public": 1,
+ "public": 0,
  "quick_lists": [],
  "roles": [],
  "sequence_id": 5.0,
@@ -215,12 +215,13 @@
   {
    "child": 0,
    "collapsible": 1,
-   "icon": "house",
+   "default_workspace": 0,
+   "icon": "layout-dashboard",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Home",
+   "label": "Dashboard",
    "link_to": "Leaves",
-   "link_type": "Workspace",
+   "link_type": "Dashboard",
    "open_in_new_tab": 1,
    "show_arrow": 0,
    "type": "Link"
@@ -228,6 +229,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "clipboard-pen",
    "indent": 0,
    "keep_closed": 0,
@@ -241,6 +243,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "coins",
    "indent": 0,
    "keep_closed": 0,
@@ -254,6 +257,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "sliders-horizontal",
    "indent": 0,
    "keep_closed": 0,
@@ -267,6 +271,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "calendar-heart",
    "indent": 0,
    "keep_closed": 0,
@@ -280,6 +285,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "clipboard-check",
    "indent": 0,
    "keep_closed": 0,
@@ -293,6 +299,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "notepad-text",
    "indent": 1,
    "keep_closed": 1,
@@ -305,6 +312,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -318,6 +326,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -331,6 +340,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -344,6 +354,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "database",
    "indent": 1,
    "keep_closed": 1,
@@ -356,6 +367,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -369,6 +381,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "indent": 0,
    "keep_closed": 0,
    "label": "Holiday List Assignment",
@@ -381,6 +394,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -394,6 +408,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -407,6 +422,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -420,6 +436,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -433,6 +450,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "settings",
    "indent": 0,
    "keep_closed": 0,

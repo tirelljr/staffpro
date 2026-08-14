@@ -24,13 +24,14 @@ export default defineConfig({
 			},
 			manifest: {
 				display: "standalone",
-				name: "Frappe HR",
-				short_name: "Frappe HR",
+				name: "Staff Pro BPO",
+				short_name: "Staff Pro",
 				start_url: "/hrms",
 				scope: "/hrms",
 				id: "/hrms",
-				description: "Everyday HR & Payroll operations at your fingertips",
-				theme_color: "#ffffff",
+				description: "HR & Payroll for Staff Pro BPO",
+				theme_color: "#16607A",
+				background_color: "#000000",
 				icons: [
 					{
 						src: "/assets/hrms/manifest/manifest-icon-192.maskable.png",

@@ -1,0 +1,231 @@
+body[data-path="login"] {
+	--sp-navy: #16607a;
+	--sp-cyan: #00a6e8;
+	--sp-lime: #8cc040;
+	--sp-ink: #1e3a4c;
+	--sp-black: #000000;
+	background: #ffffff !important;
+	min-height: 100vh;
+}
+
+body[data-path="login"] .web-footer,
+body[data-path="login"] .navbar {
+	display: none !important;
+}
+
+body[data-path="login"] .page-content-wrapper {
+	min-height: 100vh !important;
+	height: 100vh !important;
+	padding: 0 !important;
+	display: flex;
+	align-items: stretch;
+	justify-content: stretch;
+	background: #ffffff !important;
+}
+
+body[data-path="login"] main.container {
+	max-width: none !important;
+	width: 100% !important;
+	height: 100% !important;
+	min-height: 100vh !important;
+	padding: 0 !important;
+	margin: 0 !important;
+	display: flex;
+	flex-direction: column;
+}
+
+body[data-path="login"] .page-content,
+body[data-path="login"] .page_content {
+	width: 100% !important;
+	height: 100% !important;
+	max-width: none !important;
+	padding: 0 !important;
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+}
+
+.sp-login-shell {
+	width: 100%;
+	height: 100%;
+	max-width: none;
+	margin: 0;
+	flex: 1;
+}
+
+.sp-login-card {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	background: #ffffff;
+	border-radius: 0;
+	overflow: hidden;
+	box-shadow: none;
+	border: none;
+	width: 100%;
+	height: 100%;
+	min-height: 100vh;
+}
+
+.sp-login-form-col {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 48px 40px;
+	background: #ffffff;
+}
+
+.sp-login-form-col > section {
+	width: 100%;
+	max-width: 380px;
+}
+
+body[data-path="login"] .sp-login-brand-col {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 40px;
+	background: #000000;
+}
+
+body[data-path="login"] .sp-login-brand-col img {
+	width: 88% !important;
+	max-width: 440px !important;
+	height: auto !important;
+	max-height: none !important;
+	min-height: 280px !important;
+	object-fit: contain;
+}
+
+body[data-path="login"] .for-login .page-card,
+body[data-path="login"] .for-forgot .page-card,
+body[data-path="login"] .for-login-with-email-link .page-card,
+body[data-path="login"] .for-signup .page-card,
+body[data-path="login"] .for-email-login .page-card {
+	max-width: none !important;
+	width: 100% !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	background: transparent !important;
+	border: none !important;
+	border-radius: 0 !important;
+	box-shadow: none !important;
+	min-height: 0 !important;
+}
+
+body[data-path="login"] .page-card-head img.app-logo {
+	display: none;
+}
+
+body[data-path="login"] .page-card-head h4 {
+	font-size: 2rem;
+	line-height: 1.2;
+	color: var(--sp-ink);
+	font-weight: 700;
+}
+
+body[data-path="login"] .page-card-subtitle {
+	color: #6b7280 !important;
+}
+
+body[data-path="login"] .page-card-body input[type="text"],
+body[data-path="login"] .page-card-body input[type="email"],
+body[data-path="login"] .page-card-body input[type="password"] {
+	height: 48px !important;
+	border-radius: 12px !important;
+	border: 1px solid #e5e7eb !important;
+	padding: 12px 44px 12px 14px !important;
+	background: #ffffff !important;
+	font-size: 15px !important;
+}
+
+body[data-path="login"] .page-card-body input:focus {
+	border-color: var(--sp-cyan) !important;
+	box-shadow: 0 0 0 3px rgba(0, 166, 232, 0.18) !important;
+	outline: none;
+}
+
+body[data-path="login"] .email-field,
+body[data-path="login"] .password-field {
+	position: relative;
+	width: 100%;
+}
+
+body[data-path="login"] .sp-field-icon {
+	position: absolute;
+	right: 14px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: #9ca3af;
+	pointer-events: none;
+}
+
+body[data-path="login"] .es-button[data-variant="solid"] {
+	height: 48px !important;
+	border-radius: 12px !important;
+	background: #111111 !important;
+	border-color: #111111 !important;
+	color: #ffffff !important;
+	font-weight: 600 !important;
+	font-size: 15px !important;
+}
+
+body[data-path="login"] .es-button[data-variant="solid"]:hover,
+body[data-path="login"] .es-button[data-variant="solid"]:focus {
+	background: #16607a !important;
+	border-color: #16607a !important;
+}
+
+body[data-path="login"] .btn-login-option {
+	border-radius: 12px !important;
+	height: 44px !important;
+	border: 1px solid #e5e7eb !important;
+	background: #f9fafb !important;
+	color: #374151 !important;
+}
+
+body[data-path="login"] a[href="#forgot"],
+body[data-path="login"] .sign-up-message a {
+	color: var(--sp-navy) !important;
+	font-weight: 600;
+}
+
+@media (max-width: 900px) {
+	body[data-path="login"] main.container {
+		width: 100% !important;
+		height: 100% !important;
+		min-height: 100vh !important;
+	}
+
+	body[data-path="login"] .page-content,
+	body[data-path="login"] .page_content {
+		padding: 0;
+	}
+
+	.sp-login-card {
+		grid-template-columns: 1fr;
+		min-height: 100vh;
+	}
+
+	.sp-login-brand-col {
+		order: -1;
+		min-height: 180px;
+		padding: 28px 24px;
+	}
+
+	body[data-path="login"] .sp-login-brand-col img {
+		width: min(70%, 240px) !important;
+		max-width: 240px !important;
+		height: auto !important;
+		max-height: none !important;
+		min-height: 0 !important;
+	}
+
+	.sp-login-form-col {
+		padding: 32px 24px 48px;
+		align-items: flex-start;
+	}
+
+	body[data-path="login"] .page-card-head img.app-logo.sp-mobile-logo {
+		display: none;
+	}
+}

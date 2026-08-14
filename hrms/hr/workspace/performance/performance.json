@@ -15,17 +15,17 @@
  "hide_custom": 0,
  "icon": "star",
  "idx": 0,
- "is_hidden": 0,
+ "is_hidden": 1,
  "label": "Performance",
  "links": [],
- "modified": "2026-07-03 13:44:08.008994",
+ "modified": "2026-08-14 12:41:19.532507",
  "modified_by": "Administrator",
  "module": "HR",
  "name": "Performance",
  "number_cards": [],
  "owner": "Administrator",
  "parent_page": "",
- "public": 1,
+ "public": 0,
  "quick_lists": [],
  "roles": [],
  "sequence_id": 7.0,
@@ -34,12 +34,13 @@
   {
    "child": 0,
    "collapsible": 1,
-   "icon": "house",
+   "default_workspace": 0,
+   "icon": "layout-dashboard",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Home",
+   "label": "Dashboard",
    "link_to": "Performance",
-   "link_type": "Workspace",
+   "link_type": "Dashboard",
    "open_in_new_tab": 1,
    "show_arrow": 0,
    "type": "Link"
@@ -47,6 +48,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "goal",
    "indent": 0,
    "keep_closed": 0,
@@ -60,6 +62,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "orbit",
    "indent": 0,
    "keep_closed": 0,
@@ -73,6 +76,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "arrow-up",
    "indent": 0,
    "keep_closed": 0,
@@ -86,6 +90,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "trending-up",
    "indent": 0,
    "keep_closed": 0,
@@ -99,6 +104,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "graduation-cap",
    "indent": 0,
    "keep_closed": 0,
@@ -112,6 +118,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "notepad-text",
    "indent": 1,
    "keep_closed": 1,
@@ -124,6 +131,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "indent": 0,
    "keep_closed": 0,
    "label": "Appraisal Overview",
@@ -136,6 +144,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "database",
    "indent": 1,
    "keep_closed": 1,
@@ -148,6 +157,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -161,6 +171,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -174,6 +185,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,

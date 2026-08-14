@@ -9,6 +9,15 @@ export default {
 	],
 	theme: {
 		extend: {
+			colors: {
+				brand: {
+					navy: "#16607a",
+					cyan: "#00a6e8",
+					lime: "#8cc040",
+					ink: "#1e3a4c",
+					black: "#000000",
+				},
+			},
 			screens: {
 				standalone: {
 					raw: "(display-mode: standalone)",

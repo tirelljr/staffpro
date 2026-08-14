@@ -15,7 +15,7 @@
  "hide_custom": 1,
  "icon": "milestone",
  "idx": 2,
- "is_hidden": 0,
+ "is_hidden": 1,
  "label": "Shift & Attendance",
  "links": [
   {
@@ -261,14 +261,14 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-03 13:43:50.672935",
+ "modified": "2026-08-14 12:41:18.109980",
  "modified_by": "Administrator",
  "module": "HR",
  "name": "Shift & Attendance",
  "number_cards": [],
  "owner": "Administrator",
  "parent_page": "",
- "public": 1,
+ "public": 0,
  "quick_lists": [],
  "roles": [],
  "sequence_id": 4.0,
@@ -277,32 +277,7 @@
   {
    "child": 0,
    "collapsible": 1,
-   "icon": "house",
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Home",
-   "link_to": "Shift & Attendance",
-   "link_type": "Workspace",
-   "open_in_new_tab": 1,
-   "show_arrow": 0,
-   "type": "Link"
-  },
-  {
-   "child": 0,
-   "collapsible": 1,
-   "icon": "calendar-range",
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Roster",
-   "link_type": "URL",
-   "open_in_new_tab": 1,
-   "show_arrow": 0,
-   "type": "Link",
-   "url": "/hr/roster"
-  },
-  {
-   "child": 0,
-   "collapsible": 1,
+   "default_workspace": 0,
    "icon": "layout-dashboard",
    "indent": 0,
    "keep_closed": 0,
@@ -316,6 +291,21 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
+   "icon": "calendar-range",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Roster",
+   "link_type": "URL",
+   "open_in_new_tab": 1,
+   "show_arrow": 0,
+   "type": "Link",
+   "url": "/hr/roster"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "default_workspace": 0,
    "icon": "wrench",
    "indent": 0,
    "keep_closed": 0,
@@ -329,6 +319,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "pointer",
    "indent": 0,
    "keep_closed": 0,
@@ -342,6 +333,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "bell-dot",
    "indent": 0,
    "keep_closed": 0,
@@ -355,6 +347,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "calendar-check",
    "indent": 0,
    "keep_closed": 0,
@@ -368,6 +361,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "calendar-clock",
    "indent": 1,
    "keep_closed": 1,
@@ -380,6 +374,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -393,6 +388,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -406,6 +402,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "notepad-text",
    "indent": 1,
    "keep_closed": 1,
@@ -418,6 +415,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -431,6 +429,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -444,6 +443,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -457,6 +457,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -470,6 +471,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "database",
    "indent": 1,
    "keep_closed": 1,
@@ -482,6 +484,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -495,6 +498,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -508,6 +512,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -521,6 +526,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -534,6 +540,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -547,6 +554,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "settings",
    "indent": 0,
    "keep_closed": 0,

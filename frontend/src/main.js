@@ -138,7 +138,7 @@ router.beforeEach(async (to, _, next) => {
 		) {
 			next({ name: "InvalidEmployee" })
 		} else if (["Login", "ForgotPassword"].includes(to.name)) {
-			next({ name: "Home" })
+			next({ name: "AttendanceDashboard" })
 		} else {
 			next()
 		}

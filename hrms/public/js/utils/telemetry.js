@@ -11,6 +11,12 @@ const HR_WORKSPACES = new Set([
 	"Recruitment",
 	"Tenure",
 	"Payroll",
+	"Tax & Benefits",
+	"Workforce",
+	"Time",
+	"Pay",
+	"Talent",
+	"Finance & Admin",
 ]);
 
 // Key HR doctypes worth tracking navigation into. Kept explicit so we only ever

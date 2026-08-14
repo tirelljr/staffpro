@@ -1,9 +1,9 @@
 [project]
 name = "hrms"
 authors = [
-    { name = "Frappe Technologies Pvt Ltd", email = "developers@frappe.io" },
+    { name = "Staff Pro BPO" },
 ]
-description = "Open Source HR & Payroll Software"
+description = "HR and Payroll Software for Staff Pro BPO"
 requires-python = ">=3.10"
 readme = "README.md"
 dynamic = ["version"]

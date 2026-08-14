@@ -1,0 +1,40 @@
+:root {
+	--sp-navy: #16607a;
+	--sp-cyan: #00a6e8;
+	--sp-lime: #8cc040;
+	--sp-ink: #1e3a4c;
+	--sp-black: #000000;
+
+	--primary: var(--sp-cyan);
+	--primary-color: var(--sp-cyan);
+}
+
+.navbar .app-logo,
+.navbar img.app-logo,
+header .app-logo,
+.login-content .page-card-head img {
+	max-height: 48px;
+	width: auto;
+}
+
+.btn-primary {
+	background-color: var(--sp-cyan) !important;
+	border-color: var(--sp-cyan) !important;
+}
+
+.btn-primary:hover,
+.btn-primary:active,
+.btn-primary:focus {
+	background-color: #0092cc !important;
+	border-color: #0092cc !important;
+}
+
+a,
+.btn-link {
+	--icon-stroke: var(--sp-cyan);
+}
+
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
+	accent-color: var(--sp-cyan);
+}

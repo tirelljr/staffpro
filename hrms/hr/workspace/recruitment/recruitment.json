@@ -15,7 +15,7 @@
  "hide_custom": 0,
  "icon": "users",
  "idx": 7,
- "is_hidden": 0,
+ "is_hidden": 1,
  "label": "Recruitment",
  "links": [
   {
@@ -175,14 +175,14 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-03 13:43:50.797829",
+ "modified": "2026-08-14 12:41:18.459201",
  "modified_by": "Administrator",
  "module": "HR",
  "name": "Recruitment",
  "number_cards": [],
  "owner": "Administrator",
  "parent_page": "",
- "public": 1,
+ "public": 0,
  "quick_lists": [
   {
    "document_type": "Interview",
@@ -197,19 +197,7 @@
   {
    "child": 0,
    "collapsible": 1,
-   "icon": "house",
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Home",
-   "link_to": "Recruitment",
-   "link_type": "Workspace",
-   "open_in_new_tab": 0,
-   "show_arrow": 0,
-   "type": "Link"
-  },
-  {
-   "child": 0,
-   "collapsible": 1,
+   "default_workspace": 0,
    "icon": "layout-dashboard",
    "indent": 0,
    "keep_closed": 0,
@@ -223,6 +211,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "user-round-plus",
    "indent": 0,
    "keep_closed": 0,
@@ -236,6 +225,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "circle-user-round",
    "indent": 0,
    "keep_closed": 0,
@@ -249,6 +239,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "videotape",
    "indent": 0,
    "keep_closed": 0,
@@ -262,6 +253,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "user-round-check",
    "indent": 0,
    "keep_closed": 0,
@@ -275,6 +267,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "file-text",
    "indent": 0,
    "keep_closed": 0,
@@ -288,6 +281,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "align-start-horizontal",
    "indent": 1,
    "keep_closed": 1,
@@ -300,6 +294,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -313,6 +308,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -326,6 +322,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "indent": 0,
    "keep_closed": 0,
    "label": "Employee Referral",
@@ -338,6 +335,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "notepad-text",
    "indent": 1,
    "keep_closed": 1,
@@ -350,6 +348,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -363,6 +362,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "database",
    "indent": 1,
    "keep_closed": 1,
@@ -375,6 +375,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -388,6 +389,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "indent": 0,
    "keep_closed": 0,
    "label": "Job Opening Template",
@@ -400,6 +402,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "",
    "indent": 0,
    "keep_closed": 0,
@@ -413,6 +416,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "indent": 0,
    "keep_closed": 0,
    "label": "Job Offer Term Template",
@@ -425,6 +429,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "globe",
    "indent": 0,
    "keep_closed": 0,
@@ -438,6 +443,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "settings",
    "indent": 0,
    "keep_closed": 0,

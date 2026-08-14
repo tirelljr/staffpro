@@ -10,7 +10,7 @@ import salarySlipRoutes from "./salary_slips"
 const routes = [
 	{
 		path: "/",
-		redirect: "/home",
+		redirect: "/dashboard/attendance",
 	},
 	{
 		path: "/",
@@ -18,12 +18,11 @@ const routes = [
 		children: [
 			{
 				path: "",
-				redirect: "/home",
+				redirect: "/dashboard/attendance",
 			},
 			{
 				path: "/home",
-				name: "Home",
-				component: () => import("@/views/Home.vue"),
+				redirect: "/dashboard/attendance",
 			},
 			{
 				path: "/dashboard/attendance",

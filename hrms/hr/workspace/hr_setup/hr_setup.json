@@ -10,7 +10,7 @@
  "hide_custom": 0,
  "icon": "briefcase-business",
  "idx": 1,
- "is_hidden": 0,
+ "is_hidden": 1,
  "label": "HR Setup",
  "links": [
   {
@@ -386,14 +386,14 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-03 13:43:50.847257",
+ "modified": "2026-08-14 12:41:17.370296",
  "modified_by": "Administrator",
  "module": "HR",
  "name": "HR Setup",
  "number_cards": [],
  "owner": "Administrator",
  "parent_page": "",
- "public": 1,
+ "public": 0,
  "quick_lists": [],
  "restrict_to_domain": "",
  "roles": [],
@@ -403,19 +403,7 @@
   {
    "child": 0,
    "collapsible": 1,
-   "icon": "house",
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Home",
-   "link_to": "HR Setup",
-   "link_type": "Workspace",
-   "open_in_new_tab": 0,
-   "show_arrow": 0,
-   "type": "Link"
-  },
-  {
-   "child": 0,
-   "collapsible": 1,
+   "default_workspace": 0,
    "icon": "layout-dashboard",
    "indent": 0,
    "keep_closed": 0,
@@ -429,6 +417,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "square-user-round",
    "indent": 0,
    "keep_closed": 0,
@@ -442,6 +431,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "building-2",
    "indent": 0,
    "keep_closed": 0,
@@ -455,6 +445,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "database",
    "indent": 1,
    "keep_closed": 1,
@@ -467,6 +458,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "indent": 0,
    "keep_closed": 0,
    "label": "Company",
@@ -479,6 +471,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "indent": 0,
    "keep_closed": 0,
    "label": "Branch",
@@ -491,6 +484,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "indent": 0,
    "keep_closed": 0,
    "label": "Department",
@@ -503,6 +497,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "indent": 0,
    "keep_closed": 0,
    "label": "Designation",
@@ -515,6 +510,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "indent": 0,
    "keep_closed": 0,
    "label": "Employee Group",
@@ -527,6 +523,7 @@
   {
    "child": 1,
    "collapsible": 1,
+   "default_workspace": 0,
    "indent": 0,
    "keep_closed": 0,
    "label": "Employee Grade",
@@ -539,6 +536,7 @@
   {
    "child": 0,
    "collapsible": 1,
+   "default_workspace": 0,
    "icon": "settings",
    "indent": 0,
    "keep_closed": 0,
