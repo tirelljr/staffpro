@@ -63,7 +63,8 @@
    "link_to": "Company",
    "link_type": "DocType",
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "building"
   },
   {
    "child": 1,
@@ -74,7 +75,8 @@
    "link_to": "Branch",
    "link_type": "DocType",
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "git-branch"
   },
   {
    "child": 1,
@@ -85,7 +87,8 @@
    "link_to": "Department",
    "link_type": "DocType",
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "network"
   },
   {
    "child": 1,
@@ -96,7 +99,8 @@
    "link_to": "Designation",
    "link_type": "DocType",
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "badge"
   },
   {
    "child": 1,
@@ -107,7 +111,8 @@
    "link_to": "Employee Group",
    "link_type": "DocType",
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "users"
   },
   {
    "child": 1,
@@ -118,7 +123,8 @@
    "link_to": "Employee Grade",
    "link_type": "DocType",
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "layers"
   },
   {
    "child": 0,

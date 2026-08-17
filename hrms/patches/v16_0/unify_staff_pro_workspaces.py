@@ -18,6 +18,7 @@ NEW_WORKSPACES = [
 	"Workforce",
 	"Time",
 	"Pay",
+	"SS and Taxes",
 	"Talent",
 	"Finance & Admin",
 ]
@@ -28,6 +29,7 @@ NEW_DESKTOP_ICONS = [
 	"People",
 	"Time",
 	"Pay",
+	"SS and Taxes",
 	"Talent",
 	"Finance & Admin",
 ]

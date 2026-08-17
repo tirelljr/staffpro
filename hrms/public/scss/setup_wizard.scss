@@ -1,0 +1,29 @@
+body.staff-pro-has-topbar #page-setup-wizard {
+	min-height: calc(100vh - 56px);
+	overflow: auto;
+}
+
+body.staff-pro-has-topbar #page-setup-wizard .slides-wrapper.container {
+	height: auto;
+	min-height: 36rem;
+	overflow: visible;
+}
+
+body.staff-pro-has-topbar #page-setup-wizard .slide-container,
+body.staff-pro-has-topbar #page-setup-wizard .slide-body,
+body.staff-pro-has-topbar #page-setup-wizard .form-wrapper {
+	overflow: visible;
+	height: auto;
+}
+
+#page-setup-wizard .complete-btn.btn-primary {
+	background-color: var(--sp-navy) !important;
+	border-color: var(--sp-navy) !important;
+}
+
+#page-setup-wizard .complete-btn.btn-primary:hover,
+#page-setup-wizard .complete-btn.btn-primary:focus,
+#page-setup-wizard .complete-btn.btn-primary:active {
+	background-color: var(--sp-ink) !important;
+	border-color: var(--sp-ink) !important;
+}

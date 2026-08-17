@@ -10,7 +10,7 @@ const SIDEBAR_CSS = `
 .workspace-dock {
 	flex: 0 0 72px !important;
 	width: 72px !important;
-	background: #f6f6f7 !important;
+	background: #ffffff !important;
 	border-right: 1px solid #ececec !important;
 	padding: 10px 0 12px !important;
 }
@@ -51,16 +51,16 @@ const SIDEBAR_CSS = `
 	justify-content: flex-start !important;
 	width: 56px !important;
 	height: auto !important;
-	min-height: 58px !important;
+	min-height: 64px !important;
 	padding: 6px 2px 6px !important;
-	gap: 4px !important;
+	gap: 5px !important;
 	border: 0 !important;
 	border-radius: 8px !important;
 	background: transparent !important;
 	box-shadow: none !important;
 	overflow: visible !important;
-	color: #4b5563 !important;
-	font-size: 9px !important;
+	color: #000000 !important;
+	font-size: 11px !important;
 	line-height: 1.15 !important;
 	text-indent: 0 !important;
 	text-transform: none !important;
@@ -71,11 +71,11 @@ const SIDEBAR_CSS = `
 	width: 100% !important;
 	max-width: 64px !important;
 	margin-top: 2px !important;
-	font-size: 9px !important;
+	font-size: 11px !important;
 	font-weight: 500 !important;
 	line-height: 1.15 !important;
 	letter-spacing: 0 !important;
-	color: #6b7280 !important;
+	color: #000000 !important;
 	text-align: center !important;
 	white-space: normal !important;
 	word-break: break-word !important;
@@ -85,21 +85,29 @@ const SIDEBAR_CSS = `
 	content: none !important;
 	display: none !important;
 }
+.workspace-dock .workspace-dock-icon,
+.workspace-dock button.workspace-dock-item .sidebar-item-icon {
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	flex-shrink: 0 !important;
+}
 .workspace-dock .workspace-dock-item svg,
 .workspace-dock .workspace-dock-item .icon,
 .workspace-dock .workspace-dock-item img {
-	width: 18px !important;
-	height: 18px !important;
-	min-width: 18px !important;
-	min-height: 18px !important;
-	stroke: #4b5563 !important;
-	stroke-width: 1.5 !important;
+	display: block !important;
+	width: 22px !important;
+	height: 22px !important;
+	min-width: 22px !important;
+	min-height: 22px !important;
+	color: #000000 !important;
 }
 .workspace-dock button.workspace-dock-item:hover {
 	background: #ececee !important;
 }
 .workspace-dock button.workspace-dock-item.active {
 	background: #e8e8ea !important;
+	color: #000000 !important;
 }
 .workspace-dock button.workspace-dock-item.active::before {
 	display: none !important;
@@ -110,23 +118,27 @@ const SIDEBAR_CSS = `
 	width: 100% !important;
 	max-width: 56px !important;
 	margin-top: 2px !important;
-	font-size: 9px !important;
+	font-size: 11px !important;
 	font-weight: 500 !important;
 	line-height: 1.15 !important;
 	letter-spacing: 0 !important;
-	color: #6b7280 !important;
+	color: #000000 !important;
 	text-align: center !important;
 	white-space: normal !important;
 	overflow: hidden !important;
 	word-break: break-word !important;
 }
 .workspace-dock .workspace-dock-shortcuts .workspace-dock-item {
-	min-height: 36px !important;
-	padding: 8px 2px !important;
+	min-height: 64px !important;
+	padding: 6px 2px 6px !important;
 }
 .workspace-dock .workspace-dock-divider {
 	width: 28px !important;
 	background: #e5e7eb !important;
+}
+
+:root {
+	--sidebar-width: 260px;
 }
 
 /* Body sidebar */
@@ -136,16 +148,22 @@ const SIDEBAR_CSS = `
 	padding: 8px 8px 10px !important;
 }
 .body-sidebar .sidebar-header {
-	padding: 8px 8px 10px !important;
-	margin: 0 0 4px !important;
+	padding: 14px 8px 10px !important;
+	margin: 0 0 2px !important;
+}
+.body-sidebar .sidebar-header .header-icon,
+.body-sidebar .sidebar-header > img,
+.body-sidebar .sidebar-header .sidebar-item-icon {
+	display: none !important;
 }
 .body-sidebar .sidebar-header .header-title,
 .body-sidebar .sidebar-header .workspace-title,
-.body-sidebar .sidebar-header span {
-	font-size: 14px !important;
+.body-sidebar .sidebar-header span:not(.drop-icon):not(.icon):not(.sidebar-item-icon) {
+	font-size: 11px !important;
 	font-weight: 700 !important;
-	letter-spacing: -0.01em !important;
-	color: #111827 !important;
+	letter-spacing: 0.06em !important;
+	text-transform: uppercase !important;
+	color: #2c2e30 !important;
 	line-height: 1.3 !important;
 }
 .body-sidebar .staff-pro-sidebar-search {
@@ -153,7 +171,7 @@ const SIDEBAR_CSS = `
 	align-items: center !important;
 	gap: 8px !important;
 	height: 34px !important;
-	margin: 8px 4px 10px !important;
+	margin: 4px 4px 10px !important;
 	padding: 0 10px !important;
 	border: 1px solid #ececec !important;
 	border-radius: 8px !important;
@@ -171,15 +189,17 @@ const SIDEBAR_CSS = `
 	font-size: 13px !important;
 	font-weight: 400 !important;
 	color: #9ca3af !important;
+	text-transform: none !important;
+	letter-spacing: 0 !important;
 }
 .body-sidebar .sidebar-items {
-	padding: 0 2px !important;
+	padding: 0 2px 8px !important;
 }
 .body-sidebar .standard-sidebar-item {
-	margin: 0 0 2px !important;
+	margin: 0 !important;
 	padding: 0 !important;
 	border-radius: 8px !important;
-	overflow: hidden !important;
+	overflow: visible !important;
 	background: transparent !important;
 	box-shadow: none !important;
 }
@@ -187,82 +207,615 @@ const SIDEBAR_CSS = `
 	display: flex !important;
 	flex-direction: row !important;
 	align-items: center !important;
-	height: 36px !important;
-	min-height: 36px !important;
-	padding: 0 10px !important;
+	height: auto !important;
+	min-height: 44px !important;
+	padding: 10px 8px !important;
 	gap: 10px !important;
-	color: #111827 !important;
+	color: #2c2e30 !important;
 	text-decoration: none !important;
 }
 .body-sidebar .standard-sidebar-item .sidebar-item-icon {
 	display: inline-flex !important;
 	align-items: center !important;
 	justify-content: center !important;
-	width: 18px !important;
-	height: 18px !important;
+	width: 28px !important;
+	height: 28px !important;
+	min-width: 28px !important;
 	padding: 0 !important;
 	margin: 0 !important;
+	border-radius: 50% !important;
+	background: #0f1b2d !important;
+	color: var(--sp-icon-accent, #3ddcb0) !important;
+	flex-shrink: 0 !important;
 }
 .body-sidebar .standard-sidebar-item .sidebar-item-icon svg,
-.body-sidebar .standard-sidebar-item .sidebar-item-icon .icon {
-	width: 16px !important;
-	height: 16px !important;
-	stroke: #111827 !important;
-	stroke-width: 1.5 !important;
+.body-sidebar .standard-sidebar-item .sidebar-item-icon .icon,
+.body-sidebar .standard-sidebar-item .sidebar-item-icon .text-ink-gray-7,
+.body-sidebar .standard-sidebar-item .sidebar-item-icon .current-color {
+	width: 14px !important;
+	height: 14px !important;
+	color: inherit !important;
+}
+.body-sidebar .standard-sidebar-item .sidebar-item-icon:not(.staff-pro-glyph) svg,
+.body-sidebar .standard-sidebar-item .sidebar-item-icon:not(.staff-pro-glyph) svg * {
+	stroke: currentColor !important;
+	stroke-width: 1.85 !important;
+	fill: none !important;
+}
+.body-sidebar .standard-sidebar-item .sidebar-item-icon.staff-pro-glyph svg,
+.body-sidebar .standard-sidebar-item .sidebar-item-icon.staff-pro-glyph svg * {
+	width: 14px !important;
+	height: 14px !important;
+	fill: currentColor !important;
+	stroke: none !important;
+}
+.body-sidebar .standard-sidebar-item .sidebar-item-icon.staff-pro-section-icon svg,
+.body-sidebar .standard-sidebar-item .sidebar-item-icon.staff-pro-section-icon svg * {
+	width: 14px !important;
+	height: 14px !important;
+	stroke: currentColor !important;
+	fill: none !important;
+	stroke-width: 1.85 !important;
+}
+.body-sidebar .standard-sidebar-item .sidebar-item-icon:empty::before {
+	content: "";
+	width: 8px;
+	height: 8px;
+	border-radius: 3px 7px 4px 6px;
+	background: currentColor;
 }
 .body-sidebar .standard-sidebar-item .sidebar-item-label {
-	font-size: 13px !important;
+	flex: 1 1 auto !important;
+	font-size: 14px !important;
 	font-weight: 500 !important;
-	line-height: 1.3 !important;
+	line-height: 1.35 !important;
 	letter-spacing: 0 !important;
-	color: #111827 !important;
+	color: #2c2c2c !important;
 	margin-left: 0 !important;
 }
 .body-sidebar .standard-sidebar-item:hover,
 .body-sidebar .standard-sidebar-item.hover {
-	background: #f3f4f6 !important;
+	background: transparent !important;
+}
+.body-sidebar .standard-sidebar-item:not(:has(.drop-icon)):not(:has(.section-break)):hover,
+.body-sidebar .standard-sidebar-item:not(:has(.drop-icon)):not(:has(.section-break)).hover {
+	background: #f4f5f7 !important;
 }
 .body-sidebar .standard-sidebar-item.active-sidebar,
 .body-sidebar .standard-sidebar-item.selected,
 .body-sidebar .active-sidebar {
-	background: #f0f0f1 !important;
+	background: transparent !important;
 	box-shadow: none !important;
+}
+.body-sidebar .standard-sidebar-item:not(:has(.drop-icon)):not(:has(.section-break)).active-sidebar,
+.body-sidebar .standard-sidebar-item:not(:has(.drop-icon)):not(:has(.section-break)).selected {
+	background: #f4f5f7 !important;
+}
+.body-sidebar .standard-sidebar-item:not(:has(.drop-icon)).active-sidebar .sidebar-item-label,
+.body-sidebar .standard-sidebar-item:not(:has(.drop-icon)).selected .sidebar-item-label {
+	font-weight: 700 !important;
+}
+.body-sidebar .sidebar-item-control {
+	margin-left: auto !important;
+	display: flex !important;
+	align-items: center !important;
 }
 .body-sidebar .sidebar-item-control .drop-icon {
 	width: 18px !important;
 	height: 18px !important;
-	color: #c4c4c4 !important;
+	color: #b0b4ba !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	position: relative !important;
 }
 .body-sidebar .sidebar-item-control .drop-icon svg,
 .body-sidebar .sidebar-item-control .drop-icon .icon {
-	width: 14px !important;
-	height: 14px !important;
-	stroke: #c4c4c4 !important;
+	display: none !important;
+}
+.body-sidebar .sidebar-item-control .drop-icon::after {
+	content: "" !important;
+	width: 6px !important;
+	height: 6px !important;
+	border-right: 1.5px solid #b0b4ba !important;
+	border-bottom: 1.5px solid #b0b4ba !important;
+	transform: rotate(-135deg) !important;
+	margin-top: 2px !important;
+}
+.body-sidebar .sidebar-item-control .drop-icon[data-state="closed"]::after {
+	transform: rotate(45deg) !important;
+	margin-top: -3px !important;
 }
 .body-sidebar .section-break,
 .body-sidebar .section-break .sidebar-item-label {
-	font-size: 13px !important;
+	font-size: 14px !important;
 	font-weight: 500 !important;
 	letter-spacing: 0 !important;
 	text-transform: none !important;
-	color: #111827 !important;
+	color: #2c2e30 !important;
 	margin-left: 0 !important;
 }
+.body-sidebar .indent + .nested-container,
 .body-sidebar .nested-container {
-	margin: 0 0 4px 14px !important;
-	padding-left: 8px !important;
-	border-left: 1px solid #ececec !important;
+	margin: 0 0 6px !important;
+	padding: 0 !important;
+	border: 0 !important;
+	border-left: 0 !important;
+}
+.body-sidebar .nested-container.hidden {
+	display: none !important;
+	margin: 0 !important;
+}
+.body-sidebar .nested-container .standard-sidebar-item {
+	margin: 0 0 2px !important;
+	border-radius: 8px !important;
+	overflow: hidden !important;
 }
 .body-sidebar .nested-container .standard-sidebar-item .item-anchor {
-	height: 32px !important;
-	min-height: 32px !important;
+	height: auto !important;
+	min-height: 34px !important;
+	padding: 6px 10px 6px 36px !important;
+	gap: 8px !important;
+}
+.body-sidebar .nested-container .sidebar-item-icon,
+.body-sidebar .nested-container .staff-pro-sub-icon {
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	width: 16px !important;
+	height: 16px !important;
+	min-width: 16px !important;
+	border-radius: 0 !important;
+	background: transparent !important;
+	color: #8b8f94 !important;
+}
+.body-sidebar .nested-container .sidebar-item-icon svg,
+.body-sidebar .nested-container .sidebar-item-icon .icon,
+.body-sidebar .nested-container .sidebar-item-icon svg * {
+	width: 14px !important;
+	height: 14px !important;
+	stroke: #8b8f94 !important;
+	fill: none !important;
+	stroke-width: 1.7 !important;
 }
 .body-sidebar .nested-container .sidebar-item-label {
 	font-size: 13px !important;
-	font-weight: 500 !important;
-	color: #111827 !important;
+	font-weight: 400 !important;
+	line-height: 1.35 !important;
+	color: #000000 !important;
+}
+.body-sidebar .nested-container .standard-sidebar-item:hover,
+.body-sidebar .nested-container .standard-sidebar-item.hover {
+	background: #f4f5f7 !important;
+}
+.body-sidebar .nested-container .standard-sidebar-item.active-sidebar,
+.body-sidebar .nested-container .standard-sidebar-item.selected {
+	background: #f4f5f7 !important;
+	box-shadow: none !important;
+}
+.body-sidebar .nested-container .standard-sidebar-item:hover .sidebar-item-label,
+.body-sidebar .nested-container .standard-sidebar-item.active-sidebar .sidebar-item-label,
+.body-sidebar .nested-container .standard-sidebar-item.selected .sidebar-item-label {
+	font-weight: 700 !important;
+	color: #2c2c2c !important;
+}
+.body-sidebar .nested-container .standard-sidebar-item.active-sidebar .sidebar-item-icon,
+.body-sidebar .nested-container .standard-sidebar-item.selected .sidebar-item-icon,
+.body-sidebar .nested-container .standard-sidebar-item:hover .sidebar-item-icon {
+	color: #2c2c2c !important;
+}
+.body-sidebar .nested-container .standard-sidebar-item.active-sidebar .sidebar-item-icon svg,
+.body-sidebar .nested-container .standard-sidebar-item.active-sidebar .sidebar-item-icon svg *,
+.body-sidebar .nested-container .standard-sidebar-item.selected .sidebar-item-icon svg,
+.body-sidebar .nested-container .standard-sidebar-item.selected .sidebar-item-icon svg *,
+.body-sidebar .nested-container .standard-sidebar-item:hover .sidebar-item-icon svg,
+.body-sidebar .nested-container .standard-sidebar-item:hover .sidebar-item-icon svg * {
+	stroke: #2c2c2c !important;
+}
+.body-sidebar-container:not(.expanded) .body-sidebar-placeholder {
+	width: 0 !important;
+}
+.body-sidebar-container:not(.expanded) .body-sidebar {
+	background: transparent !important;
+	border-right-color: transparent !important;
+	pointer-events: none;
 }
 `;
+
+const PARENT_GLYPHS = {
+	home: `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.2 1.6 7.1v7.2h4.2V9.8h4.4v4.5h4.2V7.1L8 1.2z"/></svg>`,
+	bowtie: `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M2.1 3.05c0-.72.58-1.15 1.32-1.15h9.16c.74 0 1.32.43 1.32 1.15 0 .38-.16.72-.48 1.04L9.7 8l3.72 3.91c.32.32.48.66.48 1.04 0 .72-.58 1.15-1.32 1.15H3.42c-.74 0-1.32-.43-1.32-1.15 0-.38.16-.72.48-1.04L6.3 8 2.58 4.09A1.4 1.4 0 0 1 2.1 3.05z"/></svg>`,
+	chevron: `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M3.05 2.7 8.7 8 3.05 13.3l1.7 1.6L12.2 8 4.75 1.1 3.05 2.7z"/></svg>`,
+	bars: `<svg viewBox="0 0 16 16" aria-hidden="true"><rect fill="currentColor" x="1.7" y="9.1" width="3.5" height="5.1" rx="1"/><rect fill="currentColor" x="6.25" y="5.6" width="3.5" height="8.6" rx="1"/><rect fill="currentColor" x="10.8" y="2.6" width="3.5" height="11.6" rx="1"/></svg>`,
+	person: `<svg viewBox="0 0 16 16" aria-hidden="true"><circle fill="currentColor" cx="8" cy="4.7" r="2.75"/><path fill="currentColor" d="M2.45 14.15c.25-3.05 2.3-4.8 5.55-4.8s5.3 1.75 5.55 4.8H2.45z"/></svg>`,
+	leaf: `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M13.7 2.45c-3.9-.55-8.35 1.25-9.75 5.35-1 2.85.25 5.5 2.7 6.55 2.65 1.15 5.7-.15 7.15-2.85 1.65-2.9 1.4-8.45-.1-9.05z"/></svg>`,
+	plus: `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M6.35 2.15h3.3v4.05h4.05v3.3H9.65v4.05h-3.3V9.5H2.3V6.2h4.05V2.15z"/></svg>`,
+	diamond: `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.45 14.55 8 8 14.55 1.45 8 8 1.45z"/></svg>`,
+	clock: `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.35a6.65 6.65 0 1 0 0 13.3 6.65 6.65 0 0 0 0-13.3zm.75 3.35H7.1v4.2l3.35 2 .85-1.35-2.55-1.5V4.7z"/></svg>`,
+	wallet: `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M2.15 4.35h11.7v1.45H3.55v7.9H2.15V4.35zm1.85 2.25h9.9c.7 0 1.25.5 1.25 1.2v5.1c0 .7-.55 1.2-1.25 1.2H4c-.7 0-1.25-.5-1.25-1.2v-5.1c0-.7.55-1.2 1.25-1.2zm7.7 2.25a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 0 0 0-2.3z"/></svg>`,
+	gear: `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M6.55 1.55h2.9l.35 1.55 1.45.6 1.5-.9 2.05 2.05-.9 1.5.6 1.45 1.55.35v2.9l-1.55.35-.6 1.45.9 1.5-2.05 2.05-1.5-.9-1.45.6-.35 1.55h-2.9l-.35-1.55-1.45-.6-1.5.9-2.05-2.05.9-1.5-.6-1.45L1.55 9.45v-2.9l1.55-.35.6-1.45-.9-1.5 2.05-2.05 1.5.9 1.45-.6.35-1.55zM8 6.15A1.85 1.85 0 1 0 8 9.85 1.85 1.85 0 0 0 8 6.15z"/></svg>`,
+	grid: `<svg viewBox="0 0 16 16" aria-hidden="true"><rect fill="currentColor" x="1.9" y="1.9" width="5.3" height="5.3" rx="1.2"/><rect fill="currentColor" x="8.8" y="1.9" width="5.3" height="5.3" rx="1.2"/><rect fill="currentColor" x="1.9" y="8.8" width="5.3" height="5.3" rx="1.2"/><rect fill="currentColor" x="8.8" y="8.8" width="5.3" height="5.3" rx="1.2"/></svg>`,
+	plane: `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M14.7 8 2.15 2.7l.65 4.25 5.3 1.05-5.3 1.05-.65 4.25L14.7 8z"/></svg>`,
+	file: `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M3.9 1.7h5.3L13.1 5.6v8.7c0 .55-.45 1-1 1H3.9c-.55 0-1-.45-1-1V2.7c0-.55.45-1 1-1zm4.7.85v3.45h3.45L8.6 2.55z"/></svg>`,
+};
+
+const PARENT_STYLES = [
+	{ test: /^dashboard$/i, glyph: "home", hue: "#3DDCB0" },
+	{ test: /^employee$|^people$|^team$/i, glyph: "person", hue: "#4DB0F5" },
+	{ test: /organizational|org chart/i, glyph: "plus", hue: "#3DDCB0" },
+	{ test: /onboarding|recruit|talent|hiring|job opening|job applicant|interview|job offer|appointment/i, glyph: "person", hue: "#60A5FA" },
+	{ test: /separation|grievance/i, glyph: "person", hue: "#F070A8" },
+	{ test: /expense|bill|claim|advance/i, glyph: "chevron", hue: "#4BE06A" },
+	{ test: /travel/i, glyph: "plane", hue: "#4BE06A" },
+	{ test: /payroll|pay$|salary|wallet/i, glyph: "wallet", hue: "#3DDCB0" },
+	{ test: /tax|benefit|exemption/i, glyph: "leaf", hue: "#F07888" },
+	{ test: /leave|holiday/i, glyph: "leaf", hue: "#5CE1B0" },
+	{ test: /time|attendance|shift|roster|overtime|checkin/i, glyph: "clock", hue: "#3DD6E8" },
+	{ test: /performance|appraisal|goal|kra/i, glyph: "bars", hue: "#3DDCB0" },
+	{ test: /accounting|account|journal|finance|chart of accounts/i, glyph: "bowtie", hue: "#3DDCB0" },
+	{ test: /admin|role|permission|user$/i, glyph: "gear", hue: "#A78BFA" },
+	{ test: /report/i, glyph: "bars", hue: "#F5C43C" },
+	{ test: /setup|settings/i, glyph: "gear", hue: "#A78BFA" },
+	{ test: /planning|staffing/i, glyph: "diamond", hue: "#F5C43C" },
+	{ test: /marketing/i, glyph: "diamond", hue: "#F5C43C" },
+];
+
+const SUBMENU_ICONS = {
+	"chart of accounts": "book",
+	"journal entry": "book-open",
+	"payment entry": "credit-card",
+	"bank reconciliation tool": "landmark",
+	"general ledger": "book-open",
+	"profit and loss statement": "bar-chart-2",
+	"trial balance": "scale",
+	"accounts receivable": "arrow-down-left",
+	"accounts payable": "arrow-up-right",
+	user: "user",
+	role: "shield",
+	"role permission manager": "key",
+	"system settings": "settings",
+	"customize form": "sliders",
+	"print format": "printer",
+	"email account": "mail",
+	"website settings": "globe",
+	company: "building",
+	branch: "git-branch",
+	department: "network",
+	designation: "badge",
+	"employee group": "users",
+	"employee grade": "layers",
+	"employee skill map": "map",
+	"grievance type": "flag",
+	"training program": "graduation-cap",
+	"training event": "calendar",
+	"training feedback": "message-square",
+	"training result": "check-circle",
+	"employee exits": "log-out",
+	"employee birthday": "cake",
+	"employee information": "file-text",
+	"employee analytics": "bar-chart-2",
+	"purpose of travel": "map-pin",
+	"travel request": "plane",
+	"vehicle log": "truck",
+	"unpaid expense claim": "alert-circle",
+	"vehicle expenses": "car",
+	"expense claim type": "tag",
+	driver: "user",
+	vehicle: "car",
+	"leave balance": "calendar-check",
+	"leave balance summary": "calendar-range",
+	"employees working on a holiday": "sun",
+	"holiday list": "calendar",
+	"holiday list assignment": "calendar-plus",
+	"leave period": "clock",
+	"leave policy": "file-check",
+	"leave block list": "slash",
+	"leave type": "tag",
+	"leave control panel": "sliders",
+	"leave policy assignment": "user-check",
+	"leave allocation": "pie-chart",
+	"monthly attendance sheet": "calendar",
+	"shift attendance": "clock",
+	"employee hours utilization": "timer",
+	"project profitability": "trending-up",
+	"shift type": "layers",
+	"shift location": "map-pin",
+	"shift schedule": "calendar-range",
+	"activity type": "tag",
+	timesheet: "clock",
+	"overtime type": "timer",
+	"overtime slip": "file-text",
+	"income tax computation": "calculator",
+	"income tax deductions": "minus-circle",
+	"professional tax deductions": "minus-circle",
+	"accrued earnings report": "bar-chart-2",
+	"income tax slab": "layers",
+	"exemption category": "tag",
+	"exemption declaration": "file-text",
+	"exemption proof submission": "upload",
+	"exemption submission proof": "upload",
+	"benefit application": "heart",
+	"benefit claim": "heart",
+	"salary register": "book",
+	"employee ctc break-up": "pie-chart",
+	"salary component": "coins",
+	"salary structure": "layers",
+	"payroll settings": "settings",
+	"hr settings": "settings",
+	"job requisition": "file-plus",
+	"staffing plan": "users",
+	"employee referral": "user-plus",
+	"recruitment analytics": "bar-chart-2",
+	"interview type": "video",
+	"job opening template": "file-text",
+	"appointment letter template": "file-text",
+	"job offer term template": "file-text",
+	"job portal": "globe",
+	"appraisal template": "file-text",
+	kra: "target",
+	"employee feedback criteria": "list",
+	"appraisal overview": "bar-chart-2",
+	"job opening": "user-round-plus",
+	"job applicant": "circle-user-round",
+	interview: "videotape",
+	"job offer": "user-round-check",
+	goal: "goal",
+	"payroll entry": "banknote-arrow-up",
+	"salary structure assignment": "hand-coins",
+	"salary slip": "wallet",
+	"expense claim": "arrow-down-from-line",
+	"employee onboarding": "user-star",
+	"employee separation": "user-round-minus",
+	"employee grievance": "user-lock",
+	"organizational chart": "building-2",
+	"employee promotion": "graduation-cap",
+	"employee performance feedback": "trending-up",
+	"appraisal cycle": "orbit",
+	"appointment letter": "file-text",
+	"additional salary": "piggy-bank",
+	"salary withholding": "banknote-x",
+	"employee advance": "upload",
+	"employee checkin": "pointer",
+	"attendance request": "calendar-check",
+	"shift request": "bell-dot",
+	"employee attendance tool": "wrench",
+	"leave application": "clipboard-pen",
+	"leave encashment": "coins",
+	roster: "calendar-range",
+	dashboard: "home",
+	settings: "settings",
+	agents: "square-user-round",
+	"team structure": "building-2",
+	"new hire onboarding": "user-star",
+	offboarding: "user-round-minus",
+	"concerns & escalations": "user-lock",
+	"clock in/out": "pointer",
+	"schedule correction": "calendar-check",
+	"shift swap": "bell-dot",
+	"bulk attendance": "wrench",
+	"time off request": "clipboard-pen",
+	"pto cash-out": "coins",
+	"time off admin": "sliders-horizontal",
+	"extra hours": "calendar-clock",
+	"open positions": "user-round-plus",
+	candidates: "circle-user-round",
+	interviews: "videotape",
+	"offer letters": "user-round-check",
+	"qa feedback": "trending-up",
+	"run payroll": "banknote-arrow-up",
+	"pay stubs": "wallet",
+	reimbursements: "arrow-down-from-line",
+	"cash advances": "upload",
+};
+
+const SECTION_ICONS = {
+	accounting: "coins",
+	admin: "settings",
+	"leave admin": "sliders-horizontal",
+	overtime: "calendar-clock",
+	planning: "align-start-horizontal",
+	reports: "notepad-text",
+	setup: "database",
+	"tax & benefits": "badge-alert",
+	travel: "plane",
+	"time off admin": "sliders-horizontal",
+	"extra hours": "calendar-clock",
+	"workforce planning": "align-start-horizontal",
+};
+
+const SUBMENU_KEYWORD_ICONS = [
+	{ test: /account|ledger|journal/i, icon: "book-open" },
+	{ test: /payment|bank|wallet|salary|pay/i, icon: "credit-card" },
+	{ test: /report|analytic|overview/i, icon: "bar-chart-2" },
+	{ test: /user|employee|driver/i, icon: "user" },
+	{ test: /setting|setup/i, icon: "settings" },
+	{ test: /template|letter|policy/i, icon: "file-text" },
+	{ test: /calendar|holiday|leave|shift|roster/i, icon: "calendar" },
+	{ test: /travel|plane/i, icon: "plane" },
+	{ test: /vehicle|car/i, icon: "car" },
+	{ test: /tax|benefit/i, icon: "tag" },
+	{ test: /goal|appraisal|kra/i, icon: "target" },
+	{ test: /job|interview|recruit/i, icon: "briefcase" },
+	{ test: /department|branch|company/i, icon: "building" },
+	{ test: /type|category|component/i, icon: "tag" },
+];
+
+function sidebar_item_label($item) {
+	return ($item.find(".sidebar-item-label").first().text() || "").trim();
+}
+
+function sidebar_href_to_link(href) {
+	if (!href) return "";
+	try {
+		const path = String(href).split("?")[0].replace(/\/$/, "");
+		const parts = path.split("/").filter(Boolean);
+		let last = parts[parts.length - 1] || "";
+		if (!last || ["List", "view", "app", "desk"].includes(last)) {
+			last = parts[parts.length - 2] || "";
+		}
+		if (!last) return "";
+		if (last === "organizational-chart") return "organizational-chart";
+		return last
+			.split("-")
+			.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+			.join(" ");
+	} catch (e) {
+		return "";
+	}
+}
+
+function bpo_sidebar_maps() {
+	return frappe.boot?.staff_pro_bpo_sidebar_labels || { by_link: {}, by_label: {} };
+}
+
+function bpo_sidebar_label(currentLabel, href) {
+	const maps = bpo_sidebar_maps();
+	const linkKey = sidebar_href_to_link(href);
+	if (linkKey && maps.by_link?.[linkKey]) {
+		return maps.by_link[linkKey];
+	}
+	if (currentLabel && maps.by_label?.[currentLabel]) {
+		return maps.by_label[currentLabel];
+	}
+	return currentLabel;
+}
+
+function apply_bpo_sidebar_label($item) {
+	const $label = $item.find(".sidebar-item-label").first();
+	if (!$label.length) return;
+
+	const current = ($label.text() || "").trim();
+	if (!current) return;
+
+	const href = ($item.find(".item-anchor").attr("href") || "").trim();
+	const next = bpo_sidebar_label(current, href);
+	if (!next || next === current) return;
+
+	$label.text(__(next));
+	$item.attr("data-sp-bpo-label", next);
+}
+
+function parent_look(label) {
+	for (const rule of PARENT_STYLES) {
+		if (rule.test.test(label)) return rule;
+	}
+	return { glyph: "plus", hue: "#3DDCB0" };
+}
+
+function section_icon_name(label) {
+	const key = label.toLowerCase();
+	if (SECTION_ICONS[key]) return SECTION_ICONS[key];
+	return submenu_icon_name(label);
+}
+
+function submenu_icon_name(label) {
+	const key = label.toLowerCase();
+	if (SUBMENU_ICONS[key]) return SUBMENU_ICONS[key];
+	for (const rule of SUBMENU_KEYWORD_ICONS) {
+		if (rule.test.test(label)) return rule.icon;
+	}
+	return "file-text";
+}
+
+function lucide_icon_html(name) {
+	try {
+		const html = frappe.utils.icon(name, "sm");
+		if (html && String(html).includes("svg")) return html;
+	} catch (e) {
+		/* use fallback */
+	}
+	return `<svg class="icon icon-sm" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>`;
+}
+
+function apply_top_level_icon($item, $icon, label) {
+	const look = parent_look(label);
+	$item[0]?.style?.setProperty("--sp-icon-accent", look.hue);
+
+	let iconName = "file-text";
+	if (/^dashboard$/i.test(label)) {
+		iconName = "home";
+	} else {
+		iconName = submenu_icon_name(label);
+	}
+
+	if ($icon.attr("data-sp-icon") === iconName && $icon.find("svg").length) {
+		return;
+	}
+
+	$icon.removeClass("staff-pro-glyph staff-pro-sub-icon staff-pro-icon-fallback");
+	$icon.addClass("staff-pro-section-icon");
+	$icon.attr("data-sp-icon", iconName);
+	$icon.html(lucide_icon_html(iconName));
+}
+
+function apply_section_icon($item, $icon, label) {
+	const look = parent_look(label);
+	$item[0].style.setProperty("--sp-icon-accent", look.hue);
+	$icon.removeClass("staff-pro-glyph staff-pro-sub-icon staff-pro-icon-fallback");
+	$icon.addClass("staff-pro-section-icon");
+	const iconName = section_icon_name(label);
+	$icon.attr("data-sp-icon", iconName);
+	$icon.html(lucide_icon_html(iconName));
+}
+
+function apply_submenu_icon($icon, label) {
+	const iconName = submenu_icon_name(label);
+	if ($icon.attr("data-sp-icon") === iconName && $icon.find("svg").length) {
+		return;
+	}
+	$icon.removeClass("staff-pro-glyph staff-pro-section-icon staff-pro-icon-fallback");
+	$icon.addClass("staff-pro-sub-icon");
+	$icon.attr("data-sp-icon", iconName);
+	$icon.html(lucide_icon_html(iconName));
+}
+
+function is_section_header($item) {
+	if ($item.hasClass("section-break") || $item.find(".section-break").length) {
+		return true;
+	}
+	return Boolean($item.find(".sidebar-item-control .drop-icon").length && !$item.find(".item-anchor[href]").length);
+}
+
+function enhance_sidebar_menus() {
+	$(".body-sidebar .standard-sidebar-item").each(function () {
+		const $item = $(this);
+		apply_bpo_sidebar_label($item);
+		const nested = $item.closest(".nested-container").length > 0;
+		const $anchor = $item.find(".item-anchor").first();
+		const $target = $anchor.length ? $anchor : $item;
+
+		const label = sidebar_item_label($item);
+		if (!label) return;
+
+		let $icon = $target.children(".sidebar-item-icon");
+		if (!$icon.length) {
+			$icon = $('<span class="sidebar-item-icon staff-pro-icon-fallback" aria-hidden="true"></span>');
+			$target.prepend($icon);
+		}
+
+		if (nested) {
+			apply_submenu_icon($icon, label);
+		} else if (is_section_header($item)) {
+			if ($item.attr("data-sp-section") !== label) {
+				apply_section_icon($item, $icon, label);
+				$item.attr("data-sp-section", label);
+			}
+		} else {
+			apply_top_level_icon($item, $icon, label);
+		}
+
+		const $wrapper = $item.parent();
+		const $nested = $wrapper.children(".nested-container");
+		const $drop = $item.find(".sidebar-item-control .drop-icon").first();
+		if ($drop.length && $nested.length) {
+			const closed = $nested.hasClass("hidden");
+			const next = closed ? "closed" : "opened";
+			if ($drop.attr("data-state") !== next) {
+				$drop.attr("data-state", next);
+			}
+		}
+	});
+}
 
 function inject_sidebar_css() {
 	let style = document.getElementById("staff-pro-sidebar-css");
@@ -274,7 +827,55 @@ function inject_sidebar_css() {
 	style.textContent = SIDEBAR_CSS;
 }
 
+function staff_pro_brand() {
+	return (
+		frappe.boot?.staff_pro_brand || {
+			title: "Staff Pro BPO",
+			logo_url: "/assets/hrms/images/staff-pro-bpo-logo.png",
+		}
+	);
+}
+
+function staff_pro_current_portal() {
+	if (!should_use_staff_pro_desk_home()) return null;
+
+	const path = (window.location.pathname || "").replace(/\/$/, "");
+	if (path.startsWith("/app/")) {
+		return "admin";
+	}
+
+	const app = frappe.app?.sidebar?.get_sidebar_app?.();
+	if (app?.app_name === "erpnext") {
+		return "accounting";
+	}
+
+	const routes = frappe.boot?.staff_pro_portal_routes || {};
+	const accountingRoute = (routes.accounting || "/desk/home").replace(/\/$/, "");
+	if (path === accountingRoute || path.startsWith(`${accountingRoute}/`)) {
+		return "accounting";
+	}
+
+	if (app?.app_name === "frappe") {
+		return "admin";
+	}
+
+	return "hr";
+}
+
+function staff_pro_can_access_hr() {
+	return should_use_staff_pro_desk_home();
+}
+
 function shortcut_label($item) {
+	if ($item.hasClass("staff-pro-dock-hr")) {
+		return __("HR");
+	}
+	if ($item.hasClass("staff-pro-dock-accounting")) {
+		return __("Accounting");
+	}
+	if ($item.hasClass("staff-pro-dock-admin")) {
+		return __("Admin");
+	}
 	if ($item.hasClass("navbar-modal-search-mobile") || $item.find("#icon-search, .icon-search").length) {
 		return __("Search");
 	}
@@ -282,6 +883,223 @@ function shortcut_label($item) {
 		return __("Alerts");
 	}
 	return "";
+}
+
+function staff_pro_portal_route(key) {
+	const routes = frappe.boot?.staff_pro_portal_routes || {};
+	return routes[key] || (key === "accounting" ? "/desk/home" : "/app/build");
+}
+
+function staff_pro_can_access_accounting() {
+	if (frappe.session.user === "Administrator") return true;
+	return frappe.user.has_role(["Accounts User", "Accounts Manager"]);
+}
+
+function staff_pro_can_access_admin() {
+	if (frappe.session.user === "Administrator") return true;
+	return frappe.user.has_role(["System Manager", "Workspace Manager"]);
+}
+
+function staff_pro_open_portal(route) {
+	if (!route) return;
+	if (route.startsWith("/app/")) {
+		window.location.href = route;
+		return;
+	}
+	frappe.set_route(route);
+}
+
+function staff_pro_dock_shortcuts() {
+	const portal = staff_pro_current_portal();
+	const shortcuts = [];
+
+	if (portal !== "hr") {
+		shortcuts.push({
+			name: "hr",
+			icon: "briefcase",
+			label: __("HR"),
+			css_class: "staff-pro-dock-hr",
+			condition: () => staff_pro_can_access_hr(),
+			on_click: () => staff_pro_open_portal(staff_pro_portal_route("hr")),
+		});
+	}
+
+	if (portal !== "accounting") {
+		shortcuts.push({
+			name: "accounting",
+			icon: "book-open",
+			label: __("Accounting"),
+			css_class: "staff-pro-dock-accounting",
+			condition: () => staff_pro_can_access_accounting(),
+			on_click: () => staff_pro_open_portal(staff_pro_portal_route("accounting")),
+		});
+	}
+
+	if (portal !== "admin") {
+		shortcuts.push({
+			name: "admin",
+			icon: "settings",
+			label: __("Admin"),
+			css_class: "staff-pro-dock-admin",
+			condition: () => staff_pro_can_access_admin(),
+			on_click: () => staff_pro_open_portal(staff_pro_portal_route("admin")),
+		});
+	}
+
+	return shortcuts;
+}
+
+function patch_workspace_dock_shortcuts() {
+	const Dock = frappe.ui && frappe.ui.WorkspaceDock;
+	if (!Dock || Dock.prototype._staff_pro_shortcuts) return;
+	Dock.prototype._staff_pro_shortcuts = true;
+
+	Dock.prototype.get_shortcuts = function () {
+		if (!should_use_staff_pro_desk_home()) {
+			return [
+				{
+					name: "search",
+					icon: "search",
+					label: __("Search"),
+					css_class: "navbar-modal-search-mobile",
+					condition: () => frappe.boot.desk_settings.search_bar,
+				},
+				{
+					name: "notifications",
+					icon: "bell",
+					label: __("Notifications"),
+					css_class: "sidebar-notification",
+					condition: () => frappe.boot.desk_settings.notifications,
+					badge: `<span class="notification-count hidden" aria-live="polite"></span>`,
+					on_click: () => this.toggle_notifications(),
+					setup: ($item) => {
+						this.sync_notification_count(
+							$item,
+							frappe.boot.notification_unread_count || 0
+						);
+					},
+				},
+			];
+		}
+		return staff_pro_dock_shortcuts();
+	};
+}
+
+function patch_workspace_dock_logo() {
+	const Dock = frappe.ui && frappe.ui.WorkspaceDock;
+	if (!Dock || Dock.prototype._staff_pro_logo) return;
+	Dock.prototype._staff_pro_logo = true;
+
+	const original = Dock.prototype.render_logo;
+	Dock.prototype.render_logo = function () {
+		if (!should_use_staff_pro_desk_home()) {
+			return original.call(this);
+		}
+
+		const brand = staff_pro_brand();
+		const homeRoute = staff_pro_desk_home_route();
+
+		this.$logo.empty();
+		const $link = $(
+			`<a href="/desk/${homeRoute}" title="${frappe.utils.escape_html(brand.title)}" aria-label="${frappe.utils.escape_html(brand.title)}">
+				<img src="${frappe.utils.escape_html(brand.logo_url)}" alt="${frappe.utils.escape_html(brand.title)}" />
+			</a>`
+		);
+		$link.on("click", (e) => {
+			e.preventDefault();
+			frappe.set_route(homeRoute);
+		});
+		this.$logo.append($link);
+	};
+}
+
+function patch_sidebar_header_branding() {
+	const Header = frappe.ui && frappe.ui.SidebarHeader;
+	if (!Header || Header.prototype._staff_pro_brand) return;
+	Header.prototype._staff_pro_brand = true;
+
+	const originalTitle = Header.prototype.get_display_title;
+	Header.prototype.get_display_title = function () {
+		if (should_use_staff_pro_desk_home()) {
+			return staff_pro_brand().title;
+		}
+		return originalTitle.call(this);
+	};
+
+	const originalIcon = Header.prototype.get_default_icon;
+	Header.prototype.get_default_icon = function () {
+		if (should_use_staff_pro_desk_home()) {
+			return staff_pro_brand().logo_url;
+		}
+		return originalIcon.call(this);
+	};
+}
+
+function refresh_staff_pro_dock_shortcuts() {
+	if (!should_use_staff_pro_desk_home()) return;
+
+	patch_workspace_dock_shortcuts();
+	patch_workspace_dock_logo();
+
+	const dock = frappe.app?.sidebar?.workspace_dock;
+	if (!dock?.$shortcuts) return;
+
+	const portal = staff_pro_current_portal();
+	if (
+		dock._staff_pro_portal === portal &&
+		dock.$shortcuts.children(".staff-pro-dock-hr, .staff-pro-dock-accounting, .staff-pro-dock-admin").length
+	) {
+		label_workspace_dock();
+		return;
+	}
+
+	dock._staff_pro_portal = portal;
+	dock.$shortcuts.find('[data-toggle="tooltip"]').tooltip("dispose");
+	dock.$shortcuts.empty();
+	dock.render_shortcuts();
+	label_workspace_dock();
+	dock.render_logo();
+}
+
+const DOCK_ICONS = {
+	people: "users",
+	pay: "coins",
+	"ss and taxes": "shield-check",
+	time: "clock",
+	talent: "user-plus",
+	"finance & admin": "landmark",
+	"finance and admin": "landmark",
+	hr: "briefcase",
+	accounting: "book-open",
+	admin: "settings",
+};
+
+function dock_icon_html(name) {
+	try {
+		const html = frappe.utils.icon(name, "sm");
+		if (html && String(html).includes("svg")) return html;
+	} catch (e) {
+		/* use fallback */
+	}
+	return lucide_icon_html(name);
+}
+
+function apply_dock_icon($item, label) {
+	const iconName = DOCK_ICONS[(label || "").toLowerCase()];
+	if (!iconName) return;
+	if ($item.attr("data-sp-dock-icon") === iconName) return;
+
+	const html = dock_icon_html(iconName);
+	if (!html || !String(html).includes("svg")) return;
+
+	let $wrap = $item.children(".workspace-dock-icon, .sidebar-item-icon").first();
+	if (!$wrap.length) {
+		$wrap = $('<span class="workspace-dock-icon" aria-hidden="true"></span>');
+		$item.prepend($wrap);
+	}
+	$wrap.html(html);
+	$item.children("svg, .icon, img").not($wrap.find("svg, .icon, img")).remove();
+	$item.attr("data-sp-dock-icon", iconName);
 }
 
 function dock_item_label($item) {
@@ -299,6 +1117,8 @@ function label_workspace_dock() {
 		const $item = $(this);
 		const label = dock_item_label($item);
 		if (!label) return;
+
+		apply_dock_icon($item, label);
 
 		let $label = $item.children(".workspace-dock-label");
 		if ($label.length) {
@@ -332,30 +1152,54 @@ function add_sidebar_search() {
 }
 
 function patch_workspace_dock() {
+	patch_workspace_dock_shortcuts();
+	patch_workspace_dock_logo();
+	patch_sidebar_header_branding();
+
 	const Dock = frappe.ui && frappe.ui.WorkspaceDock;
 	if (!Dock || Dock.prototype._staff_pro_labeled) return;
 	Dock.prototype._staff_pro_labeled = true;
 
 	const orig = Dock.prototype.make_workspace_item;
 	Dock.prototype.make_workspace_item = function (workspace) {
+		const label = workspace.title || workspace.label || workspace.name || "";
+		const mappedIcon = DOCK_ICONS[String(label).toLowerCase()];
+		if (mappedIcon) {
+			workspace = Object.assign({}, workspace, { icon: mappedIcon });
+		}
 		const $item = orig.call(this, workspace);
 		if ($item && $item.length) {
-			const label = workspace.title || workspace.label || workspace.name || "";
 			if (label && !$item.children(".workspace-dock-label").length) {
 				$item.append(
 					`<span class="workspace-dock-label">${frappe.utils.escape_html(String(label))}</span>`
 				);
 			}
+			apply_dock_icon($item, label);
 		}
 		return $item;
 	};
 }
 
+function update_staff_pro_sidebar_title() {
+	if (!should_use_staff_pro_desk_home()) return;
+
+	const brand = staff_pro_brand();
+	const $title = $(
+		".body-sidebar .sidebar-header .header-title, .body-sidebar .sidebar-header .workspace-title"
+	).first();
+	if ($title.length && $title.text() !== brand.title) {
+		$title.text(brand.title);
+	}
+}
+
 function watch_workspace_dock() {
 	inject_sidebar_css();
 	patch_workspace_dock();
+	refresh_staff_pro_dock_shortcuts();
+	update_staff_pro_sidebar_title();
 	label_workspace_dock();
 	add_sidebar_search();
+	enhance_sidebar_menus();
 
 	const dock = document.querySelector(".workspace-dock");
 	const sidebar = document.querySelector(".body-sidebar");
@@ -365,8 +1209,11 @@ function watch_workspace_dock() {
 	}
 
 	const observer = new MutationObserver(() => {
+		refresh_staff_pro_dock_shortcuts();
+		update_staff_pro_sidebar_title();
 		label_workspace_dock();
 		add_sidebar_search();
+		enhance_sidebar_menus();
 	});
 	if (dock) observer.observe(dock, { childList: true, subtree: true });
 	if (sidebar) observer.observe(sidebar, { childList: true, subtree: true });
@@ -378,19 +1225,75 @@ if (typeof frappe !== "undefined" && $(".workspace-dock, .body-sidebar").length)
 	watch_workspace_dock();
 }
 
-function redirect_single_app_screen() {
-	// Skip the multi-app picker when Staff Pro BPO is the only visible app.
-	const route = frappe.get_route?.() || [];
-	const path = window.location.pathname || "";
-	const on_apps = route[0] === "apps" || path === "/apps" || path.endsWith("/apps");
-	if (!on_apps) return;
-
-	const apps = frappe.boot?.apps || [];
-	if (apps.length === 1 && apps[0]?.name === "hrms") {
-		const home = apps[0].route || "/desk/workforce";
-		window.location.href = home;
-	}
+function should_use_staff_pro_desk_home() {
+	return Boolean(frappe.boot?.staff_pro_skip_desktop);
 }
 
-$(document).on("app_ready", redirect_single_app_screen);
-$(document).on("page-change", redirect_single_app_screen);
+function staff_pro_desk_home_route() {
+	return frappe.boot?.staff_pro_desk_home || "workforce";
+}
+
+function staff_pro_desk_home_slug() {
+	const home = staff_pro_desk_home_route();
+	return frappe.router?.slug?.(home) || home;
+}
+
+function is_already_on_staff_pro_desk_home(route = frappe.get_route?.() || []) {
+	const slug = staff_pro_desk_home_slug();
+	const path = (window.location.pathname || "").replace(/\/$/, "");
+
+	if (path.endsWith(`/desk/${slug}`) || path.endsWith(`/desk/private/${slug}`)) {
+		return true;
+	}
+
+	if (route[0] === "Workspaces") {
+		const workspace = route[route.length - 1];
+		return frappe.router.slug(workspace) === slug;
+	}
+
+	return Boolean(frappe.workspaces?.[route[0]] && route[0] === slug);
+}
+
+function is_staff_pro_desktop_route(route = frappe.get_route?.() || []) {
+	if (is_already_on_staff_pro_desk_home(route)) return false;
+
+	const path = window.location.pathname || "";
+	const on_apps = route[0] === "apps" || path === "/apps" || path.endsWith("/apps");
+	const on_desktop_page = route[0] === "desktop";
+	const on_empty_desk_route = !route[0] && path === "/desk";
+	return on_apps || on_desktop_page || on_empty_desk_route;
+}
+
+function redirect_staff_pro_desk_home() {
+	if (!should_use_staff_pro_desk_home() || window._staff_pro_desk_redirecting) return;
+
+	const route = frappe.get_route?.() || [];
+	if (!is_staff_pro_desktop_route(route)) return;
+
+	window._staff_pro_desk_redirecting = true;
+	Promise.resolve(frappe.set_route(staff_pro_desk_home_route())).finally(() => {
+		window._staff_pro_desk_redirecting = false;
+	});
+}
+
+function patch_staff_pro_desktop_redirect() {
+	const pageview = frappe.views?.pageview;
+	if (!pageview || pageview._staff_pro_desktop_redirect) return;
+	pageview._staff_pro_desktop_redirect = true;
+
+	const original_show = pageview.show.bind(pageview);
+	pageview.show = function (name) {
+		if (should_use_staff_pro_desk_home() && (!name || name === "desktop")) {
+			redirect_staff_pro_desk_home();
+			return;
+		}
+		return original_show(name);
+	};
+}
+
+$(document).on("app_ready", patch_staff_pro_desktop_redirect);
+$(document).on("app_ready", redirect_staff_pro_desk_home);
+$(document).on("page-change", redirect_staff_pro_desk_home);
+$(document).on("page-change", refresh_staff_pro_dock_shortcuts);
+$(document).on("page-change", update_staff_pro_sidebar_title);
+$(document).on("page-change", enhance_sidebar_menus);

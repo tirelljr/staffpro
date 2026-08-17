@@ -139,7 +139,8 @@
    "link_type": "Report",
    "open_in_new_tab": 1,
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "bar-chart-2"
   },
   {
    "child": 0,
@@ -158,7 +159,7 @@
    "child": 1,
    "collapsible": 1,
    "default_workspace": 0,
-   "icon": "",
+   "icon": "file-text",
    "indent": 0,
    "keep_closed": 0,
    "label": "Appraisal Template",
@@ -172,7 +173,7 @@
    "child": 1,
    "collapsible": 1,
    "default_workspace": 0,
-   "icon": "",
+   "icon": "target",
    "indent": 0,
    "keep_closed": 0,
    "label": "KRA",
@@ -186,7 +187,7 @@
    "child": 1,
    "collapsible": 1,
    "default_workspace": 0,
-   "icon": "",
+   "icon": "list",
    "indent": 0,
    "keep_closed": 0,
    "label": "Employee Feedback Criteria",

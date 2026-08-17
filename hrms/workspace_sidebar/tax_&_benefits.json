@@ -68,7 +68,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "calculator",
    "indent": 0,
    "keep_closed": 0,
    "label": "Income Tax Computation",
@@ -80,7 +80,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "minus-circle",
    "indent": 0,
    "keep_closed": 0,
    "label": "Income Tax Deductions",
@@ -98,7 +98,8 @@
    "link_to": "Accrued Earnings Report",
    "link_type": "Report",
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "bar-chart-2"
   },
   {
    "child": 0,
@@ -114,7 +115,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "layers",
    "indent": 0,
    "keep_closed": 0,
    "label": "Income Tax Slab",
@@ -126,7 +127,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "tag",
    "indent": 0,
    "keep_closed": 0,
    "label": "Exemption Category",

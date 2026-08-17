@@ -466,7 +466,8 @@
    "link_type": "DocType",
    "open_in_new_tab": 0,
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "building"
   },
   {
    "child": 1,
@@ -479,7 +480,8 @@
    "link_type": "DocType",
    "open_in_new_tab": 0,
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "git-branch"
   },
   {
    "child": 1,
@@ -492,7 +494,8 @@
    "link_type": "DocType",
    "open_in_new_tab": 0,
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "network"
   },
   {
    "child": 1,
@@ -505,7 +508,8 @@
    "link_type": "DocType",
    "open_in_new_tab": 0,
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "badge"
   },
   {
    "child": 1,
@@ -518,7 +522,8 @@
    "link_type": "DocType",
    "open_in_new_tab": 0,
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "users"
   },
   {
    "child": 1,
@@ -531,7 +536,8 @@
    "link_type": "DocType",
    "open_in_new_tab": 0,
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "layers"
   },
   {
    "child": 0,

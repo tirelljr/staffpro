@@ -363,10 +363,13 @@ hrms.ui.TopBar = class {
 		const { id, status } = this.get_context();
 		this.$wrapper.find(".staff-pro-topbar__id").text(id);
 		this.$wrapper.find(".staff-pro-topbar__status-label").text(status);
+		this.$wrapper
+			.find(".staff-pro-topbar__avatar")
+			.attr("title", this.is_intake_flow() ? __("Logout") : __("Profile"));
 	}
 
 	get_context() {
-		const route = frappe.get_route ? frappe.get_route() : [];
+		const route = frappe.get_route?.() || [];
 		const frm = window.cur_frm;
 
 		if (frm?.docname && !frm.is_new?.()) {
@@ -456,7 +459,24 @@ hrms.ui.TopBar = class {
 	}
 
 	open_profile() {
+		if (this.is_intake_flow()) {
+			this.logout();
+			return;
+		}
 		frappe.set_route("Form", "User", frappe.session.user);
+	}
+
+	is_intake_flow() {
+		const route = frappe.get_route?.() || [];
+		return route[0] === "setup-wizard";
+	}
+
+	logout() {
+		if (frappe.app?.logout) {
+			frappe.app.logout();
+			return;
+		}
+		window.location.href = "/api/method/logout";
 	}
 
 	language_label() {

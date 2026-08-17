@@ -295,7 +295,7 @@
    "child": 1,
    "collapsible": 1,
    "default_workspace": 0,
-   "icon": "",
+   "icon": "file-plus",
    "indent": 0,
    "keep_closed": 0,
    "label": "Job Requisition",
@@ -309,7 +309,7 @@
    "child": 1,
    "collapsible": 1,
    "default_workspace": 0,
-   "icon": "",
+   "icon": "users",
    "indent": 0,
    "keep_closed": 0,
    "label": "Staffing Plan",
@@ -330,7 +330,8 @@
    "link_type": "DocType",
    "open_in_new_tab": 0,
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "user-plus"
   },
   {
    "child": 0,
@@ -349,7 +350,7 @@
    "child": 1,
    "collapsible": 1,
    "default_workspace": 0,
-   "icon": "",
+   "icon": "bar-chart-2",
    "indent": 0,
    "keep_closed": 0,
    "label": "Recruitment Analytics",
@@ -376,7 +377,7 @@
    "child": 1,
    "collapsible": 1,
    "default_workspace": 0,
-   "icon": "",
+   "icon": "video",
    "indent": 0,
    "keep_closed": 0,
    "label": "Interview Type",
@@ -397,13 +398,14 @@
    "link_type": "DocType",
    "open_in_new_tab": 0,
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "file-text"
   },
   {
    "child": 1,
    "collapsible": 1,
    "default_workspace": 0,
-   "icon": "",
+   "icon": "file-text",
    "indent": 0,
    "keep_closed": 0,
    "label": "Appointment Letter Template",
@@ -424,7 +426,8 @@
    "link_type": "DocType",
    "open_in_new_tab": 0,
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "file-text"
   },
   {
    "child": 0,

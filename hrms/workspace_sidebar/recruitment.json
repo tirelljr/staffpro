@@ -105,7 +105,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "file-plus",
    "indent": 0,
    "keep_closed": 0,
    "label": "Job Requisition",
@@ -117,7 +117,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "users",
    "indent": 0,
    "keep_closed": 0,
    "label": "Staffing Plan",
@@ -135,7 +135,8 @@
    "link_to": "Employee Referral",
    "link_type": "DocType",
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "user-plus"
   },
   {
    "child": 0,
@@ -151,7 +152,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "bar-chart-2",
    "indent": 0,
    "keep_closed": 0,
    "label": "Recruitment Analytics",
@@ -174,7 +175,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "video",
    "indent": 0,
    "keep_closed": 0,
    "label": "Interview Type",
@@ -192,12 +193,13 @@
    "link_to": "Job Opening Template",
    "link_type": "DocType",
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "file-text"
   },
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "file-text",
    "indent": 0,
    "keep_closed": 0,
    "label": "Appointment Letter Template",
@@ -215,7 +217,8 @@
    "link_to": "Job Offer Term Template",
    "link_type": "DocType",
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "file-text"
   },
   {
    "child": 0,

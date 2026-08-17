@@ -2,6 +2,11 @@
 
 cd /home/frappe
 
+# Windows bind mounts can trigger Git's dubious ownership check
+git config --global --add safe.directory /workspace/hrms
+
+APP_PATH="/workspace/hrms"
+
 finish_site_setup() {
     cd /home/frappe/frappe-bench
 
@@ -57,16 +62,16 @@ bench set-redis-socketio-host redis://redis:6379
 
 # Redis runs in a separate container; keep `watch` so frontend edits reload
 sed -i '/redis/d' ./Procfile
-sed -i 's/bench serve  --port 8000/bench serve --host 0.0.0.0 --port 8000/' ./Procfile
+sed -i 's/bench serve --port 8000/bench serve --host 0.0.0.0 --port 8000/' ./Procfile
 
 bench get-app erpnext
 
 # Use the repo mounted from the host so Cursor edits apply live
 if bench get-app --help 2>/dev/null | grep -q -- "--soft-link"; then
-    bench get-app --soft-link /workspace/hrms
+    bench get-app --soft-link "$APP_PATH"
 else
-    ln -sfn /workspace/hrms /home/frappe/frappe-bench/apps/hrms
-    bench setup requirements --app hrms
+    ln -sfn "$APP_PATH" /home/frappe/frappe-bench/apps/hrms
+    bench setup requirements hrms
 fi
 
 finish_site_setup

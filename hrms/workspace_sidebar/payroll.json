@@ -106,12 +106,13 @@
    "link_type": "Report",
    "open_in_new_tab": 1,
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "user"
   },
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "book",
    "indent": 0,
    "keep_closed": 0,
    "label": "Salary Register",
@@ -124,7 +125,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "minus-circle",
    "indent": 0,
    "keep_closed": 0,
    "label": "Income Tax Deductions",
@@ -137,7 +138,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "minus-circle",
    "indent": 0,
    "keep_closed": 0,
    "label": "Professional Tax Deductions",
@@ -150,7 +151,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "book-open",
    "indent": 0,
    "keep_closed": 0,
    "label": "General Ledger",
@@ -163,7 +164,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "arrow-up-right",
    "indent": 0,
    "keep_closed": 0,
    "label": "Accounts Payable",
@@ -188,7 +189,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "coins",
    "indent": 0,
    "keep_closed": 0,
    "label": "Salary Component",
@@ -201,7 +202,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "layers",
    "indent": 0,
    "keep_closed": 0,
    "label": "Salary Structure",

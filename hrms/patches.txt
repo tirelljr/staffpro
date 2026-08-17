@@ -53,3 +53,7 @@ hrms.patches.v16_0.set_leave_approver_name_in_leave_application #2026-08-05
 hrms.patches.v16_0.apply_staff_pro_branding
 hrms.patches.v16_0.remove_workspace_sidebar_home_links #2026-08-14
 hrms.patches.v16_0.unify_staff_pro_workspaces #2026-08-14
+hrms.patches.v16_0.add_workspace_sidebar_icons #2026-08-16
+hrms.patches.v16_0.add_ss_and_taxes_workspace #2026-08-16
+hrms.patches.v16_0.apply_bpo_sidebar_labels #2026-08-16
+hrms.patches.v16_0.sync_bpo_sidebar_labels_from_fixtures #2026-08-16

@@ -1,0 +1,867 @@
+:root {
+	--sp-canvas: #ffffff;
+	--sp-card: #ffffff;
+	--sp-card-border: #e3e6ea;
+	--sp-card-radius: 12px;
+	--sp-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+	--sp-ink: #152433;
+	--sp-muted: #6b7280;
+	--sp-soft: #9aa3af;
+	--sp-icon-navy: #0f1b2d;
+}
+
+body.staff-pro-alive {
+	--bg-color: var(--sp-canvas);
+}
+
+/* —— Page canvas —— */
+body.staff-pro-alive #page-dashboard-view .layout-main-section-wrapper,
+body.staff-pro-alive #page-dashboard-view .page-body,
+body.staff-pro-alive .page-container[data-page-route="dashboard-view"] .layout-main-section-wrapper,
+body.staff-pro-alive .page-container[data-page-route="dashboard-view"] .page-body,
+body.staff-pro-alive #page-Workspaces .layout-main-section-wrapper,
+body.staff-pro-alive .page-container[id^="page-List/"] .layout-main-section-wrapper,
+body.staff-pro-alive .page-container[id^="page-List/"] .page-body {
+	background: var(--sp-canvas) !important;
+}
+
+body.staff-pro-alive #page-dashboard-view .layout-main-section,
+body.staff-pro-alive #page-dashboard-view .dashboard,
+body.staff-pro-alive .page-container[data-page-route="dashboard-view"] .layout-main-section,
+body.staff-pro-alive #page-Workspaces .layout-main-section {
+	background: transparent !important;
+	border: 0 !important;
+	box-shadow: none !important;
+	padding: 8px 20px 32px !important;
+}
+
+body.staff-pro-alive #page-dashboard-view .page-head,
+body.staff-pro-alive #page-Workspaces .page-head {
+	background: transparent !important;
+	border-bottom: 0 !important;
+	box-shadow: none !important;
+}
+
+/* —— Quick actions —— */
+.sp-dash-pills {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: center;
+	gap: 16px 32px;
+	margin: 8px 0 40px;
+	padding: 0;
+	width: 100%;
+}
+
+.sp-dash-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--sp-ink);
+	font-family: inherit;
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 1;
+	cursor: pointer;
+	transition: opacity 0.15s ease;
+}
+
+.sp-dash-pill:hover {
+	opacity: 0.72;
+	background: transparent;
+	border-color: transparent;
+	color: var(--sp-ink);
+	text-decoration: none;
+	transform: none;
+	box-shadow: none;
+}
+
+.sp-dash-pill__icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 24px;
+	height: 24px;
+	border-radius: 50%;
+	background: var(--sp-icon-navy);
+	color: var(--sp-icon-accent, #3ddcb0);
+}
+
+.sp-dash-pill__icon svg {
+	width: 12px;
+	height: 12px;
+	stroke: currentColor;
+	stroke-width: 2;
+	fill: none;
+}
+
+.sp-dash-pill__label {
+	white-space: nowrap;
+}
+
+/* —— Dashboard split panels —— */
+.sp-dash-split {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 16px;
+	margin: 0 0 18px;
+}
+
+.sp-dash-panel {
+	min-width: 0;
+	padding: 18px 20px 8px;
+	border: 1px solid var(--sp-card-border);
+	border-radius: var(--sp-card-radius);
+	background: var(--sp-card);
+	box-shadow: var(--sp-shadow);
+}
+
+.sp-dash-panel__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 8px;
+}
+
+.sp-dash-panel__title {
+	margin: 0;
+	font-size: 15px;
+	font-weight: 700;
+	color: var(--sp-ink);
+}
+
+.sp-dash-panel__filter {
+	margin: 0;
+}
+
+.sp-dash-panel__filters {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+}
+
+.sp-dash-panel__select,
+.sp-celebrations__select,
+.sp-celebrations__period {
+	height: 32px;
+	padding: 0 28px 0 12px;
+	border: 1px solid var(--sp-card-border);
+	border-radius: 999px;
+	background: #fff;
+	color: var(--sp-ink);
+	font-family: inherit;
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	appearance: none;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 10px center;
+}
+
+.sp-celebrations__type-filter {
+	min-width: 118px;
+}
+
+.sp-celebrations__period {
+	min-width: 93px;
+}
+
+.sp-payroll__period {
+	min-width: 104px;
+}
+
+/* —— Birthdays & anniversaries —— */
+.sp-dash-celebrations {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+.sp-celebrations__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 8px;
+}
+
+.sp-celebrations__title {
+	margin: 0;
+	font-size: 15px;
+	font-weight: 700;
+	color: var(--sp-ink);
+}
+
+.sp-celebrations__filter {
+	margin: 0;
+}
+
+.sp-celebrations__filters {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+}
+
+.sp-celebrations__list {
+	max-height: 320px;
+	overflow: auto;
+}
+
+.sp-celebrations__list.is-loading {
+	min-height: 120px;
+	opacity: 0.55;
+}
+
+.sp-celebrations__row {
+	display: grid;
+	grid-template-columns: 44px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 14px;
+	width: 100%;
+	padding: 14px 4px;
+	border: 0;
+	border-bottom: 1px solid #eef1f4;
+	background: transparent;
+	text-align: left;
+	cursor: pointer;
+	transition: background 0.15s ease;
+}
+
+.sp-celebrations__row:last-child {
+	border-bottom: 0;
+}
+
+.sp-celebrations__row:hover {
+	background: #fafbfc;
+}
+
+.sp-celebrations__avatar {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	overflow: hidden;
+	background: #eef2f6;
+	flex-shrink: 0;
+}
+
+.sp-celebrations__avatar-img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.sp-celebrations__avatar-fallback {
+	font-size: 13px;
+	font-weight: 700;
+	color: var(--sp-muted);
+}
+
+.sp-celebrations__meta {
+	min-width: 0;
+}
+
+.sp-celebrations__name {
+	display: block;
+	font-size: 14px;
+	font-weight: 700;
+	color: var(--sp-ink);
+}
+
+.sp-celebrations__details {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 10px;
+	margin-top: 4px;
+	min-width: 0;
+}
+
+.sp-celebrations__type {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 2px 8px 2px 6px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 1.3;
+	white-space: nowrap;
+}
+
+.sp-celebrations__type--birthday {
+	background: #fff7ed;
+	color: #c2410c;
+}
+
+.sp-celebrations__type--anniversary {
+	background: #eff6ff;
+	color: #1d4ed8;
+}
+
+.sp-celebrations__type-icon {
+	font-size: 12px;
+	line-height: 1;
+}
+
+.sp-celebrations__type-label {
+	line-height: 1.2;
+}
+
+.sp-celebrations__role {
+	font-size: 12px;
+	line-height: 1.4;
+	color: var(--sp-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.sp-celebrations__role::before {
+	content: "·";
+	margin-right: 10px;
+	color: var(--sp-soft);
+}
+
+.sp-celebrations__badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 14px;
+	line-height: 1;
+}
+
+.sp-celebrations__subtitle {
+	display: block;
+	margin-top: 2px;
+	font-size: 12px;
+	line-height: 1.4;
+	color: var(--sp-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.sp-celebrations__date {
+	display: inline-flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	min-width: 42px;
+	text-align: center;
+}
+
+.sp-celebrations__day {
+	font-size: 22px;
+	font-weight: 700;
+	line-height: 1;
+	color: var(--sp-ink);
+}
+
+.sp-celebrations__month {
+	margin-top: 2px;
+	font-size: 11px;
+	font-weight: 500;
+	color: var(--sp-soft);
+	text-transform: capitalize;
+}
+
+.sp-celebrations__fallback-note {
+	margin: 0 0 12px;
+	padding: 0 4px;
+	font-size: 12px;
+	color: var(--sp-muted);
+}
+
+.sp-celebrations__empty {
+	padding: 28px 8px 24px;
+	text-align: center;
+}
+
+.sp-celebrations__empty p {
+	margin: 0;
+	font-size: 13px;
+	color: var(--sp-muted);
+}
+
+/* —— Upcoming payroll —— */
+.sp-dash-payroll {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+.sp-payroll__table-wrap {
+	min-width: 0;
+}
+
+.sp-payroll__table-head,
+.sp-payroll__row {
+	display: grid;
+	grid-template-columns: minmax(140px, 1.6fr) 0.9fr 0.9fr 0.6fr 0.8fr;
+	align-items: center;
+	gap: 12px;
+}
+
+.sp-payroll__table-head {
+	padding: 0 4px 10px;
+	border-bottom: 1px solid #eef1f4;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--sp-soft);
+}
+
+.sp-payroll__list {
+	max-height: 320px;
+	overflow: auto;
+}
+
+.sp-payroll__list.is-loading {
+	min-height: 120px;
+	opacity: 0.55;
+}
+
+.sp-payroll__row {
+	width: 100%;
+	padding: 12px 4px;
+	border: 0;
+	border-bottom: 1px solid #eef1f4;
+	background: transparent;
+	text-align: left;
+	cursor: pointer;
+	transition: background 0.15s ease;
+}
+
+.sp-payroll__row:last-child {
+	border-bottom: 0;
+}
+
+.sp-payroll__row:hover {
+	background: #fafbfc;
+}
+
+.sp-payroll__agent {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+
+.sp-payroll__avatar {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	overflow: hidden;
+	background: #eef2f6;
+	flex-shrink: 0;
+}
+
+.sp-payroll__avatar .sp-celebrations__avatar-img,
+.sp-payroll__avatar .sp-celebrations__avatar-fallback {
+	width: 100%;
+	height: 100%;
+}
+
+.sp-payroll__agent-meta {
+	min-width: 0;
+}
+
+.sp-payroll__name {
+	display: block;
+	font-size: 13px;
+	font-weight: 700;
+	color: var(--sp-ink);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.sp-payroll__subtitle {
+	display: block;
+	margin-top: 2px;
+	font-size: 11px;
+	color: var(--sp-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.sp-payroll__status {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	padding: 4px 10px 4px 8px;
+	border-radius: 999px;
+	background: #f3f4f6;
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--sp-ink);
+	justify-self: start;
+}
+
+.sp-payroll__status-dot {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: #9aa3af;
+	flex-shrink: 0;
+}
+
+.sp-payroll__status--paid .sp-payroll__status-dot,
+.sp-payroll__status--ready .sp-payroll__status-dot {
+	background: #22c55e;
+}
+
+.sp-payroll__status--pending .sp-payroll__status-dot {
+	background: #ef4444;
+}
+
+.sp-payroll__date,
+.sp-payroll__hours,
+.sp-payroll__amount {
+	font-size: 13px;
+	color: var(--sp-ink);
+	white-space: nowrap;
+}
+
+.sp-payroll__amount {
+	font-weight: 600;
+}
+
+.sp-payroll__empty {
+	padding: 28px 8px 24px;
+	text-align: center;
+}
+
+.sp-payroll__empty p {
+	margin: 0;
+	font-size: 13px;
+	color: var(--sp-muted);
+}
+
+body.staff-pro-alive .number-widget-area,
+body.staff-pro-alive .number-card-container,
+body.staff-pro-alive .dashboard-view > .widget-group {
+	display: grid !important;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: 12px !important;
+	margin-bottom: 14px !important;
+}
+
+/* —— Widgets / cards —— */
+body.staff-pro-alive #page-dashboard-view .widget,
+body.staff-pro-alive #page-Workspaces .widget,
+body.staff-pro-alive .dashboard-view .widget {
+	border: 1px solid var(--sp-card-border) !important;
+	border-radius: var(--sp-card-radius) !important;
+	background: var(--sp-card) !important;
+	box-shadow: var(--sp-shadow) !important;
+	overflow: hidden;
+}
+
+body.staff-pro-alive #page-dashboard-view .number-widget-box,
+body.staff-pro-alive .dashboard-view .number-widget-box,
+body.staff-pro-alive .number-card-container .widget,
+body.staff-pro-alive .number-widget-area .widget {
+	position: relative;
+	min-height: 108px;
+	padding: 14px 16px 12px !important;
+	background: var(--sp-card) !important;
+}
+
+body.staff-pro-alive .number-widget-box::before,
+body.staff-pro-alive .dashboard-view .number-card-container .widget::before {
+	display: none !important;
+}
+
+body.staff-pro-alive .number-widget-box .widget-head,
+body.staff-pro-alive .number-widget-box .widget-label {
+	align-items: flex-start;
+	padding-bottom: 0 !important;
+}
+
+body.staff-pro-alive .number-widget-box .widget-title,
+body.staff-pro-alive .number-widget-box .widget-title .ellipsis {
+	font-size: 12px !important;
+	font-weight: 500 !important;
+	color: var(--sp-muted) !important;
+	letter-spacing: 0;
+}
+
+body.staff-pro-alive .number-widget-box .widget-body,
+body.staff-pro-alive .number-widget-box .widget-content {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: flex-end;
+	min-height: 48px;
+	padding-top: 4px !important;
+}
+
+body.staff-pro-alive .number-widget-box .number,
+body.staff-pro-alive .number-widget-box .widget-content .number {
+	margin-top: 6px;
+	font-size: 28px !important;
+	font-weight: 700 !important;
+	letter-spacing: -0.03em;
+	line-height: 1 !important;
+	color: var(--sp-ink) !important;
+}
+
+body.staff-pro-alive .number-widget-box .card-stats,
+body.staff-pro-alive .number-widget-box .percentage-stat-area {
+	margin-top: 4px;
+	font-size: 11px;
+	color: var(--sp-soft);
+}
+
+body.staff-pro-alive .number-widget-box .percentage-stat-area .indicator-pill,
+body.staff-pro-alive .number-widget-box .percentage-stat-area .stat-percentage {
+	color: var(--sp-soft) !important;
+}
+
+.sp-kpi-icon,
+.sp-kpi-hint {
+	display: none !important;
+}
+
+/* —— Charts —— */
+body.staff-pro-alive #page-dashboard-view .chart-widget,
+body.staff-pro-alive .dashboard-view .chart-widget,
+body.staff-pro-alive .dashboard-graph .widget {
+	min-height: 280px;
+}
+
+body.staff-pro-alive .chart-widget .widget-head,
+body.staff-pro-alive .dashboard-graph .widget .widget-head {
+	padding: 16px 18px 8px !important;
+}
+
+body.staff-pro-alive .chart-widget .widget-title,
+body.staff-pro-alive .dashboard-graph .widget .widget-title {
+	font-size: 15px !important;
+	font-weight: 700 !important;
+	color: var(--sp-ink) !important;
+}
+
+body.staff-pro-alive .chart-widget .widget-subtitle,
+body.staff-pro-alive .dashboard-graph .widget .widget-subtitle {
+	color: var(--sp-soft) !important;
+	font-size: 12px !important;
+}
+
+body.staff-pro-alive .chart-widget .widget-body,
+body.staff-pro-alive .dashboard-graph .widget .widget-body {
+	padding: 4px 12px 16px !important;
+}
+
+.sp-empty-chart {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	min-height: 220px;
+	padding: 24px 16px 28px;
+	text-align: center;
+}
+
+.sp-empty-chart__art {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 56px;
+	height: 56px;
+	margin-bottom: 12px;
+	border-radius: 50%;
+	background: var(--sp-icon-navy);
+	color: #3ddcb0;
+}
+
+.sp-empty-chart__art svg {
+	width: 22px;
+	height: 22px;
+	stroke: currentColor;
+	fill: none;
+}
+
+.sp-empty-chart__title {
+	margin: 0 0 6px;
+	font-size: 15px;
+	font-weight: 700;
+	color: var(--sp-ink);
+}
+
+.sp-empty-chart__text {
+	margin: 0 0 14px;
+	max-width: 22rem;
+	font-size: 13px;
+	line-height: 1.45;
+	color: var(--sp-muted);
+}
+
+.sp-empty-chart__btn {
+	display: inline-flex;
+	align-items: center;
+	height: 34px;
+	padding: 0 14px;
+	border: 1px solid var(--sp-card-border);
+	border-radius: 999px;
+	background: #fff;
+	color: var(--sp-ink);
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+}
+
+.sp-empty-chart__btn:hover {
+	background: #fafbfc;
+}
+
+/* —— List empty states —— */
+body.staff-pro-alive .frappe-list .no-result,
+body.staff-pro-alive .list-empty-state,
+body.staff-pro-alive .empty-state {
+	min-height: 420px;
+	padding: 48px 20px !important;
+	background: transparent !important;
+}
+
+.sp-empty-list {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	width: min(440px, 100%);
+	margin: 24px auto;
+	padding: 36px 28px 32px;
+	border: 1px solid var(--sp-card-border);
+	border-radius: 20px;
+	background: var(--sp-card);
+	box-shadow: var(--sp-shadow);
+	text-align: center;
+}
+
+.sp-empty-list__art {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 56px;
+	height: 56px;
+	margin-bottom: 14px;
+	border-radius: 50%;
+	background: var(--sp-icon-navy);
+	color: #3ddcb0;
+}
+
+.sp-empty-list__art svg {
+	width: 22px;
+	height: 22px;
+	stroke: currentColor;
+	fill: none;
+}
+
+.sp-empty-list__title {
+	margin: 0 0 8px;
+	font-size: 20px;
+	font-weight: 750;
+	letter-spacing: -0.02em;
+	color: var(--sp-ink);
+}
+
+.sp-empty-list__text {
+	margin: 0 0 18px;
+	font-size: 14px;
+	line-height: 1.5;
+	color: var(--sp-muted);
+}
+
+.sp-empty-list__btn {
+	display: inline-flex;
+	align-items: center;
+	height: 40px;
+	padding: 0 18px;
+	border: 0;
+	border-radius: 999px;
+	background: var(--sp-ink);
+	color: #fff;
+	font-size: 14px;
+	font-weight: 650;
+	cursor: pointer;
+}
+
+body.staff-pro-alive .frappe-list .no-result > svg,
+body.staff-pro-alive .frappe-list .no-result > .text-muted:first-child,
+body.staff-pro-alive .list-empty-state > svg {
+	display: none;
+}
+
+body.staff-pro-alive .page-container[id^="page-List/"] .layout-main-section {
+	background: var(--sp-canvas) !important;
+	border: 0 !important;
+	box-shadow: none !important;
+}
+
+body.staff-pro-alive .frappe-list .result,
+body.staff-pro-alive .frappe-list .list-row-container {
+	background: var(--sp-card);
+	border-radius: 12px;
+}
+
+@media (max-width: 768px) {
+	.sp-dash-split {
+		grid-template-columns: 1fr;
+	}
+
+	.sp-dash-pills {
+		gap: 12px 20px;
+		margin-bottom: 28px;
+	}
+
+	.sp-payroll__table-head {
+		display: none;
+	}
+
+	.sp-payroll__row {
+		grid-template-columns: 1fr;
+		gap: 8px;
+		padding: 14px 4px;
+	}
+
+	.sp-payroll__date,
+	.sp-payroll__hours,
+	.sp-payroll__amount {
+		padding-left: 46px;
+		font-size: 12px;
+	}
+
+	body.staff-pro-alive .number-widget-box .number {
+		font-size: 24px !important;
+	}
+}

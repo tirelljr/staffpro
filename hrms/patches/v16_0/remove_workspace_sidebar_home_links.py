@@ -60,6 +60,8 @@ def _reorder_sidebar_rows(rows: list[dict], workspace_name: str) -> list[dict]:
 	)
 	if dashboard_row:
 		rows = [row for row in rows if row is not dashboard_row]
+		dashboard_row = dict(dashboard_row)
+		dashboard_row["link_to"] = dashboard_name
 	else:
 		dashboard_row = {
 			"type": "Link",
@@ -73,7 +75,7 @@ def _reorder_sidebar_rows(rows: list[dict], workspace_name: str) -> list[dict]:
 			"keep_closed": 0,
 			"show_arrow": 0,
 		}
-		dashboard_row.update(extras)
+	dashboard_row.update(extras)
 	rows.insert(0, dashboard_row)
 	return rows
 

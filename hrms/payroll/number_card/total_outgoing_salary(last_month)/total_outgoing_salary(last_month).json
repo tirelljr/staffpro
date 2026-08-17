@@ -1,5 +1,6 @@
 {
  "aggregate_function_based_on": "rounded_total",
+ "color": "#0f766e",
  "creation": "2020-07-22 11:56:34.626019",
  "docstatus": 0,
  "doctype": "Number Card",

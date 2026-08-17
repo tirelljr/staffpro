@@ -15,6 +15,7 @@ const HR_WORKSPACES = new Set([
 	"Workforce",
 	"Time",
 	"Pay",
+	"SS and Taxes",
 	"Talent",
 	"Finance & Admin",
 ]);

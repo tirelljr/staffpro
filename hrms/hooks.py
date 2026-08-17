@@ -22,6 +22,7 @@ add_to_apps_screen = [
 ]
 
 extend_bootinfo = "hrms.boot.extend_bootinfo"
+get_website_user_home_page = "hrms.boot.get_staff_pro_home_page"
 
 website_context = {
 	"favicon": "/assets/hrms/images/staff-pro-bpo-icon.png",
@@ -344,9 +345,10 @@ global_search_doctypes = {
 	],
 }
 
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "hrms.event.get_events"
-# }
+override_whitelisted_methods = {
+	"frappe.desk.doctype.dashboard.dashboard.get_permitted_cards": "hrms.boot.get_permitted_cards",
+	"frappe.desk.doctype.dashboard.dashboard.get_permitted_charts": "hrms.boot.get_permitted_charts",
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,

@@ -92,7 +92,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "calendar-check",
    "indent": 0,
    "keep_closed": 0,
    "label": "Leave Balance",
@@ -104,7 +104,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "calendar-range",
    "indent": 0,
    "keep_closed": 0,
    "label": "Leave Balance Summary",
@@ -116,7 +116,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "sun",
    "indent": 0,
    "keep_closed": 0,
    "label": "Employees Working on a Holiday",
@@ -139,7 +139,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "calendar",
    "indent": 0,
    "keep_closed": 0,
    "label": "Holiday List",
@@ -157,12 +157,13 @@
    "link_to": "Holiday List Assignment",
    "link_type": "DocType",
    "show_arrow": 0,
-   "type": "Link"
+   "type": "Link",
+   "icon": "calendar-plus"
   },
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "clock",
    "indent": 0,
    "keep_closed": 0,
    "label": "Leave Period",
@@ -174,7 +175,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "file-check",
    "indent": 0,
    "keep_closed": 0,
    "label": "Leave Policy",
@@ -186,7 +187,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "slash",
    "indent": 0,
    "keep_closed": 0,
    "label": "Leave Block List",
@@ -198,7 +199,7 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "",
+   "icon": "tag",
    "indent": 0,
    "keep_closed": 0,
    "label": "Leave Type",
