@@ -554,14 +554,22 @@ body.staff-pro-alive #page-Workspaces .page-head {
 
 .sp-payroll__table-wrap {
 	min-width: 0;
+	overflow-x: auto;
 }
 
 .sp-payroll__table-head,
 .sp-payroll__row {
 	display: grid;
-	grid-template-columns: minmax(140px, 1.6fr) 0.9fr 0.9fr 0.6fr 0.8fr;
+	grid-template-columns:
+		minmax(0, 1.4fr)
+		minmax(72px, 0.7fr)
+		minmax(84px, 0.8fr)
+		minmax(52px, 0.5fr)
+		minmax(72px, 0.8fr);
 	align-items: center;
-	gap: 12px;
+	column-gap: 10px;
+	width: 100%;
+	min-width: 0;
 }
 
 .sp-payroll__table-head {
@@ -656,6 +664,7 @@ body.staff-pro-alive #page-Workspaces .page-head {
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
+	max-width: 100%;
 	min-width: 0;
 	padding: 4px 10px 4px 8px;
 	border-radius: 999px;
@@ -664,6 +673,13 @@ body.staff-pro-alive #page-Workspaces .page-head {
 	font-weight: 500;
 	color: var(--sp-ink);
 	justify-self: start;
+	overflow: hidden;
+}
+
+.sp-payroll__status-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .sp-payroll__status-dot {
@@ -686,13 +702,22 @@ body.staff-pro-alive #page-Workspaces .page-head {
 .sp-payroll__date,
 .sp-payroll__hours,
 .sp-payroll__amount {
+	min-width: 0;
 	font-size: 13px;
 	color: var(--sp-ink);
 	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .sp-payroll__amount {
 	font-weight: 600;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.sp-payroll__table-head span:last-child {
+	text-align: right;
 }
 
 .sp-payroll__empty {

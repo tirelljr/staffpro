@@ -92,8 +92,11 @@ def _remove_broken_ss_and_taxes_workspace():
 	if not frappe.db.exists("Workspace", "SS and Taxes"):
 		return
 	try:
-		frappe.get_doc("Workspace", "SS and Taxes").save(ignore_permissions=True)
-	except frappe.MandatoryError:
+		doc = frappe.get_doc("Workspace", "SS and Taxes")
+		doc.flags.ignore_links = True
+		doc.flags.ignore_validate = True
+		doc.save(ignore_permissions=True)
+	except (frappe.MandatoryError, frappe.LinkValidationError, frappe.ValidationError):
 		frappe.delete_doc("Workspace", "SS and Taxes", force=1, ignore_permissions=True)
 
 

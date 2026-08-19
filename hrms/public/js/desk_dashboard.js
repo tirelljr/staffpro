@@ -705,8 +705,16 @@ function format_hours(value) {
 
 function format_pay_amount(row) {
 	if (row.net_pay == null || row.net_pay === "") return "—";
-	if (typeof frappe.format === "function") {
-		return frappe.format(row.net_pay, { fieldtype: "Currency", options: row.currency || "" });
+	const currency = row.currency || "";
+	if (typeof format_currency === "function") {
+		return format_currency(row.net_pay, currency);
+	}
+	if (frappe.utils && typeof frappe.utils.fmt_money === "function") {
+		return frappe.utils.fmt_money(row.net_pay, null, currency);
+	}
+	const amount = Number(row.net_pay);
+	if (Number.isFinite(amount)) {
+		return amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 	}
 	return String(row.net_pay);
 }

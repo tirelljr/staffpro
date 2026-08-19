@@ -1,0 +1,2 @@
+# Keep Docker/Linux scripts as LF so bash in containers can run them.
+*.sh text eol=lf

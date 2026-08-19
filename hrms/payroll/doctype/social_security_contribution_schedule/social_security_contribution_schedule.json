@@ -1,0 +1,143 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 1,
+ "autoname": "Prompt",
+ "creation": "2026-08-17 08:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "disabled",
+  "section_break_details",
+  "effective_from",
+  "company",
+  "column_break_details",
+  "currency",
+  "injury_only_section",
+  "injury_only_employee_amount",
+  "injury_only_employer_amount",
+  "wage_bands_section",
+  "wage_bands"
+ ],
+ "fields": [
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
+  },
+  {
+   "fieldname": "section_break_details",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "effective_from",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Effective From",
+   "reqd": 1
+  },
+  {
+   "description": "Leave blank to apply to all companies",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "column_break_details",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "company.default_currency",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "description": "Applies to persons 60-64 receiving a Social Security benefit, and all persons 65 and older. Covers Employment Injury Benefit Only.",
+   "fieldname": "injury_only_section",
+   "fieldtype": "Section Break",
+   "label": "Employment Injury Only (A) & (B)"
+  },
+  {
+   "default": "0",
+   "fieldname": "injury_only_employee_amount",
+   "fieldtype": "Currency",
+   "label": "Injury Only Employee Amount (Weekly)",
+   "non_negative": 1
+  },
+  {
+   "default": "2.6",
+   "fieldname": "injury_only_employer_amount",
+   "fieldtype": "Currency",
+   "label": "Injury Only Employer Amount (Weekly)",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "wage_bands_section",
+   "fieldtype": "Section Break",
+   "label": "Wage Bands"
+  },
+  {
+   "fieldname": "wage_bands",
+   "fieldtype": "Table",
+   "label": "Wage Bands",
+   "options": "Social Security Wage Band",
+   "reqd": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-08-17 08:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Payroll",
+ "name": "Social Security Contribution Schedule",
+ "naming_rule": "Set by user",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "effective_from",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

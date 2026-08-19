@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<style>
+		body { font-family: Helvetica, Arial, sans-serif; font-size: 11px; color: #222; }
+		h1 { font-size: 18px; margin: 0 0 4px 0; color: #0b6e4f; }
+		.meta { margin-bottom: 12px; color: #444; }
+		.meta div { margin: 2px 0; }
+		table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+		th, td { border: 1px solid #ccc; padding: 5px 6px; text-align: left; }
+		th { background: #e8f5ef; font-weight: bold; }
+		td.num, th.num { text-align: right; }
+		.totals td { font-weight: bold; background: #f7f7f7; }
+		.signature { margin-top: 40px; }
+		.signature-line { margin-top: 36px; border-top: 1px solid #333; width: 240px; padding-top: 4px; }
+		.footer { margin-top: 24px; font-size: 10px; color: #666; }
+		.page-break { page-break-after: always; }
+	</style>
+</head>
+<body>
+	{% if grouped %}
+		{% for group in grouped %}
+		<div {% if not loop.last %}class="page-break"{% endif %}>
+			<h1>{{ _("Social Security Contributions") }}</h1>
+			<div class="meta">
+				<div><strong>{{ _("Employer") }}:</strong> {{ group.company }}</div>
+				{% if group.employer_ss_reg_no %}
+				<div><strong>{{ _("SS Registration No") }}:</strong> {{ group.employer_ss_reg_no }}</div>
+				{% endif %}
+				<div><strong>{{ _("Period") }}:</strong> {{ period_label }}</div>
+				<div><strong>{{ _("Generated On") }}:</strong> {{ generated_on }}</div>
+			</div>
+
+			<table>
+				<thead>
+					<tr>
+						<th>{{ _("Employee") }}</th>
+						<th>{{ _("SS Number") }}</th>
+						<th>{{ _("Period") }}</th>
+						<th>{{ _("Wage Band") }}</th>
+						<th class="num">{{ _("Weeks") }}</th>
+						<th class="num">{{ _("Employee") }}</th>
+						<th class="num">{{ _("Employer") }}</th>
+						<th class="num">{{ _("Total") }}</th>
+						<th>{{ _("Scheme") }}</th>
+					</tr>
+				</thead>
+				<tbody>
+					{% for row in group.rows %}
+					<tr>
+						<td>{{ row.employee_name }} ({{ row.employee }})</td>
+						<td>{{ row.social_security_number or "" }}</td>
+						<td>{{ row.start_date_formatted }} - {{ row.end_date_formatted }}</td>
+						<td>{{ row.ss_wage_band or "" }}</td>
+						<td class="num">{{ "%.3f"|format(row.ss_weeks or 0) }}</td>
+						<td class="num">{{ "{:,.2f}".format(row.ss_employee_contribution or 0) }}</td>
+						<td class="num">{{ "{:,.2f}".format(row.ss_employer_contribution or 0) }}</td>
+						<td class="num">{{ "{:,.2f}".format(row.total or 0) }}</td>
+						<td>{{ row.ss_scheme or "" }}</td>
+					</tr>
+					{% endfor %}
+					<tr class="totals">
+						<td colspan="5">{{ _("Employer Total") }}</td>
+						<td class="num">{{ "{:,.2f}".format(group.employee_total) }}</td>
+						<td class="num">{{ "{:,.2f}".format(group.employer_total) }}</td>
+						<td class="num">{{ "{:,.2f}".format(group.grand_total) }}</td>
+						<td></td>
+					</tr>
+				</tbody>
+			</table>
+
+			<div class="signature">
+				<div class="signature-line">{{ _("Authorized Signature") }}</div>
+			</div>
+			<div class="footer">
+				{{ _("An INVESTMENT for You, your Family, your Future!") }}
+			</div>
+		</div>
+		{% endfor %}
+	{% else %}
+		<p>{{ _("No Social Security contributions found for the selected period.") }}</p>
+	{% endif %}
+</body>
+</html>
