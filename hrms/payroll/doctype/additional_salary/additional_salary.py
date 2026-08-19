@@ -28,6 +28,7 @@ class AdditionalSalary(Document):
 		disabled: DF.Check
 		employee: DF.Link
 		employee_name: DF.Data | None
+		exclude_from_tax: DF.Check
 		from_date: DF.Date | None
 		is_recurring: DF.Check
 		naming_series: DF.Literal["HR-ADS-.YY.-.MM.-"]
@@ -59,6 +60,9 @@ class AdditionalSalary(Document):
 		self.validate_duplicate_additional_salary()
 		self.validate_tax_component_overwrite()
 		self.validate_accrual_component()
+
+		if self.exclude_from_tax:
+			self.deduct_full_tax_on_selected_payroll_date = 0
 
 		if self.amount < 0:
 			frappe.throw(_("Amount should not be less than zero"))
@@ -344,6 +348,7 @@ def get_additional_salaries(employee, start_date, end_date, component_type):
 			additional_sal.is_recurring,
 			overwrite_field,
 			additional_sal.deduct_full_tax_on_selected_payroll_date,
+			additional_sal.exclude_from_tax,
 			additional_sal.ref_doctype,
 		)
 		.where(

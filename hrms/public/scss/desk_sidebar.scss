@@ -6,6 +6,7 @@
 	--sp-sidebar-border: #ececec;
 	--sp-sidebar-radius: 8px;
 	--sp-icon-navy: #0f1b2d;
+	--sp-icon-accent: #90ba93;
 	--sp-dock-width: 72px;
 	--sidebar-width: 260px;
 }
@@ -20,6 +21,8 @@
 .workspace-dock {
 	flex: 0 0 var(--sp-dock-width) !important;
 	width: var(--sp-dock-width) !important;
+	display: flex;
+	flex-direction: column;
 	background: #ffffff !important;
 	border-right-color: var(--sp-sidebar-border) !important;
 	padding: 8px 0 12px !important;
@@ -39,6 +42,14 @@
 .workspace-dock .workspace-dock-items {
 	gap: 4px !important;
 	padding: 0 6px;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	scrollbar-width: none;
+
+	&::-webkit-scrollbar {
+		display: none;
+	}
 }
 
 .workspace-dock .workspace-dock-item {
@@ -89,6 +100,15 @@
 	width: 22px;
 	height: 22px;
 	color: #000000;
+}
+
+.workspace-dock .staff-pro-dock-integrations .workspace-dock-item img,
+.workspace-dock .staff-pro-dock-integrations .workspace-dock-item svg {
+	width: 24px;
+	height: 24px;
+	color: unset;
+	object-fit: contain;
+	border-radius: 5px;
 }
 
 .workspace-dock .workspace-dock-icon,
@@ -152,8 +172,30 @@
 	padding: 6px 4px !important;
 }
 
+.workspace-dock .staff-pro-dock-integrations {
+	flex: 0 0 auto;
+	width: 100%;
+	padding: 0 6px 4px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+}
+
+.workspace-dock .staff-pro-dock-integrations .workspace-dock-item {
+	min-height: 56px;
+	padding: 4px 2px !important;
+}
+
 .workspace-dock .workspace-dock-divider {
 	background: #e5e7eb;
+}
+
+.workspace-dock .staff-pro-integrations-divider {
+	flex: 0 0 auto;
+	width: 28px;
+	height: 1px;
+	margin: 8px auto;
 }
 
 /* —— Body sidebar (menus + submenus) —— */
@@ -222,7 +264,7 @@
 	align-items: center;
 	justify-content: center;
 	background: var(--sp-icon-navy);
-	color: var(--sp-icon-accent, #3ddcb0);
+	color: var(--sp-icon-accent, #90ba93);
 	flex-shrink: 0;
 }
 
@@ -446,11 +488,20 @@
 }
 
 .body-sidebar .collapse-sidebar-link,
-.body-sidebar .onboarding-sidebar span,
 .body-sidebar .promotional-banner-title {
 	font-size: 13px;
 	font-weight: 500;
 	color: var(--sp-sidebar-muted);
+}
+
+/* Hide Frappe module onboarding (Getting Started / Accounting Onboarding) everywhere */
+.user-onboarding,
+.onb-panel,
+.body-sidebar .onboarding-sidebar,
+.onboarding-widget-box,
+.widget.onboarding-widget,
+.workspace-page .onboarding-widget {
+	display: none !important;
 }
 
 /* Collapsed submenu — let Frappe hide the panel instead of leaving a white strip */

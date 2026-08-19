@@ -1,10 +1,13 @@
 @import "frappe-ui/src/style.css";
 
 :root {
-	--sp-navy: #16607a;
-	--sp-cyan: #00a6e8;
-	--sp-lime: #8cc040;
-	--sp-ink: #1e3a4c;
+	--sp-teal: #16678c;
+	--sp-navy: #16678c;
+	--sp-cyan: #11a5dd;
+	--sp-lime: #90ba93;
+	--sp-green: #90ba93;
+	--sp-light-cyan: #a7c8cc;
+	--sp-ink: #111111;
 	--sp-black: #000000;
 	--app-topbar-height: calc(4rem + env(safe-area-inset-top, 0px));
 }
@@ -44,12 +47,23 @@ body {
 }
 
 .btn-brand {
-	background-color: var(--sp-cyan) !important;
+	background-color: var(--sp-teal) !important;
 	color: #ffffff !important;
 }
 
 .btn-brand:hover {
-	background-color: #0092cc !important;
+	background-color: #125a7a !important;
+}
+
+.btn-outline-accent {
+	background-color: #ffffff !important;
+	border: 1px solid var(--sp-teal) !important;
+	color: var(--sp-teal) !important;
+}
+
+.btn-outline-accent:hover {
+	background-color: rgba(167, 200, 204, 0.35) !important;
+	color: var(--sp-teal) !important;
 }
 
 

@@ -56,6 +56,15 @@
   "earnings",
   "column_break_k1jz",
   "deductions",
+  "ss_section",
+  "ss_number",
+  "ss_weekly_earnings",
+  "ss_insurable_earnings",
+  "ss_wage_band",
+  "ss_column_break",
+  "ss_category",
+  "ss_employee_amount",
+  "ss_employer_amount",
   "section_break_jgfy",
   "accrued_benefits",
   "totals",
@@ -321,6 +330,64 @@
    "oldfieldname": "deduction_details",
    "oldfieldtype": "Table",
    "options": "Salary Detail"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "ss_section",
+   "fieldtype": "Section Break",
+   "label": "Social Security"
+  },
+  {
+   "fetch_from": "employee.social_security_number",
+   "fieldname": "ss_number",
+   "fieldtype": "Data",
+   "label": "Social Security Number",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ss_weekly_earnings",
+   "fieldtype": "Currency",
+   "label": "Weekly Earnings",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ss_insurable_earnings",
+   "fieldtype": "Currency",
+   "label": "Weekly Insurable Earnings",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ss_wage_band",
+   "fieldtype": "Data",
+   "label": "Wage Band",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ss_column_break",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ss_category",
+   "fieldtype": "Select",
+   "label": "SS Category",
+   "options": "\nStandard\nEmployment Injury Only",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ss_employee_amount",
+   "fieldtype": "Currency",
+   "label": "Employee SS",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ss_employer_amount",
+   "fieldtype": "Currency",
+   "label": "Employer SS",
+   "options": "currency",
+   "read_only": 1
   },
   {
    "fieldname": "totals",
@@ -801,7 +868,7 @@
   }
  ],
  "row_format": "Dynamic",
- "search_fields": "employee_name",
+ "search_fields": "employee_name,ss_number",
  "show_name_in_global_search": 1,
  "sort_field": "creation",
  "sort_order": "DESC",

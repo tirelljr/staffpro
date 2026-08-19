@@ -22,7 +22,7 @@
 						{{ __("Your password has expired. Please reset your password to continue") }}
 					</p>
 					<a
-						class="mt-6 inline-flex items-center justify-center gap-2 transition-colors focus:outline-none text-white bg-brand-cyan hover:bg-[#0092cc] active:bg-[#007fb3] focus-visible:ring focus-visible:ring-brand-cyan h-9 text-base px-4 rounded"
+						class="mt-6 inline-flex items-center justify-center gap-2 transition-colors focus:outline-none text-white bg-brand-navy hover:bg-[#125a7a] active:bg-[#0f4d68] focus-visible:ring focus-visible:ring-brand-navy h-9 text-base px-4 rounded-full"
 						:href="resetPassword.link"
 						target="_blank"
 					>
@@ -71,7 +71,7 @@
 						<div class="text-center mt-4">
 							<router-link
 								:to="{ name: 'ForgotPassword', query: email ? { email } : {} }"
-								class="text-sm text-gray-600 hover:text-brand-navy underline"
+								class="text-sm text-gray-600 hover:text-brand-cyan underline"
 							>
 								{{ __("Forgot Password?") }}
 							</router-link>

@@ -33,4 +33,22 @@ frappe.ui.form.on("Payroll Period", {
 			frappe.datetime.add_days(frappe.datetime.add_months(frm.doc.start_date, 12), -1),
 		);
 	},
+
+	refresh: function (frm) {
+		if (frm.doc.__islocal) return;
+
+		const open_adjustment = (adjustment_type) => {
+			frappe.route_options = {
+				company: frm.doc.company,
+				payroll_period: frm.doc.name,
+				adjustment_type,
+				valid_from: frm.doc.start_date,
+				valid_to: frm.doc.end_date,
+			};
+			frappe.new_doc("Employee Tax Adjustment");
+		};
+
+		frm.add_custom_button(__("Exclude Agents from Tax"), () => open_adjustment("Exclude from Tax Period"), __("Tax"));
+		frm.add_custom_button(__("Include Agents in Tax"), () => open_adjustment("Include in Tax Period"), __("Tax"));
+	},
 });

@@ -17,13 +17,15 @@ body.staff-pro-has-topbar #page-setup-wizard .form-wrapper {
 }
 
 #page-setup-wizard .complete-btn.btn-primary {
-	background-color: var(--sp-navy) !important;
-	border-color: var(--sp-navy) !important;
+	background-color: var(--sp-teal, #16678c) !important;
+	border-color: var(--sp-teal, #16678c) !important;
+	color: #ffffff !important;
 }
 
 #page-setup-wizard .complete-btn.btn-primary:hover,
 #page-setup-wizard .complete-btn.btn-primary:focus,
 #page-setup-wizard .complete-btn.btn-primary:active {
-	background-color: var(--sp-ink) !important;
-	border-color: var(--sp-ink) !important;
+	background-color: var(--sp-teal-hover, #125a7a) !important;
+	border-color: var(--sp-teal-hover, #125a7a) !important;
+	color: #ffffff !important;
 }

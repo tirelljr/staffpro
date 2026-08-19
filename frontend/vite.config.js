@@ -30,7 +30,7 @@ export default defineConfig({
 				scope: "/hrms",
 				id: "/hrms",
 				description: "HR & Payroll for Staff Pro BPO",
-				theme_color: "#16607A",
+				theme_color: "#16678C",
 				background_color: "#000000",
 				icons: [
 					{
@@ -75,6 +75,7 @@ export default defineConfig({
 		},
 		sourcemap: true,
 		rollupOptions: {
+			external: [/^\/assets\//],
 			output: {
 				manualChunks: {
 					"frappe-ui": ["frappe-ui"],

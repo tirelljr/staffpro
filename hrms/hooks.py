@@ -7,7 +7,7 @@ app_license = "GNU General Public License (v3)"
 required_apps = ["frappe/erpnext"]
 source_link = "http://github.com/frappe/hrms"
 app_logo_url = "/assets/hrms/images/staff-pro-bpo-logo.png"
-app_home = "/desk/workforce"
+app_home = "/desk/dashboard-view/Human Resource"
 email_brand_image = "/assets/hrms/images/staff-pro-bpo-logo.png"
 
 add_to_apps_screen = [
@@ -37,6 +37,7 @@ website_context = {
 # include js, css files in header of desk.html
 # app_include_css = "/assets/hrms/css/hrms.css"
 app_include_js = [
+	"/assets/hrms/js/staff_pro_home_redirect.js",
 	"hrms.bundle.js",
 ]
 app_include_css = "hrms.bundle.css"
@@ -114,6 +115,8 @@ after_migrate = [
 	"hrms.setup.update_select_perm_after_install",
 	"hrms.branding.apply_branding",
 	"hrms.patches.v16_0.remove_workspace_sidebar_home_links.execute",
+	"hrms.patches.v16_0.disable_app_onboarding.execute",
+	"hrms.patches.v16_0.split_finance_and_admin.execute",
 	"hrms.boot.hide_unused_erpnext_workspaces",
 ]
 
@@ -327,6 +330,10 @@ regional_overrides = {
 		"hrms.hr.utils.calculate_annual_eligible_hra_exemption": "hrms.regional.india.utils.calculate_annual_eligible_hra_exemption",
 		"hrms.hr.utils.calculate_hra_exemption_for_period": "hrms.regional.india.utils.calculate_hra_exemption_for_period",
 		"hrms.hr.utils.calculate_tax_with_marginal_relief": "hrms.regional.india.utils.calculate_tax_with_marginal_relief",
+	},
+	"Belize": {
+		"hrms.payroll.doctype.income_tax_slab.income_tax_slab.calculate_tax_by_tax_slab": "hrms.regional.belize.utils.calculate_tax_by_tax_slab",
+		"hrms.payroll.doctype.salary_slip.salary_slip.apply_regional_deductions": "hrms.regional.belize.utils.apply_regional_deductions",
 	},
 }
 

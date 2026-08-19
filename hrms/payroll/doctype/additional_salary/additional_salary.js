@@ -83,6 +83,12 @@ frappe.ui.form.on("Additional Salary", {
 		});
 	},
 
+	exclude_from_tax: function (frm) {
+		if (frm.doc.exclude_from_tax) {
+			frm.set_value("deduct_full_tax_on_selected_payroll_date", 0);
+		}
+	},
+
 	salary_component: function (frm) {
 		if (!frm.doc.ref_doctype) {
 			frm.trigger("get_salary_component_amount");

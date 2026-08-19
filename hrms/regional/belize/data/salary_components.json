@@ -1,0 +1,34 @@
+[
+	{
+		"doctype": "Salary Component",
+		"salary_component": "Income Tax",
+		"description": "Belize PAYE Income Tax",
+		"type": "Deduction",
+		"is_income_tax_component": 1,
+		"variable_based_on_taxable_salary": 1
+	},
+	{
+		"doctype": "Salary Component",
+		"salary_component": "Basic",
+		"description": "Basic",
+		"type": "Earning",
+		"is_tax_applicable": 1,
+		"earning_category": "Regular"
+	},
+	{
+		"doctype": "Salary Component",
+		"salary_component": "Bonus",
+		"description": "Campaign or annual bonus",
+		"type": "Earning",
+		"is_tax_applicable": 1,
+		"earning_category": "Bonus"
+	},
+	{
+		"doctype": "Salary Component",
+		"salary_component": "Incentive",
+		"description": "QA or campaign incentive",
+		"type": "Earning",
+		"is_tax_applicable": 1,
+		"earning_category": "Incentive"
+	}
+]

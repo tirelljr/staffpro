@@ -18,7 +18,7 @@ DASHBOARD_FIRST = {
 	"Talent": ("Recruitment", {}),
 }
 
-HRMS_WORKSPACES = list(DASHBOARD_FIRST) + ["Tax & Benefits", "Finance & Admin"]
+HRMS_WORKSPACES = list(DASHBOARD_FIRST) + ["Tax & Benefits", "Finance", "Admin"]
 
 
 def _clean_row(row) -> dict:
@@ -43,7 +43,7 @@ def _reorder_sidebar_rows(rows: list[dict], workspace_name: str) -> list[dict]:
 	rows = [
 		row
 		for row in rows
-		if not (row.get("label") == "Home" and row.get("link_type") == "Workspace")
+		if not (row.get("label") == "Home" and row.get("link_to") == "Home")
 	]
 
 	if workspace_name not in DASHBOARD_FIRST:

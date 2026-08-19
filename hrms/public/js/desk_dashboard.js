@@ -24,18 +24,31 @@ const ICONS = {
 const DASHBOARDS = {
 	"Human Resource": {
 		kicker: __("People"),
+		subtitle: __("Add agents, see who's celebrating, and check upcoming payroll."),
+		empty_text: __("Use the shortcuts above to add agents or open the roster."),
+		create_label: __("Add Employee"),
+		create_doctype: "Employee",
+		pills: [
+			{ label: __("Add Agent"), icon: "userPlus", hue: "#11A5DD", doctype: "Employee" },
+			{ label: __("Import Agents"), icon: "upload", hue: "#11A5DD", action: "import-employee" },
+			{ label: __("Agents"), icon: "users", hue: "#90BA93", route: ["List", "Employee"] },
+			{ label: __("In / Out today"), icon: "clock", hue: "#11A5DD", route: ["in-out-today"] },
+			{ label: __("Team Structure"), icon: "org", hue: "#90BA93", route: ["organizational-chart"] },
+			{ label: __("New Hire Onboarding"), icon: "spark", hue: "#11A5DD", route: ["List", "Employee Onboarding"] },
+			{ label: __("Offboarding"), icon: "userMinus", hue: "#16678C", route: ["List", "Employee Separation"] },
+			{ label: __("Concerns"), icon: "alert", hue: "#205B76", route: ["List", "Employee Grievance"] },
+		],
+	},
+	"Data Analytics": {
+		kicker: __("People"),
 		subtitle: __("Headcount, hiring, and movement across the company."),
 		empty_text: __("Add employees and these cards fill with live hiring, exits, and diversity."),
 		create_label: __("Add Employee"),
 		create_doctype: "Employee",
 		pills: [
-			{ label: __("Add Agent"), icon: "userPlus", hue: "#4DB0F5", doctype: "Employee" },
-			{ label: __("Import Agents"), icon: "upload", hue: "#4DB0F5", action: "import-employee" },
-			{ label: __("Agents"), icon: "users", hue: "#3DDCB0", route: ["List", "Employee"] },
-			{ label: __("Team Structure"), icon: "org", hue: "#3DDCB0", route: ["organizational-chart"] },
-			{ label: __("New Hire Onboarding"), icon: "spark", hue: "#60A5FA", route: ["List", "Employee Onboarding"] },
-			{ label: __("Offboarding"), icon: "userMinus", hue: "#F472B6", route: ["List", "Employee Separation"] },
-			{ label: __("Concerns"), icon: "alert", hue: "#F5C43C", route: ["List", "Employee Grievance"] },
+			{ label: __("Add Agent"), icon: "userPlus", hue: "#11A5DD", doctype: "Employee" },
+			{ label: __("Agents"), icon: "users", hue: "#90BA93", route: ["List", "Employee"] },
+			{ label: __("Headcount Analytics"), icon: "chart", hue: "#11A5DD", route: ["query-report", "Employee Analytics"] },
 		],
 	},
 	Attendance: {
@@ -45,10 +58,10 @@ const DASHBOARDS = {
 		create_label: __("Mark Attendance"),
 		create_doctype: "Attendance",
 		pills: [
-			{ label: __("Mark Attendance"), icon: "check", hue: "#3DDCB0", route: ["List", "Attendance"] },
-			{ label: __("Clock In/Out"), icon: "clock", hue: "#3DD6E8", route: ["List", "Employee Checkin"] },
-			{ label: __("Shift Schedule"), icon: "calendar", hue: "#3DD6E8", route: ["List", "Shift Assignment"] },
-			{ label: __("Schedule Correction"), icon: "file", hue: "#F5C43C", route: ["List", "Attendance Request"] },
+			{ label: __("Mark Attendance"), icon: "check", hue: "#90BA93", route: ["List", "Attendance"] },
+			{ label: __("Clock In/Out"), icon: "clock", hue: "#11A5DD", route: ["List", "Employee Checkin"] },
+			{ label: __("Shift Schedule"), icon: "calendar", hue: "#11A5DD", route: ["List", "Shift Assignment"] },
+			{ label: __("Schedule Correction"), icon: "file", hue: "#16678C", route: ["List", "Attendance Request"] },
 		],
 	},
 	Payroll: {
@@ -58,10 +71,23 @@ const DASHBOARDS = {
 		create_label: __("New Salary Structure"),
 		create_doctype: "Salary Structure",
 		pills: [
-			{ label: __("Pay Structure"), icon: "briefcase", hue: "#3DDCB0", route: ["List", "Salary Structure"] },
-			{ label: __("Run Payroll"), icon: "wallet", hue: "#3DDCB0", route: ["List", "Payroll Entry"] },
-			{ label: __("Pay Stubs"), icon: "file", hue: "#3DDCB0", route: ["List", "Salary Slip"] },
-			{ label: __("Incentives"), icon: "spark", hue: "#F5C43C", route: ["List", "Employee Incentive"] },
+			{ label: __("Pay Structure"), icon: "briefcase", hue: "#90BA93", route: ["List", "Salary Structure"] },
+			{ label: __("Run Payroll"), icon: "wallet", hue: "#90BA93", route: ["List", "Payroll Entry"] },
+			{ label: __("Pay Stubs"), icon: "file", hue: "#90BA93", route: ["List", "Salary Slip"] },
+			{ label: __("Incentives"), icon: "spark", hue: "#11A5DD", route: ["List", "Employee Incentive"] },
+		],
+	},
+	"SS and Taxes": {
+		kicker: __("SS and Taxes"),
+		subtitle: __("Social Security contributions by week, team, and agent."),
+		empty_text: __("Run payroll and employee and employer SS amounts appear here."),
+		create_label: __("Open Social Security"),
+		create_doctype: "Salary Slip",
+		pills: [
+			{ label: __("Social Security"), icon: "file", hue: "#0f766e", route: ["query-report", "Social Security Deductions"] },
+			{ label: __("Pay Stubs"), icon: "wallet", hue: "#90BA93", route: ["List", "Salary Slip"] },
+			{ label: __("SS Contribution Table"), icon: "briefcase", hue: "#11A5DD", route: ["List", "Social Security Contribution Table"] },
+			{ label: __("Run Payroll"), icon: "spark", hue: "#16678C", route: ["List", "Payroll Entry"] },
 		],
 	},
 	Recruitment: {
@@ -71,10 +97,10 @@ const DASHBOARDS = {
 		create_label: __("New Job Opening"),
 		create_doctype: "Job Opening",
 		pills: [
-			{ label: __("Open Positions"), icon: "briefcase", hue: "#60A5FA", doctype: "Job Opening" },
-			{ label: __("Candidates"), icon: "users", hue: "#60A5FA", route: ["List", "Job Applicant"] },
-			{ label: __("Offer Letters"), icon: "spark", hue: "#3DDCB0", route: ["List", "Job Offer"] },
-			{ label: __("Interviews"), icon: "calendar", hue: "#60A5FA", route: ["List", "Interview"] },
+			{ label: __("Open Positions"), icon: "briefcase", hue: "#11A5DD", doctype: "Job Opening" },
+			{ label: __("Candidates"), icon: "users", hue: "#11A5DD", route: ["List", "Job Applicant"] },
+			{ label: __("Offer Letters"), icon: "spark", hue: "#90BA93", route: ["List", "Job Offer"] },
+			{ label: __("Interviews"), icon: "calendar", hue: "#11A5DD", route: ["List", "Interview"] },
 		],
 	},
 };
@@ -118,6 +144,7 @@ const DASHBOARD_ALIASES = {
 	Time: "Attendance",
 	Pay: "Payroll",
 	Talent: "Recruitment",
+	"SS and Taxes": "SS and Taxes",
 };
 
 function dashboard_name() {
@@ -212,6 +239,12 @@ const CELEBRATION_TYPES = {
 	anniversary: __("Anniversaries"),
 };
 
+const TEAMS_ICON = "/assets/hrms/images/integrations/teams.svg";
+const TEAMS_COLOR = "#5059C9";
+const TEAMS_CHANNEL_STORAGE = "staff_pro_teams_channel";
+
+let teamsChannelCache = null;
+
 function celebration_empty_message(eventType) {
 	if (eventType === "birthday") {
 		return __("No upcoming birthdays in this period.");
@@ -267,6 +300,213 @@ function parse_celebration_response(message) {
 	};
 }
 
+function celebration_first_name(name) {
+	return String(name || "")
+		.trim()
+		.split(/\s+/)[0] || name;
+}
+
+function celebration_date_label(row) {
+	if (row.event_date && typeof frappe.datetime?.str_to_user === "function") {
+		return frappe.datetime.str_to_user(row.event_date);
+	}
+	return [row.day, row.month].filter(Boolean).join(" ");
+}
+
+function celebration_teams_title(row) {
+	const name = row.employee_name || __("a teammate");
+	if (row.event_type === "anniversary") {
+		const years = row.years_completed
+			? __("{0} Year Work Anniversary", [row.years_completed])
+			: __("Work Anniversary");
+		return `${years}, ${name}`;
+	}
+	return __("Happy Birthday, {0}", [name]);
+}
+
+function celebration_teams_message(row) {
+	const name = row.employee_name || __("a teammate");
+	const first = celebration_first_name(name);
+	const when = celebration_date_label(row);
+	const lines = [];
+
+	if (row.event_type === "anniversary") {
+		const years = row.years_completed
+			? __("{0} Year Work Anniversary", [row.years_completed])
+			: __("Work Anniversary");
+		lines.push(`🏅 ${__("Please join us in celebrating {0}'s {1} on {2}!", [name, years, when])}`);
+	} else {
+		lines.push(`🎂 ${__("Let's wish {0} a happy birthday on {1}!", [name, when])}`);
+	}
+
+	if (row.subtitle) {
+		lines.push("");
+		lines.push(__("{0} is {1}.", [first, row.subtitle]));
+	}
+
+	lines.push("");
+	if (row.event_type === "anniversary") {
+		lines.push(__("Thank you for being part of the Staff Pro team. 🎉"));
+	} else {
+		lines.push(__("Drop a note and help us celebrate. 🎉"));
+	}
+
+	return lines.join("\n");
+}
+
+function read_local_teams_channel() {
+	try {
+		return JSON.parse(localStorage.getItem(TEAMS_CHANNEL_STORAGE) || "null") || {};
+	} catch (error) {
+		return {};
+	}
+}
+
+function write_local_teams_channel(channel) {
+	localStorage.setItem(
+		TEAMS_CHANNEL_STORAGE,
+		JSON.stringify({
+			channel_name: channel.channel_name || "",
+			webhook_url: channel.webhook_url || "",
+		})
+	);
+}
+
+function load_teams_channel(callback) {
+	if (teamsChannelCache) {
+		callback(teamsChannelCache);
+		return;
+	}
+
+	const local = read_local_teams_channel();
+	if (local.webhook_url) {
+		teamsChannelCache = local;
+		callback(local);
+		return;
+	}
+
+	frappe.call({
+		method: "hrms.hr.teams_announce.get_teams_channel",
+		callback(r) {
+			teamsChannelCache = r.message || {};
+			if (teamsChannelCache.webhook_url) {
+				write_local_teams_channel(teamsChannelCache);
+			}
+			callback(teamsChannelCache);
+		},
+		error() {
+			callback(local);
+		},
+	});
+}
+
+function style_teams_dialog_button(dialog) {
+	dialog.get_primary_btn().css({
+		backgroundColor: TEAMS_COLOR,
+		borderColor: TEAMS_COLOR,
+		color: "#fff",
+	});
+}
+
+function open_teams_announce_dialog(row) {
+	if (!row) return;
+
+	load_teams_channel((channel) => {
+		const dialog = new frappe.ui.Dialog({
+			title: __("Announce to Teams"),
+			fields: [
+				{
+					fieldtype: "HTML",
+					fieldname: "teams_help",
+					options: `<p class="sp-teams-announce__help">${escape_html(
+						__(
+							"Set the Teams channel once, then send. In Teams: channel ••• → Workflows → “Post to a channel when a webhook request is received”, and paste the URL below."
+						)
+					)}</p>`,
+				},
+				{
+					label: __("Teams channel"),
+					fieldname: "channel_name",
+					fieldtype: "Data",
+					reqd: 1,
+					default: channel.channel_name || "",
+					placeholder: __("e.g. General"),
+				},
+				{
+					label: __("Incoming webhook URL"),
+					fieldname: "webhook_url",
+					fieldtype: "Small Text",
+					reqd: 1,
+					default: channel.webhook_url || "",
+				},
+				{
+					label: __("Message"),
+					fieldname: "message",
+					fieldtype: "Text",
+					reqd: 1,
+					default: celebration_teams_message(row),
+				},
+				{
+					label: __("Remember this channel"),
+					fieldname: "save_channel",
+					fieldtype: "Check",
+					default: 1,
+				},
+			],
+			primary_action_label: __("Announce to Teams"),
+			primary_action(values) {
+				frappe.call({
+					method: "hrms.hr.teams_announce.announce_to_teams",
+					freeze: true,
+					freeze_message: __("Posting to Teams..."),
+					args: {
+						message: values.message,
+						webhook_url: values.webhook_url,
+						channel_name: values.channel_name,
+						title: celebration_teams_title(row),
+						save_channel: values.save_channel ? 1 : 0,
+					},
+					callback() {
+						const saved = {
+							channel_name: values.channel_name,
+							webhook_url: values.webhook_url,
+						};
+						teamsChannelCache = saved;
+						if (values.save_channel) {
+							write_local_teams_channel(saved);
+						}
+						dialog.hide();
+						const destination = values.channel_name
+							? __("Posted to {0}.", [values.channel_name])
+							: __("Posted to Teams.");
+						frappe.show_alert({ message: destination, indicator: "green" });
+					},
+				});
+			},
+		});
+		dialog.$wrapper.addClass("sp-teams-announce-dialog");
+		dialog.show();
+		style_teams_dialog_button(dialog);
+	});
+}
+
+function bind_celebration_rows($list, rows) {
+	$list.find(".sp-celebrations__person").on("click", function () {
+		const employee = $(this).closest(".sp-celebrations__row").data("employee");
+		if (employee) frappe.set_route("Form", "Employee", employee);
+	});
+
+	$list.find(".sp-celebrations__announce").each(function (idx) {
+		$(this).data("celebration", rows[idx]);
+	});
+
+	$list.find(".sp-celebrations__announce").on("click", function (e) {
+		e.preventDefault();
+		e.stopPropagation();
+		open_teams_announce_dialog($(this).data("celebration"));
+	});
+}
+
 function render_celebration_rows(rows, fallback = false, eventType = "all") {
 	if (!rows.length) {
 		return `
@@ -283,20 +523,26 @@ function render_celebration_rows(rows, fallback = false, eventType = "all") {
 	const rowsHtml = rows
 		.map(
 			(row) => `
-			<button type="button" class="sp-celebrations__row sp-celebrations__row--${row.event_type}" data-employee="${escape_html(row.employee)}">
-				<span class="sp-celebrations__avatar">${celebration_avatar(row)}</span>
-				<span class="sp-celebrations__meta">
-					<span class="sp-celebrations__name">${escape_html(row.employee_name)}</span>
-					<span class="sp-celebrations__details">
-						${celebration_type_label(row)}
-						${row.subtitle ? `<span class="sp-celebrations__role">${escape_html(row.subtitle)}</span>` : ""}
+			<div class="sp-celebrations__row sp-celebrations__row--${escape_html(row.event_type)}" data-employee="${escape_html(row.employee)}">
+				<button type="button" class="sp-celebrations__person" aria-label="${escape_html(row.employee_name)}">
+					<span class="sp-celebrations__avatar">${celebration_avatar(row)}</span>
+					<span class="sp-celebrations__meta">
+						<span class="sp-celebrations__name">${escape_html(row.employee_name)}</span>
+						<span class="sp-celebrations__details">
+							${celebration_type_label(row)}
+							${row.subtitle ? `<span class="sp-celebrations__role">${escape_html(row.subtitle)}</span>` : ""}
+						</span>
 					</span>
-				</span>
-				<span class="sp-celebrations__date">
-					<span class="sp-celebrations__day">${escape_html(String(row.day))}</span>
-					<span class="sp-celebrations__month">${escape_html(row.month)}</span>
-				</span>
-			</button>
+					<span class="sp-celebrations__date">
+						<span class="sp-celebrations__day">${escape_html(String(row.day))}</span>
+						<span class="sp-celebrations__month">${escape_html(row.month)}</span>
+					</span>
+				</button>
+				<button type="button" class="sp-celebrations__announce" title="${escape_html(__("Announce to Teams"))}" aria-label="${escape_html(__("Announce to Teams"))}">
+					<img class="sp-celebrations__announce-icon" src="${escape_html(TEAMS_ICON)}" alt="">
+					<span>${escape_html(__("Announce to Teams"))}</span>
+				</button>
+			</div>
 		`
 		)
 		.join("");
@@ -321,10 +567,7 @@ function load_celebrations($widget, period, eventType = "all") {
 			$list.removeClass("is-loading");
 			const { rows, fallback } = parse_celebration_response(r.message);
 			$list.html(render_celebration_rows(rows, fallback, eventType));
-			$list.find(".sp-celebrations__row").on("click", function () {
-				const employee = $(this).data("employee");
-				if (employee) frappe.set_route("Form", "Employee", employee);
-			});
+			bind_celebration_rows($list, rows);
 		},
 		error() {
 			$list.removeClass("is-loading");
@@ -339,82 +582,119 @@ function load_celebrations($widget, period, eventType = "all") {
 
 function inject_celebrations($root) {
 	if (dashboard_name() !== "Human Resource") {
-		$root.find(".sp-dash-split, .sp-dash-celebrations, .sp-dash-payroll").remove();
+		$root.find(".sp-dash-home, .sp-dash-split, .sp-dash-celebrations, .sp-dash-payroll, .sp-dash-inout").remove();
 		return;
 	}
 
-	if ($root.find(".sp-dash-split").length) return;
+	if ($root.find(".sp-dash-home").length) return;
+	$root.find(".sp-dash-split, .sp-dash-inout").remove();
 
 	const $pills = $root.find(".sp-dash-pills").first();
 	if (!$pills.length) return;
 
-	const $split = $(`
-		<section class="sp-dash-split">
-			<section class="sp-dash-panel sp-dash-celebrations" aria-label="${escape_html(__("Birthdays & Anniversaries"))}">
+	const $home = $(`
+		<div class="sp-dash-home">
+			<section class="sp-dash-split">
+				<section class="sp-dash-panel sp-dash-celebrations" aria-label="${escape_html(__("Birthdays & Anniversaries"))}">
+					<div class="sp-dash-panel__head">
+						<h2 class="sp-dash-panel__title">${escape_html(__("Birthdays & Anniversaries"))}</h2>
+						<div class="sp-dash-panel__filters">
+							<label class="sp-dash-panel__filter">
+								<span class="sr-only">${escape_html(__("Type"))}</span>
+								<select class="sp-celebrations__type-filter sp-dash-panel__select sp-dash-panel__select--solid">
+									<option value="all">${escape_html(CELEBRATION_TYPES.all)}</option>
+									<option value="birthday">${escape_html(CELEBRATION_TYPES.birthday)}</option>
+									<option value="anniversary">${escape_html(CELEBRATION_TYPES.anniversary)}</option>
+								</select>
+							</label>
+							<label class="sp-dash-panel__filter">
+								<span class="sr-only">${escape_html(__("Period"))}</span>
+								<select class="sp-celebrations__period sp-dash-panel__select sp-dash-panel__select--outline">
+									<option value="weekly">${escape_html(CELEBRATION_PERIODS.weekly)}</option>
+									<option value="monthly">${escape_html(CELEBRATION_PERIODS.monthly)}</option>
+									<option value="yearly">${escape_html(CELEBRATION_PERIODS.yearly)}</option>
+								</select>
+							</label>
+						</div>
+					</div>
+					<div class="sp-celebrations__list"></div>
+				</section>
+				<section class="sp-dash-panel sp-dash-payroll" aria-label="${escape_html(__("Upcoming Payroll"))}">
+					<div class="sp-dash-panel__head">
+						<h2 class="sp-dash-panel__title">${escape_html(__("Upcoming Payroll"))}</h2>
+						<div class="sp-dash-panel__filters">
+							<label class="sp-dash-panel__filter">
+								<span class="sr-only">${escape_html(__("Period"))}</span>
+								<select class="sp-payroll__period sp-dash-panel__select sp-dash-panel__select--outline">
+									<option value="monthly">${escape_html(__("Monthly"))}</option>
+									<option value="weekly">${escape_html(__("Weekly"))}</option>
+									<option value="yearly">${escape_html(__("Yearly"))}</option>
+								</select>
+							</label>
+						</div>
+					</div>
+					<div class="sp-payroll__table-wrap">
+						<div class="sp-payroll__table-head">
+							<span>${escape_html(__("Agent"))}</span>
+							<span>${escape_html(__("Status"))}</span>
+							<span>${escape_html(__("Pay Date"))}</span>
+							<span>${escape_html(__("Hours"))}</span>
+							<span>${escape_html(__("Net Pay"))}</span>
+						</div>
+						<div class="sp-payroll__list"></div>
+					</div>
+				</section>
+			</section>
+			<section class="sp-dash-panel sp-dash-inout" aria-label="${escape_html(__("In / Out today"))}">
 				<div class="sp-dash-panel__head">
-					<h2 class="sp-dash-panel__title">${escape_html(__("Birthdays & Anniversaries"))}</h2>
+					<h2 class="sp-dash-panel__title">${escape_html(__("In / Out today"))}</h2>
 					<div class="sp-dash-panel__filters">
 						<label class="sp-dash-panel__filter">
-							<span class="sr-only">${escape_html(__("Type"))}</span>
-							<select class="sp-celebrations__type-filter sp-dash-panel__select">
-								<option value="all">${escape_html(CELEBRATION_TYPES.all)}</option>
-								<option value="birthday">${escape_html(CELEBRATION_TYPES.birthday)}</option>
-								<option value="anniversary">${escape_html(CELEBRATION_TYPES.anniversary)}</option>
+							<span class="sr-only">${escape_html(__("Status"))}</span>
+							<select class="sp-inout-dash__status sp-dash-panel__select sp-dash-panel__select--solid">
+								<option value="all">${escape_html(__("All"))}</option>
+								<option value="IN">${escape_html(__("IN"))}</option>
+								<option value="OUT">${escape_html(__("OUT"))}</option>
 							</select>
 						</label>
-						<label class="sp-dash-panel__filter">
-							<span class="sr-only">${escape_html(__("Period"))}</span>
-							<select class="sp-celebrations__period sp-dash-panel__select">
-								<option value="weekly">${escape_html(CELEBRATION_PERIODS.weekly)}</option>
-								<option value="monthly">${escape_html(CELEBRATION_PERIODS.monthly)}</option>
-								<option value="yearly">${escape_html(CELEBRATION_PERIODS.yearly)}</option>
-							</select>
-						</label>
+						<button type="button" class="sp-inout-dash__open">${escape_html(__("View all"))}</button>
 					</div>
 				</div>
-				<div class="sp-celebrations__list"></div>
-			</section>
-			<section class="sp-dash-panel sp-dash-payroll" aria-label="${escape_html(__("Upcoming Payroll"))}">
-				<div class="sp-dash-panel__head">
-					<h2 class="sp-dash-panel__title">${escape_html(__("Upcoming Payroll"))}</h2>
-					<div class="sp-dash-panel__filters">
-						<label class="sp-dash-panel__filter">
-							<span class="sr-only">${escape_html(__("Period"))}</span>
-							<select class="sp-payroll__period sp-dash-panel__select">
-								<option value="monthly">${escape_html(__("Monthly"))}</option>
-								<option value="weekly">${escape_html(__("Weekly"))}</option>
-								<option value="yearly">${escape_html(__("Yearly"))}</option>
-							</select>
-						</label>
+				<div class="sp-inout-dash__totals" aria-live="polite"></div>
+				<div class="sp-inout-dash__table-wrap">
+					<div class="sp-inout-dash__table-head">
+						<span>${escape_html(__("Name"))}</span>
+						<span>${escape_html(__("In / Out"))}</span>
+						<span>${escape_html(__("Time"))}</span>
+						<span>${escape_html(__("Job / Pto Code"))}</span>
+						<span>${escape_html(__("Device ID"))}</span>
 					</div>
-				</div>
-				<div class="sp-payroll__table-wrap">
-					<div class="sp-payroll__table-head">
-						<span>${escape_html(__("Agent"))}</span>
-						<span>${escape_html(__("Status"))}</span>
-						<span>${escape_html(__("Pay Date"))}</span>
-						<span>${escape_html(__("Hours"))}</span>
-						<span>${escape_html(__("Net Pay"))}</span>
-					</div>
-					<div class="sp-payroll__list"></div>
+					<div class="sp-inout-dash__list"></div>
 				</div>
 			</section>
-		</section>
+		</div>
 	`);
 
-	$pills.after($split);
+	$pills.after($home);
 
-	const $celebrations = $split.find(".sp-dash-celebrations");
+	const $celebrations = $home.find(".sp-dash-celebrations");
 	reload_celebrations($celebrations);
 	$celebrations.find(".sp-celebrations__period, .sp-celebrations__type-filter").on("change", function () {
 		reload_celebrations($celebrations);
 	});
 
-	const $payroll = $split.find(".sp-dash-payroll");
+	const $payroll = $home.find(".sp-dash-payroll");
 	reload_payroll($payroll);
 	$payroll.find(".sp-payroll__period").on("change", function () {
 		reload_payroll($payroll);
 	});
+
+	const $inout = $home.find(".sp-dash-inout");
+	$inout.find(".sp-inout-dash__open").on("click", () => go(["in-out-today"]));
+	$inout.find(".sp-inout-dash__status").on("change", function () {
+		render_inout_rows($inout);
+	});
+	load_inout($inout);
 }
 
 function format_hours(value) {
@@ -501,6 +781,97 @@ function load_payroll($widget, period) {
 	});
 }
 
+function inout_status_label(row) {
+	if (row.late) return __("LATE");
+	return row.status || __("OUT");
+}
+
+function inout_status_class(row) {
+	if (row.late) return "is-late";
+	if (row.status === "IN") return "is-in";
+	return "is-out";
+}
+
+function render_inout_empty(message) {
+	return `
+		<div class="sp-inout-dash__empty">
+			<p>${escape_html(message)}</p>
+		</div>
+	`;
+}
+
+function filtered_inout_rows($widget) {
+	const rows = $widget.data("inout-rows") || [];
+	const status = $widget.find(".sp-inout-dash__status").val() || "all";
+	if (status === "all") return rows;
+	return rows.filter((row) => row.status === status);
+}
+
+function render_inout_totals($widget, totals) {
+	const data = totals || {};
+	$widget.find(".sp-inout-dash__totals").html(`
+		<span><strong>${escape_html(__("Total"))}:</strong> ${Number(data.total || 0)}</span>
+		<span><strong>${escape_html(__("IN"))}:</strong> ${Number(data.in_count || 0)}</span>
+		<span><strong>${escape_html(__("OUT"))}:</strong> ${Number(data.out_count || 0)}</span>
+		<span><strong>${escape_html(__("Late"))}:</strong> ${Number(data.late || 0)}</span>
+	`);
+}
+
+function render_inout_rows($widget) {
+	const $list = $widget.find(".sp-inout-dash__list");
+	const rows = filtered_inout_rows($widget);
+	if (!rows.length) {
+		$list.html(render_inout_empty(__("No agents to show for this filter.")));
+		return;
+	}
+
+	$list.html(
+		rows
+			.map(
+				(row) => `
+			<button type="button" class="sp-inout-dash__row" data-employee="${escape_html(row.employee)}">
+				<span class="sp-inout-dash__agent">
+					<span class="sp-inout-dash__name">${escape_html(row.employee_name || row.employee || "")}</span>
+					${row.department ? `<span class="sp-inout-dash__dept">${escape_html(row.department)}</span>` : ""}
+				</span>
+				<span class="sp-inout-dash__status-pill ${inout_status_class(row)}">${escape_html(inout_status_label(row))}</span>
+				<span class="sp-inout-dash__time">${escape_html(row.time || "—")}</span>
+				<span class="sp-inout-dash__pto">${escape_html(row.pto_code || "—")}</span>
+				<span class="sp-inout-dash__device">${escape_html(row.device_id || "—")}</span>
+			</button>
+		`
+			)
+			.join("")
+	);
+
+	$list.find(".sp-inout-dash__row").on("click", function () {
+		const employee = $(this).data("employee");
+		if (employee) frappe.set_route("Form", "Employee", employee);
+	});
+}
+
+function load_inout($widget) {
+	const $list = $widget.find(".sp-inout-dash__list");
+	$list.addClass("is-loading");
+
+	frappe.call({
+		method: "hrms.hr.page.in_out_today.in_out_today.get_in_out_today",
+		callback(r) {
+			$list.removeClass("is-loading");
+			const payload = r.message || {};
+			$widget.data("inout-rows", payload.details || []);
+			render_inout_totals($widget, payload.totals);
+			render_inout_rows($widget);
+		},
+		error() {
+			$list.removeClass("is-loading");
+			$widget.data("inout-rows", []);
+			render_inout_totals($widget, {});
+			$list.html(render_inout_empty(__("Could not load today's timeclock.")));
+		},
+	});
+}
+
 function inject_quick_actions($root) {
 	$root.find(".sp-dash-hero").remove();
 	$root.removeClass("staff-pro-has-hero");
@@ -521,7 +892,7 @@ function inject_quick_actions($root) {
 	cfg.pills.forEach((pill) => {
 		const $btn = $(`
 			<button type="button" class="sp-dash-pill">
-				<span class="sp-dash-pill__icon" style="--sp-icon-accent:${pill.hue || "#3DDCB0"}">${ICONS[pill.icon] || ICONS.spark}</span>
+				<span class="sp-dash-pill__icon" style="--sp-icon-accent:${pill.hue || "#90BA93"}">${ICONS[pill.icon] || ICONS.spark}</span>
 				<span class="sp-dash-pill__label">${escape_html(pill.label)}</span>
 			</button>
 		`);

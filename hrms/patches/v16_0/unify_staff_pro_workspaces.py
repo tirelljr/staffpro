@@ -20,7 +20,8 @@ NEW_WORKSPACES = [
 	"Pay",
 	"SS and Taxes",
 	"Talent",
-	"Finance & Admin",
+	"Finance",
+	"Admin",
 ]
 
 OLD_DESKTOP_ICONS = OLD_WORKSPACES[:]
@@ -31,7 +32,8 @@ NEW_DESKTOP_ICONS = [
 	"Pay",
 	"SS and Taxes",
 	"Talent",
-	"Finance & Admin",
+	"Finance",
+	"Admin",
 ]
 
 
@@ -63,13 +65,15 @@ def execute():
 		if frappe.db.exists("Desktop Icon", name):
 			frappe.db.set_value("Desktop Icon", name, "hidden", 0, update_modified=False)
 
-	# Root Staff Pro BPO icon should open Workforce, not Framework People
+	# Root Staff Pro BPO icon should open the People dashboard, not a workspace page
+	from hrms.boot import STAFF_PRO_DESK_HOME
+
 	if frappe.db.exists("Desktop Icon", "Staff Pro BPO"):
 		frappe.db.set_value(
 			"Desktop Icon",
 			"Staff Pro BPO",
 			"link",
-			"/desk/workforce",
+			f"/{STAFF_PRO_DESK_HOME}",
 			update_modified=False,
 		)
 

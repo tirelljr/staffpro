@@ -1,11 +1,40 @@
 import frappe
+from frappe import _
 
-STAFF_PRO_DESK_HOME = "workforce"
+STAFF_PRO_DESK_HOME_DASHBOARD = "Human Resource"
+STAFF_PRO_DESK_HOME = f"desk/dashboard-view/{STAFF_PRO_DESK_HOME_DASHBOARD}"
+STAFF_PRO_DESK_HOME_ROUTE = ["dashboard-view", STAFF_PRO_DESK_HOME_DASHBOARD]
 STAFF_PRO_PORTAL_ROUTES = {
-	"hr": f"/desk/{STAFF_PRO_DESK_HOME}",
-	"accounting": "/desk/home",
-	"admin": "/app/build",
+	"hr": f"/{STAFF_PRO_DESK_HOME}",
+	"accounting": "/desk/finance",
+	"admin": "/desk/admin",
 }
+STAFF_PRO_INTEGRATIONS = [
+	{
+		"name": "quickbooks",
+		"label": "QuickBooks",
+		"url": "https://qbo.intuit.com",
+		"icon": "/assets/hrms/images/integrations/quickbooks.svg",
+	},
+	{
+		"name": "whatsapp",
+		"label": "WhatsApp",
+		"url": "https://web.whatsapp.com",
+		"icon": "/assets/hrms/images/integrations/whatsapp.svg",
+	},
+	{
+		"name": "freshdesk",
+		"label": "Freshdesk",
+		"url": "https://freshdesk.com/login",
+		"icon": "/assets/hrms/images/integrations/freshdesk.svg",
+	},
+	{
+		"name": "teams",
+		"label": "Teams",
+		"url": "https://teams.microsoft.com",
+		"icon": "/assets/hrms/images/integrations/teams.svg",
+	},
+]
 STAFF_PRO_BRAND = {
 	"title": "Staff Pro BPO",
 	"logo_url": "/assets/hrms/images/staff-pro-bpo-logo.png",
@@ -18,6 +47,7 @@ WORKSPACE_DASHBOARD_ALIASES = {
 	"Time": "Attendance",
 	"Pay": "Payroll",
 	"Talent": "Recruitment",
+	"SS and Taxes": "SS and Taxes",
 }
 
 
@@ -65,10 +95,32 @@ def is_staff_pro_desk_admin(user=None):
 
 
 def get_staff_pro_home_page(user):
-	"""Send desk admins to the Workforce hub after login."""
+	"""Send desk admins to the People dashboard after login."""
 	if is_staff_pro_desk_admin(user):
-		return f"desk/{STAFF_PRO_DESK_HOME}"
+		return STAFF_PRO_DESK_HOME
 	return None
+
+
+def _patch_get_default_path():
+	import frappe.apps as apps_module
+
+	if getattr(apps_module, "_staff_pro_patched_default_path", False):
+		return
+
+	apps_module._staff_pro_patched_default_path = True
+	original = apps_module.get_default_path
+
+	@frappe.whitelist()
+	@apps_module.request_cache
+	def get_default_path():
+		if is_staff_pro_desk_admin():
+			return f"/{STAFF_PRO_DESK_HOME}"
+		return original()
+
+	apps_module.get_default_path = get_default_path
+
+
+_patch_get_default_path()
 
 
 def extend_bootinfo(bootinfo):
@@ -80,9 +132,12 @@ def extend_bootinfo(bootinfo):
 
 	if is_staff_pro_desk_admin():
 		bootinfo["staff_pro_skip_desktop"] = True
-		bootinfo["staff_pro_desk_home"] = STAFF_PRO_DESK_HOME
+		bootinfo["staff_pro_desk_home"] = STAFF_PRO_DESK_HOME_ROUTE
 		bootinfo["staff_pro_portal_routes"] = STAFF_PRO_PORTAL_ROUTES
 		bootinfo["staff_pro_brand"] = STAFF_PRO_BRAND
+		bootinfo["staff_pro_integrations"] = STAFF_PRO_INTEGRATIONS
+
+	_disable_app_onboarding_bootinfo(bootinfo)
 
 	first_name = ""
 	user = frappe.session.user
@@ -95,15 +150,42 @@ def extend_bootinfo(bootinfo):
 	bootinfo["staff_pro_bpo_sidebar_labels"] = get_sidebar_label_maps()
 
 
+def _disable_app_onboarding_bootinfo(bootinfo):
+	"""Keep module onboarding off even if System Settings has not been patched yet."""
+	sysdefaults = bootinfo.get("sysdefaults")
+	if sysdefaults is None:
+		bootinfo["sysdefaults"] = {"enable_onboarding": 0}
+	else:
+		sysdefaults["enable_onboarding"] = 0
+
+
 def get_sidebar_label_maps():
 	from hrms.hr.bpo_sidebar_labels import get_sidebar_label_maps as _get_maps
 
 	return _get_maps()
 
 
+@frappe.whitelist()
+def set_user_language(language: str | None = None):
+	"""Persist the signed-in user's desk language using Frappe's language resolution."""
+	from frappe.translate import get_lang_code
+
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Please sign in to change language"))
+
+	language = get_lang_code(language or "") or (language or "en")
+	if not frappe.db.exists("Language", language):
+		frappe.throw(_("Language {0} is not available").format(language))
+
+	user = frappe.get_doc("User", frappe.session.user)
+	user.language = language
+	user.save(ignore_permissions=True)
+	return language
+
+
 def hide_unused_erpnext_workspaces():
 	"""Hide ERPNext module workspaces so they do not appear beside Staff Pro BPO."""
 	from hrms.subscription_utils import update_erpnext_workspaces
 
-	# Always hide stock/CRM/etc. Accounting is surfaced via Finance & Admin instead.
+	# Always hide stock/CRM/etc. Accounting is surfaced via the Finance workspace.
 	update_erpnext_workspaces(disable=True)

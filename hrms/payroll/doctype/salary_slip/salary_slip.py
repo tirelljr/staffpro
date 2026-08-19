@@ -133,6 +133,13 @@ class SalarySlip(TransactionBase):
 		salary_structure: DF.Link
 		salary_withholding: DF.Link | None
 		salary_withholding_cycle: DF.Data | None
+		ss_category: DF.Literal["", "Standard", "Employment Injury Only"]
+		ss_employee_amount: DF.Currency
+		ss_employer_amount: DF.Currency
+		ss_insurable_earnings: DF.Currency
+		ss_number: DF.Data | None
+		ss_wage_band: DF.Data | None
+		ss_weekly_earnings: DF.Currency
 		standard_tax_exemption_amount: DF.Currency
 		start_date: DF.Date | None
 		status: DF.Literal["Draft", "Submitted", "Cancelled", "Withheld"]
@@ -949,6 +956,7 @@ class SalarySlip(TransactionBase):
 		# here so they are reflected in both saved slips and the preview generated
 		# by process_salary_structure, before totals are finalised below.
 		self.apply_regional_deductions()
+		self.apply_social_security_deductions()
 
 		self.set_precision_for_component_amounts()
 		self.set_net_pay()
@@ -959,6 +967,11 @@ class SalarySlip(TransactionBase):
 	def apply_regional_deductions(self):
 		"Hook point for region-specific salary slip deductions."
 		pass
+
+	def apply_social_security_deductions(self):
+		from hrms.payroll.social_security import apply_social_security
+
+		apply_social_security(self)
 
 	def set_net_pay(self):
 		self.total_deduction = self.get_component_totals("deductions")
@@ -1697,6 +1710,45 @@ class SalarySlip(TransactionBase):
 			)
 
 		self._component_based_variable_tax = {}
+		self._tax_adjustment = None
+		if self.payroll_period:
+			from hrms.payroll.tax_adjustments import (
+				apply_tax_exclusions_to_earnings,
+				get_active_tax_adjustment,
+				is_excluded_from_tax,
+				zero_tax_components,
+			)
+
+			self._tax_adjustment = get_active_tax_adjustment(
+				self.employee,
+				self.company,
+				self.payroll_period.name,
+				self.end_date or self.start_date,
+			)
+			apply_tax_exclusions_to_earnings(self, self._tax_adjustment)
+
+			if tax_components and is_excluded_from_tax(self._tax_adjustment):
+				zero_tax_components(self, tax_components)
+				return
+
+			if tax_components and self._tax_adjustment and flt(self._tax_adjustment.tax_amount_override):
+				override_amount = flt(self._tax_adjustment.tax_amount_override)
+				for tax_component in tax_components:
+					self._component_based_variable_tax.setdefault(tax_component, {})
+					self._component_based_variable_tax[tax_component].update(
+						{
+							"previous_total_paid_taxes": 0,
+							"total_structured_tax_amount": override_amount,
+							"current_structured_tax_amount": override_amount,
+							"full_tax_on_additional_earnings": 0,
+							"current_tax_amount": override_amount,
+						}
+					)
+					tax_row = get_salary_component_data(tax_component)
+					self.update_component_row(tax_row, override_amount, "deductions")
+				self.current_tax_amount = override_amount
+				return
+
 		if tax_components and self.payroll_period and self.salary_structure:
 			self.tax_slab = self.get_income_tax_slabs()
 			self.compute_taxable_earnings_for_year()
@@ -1854,6 +1906,9 @@ class SalarySlip(TransactionBase):
 			component_row.deduct_full_tax_on_selected_payroll_date = (
 				additional_salary.deduct_full_tax_on_selected_payroll_date
 			)
+			if cint(getattr(additional_salary, "exclude_from_tax", 0)):
+				component_row.is_tax_applicable = 0
+				component_row.deduct_full_tax_on_selected_payroll_date = 0
 		else:
 			component_row.default_amount = default_amount or amount
 			component_row.additional_amount = 0
@@ -1902,6 +1957,17 @@ class SalarySlip(TransactionBase):
 		return self.calculate_variable_tax(tax_component)
 
 	def calculate_variable_tax(self, tax_component, has_additional_salary_tax_component=False):
+		previous_company = getattr(frappe.local.flags, "company", None)
+		frappe.local.flags.company = self.company
+		try:
+			self._calculate_variable_tax(tax_component, has_additional_salary_tax_component)
+		finally:
+			if previous_company:
+				frappe.local.flags.company = previous_company
+			elif hasattr(frappe.local.flags, "company"):
+				delattr(frappe.local.flags, "company")
+
+	def _calculate_variable_tax(self, tax_component, has_additional_salary_tax_component=False):
 		self.previous_total_paid_taxes = self.get_tax_paid_in_period(
 			self.payroll_period.start_date, self.start_date, tax_component
 		)
@@ -1953,6 +2019,9 @@ class SalarySlip(TransactionBase):
 
 	def get_income_tax_slabs(self):
 		income_tax_slab = self._salary_structure_assignment.income_tax_slab
+		adjustment = getattr(self, "_tax_adjustment", None)
+		if not income_tax_slab and adjustment and adjustment.get("income_tax_slab"):
+			income_tax_slab = adjustment.income_tax_slab
 
 		if not income_tax_slab:
 			frappe.throw(
@@ -1991,6 +2060,13 @@ class SalarySlip(TransactionBase):
 		return (taxable_earnings + opening_taxable_earning) - exempted_amount, exempted_amount
 
 	def get_opening_for(self, field_to_select, start_date, end_date):
+		adjustment = getattr(self, "_tax_adjustment", None)
+		if adjustment and adjustment.get("adjustment_type") == "Include in Tax Period":
+			if field_to_select == "taxable_earnings_till_date" and flt(adjustment.opening_taxable_earnings):
+				return flt(adjustment.opening_taxable_earnings)
+			if field_to_select == "tax_deducted_till_date" and flt(adjustment.tax_deducted_till_date):
+				return flt(adjustment.tax_deducted_till_date)
+
 		if self._salary_structure_assignment.from_date < self.payroll_period.start_date:
 			return 0
 		return self._salary_structure_assignment.get(field_to_select) or 0

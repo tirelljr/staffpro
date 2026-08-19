@@ -1,8 +1,11 @@
 body[data-path="login"] {
-	--sp-navy: #16607a;
-	--sp-cyan: #00a6e8;
-	--sp-lime: #8cc040;
-	--sp-ink: #1e3a4c;
+	--sp-teal: #16678c;
+	--sp-navy: #16678c;
+	--sp-cyan: #11a5dd;
+	--sp-lime: #90ba93;
+	--sp-green: #90ba93;
+	--sp-light-cyan: #a7c8cc;
+	--sp-ink: #111111;
 	--sp-black: #000000;
 	background: #ffffff !important;
 	min-height: 100vh;
@@ -140,7 +143,7 @@ body[data-path="login"] .page-card-body input[type="password"] {
 
 body[data-path="login"] .page-card-body input:focus {
 	border-color: var(--sp-cyan) !important;
-	box-shadow: 0 0 0 3px rgba(0, 166, 232, 0.18) !important;
+	box-shadow: 0 0 0 3px rgba(17, 165, 221, 0.18) !important;
 	outline: none;
 }
 
@@ -161,9 +164,9 @@ body[data-path="login"] .sp-field-icon {
 
 body[data-path="login"] .es-button[data-variant="solid"] {
 	height: 48px !important;
-	border-radius: 12px !important;
-	background: #111111 !important;
-	border-color: #111111 !important;
+	border-radius: 999px !important;
+	background: var(--sp-teal) !important;
+	border-color: var(--sp-teal) !important;
 	color: #ffffff !important;
 	font-weight: 600 !important;
 	font-size: 15px !important;
@@ -171,8 +174,9 @@ body[data-path="login"] .es-button[data-variant="solid"] {
 
 body[data-path="login"] .es-button[data-variant="solid"]:hover,
 body[data-path="login"] .es-button[data-variant="solid"]:focus {
-	background: #16607a !important;
-	border-color: #16607a !important;
+	background: #125a7a !important;
+	border-color: #125a7a !important;
+	color: #ffffff !important;
 }
 
 body[data-path="login"] .btn-login-option {
@@ -185,7 +189,7 @@ body[data-path="login"] .btn-login-option {
 
 body[data-path="login"] a[href="#forgot"],
 body[data-path="login"] .sign-up-message a {
-	color: var(--sp-navy) !important;
+	color: var(--sp-cyan) !important;
 	font-weight: 600;
 }
 

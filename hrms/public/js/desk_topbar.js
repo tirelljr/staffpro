@@ -10,7 +10,7 @@ header.staff-pro-topbar {
 	max-height: 56px !important;
 	margin: 0 !important;
 	padding: 0 !important;
-	overflow: hidden !important;
+	overflow: visible !important;
 	background: #ffffff !important;
 	border: 0 !important;
 	border-bottom: 1px solid #ececec !important;
@@ -66,7 +66,7 @@ header.staff-pro-topbar {
 	width: 8px !important;
 	height: 8px !important;
 	border-radius: 50% !important;
-	background: #00a6e8 !important;
+	background: #11a5dd !important;
 	flex-shrink: 0 !important;
 }
 .staff-pro-topbar__center {
@@ -191,11 +191,12 @@ header.staff-pro-topbar {
 	border-radius: 50% !important;
 }
 .staff-pro-topbar__lang-wrap { position: relative !important; }
+.staff-pro-topbar__lang.is-open {
+	background: #eceef1 !important;
+}
 .staff-pro-topbar__menu {
-	position: absolute !important;
-	top: calc(100% + 8px) !important;
-	right: 0 !important;
-	z-index: 40 !important;
+	position: fixed !important;
+	z-index: 1050 !important;
 	min-width: 140px !important;
 	padding: 4px !important;
 	border-radius: 12px !important;
@@ -215,6 +216,150 @@ header.staff-pro-topbar {
 	color: #111827 !important;
 	cursor: pointer !important;
 }
+.staff-pro-topbar__menu-item:hover,
+.staff-pro-topbar__menu-item.is-active {
+	background: #f3f4f6 !important;
+}
+.staff-pro-topbar__menu-item.is-active {
+	font-weight: 600 !important;
+}
+.staff-pro-topbar__notifications-wrap { position: relative !important; }
+.staff-pro-topbar__icon-btn.is-open {
+	background: #eceef1 !important;
+}
+.staff-pro-topbar__notifications-panel {
+	position: fixed !important;
+	z-index: 1050 !important;
+	width: min(360px, calc(100vw - 24px)) !important;
+	max-height: min(480px, calc(100vh - 80px)) !important;
+	display: flex !important;
+	flex-direction: column !important;
+	border-radius: 12px !important;
+	background: #fff !important;
+	border: 1px solid #eef0f2 !important;
+	box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12) !important;
+	overflow: hidden !important;
+}
+.staff-pro-topbar__notifications-panel.hidden,
+.staff-pro-topbar__menu.hidden {
+	display: none !important;
+}
+.staff-pro-topbar__notifications-backdrop {
+	position: fixed !important;
+	inset: 0 !important;
+	z-index: 1049 !important;
+	background: transparent !important;
+}
+.staff-pro-topbar__notifications-backdrop.hidden {
+	display: none !important;
+}
+.staff-pro-topbar__notifications-header {
+	display: flex !important;
+	align-items: center !important;
+	justify-content: space-between !important;
+	gap: 12px !important;
+	padding: 12px 14px !important;
+	border-bottom: 1px solid #eef0f2 !important;
+}
+.staff-pro-topbar__notifications-title {
+	font-size: 14px !important;
+	font-weight: 700 !important;
+	color: #111827 !important;
+}
+.staff-pro-topbar__notifications-actions {
+	display: flex !important;
+	align-items: center !important;
+	gap: 4px !important;
+}
+.staff-pro-topbar__notifications-action {
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	width: 28px !important;
+	height: 28px !important;
+	border: 0 !important;
+	border-radius: 8px !important;
+	background: transparent !important;
+	color: #6b7280 !important;
+	cursor: pointer !important;
+}
+.staff-pro-topbar__notifications-action:hover {
+	background: #f3f4f6 !important;
+	color: #111827 !important;
+}
+.staff-pro-topbar__notifications-body {
+	flex: 1 1 auto !important;
+	min-height: 0 !important;
+	overflow-y: auto !important;
+}
+.staff-pro-topbar__notification-item {
+	display: flex !important;
+	align-items: flex-start !important;
+	gap: 10px !important;
+	width: 100% !important;
+	padding: 12px 14px !important;
+	border: 0 !important;
+	border-bottom: 1px solid #f3f4f6 !important;
+	background: transparent !important;
+	text-align: left !important;
+	cursor: pointer !important;
+}
+.staff-pro-topbar__notification-item:hover {
+	background: #f9fafb !important;
+}
+.staff-pro-topbar__notification-item.is-unread {
+	background: #f8fbff !important;
+}
+.staff-pro-topbar__notification-item .avatar {
+	width: 32px !important;
+	height: 32px !important;
+	flex-shrink: 0 !important;
+}
+.staff-pro-topbar__notification-content {
+	flex: 1 1 auto !important;
+	min-width: 0 !important;
+}
+.staff-pro-topbar__notification-message {
+	font-size: 13px !important;
+	line-height: 1.4 !important;
+	color: #111827 !important;
+}
+.staff-pro-topbar__notification-time {
+	margin-top: 4px !important;
+	font-size: 11px !important;
+	color: #9ca3af !important;
+}
+.staff-pro-topbar__notifications-empty,
+.staff-pro-topbar__notifications-loading {
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	min-height: 180px !important;
+	padding: 24px 16px !important;
+	font-size: 13px !important;
+	color: #6b7280 !important;
+	text-align: center !important;
+}
+.staff-pro-topbar__notifications-footer {
+	padding: 10px 14px !important;
+	border-top: 1px solid #eef0f2 !important;
+}
+.staff-pro-topbar__notifications-footer-btn {
+	display: block !important;
+	width: 100% !important;
+	padding: 8px 12px !important;
+	border: 0 !important;
+	border-radius: 8px !important;
+	background: transparent !important;
+	text-align: center !important;
+	font-size: 13px !important;
+	font-weight: 600 !important;
+	color: #11a5dd !important;
+	cursor: pointer !important;
+}
+.staff-pro-topbar__notifications-footer-btn:hover {
+	background: #f3f4f6 !important;
+}
 .staff-pro-topbar__search-toggle { display: none !important; }
 @media (max-width: 767px) {
 	.staff-pro-topbar__center { display: none !important; }
@@ -227,17 +372,27 @@ hrms.ui.TopBar = class {
 	constructor() {
 		this.$wrapper = null;
 		this.language_open = false;
+		this.notifications_open = false;
+		this.notifications_loaded = false;
+		this.notifications_loading = false;
+		this.notification_items = [];
 		this.bound = false;
+		this.on_reposition_menu = () => {
+			this.position_language_menu();
+			this.position_notifications_panel();
+		};
 		this.inject_css();
 		this.make();
 	}
 
 	inject_css() {
-		if (document.getElementById("staff-pro-topbar-css")) return;
-		const style = document.createElement("style");
-		style.id = "staff-pro-topbar-css";
+		let style = document.getElementById("staff-pro-topbar-css");
+		if (!style) {
+			style = document.createElement("style");
+			style.id = "staff-pro-topbar-css";
+			document.head.appendChild(style);
+		}
 		style.textContent = TOPBAR_CSS;
-		document.head.appendChild(style);
 	}
 
 	make() {
@@ -261,9 +416,92 @@ hrms.ui.TopBar = class {
 
 	after_mount() {
 		if (!this.$wrapper) return;
+		this.ensure_language_picker();
+		this.ensure_notifications_picker();
 		this.bind();
 		this.refresh_context();
 		this.refresh_notifications();
+	}
+
+	ensure_notifications_picker() {
+		let $wrap = this.$wrapper.find(".staff-pro-topbar__notifications-wrap");
+		const $existingBtn = this.$wrapper.find("[data-action='notifications']").first();
+
+		if (!$("body .staff-pro-topbar__notifications-backdrop").length) {
+			$("body").append(
+				`<div class="staff-pro-topbar__notifications-backdrop hidden" data-action="notifications-backdrop" aria-hidden="true"></div>`
+			);
+		}
+
+		if (!$wrap.length) {
+			const $right = this.$wrapper.find(".staff-pro-topbar__right");
+			const badge = $existingBtn.find(".staff-pro-topbar__badge").first().prop("outerHTML") ||
+				`<span class="staff-pro-topbar__badge hidden">0</span>`;
+			const picker = $(`
+				<div class="staff-pro-topbar__notifications-wrap">
+					<div class="staff-pro-topbar__icon-btn" data-action="notifications" role="button" tabindex="0" title="${__("Notifications")}" aria-haspopup="dialog" aria-expanded="false" aria-label="${__("Notifications")}">
+						${frappe.utils.icon("bell", "sm")}
+						${badge}
+					</div>
+					<div class="staff-pro-topbar__notifications-panel hidden" role="dialog" aria-label="${__("Notifications")}"></div>
+				</div>
+			`);
+			if ($existingBtn.length) {
+				$existingBtn.replaceWith(picker);
+			} else {
+				$right.prepend(picker);
+			}
+			$wrap = this.$wrapper.find(".staff-pro-topbar__notifications-wrap");
+		}
+
+		if (!$wrap.find(".staff-pro-topbar__notifications-panel").length) {
+			$wrap.append(`<div class="staff-pro-topbar__notifications-panel hidden" role="dialog" aria-label="${__("Notifications")}"></div>`);
+		}
+
+		const $btn = $wrap.find("[data-action='notifications']");
+		if ($btn.length && !$btn.attr("aria-haspopup")) {
+			$btn.attr({
+				"aria-haspopup": "dialog",
+				"aria-expanded": "false",
+				"aria-label": __("Notifications"),
+			});
+		}
+	}
+
+	ensure_language_picker() {
+		const $wrap = this.$wrapper.find(".staff-pro-topbar__lang-wrap");
+		if (!$wrap.length) {
+			const lang = this.language_label();
+			const $right = this.$wrapper.find(".staff-pro-topbar__right");
+			const $avatar = $right.find(".staff-pro-topbar__avatar").first();
+			const picker = $(`
+				<div class="staff-pro-topbar__lang-wrap">
+					<div class="staff-pro-topbar__icon-btn staff-pro-topbar__lang" data-action="language" role="button" tabindex="0" title="${__("Language")}" aria-haspopup="listbox" aria-expanded="false" aria-label="${__("Change language")}">
+						${frappe.utils.escape_html(lang)}
+					</div>
+					<div class="staff-pro-topbar__menu hidden" role="listbox" aria-label="${__("Language")}"></div>
+				</div>
+			`);
+			if ($avatar.length) {
+				$avatar.before(picker);
+			} else {
+				$right.append(picker);
+			}
+			return;
+		}
+
+		if (!$wrap.find(".staff-pro-topbar__menu").length) {
+			$wrap.append(`<div class="staff-pro-topbar__menu hidden" role="listbox" aria-label="${__("Language")}"></div>`);
+		}
+
+		const $btn = $wrap.find("[data-action='language']");
+		if ($btn.length && !$btn.attr("aria-haspopup")) {
+			$btn.attr({
+				"aria-haspopup": "listbox",
+				"aria-expanded": "false",
+				"aria-label": __("Change language"),
+			});
+		}
 	}
 
 	template() {
@@ -298,18 +536,21 @@ hrms.ui.TopBar = class {
 						<div class="staff-pro-topbar__icon-btn staff-pro-topbar__search-toggle" data-action="search" role="button" tabindex="0" title="${__("Search")}">
 							${frappe.utils.icon("search", "sm")}
 						</div>
-						<div class="staff-pro-topbar__icon-btn" data-action="notifications" role="button" tabindex="0" title="${__("Notifications")}">
-							${frappe.utils.icon("bell", "sm")}
-							<span class="staff-pro-topbar__badge hidden">0</span>
+						<div class="staff-pro-topbar__notifications-wrap">
+							<div class="staff-pro-topbar__icon-btn" data-action="notifications" role="button" tabindex="0" title="${__("Notifications")}" aria-haspopup="dialog" aria-expanded="false" aria-label="${__("Notifications")}">
+								${frappe.utils.icon("bell", "sm")}
+								<span class="staff-pro-topbar__badge hidden">0</span>
+							</div>
+							<div class="staff-pro-topbar__notifications-panel hidden" role="dialog" aria-label="${__("Notifications")}"></div>
 						</div>
 						<div class="staff-pro-topbar__icon-btn" data-action="settings" role="button" tabindex="0" title="${__("Settings")}">
 							${frappe.utils.icon("setting", "sm")}
 						</div>
 						<div class="staff-pro-topbar__lang-wrap">
-							<div class="staff-pro-topbar__icon-btn staff-pro-topbar__lang" data-action="language" role="button" tabindex="0" title="${__("Language")}">
+							<div class="staff-pro-topbar__icon-btn staff-pro-topbar__lang" data-action="language" role="button" tabindex="0" title="${__("Language")}" aria-haspopup="listbox" aria-expanded="false" aria-label="${__("Change language")}">
 								${frappe.utils.escape_html(lang)}
 							</div>
-							<div class="staff-pro-topbar__menu hidden"></div>
+							<div class="staff-pro-topbar__menu hidden" role="listbox" aria-label="${__("Language")}"></div>
 						</div>
 						<div class="staff-pro-topbar__avatar" data-action="profile" role="button" tabindex="0" title="${__("Profile")}">
 							${avatar}
@@ -321,41 +562,79 @@ hrms.ui.TopBar = class {
 	}
 
 	bind() {
-		if (!this.$wrapper || this.bound) return;
-		this.bound = true;
+		if (!this.$wrapper) return;
 
-		this.$wrapper.on("click", "[data-action='search']", () => this.open_search());
-		this.$wrapper.on("click", "[data-action='notifications']", () => this.open_notifications());
-		this.$wrapper.on("click", "[data-action='settings']", () => this.open_settings());
-		this.$wrapper.on("click", "[data-action='profile']", () => this.open_profile());
-		this.$wrapper.on("click", "[data-action='language']", (e) => {
-			e.stopPropagation();
-			this.toggle_language_menu();
-		});
-		this.$wrapper.on("keydown", "[data-action]", (e) => {
-			if (e.key === "Enter" || e.key === " ") {
-				e.preventDefault();
-				$(e.currentTarget).trigger("click");
+		if (!this.bound) {
+			this.bound = true;
+
+			this.$wrapper.on("click", "[data-action='search']", () => this.open_search());
+			this.$wrapper.on("click", "[data-action='notifications']", (e) => {
+				e.stopPropagation();
+				this.toggle_notifications_panel();
+			});
+			this.$wrapper.on("click", "[data-action='settings']", () => this.open_settings());
+			this.$wrapper.on("click", "[data-action='profile']", () => this.open_profile());
+			this.$wrapper.on("click", "[data-action='language']", (e) => {
+				e.stopPropagation();
+				this.toggle_language_menu();
+			});
+			this.$wrapper.on("keydown", "[data-action]", (e) => {
+				if (e.key === "Enter" || e.key === " ") {
+					e.preventDefault();
+					$(e.currentTarget).trigger("click");
+				}
+			});
+
+			$(document).on("page-change.staff-pro-topbar form-load.staff-pro-topbar", () => {
+				this.refresh_context();
+				this.close_notifications_panel();
+				this.close_language_menu();
+			});
+
+			if (frappe.router?.on) {
+				frappe.router.on("change", () => this.refresh_context());
 			}
-		});
 
+			if (frappe.realtime?.on) {
+				frappe.realtime.on("notification", () => {
+					this.refresh_notifications();
+					if (this.notifications_open) {
+						this.load_notifications(true);
+					}
+				});
+			}
+		}
+
+		$(document).off("click.staff-pro-topbar mousedown.staff-pro-topbar keydown.staff-pro-topbar");
 		$(document).on("click.staff-pro-topbar", (e) => {
-			if (!$(e.target).closest(".staff-pro-topbar__lang-wrap").length) {
+			if (!$(e.target).closest(".staff-pro-topbar__lang-wrap, .staff-pro-topbar__menu").length) {
 				this.close_language_menu();
 			}
+			if (
+				!$(e.target).closest(".staff-pro-topbar__notifications-wrap").length &&
+				!$(e.target).closest(".staff-pro-topbar__notifications-panel").length &&
+				!$(e.target).closest(".staff-pro-topbar__notifications-backdrop").length
+			) {
+				this.close_notifications_panel();
+			}
 		});
 
-		$(document).on("page-change.staff-pro-topbar form-load.staff-pro-topbar", () => {
-			this.refresh_context();
+		$(document).on("mousedown.staff-pro-topbar", (e) => {
+			if (
+				!$(e.target).closest(".staff-pro-topbar__notifications-wrap").length &&
+				!$(e.target).closest(".staff-pro-topbar__notifications-panel").length &&
+				!$(e.target).closest(".staff-pro-topbar__notifications-backdrop").length
+			) {
+				this.close_notifications_panel();
+			}
 		});
 
-		if (frappe.router?.on) {
-			frappe.router.on("change", () => this.refresh_context());
-		}
-
-		if (frappe.realtime?.on) {
-			frappe.realtime.on("notification", () => this.refresh_notifications());
-		}
+		$(document).on("keydown.staff-pro-topbar", (e) => {
+			if (e.key === "Escape") {
+				this.close_language_menu();
+				this.close_notifications_panel();
+			}
+		});
 	}
 
 	refresh_context() {
@@ -366,6 +645,10 @@ hrms.ui.TopBar = class {
 		this.$wrapper
 			.find(".staff-pro-topbar__avatar")
 			.attr("title", this.is_intake_flow() ? __("Logout") : __("Profile"));
+		this.$wrapper
+			.find("[data-action='language']")
+			.not(".is-open")
+			.text(this.language_label());
 	}
 
 	get_context() {
@@ -445,13 +728,228 @@ hrms.ui.TopBar = class {
 		}
 	}
 
-	open_notifications() {
-		const $btn = $(".sidebar-notification");
-		if ($btn.length) {
-			$btn.trigger("click");
+	position_notifications_panel() {
+		if (!this.notifications_open || !this.$wrapper) return;
+		const $btn = this.$wrapper.find("[data-action='notifications']");
+		const $panel = this.$wrapper.find(".staff-pro-topbar__notifications-panel");
+		const btn = $btn.get(0);
+		if (!btn) return;
+
+		const rect = btn.getBoundingClientRect();
+		$panel.css({
+			top: `${rect.bottom + 8}px`,
+			right: `${window.innerWidth - rect.right}px`,
+			left: "auto",
+		});
+	}
+
+	render_notifications_shell() {
+		return `
+			<div class="staff-pro-topbar__notifications-header">
+				<div class="staff-pro-topbar__notifications-title">${__("Notifications")}</div>
+				<div class="staff-pro-topbar__notifications-actions">
+					<button type="button" class="staff-pro-topbar__notifications-action" data-action="mark-all-read" title="${__("Mark all as read")}">
+						${frappe.utils.icon("check-check", "sm")}
+					</button>
+					<button type="button" class="staff-pro-topbar__notifications-action" data-action="notification-settings" title="${__("Notification Settings")}">
+						${frappe.utils.icon("setting", "sm")}
+					</button>
+				</div>
+			</div>
+			<div class="staff-pro-topbar__notifications-body">
+				<div class="staff-pro-topbar__notifications-loading">${__("Loading...")}</div>
+			</div>
+			<div class="staff-pro-topbar__notifications-footer">
+				<button type="button" class="staff-pro-topbar__notifications-footer-btn" data-action="view-all-notifications">
+					${__("See all Activity")}
+				</button>
+			</div>
+		`;
+	}
+
+	get_notification_message(notification) {
+		let message = notification.title || notification.subject || notification.description || "";
+		if (typeof strip_html === "function") {
+			message = strip_html(message);
+		} else if (frappe.utils?.strip_html) {
+			message = frappe.utils.strip_html(message);
+		}
+		return message || __("New notification");
+	}
+
+	get_notification_route(notification) {
+		if (notification.link) {
+			return notification.link;
+		}
+		if (notification.document_type && notification.document_name) {
+			return frappe.utils.get_form_link(notification.document_type, notification.document_name);
+		}
+		return null;
+	}
+
+	render_notifications_list(notifications) {
+		this.notification_items = notifications;
+		const $body = this.$wrapper.find(".staff-pro-topbar__notifications-body");
+		if (!notifications.length) {
+			$body.html(`<div class="staff-pro-topbar__notifications-empty">${__("You have no notifications")}</div>`);
 			return;
 		}
-		frappe.app?.sidebar?.wrapper?.find(".dropdown-notifications")?.toggleClass("hidden");
+
+		const items = notifications
+			.map((notification) => {
+				const unread_class = notification.read ? "" : "is-unread";
+				const message = frappe.utils.escape_html(this.get_notification_message(notification));
+				const time = frappe.datetime.comment_when(notification.creation);
+				const avatar = frappe.avatar(notification.from_user || "Administrator", "avatar-medium");
+				return `
+					<button type="button" class="staff-pro-topbar__notification-item ${unread_class}" data-notification="${frappe.utils.escape_html(notification.name)}">
+						${avatar}
+						<span class="staff-pro-topbar__notification-content">
+							<span class="staff-pro-topbar__notification-message">${message}</span>
+							<span class="staff-pro-topbar__notification-time">${frappe.utils.escape_html(time)}</span>
+						</span>
+					</button>
+				`;
+			})
+			.join("");
+
+		$body.html(items);
+	}
+
+	load_notifications(force = false) {
+		if (this.notifications_loading) return;
+		if (this.notifications_loaded && !force) return;
+
+		this.notifications_loading = true;
+		const $body = this.$wrapper.find(".staff-pro-topbar__notifications-body");
+		$body.html(`<div class="staff-pro-topbar__notifications-loading">${__("Loading...")}</div>`);
+
+		frappe.call({
+			method: "frappe.desk.doctype.notification_log.notification_log.get_notification_logs",
+			args: { limit: 20 },
+			type: "GET",
+			callback: (response) => {
+				this.notifications_loading = false;
+				this.notifications_loaded = true;
+				const notifications = response.message?.notification_logs || [];
+				if (response.message?.user_info) {
+					frappe.update_user_info(response.message.user_info);
+				}
+				this.render_notifications_list(notifications);
+			},
+			error: () => {
+				this.notifications_loading = false;
+				$body.html(`<div class="staff-pro-topbar__notifications-empty">${__("Could not load notifications")}</div>`);
+			},
+		});
+	}
+
+	open_notification_route(route) {
+		if (!route) {
+			frappe.set_route("List", "Notification Log");
+			return;
+		}
+
+		if (route.startsWith("/app/")) {
+			frappe.set_route(route.replace(/^\/app\//, "").split("/").filter(Boolean));
+			return;
+		}
+
+		if (route.startsWith("#")) {
+			window.location.hash = route;
+			return;
+		}
+
+		frappe.set_route(route.split("/").filter(Boolean));
+	}
+
+	handle_notification_click(name) {
+		const notification = this.notification_items.find((item) => item.name === name);
+		this.close_notifications_panel();
+		if (name) {
+			frappe.call({
+				method: "frappe.desk.doctype.notification_log.notification_log.mark_as_read",
+				args: { docname: name },
+			});
+		}
+		this.open_notification_route(notification ? this.get_notification_route(notification) : null);
+		this.refresh_notifications();
+	}
+
+	mark_all_notifications_read() {
+		frappe.call({
+			method: "frappe.desk.doctype.notification_log.notification_log.mark_all_as_read",
+			callback: () => {
+				this.$wrapper.find(".staff-pro-topbar__notification-item").removeClass("is-unread");
+				if (frappe.boot) {
+					frappe.boot.notification_unread_count = 0;
+				}
+				this.refresh_notifications();
+			},
+		});
+	}
+
+	bind_notifications_panel_events() {
+		const $panel = this.$wrapper.find(".staff-pro-topbar__notifications-panel");
+		const $backdrop = $(".staff-pro-topbar__notifications-backdrop");
+		$backdrop.off("click.notifications").on("click.notifications", (e) => {
+			e.stopPropagation();
+			this.close_notifications_panel();
+		});
+		$panel.off("click.notifications").on("click.notifications", (e) => {
+			e.stopPropagation();
+		});
+		$panel.on("click.notifications", "[data-action='mark-all-read']", (e) => {
+			e.stopPropagation();
+			this.mark_all_notifications_read();
+		});
+		$panel.on("click.notifications", "[data-action='notification-settings']", (e) => {
+			e.stopPropagation();
+			this.close_notifications_panel();
+			frappe.set_route("Form", "Notification Settings", frappe.session.user);
+		});
+		$panel.on("click.notifications", "[data-action='view-all-notifications']", (e) => {
+			e.stopPropagation();
+			this.close_notifications_panel();
+			frappe.set_route("List", "Notification Log");
+		});
+		$panel.on("click.notifications", "[data-notification]", (e) => {
+			e.stopPropagation();
+			this.handle_notification_click($(e.currentTarget).data("notification"));
+		});
+	}
+
+	toggle_notifications_panel() {
+		if (this.notifications_open) {
+			this.close_notifications_panel();
+			return;
+		}
+
+		this.close_language_menu();
+		const $panel = this.$wrapper.find(".staff-pro-topbar__notifications-panel");
+		const $btn = this.$wrapper.find("[data-action='notifications']");
+		$panel.html(this.render_notifications_shell());
+		$panel.removeClass("hidden");
+		$(".staff-pro-topbar__notifications-backdrop").removeClass("hidden");
+		$btn.addClass("is-open").attr("aria-expanded", "true");
+		this.notifications_open = true;
+		this.bind_notifications_panel_events();
+		this.position_notifications_panel();
+		$(window).on("resize.staff-pro-topbar scroll.staff-pro-topbar", this.on_reposition_menu);
+		this.load_notifications();
+		frappe.call({
+			method: "frappe.desk.doctype.notification_log.notification_log.trigger_indicator_hide",
+		});
+	}
+
+	close_notifications_panel() {
+		this.notifications_open = false;
+		if (!this.language_open) {
+			$(window).off("resize.staff-pro-topbar scroll.staff-pro-topbar", this.on_reposition_menu);
+		}
+		this.$wrapper?.find(".staff-pro-topbar__notifications-panel").addClass("hidden");
+		$(".staff-pro-topbar__notifications-backdrop").addClass("hidden");
+		this.$wrapper?.find("[data-action='notifications']").removeClass("is-open").attr("aria-expanded", "false");
 	}
 
 	open_settings() {
@@ -480,11 +978,27 @@ hrms.ui.TopBar = class {
 	}
 
 	language_label() {
-		const lang = (frappe.boot?.lang || "en").split("-")[0];
-		return lang.slice(0, 2).toUpperCase();
+		return this.current_language_code().slice(0, 2).toUpperCase();
 	}
 
-	languages() {
+	normalize_language_code(code) {
+		return String(code || "en")
+			.trim()
+			.toLowerCase()
+			.replace(/_/g, "-")
+			.split("-")[0];
+	}
+
+	current_language_code() {
+		const lang =
+			frappe.boot?.lang ||
+			frappe.boot?.user?.language ||
+			frappe.defaults?.get_user_default?.("language") ||
+			"en";
+		return this.normalize_language_code(lang);
+	}
+
+	default_languages() {
 		return [
 			{ code: "en", label: "English" },
 			{ code: "es", label: "Español" },
@@ -494,27 +1008,107 @@ hrms.ui.TopBar = class {
 		];
 	}
 
+	languages() {
+		return this.language_options || this.default_languages();
+	}
+
+	load_language_options(callback) {
+		if (this.language_options) {
+			callback?.();
+			return;
+		}
+
+		frappe.call({
+			method: "frappe.translate.get_all_languages",
+			args: { with_language_name: true },
+			callback: (response) => {
+				const options = (response.message || [])
+					.map((language) => ({
+						code: language.language_code || language.name,
+						label: language.language_name || language.language_code || language.name,
+					}))
+					.filter((language) => language.code);
+
+				this.language_options = options.length ? options : this.default_languages();
+				callback?.();
+			},
+			error: () => {
+				this.language_options = this.default_languages();
+				callback?.();
+			},
+		});
+	}
+
+	render_language_menu() {
+		const $menu = this.$wrapper.find(".staff-pro-topbar__menu");
+		const current = this.current_language_code();
+		$menu.html(
+			this.languages()
+				.map(
+					(lang) => `
+						<div class="staff-pro-topbar__menu-item ${
+							this.normalize_language_code(lang.code) === current ? "is-active" : ""
+						}" data-lang="${frappe.utils.escape_html(lang.code)}" role="option" tabindex="0" aria-selected="${
+							this.normalize_language_code(lang.code) === current ? "true" : "false"
+						}">
+							${frappe.utils.escape_html(lang.label)}
+						</div>
+					`
+				)
+				.join("")
+		);
+		this.bind_language_menu_events($menu);
+	}
+
+	bind_language_menu_events($menu) {
+		$menu.off("mousedown.lang click.lang keydown.lang");
+		$menu.on("mousedown.lang click.lang", (e) => {
+			e.stopPropagation();
+		});
+		$menu.on("click.lang", "[data-lang]", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			this.set_language($(e.currentTarget).attr("data-lang"));
+		});
+		$menu.on("keydown.lang", "[data-lang]", (e) => {
+			if (e.key === "Enter" || e.key === " ") {
+				e.preventDefault();
+				e.stopPropagation();
+				this.set_language($(e.currentTarget).attr("data-lang"));
+			}
+		});
+	}
+
+	position_language_menu() {
+		if (!this.language_open || !this.$wrapper) return;
+		const $btn = this.$wrapper.find("[data-action='language']");
+		const $menu = this.$wrapper.find(".staff-pro-topbar__menu");
+		const btn = $btn.get(0);
+		if (!btn) return;
+
+		const rect = btn.getBoundingClientRect();
+		$menu.css({
+			top: `${rect.bottom + 8}px`,
+			right: `${window.innerWidth - rect.right}px`,
+			left: "auto",
+		});
+	}
+
 	toggle_language_menu() {
 		const $menu = this.$wrapper.find(".staff-pro-topbar__menu");
+		const $btn = this.$wrapper.find("[data-action='language']");
 		if (!this.language_open) {
-			const current = (frappe.boot?.lang || "en").split("-")[0];
-			$menu.html(
-				this.languages()
-					.map(
-						(lang) => `
-							<div class="staff-pro-topbar__menu-item ${
-								lang.code === current ? "is-active" : ""
-							}" data-lang="${lang.code}" role="button" tabindex="0">
-								${frappe.utils.escape_html(lang.label)}
-							</div>
-						`
-					)
-					.join("")
-			);
+			this.close_notifications_panel();
+			$menu.html(`<div class="staff-pro-topbar__menu-item is-active">${__("Loading...")}</div>`);
 			$menu.removeClass("hidden");
+			$btn.addClass("is-open").attr("aria-expanded", "true");
 			this.language_open = true;
-			$menu.off("click.lang").on("click.lang", "[data-lang]", (e) => {
-				this.set_language($(e.currentTarget).data("lang"));
+			this.position_language_menu();
+			$(window).on("resize.staff-pro-topbar scroll.staff-pro-topbar", this.on_reposition_menu);
+			this.load_language_options(() => {
+				if (!this.language_open) return;
+				this.render_language_menu();
+				this.position_language_menu();
 			});
 		} else {
 			this.close_language_menu();
@@ -523,23 +1117,54 @@ hrms.ui.TopBar = class {
 
 	close_language_menu() {
 		this.language_open = false;
+		if (!this.notifications_open) {
+			$(window).off("resize.staff-pro-topbar scroll.staff-pro-topbar", this.on_reposition_menu);
+		}
 		this.$wrapper?.find(".staff-pro-topbar__menu").addClass("hidden");
+		this.$wrapper?.find("[data-action='language']").removeClass("is-open").attr("aria-expanded", "false");
 	}
 
 	set_language(code) {
+		const normalized = this.normalize_language_code(code);
+		if (!normalized) return;
+
 		this.close_language_menu();
-		if (!code || code === (frappe.boot?.lang || "en").split("-")[0]) return;
 
 		frappe.call({
-			method: "frappe.client.set_value",
+			method: "hrms.boot.set_user_language",
 			args: {
-				doctype: "User",
-				name: frappe.session.user,
-				fieldname: "language",
-				value: code,
+				language: normalized,
 			},
-			callback() {
+			callback: () => {
+				frappe.show_alert({
+					message: __("Language updated"),
+					indicator: "green",
+				});
 				window.location.reload();
+			},
+			error: () => {
+				frappe.call({
+					method: "frappe.client.set_value",
+					args: {
+						doctype: "User",
+						name: frappe.session.user,
+						fieldname: "language",
+						value: normalized,
+					},
+					callback: () => {
+						frappe.show_alert({
+							message: __("Language updated"),
+							indicator: "green",
+						});
+						window.location.reload();
+					},
+					error: () => {
+						frappe.show_alert({
+							message: __("Could not update language"),
+							indicator: "red",
+						});
+					},
+				});
 			},
 		});
 	}

@@ -7,11 +7,12 @@ from hrms.hr.bpo_sidebar_labels import apply_bpo_labels
 
 WORKSPACE_FIXTURES = [
 	("Workforce", "hr/workspace/workforce/workforce.json"),
-	("People", "hr/workspace/people/people.json"),
 	("Time", "hr/workspace/time/time.json"),
 	("Talent", "hr/workspace/talent/talent.json"),
 	("Pay", "payroll/workspace/pay/pay.json"),
-	("Finance & Admin", "hr/workspace/finance_and_admin/finance_and_admin.json"),
+	("SS and Taxes", "payroll/workspace/ss_and_taxes/ss_and_taxes.json"),
+	("Finance", "hr/workspace/finance/finance.json"),
+	("Admin", "hr/workspace/admin/admin.json"),
 ]
 
 SIDEBAR_FIXTURES = {
@@ -19,7 +20,10 @@ SIDEBAR_FIXTURES = {
 	"Time": "workspace_sidebar/time.json",
 	"Talent": "workspace_sidebar/talent.json",
 	"Pay": "workspace_sidebar/pay.json",
+	"SS and Taxes": "workspace_sidebar/ss_and_taxes.json",
 	"People": "workspace_sidebar/workforce.json",
+	"Finance": "workspace_sidebar/finance.json",
+	"Admin": "workspace_sidebar/admin.json",
 }
 
 

@@ -26,6 +26,7 @@
   "amount",
   "column_break_8",
   "deduct_full_tax_on_selected_payroll_date",
+  "exclude_from_tax",
   "overwrite_salary_structure_amount",
   "properties_and_references_section",
   "ref_doctype",
@@ -75,9 +76,18 @@
   },
   {
    "default": "0",
+   "depends_on": "eval:doc.type==\"Earning\" && !doc.exclude_from_tax",
    "fieldname": "deduct_full_tax_on_selected_payroll_date",
    "fieldtype": "Check",
    "label": "Deduct Full Tax on Selected Payroll Date"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.type==\"Earning\"",
+   "description": "If checked, this bonus or adjustment is paid but does not count toward income tax.",
+   "fieldname": "exclude_from_tax",
+   "fieldtype": "Check",
+   "label": "Exclude from Income Tax"
   },
   {
    "fieldname": "column_break_5",

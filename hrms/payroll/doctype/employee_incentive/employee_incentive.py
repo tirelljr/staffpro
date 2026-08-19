@@ -27,6 +27,7 @@ class EmployeeIncentive(Document):
 		incentive_amount: DF.Currency
 		payroll_date: DF.Date
 		salary_component: DF.Link
+		exclude_from_tax: DF.Check
 	# end: auto-generated types
 
 	def validate(self):
@@ -54,4 +55,5 @@ class EmployeeIncentive(Document):
 		additional_salary.company = company
 		additional_salary.ref_doctype = self.doctype
 		additional_salary.ref_docname = self.name
+		additional_salary.exclude_from_tax = self.exclude_from_tax
 		additional_salary.submit()

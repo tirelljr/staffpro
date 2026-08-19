@@ -57,3 +57,12 @@ hrms.patches.v16_0.add_workspace_sidebar_icons #2026-08-16
 hrms.patches.v16_0.add_ss_and_taxes_workspace #2026-08-16
 hrms.patches.v16_0.apply_bpo_sidebar_labels #2026-08-16
 hrms.patches.v16_0.sync_bpo_sidebar_labels_from_fixtures #2026-08-16
+hrms.patches.v16_0.hide_duplicate_people_workspace #2026-08-18
+hrms.patches.v16_0.set_staff_pro_desk_home_dashboard #2026-08-18
+hrms.patches.v16_0.setup_belize_social_security #2026-08-18
+hrms.patches.v16_0.add_employee_social_security_number #2026-08-18
+hrms.patches.v16_0.add_employee_tax_adjustment #2026-08-19
+hrms.patches.v16_0.disable_app_onboarding #2026-08-18
+hrms.patches.v16_0.split_finance_and_admin #2026-08-18
+hrms.patches.v16_0.add_in_out_today_sidebar #2026-08-19
+hrms.patches.v16_0.add_data_analytics_dashboard #2026-08-19

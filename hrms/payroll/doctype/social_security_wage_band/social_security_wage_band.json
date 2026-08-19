@@ -1,0 +1,77 @@
+{
+ "actions": [],
+ "creation": "2026-08-18 23:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "band_label",
+  "from_weekly_earnings",
+  "to_weekly_earnings",
+  "insurable_earnings",
+  "employee_amount",
+  "employer_amount"
+ ],
+ "fields": [
+  {
+   "fieldname": "band_label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Wage Band",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "from_weekly_earnings",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "From Weekly Earnings",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "description": "Leave empty for the top (over) band.",
+   "fieldname": "to_weekly_earnings",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "To Weekly Earnings",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "insurable_earnings",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Weekly Insurable Earnings",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "employee_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Employee Contribution",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "employer_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Employer Contribution",
+   "non_negative": 1,
+   "reqd": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-18 23:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Payroll",
+ "name": "Social Security Wage Band",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "from_weekly_earnings",
+ "sort_order": "ASC",
+ "states": [],
+ "track_changes": 1
+}

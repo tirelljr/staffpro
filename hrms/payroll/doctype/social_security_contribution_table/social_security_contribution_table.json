@@ -1,0 +1,156 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 1,
+ "autoname": "field:title",
+ "creation": "2026-08-18 23:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Setup",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "disabled",
+  "section_break_main",
+  "title",
+  "effective_from",
+  "column_break_meta",
+  "company",
+  "currency",
+  "injury_only_section",
+  "injury_only_employee_amount",
+  "column_break_injury",
+  "injury_only_employer_amount",
+  "bands_section",
+  "bands"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
+  },
+  {
+   "fieldname": "section_break_main",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "effective_from",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Effective From",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_meta",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Leave empty to apply for all companies.",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "description": "Category (A) ages 60-64 receiving a Social Security benefit, and (B) all persons 65 and older. Covers Employment Injury Benefit only.",
+   "fieldname": "injury_only_section",
+   "fieldtype": "Section Break",
+   "label": "Employment Injury Only"
+  },
+  {
+   "default": "0",
+   "fieldname": "injury_only_employee_amount",
+   "fieldtype": "Currency",
+   "label": "Injury Only Employee Amount",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "column_break_injury",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "2.6",
+   "fieldname": "injury_only_employer_amount",
+   "fieldtype": "Currency",
+   "label": "Injury Only Employer Amount",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "bands_section",
+   "fieldtype": "Section Break",
+   "label": "Weekly Wage Bands"
+  },
+  {
+   "fieldname": "bands",
+   "fieldtype": "Table",
+   "label": "Wage Bands",
+   "options": "Social Security Wage Band",
+   "reqd": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-18 23:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Payroll",
+ "name": "Social Security Contribution Table",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR User",
+   "share": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "effective_from",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

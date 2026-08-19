@@ -1,12 +1,19 @@
 :root {
-	--sp-navy: #16607a;
-	--sp-cyan: #00a6e8;
-	--sp-lime: #8cc040;
-	--sp-ink: #1e3a4c;
+	--sp-teal: #16678c;
+	--sp-navy: var(--sp-teal);
+	--sp-cyan: #11a5dd;
+	--sp-lime: #90ba93;
+	--sp-green: #90ba93;
+	--sp-light-cyan: #a7c8cc;
+	--sp-deep: #205b76;
+	--sp-ink: #111111;
 	--sp-black: #000000;
+	--sp-icon-accent: var(--sp-green);
+	--sp-teal-hover: #125a7a;
+	--sp-cyan-hover: #0e94c4;
 
-	--primary: var(--sp-cyan);
-	--primary-color: var(--sp-cyan);
+	--primary: var(--sp-teal);
+	--primary-color: var(--sp-teal);
 }
 
 .navbar .app-logo,
@@ -17,24 +24,65 @@ header .app-logo,
 	width: auto;
 }
 
+/* Solid primary — teal fill, white text */
 .btn-primary {
-	background-color: var(--sp-cyan) !important;
-	border-color: var(--sp-cyan) !important;
+	background-color: var(--sp-teal) !important;
+	border-color: var(--sp-teal) !important;
+	color: #ffffff !important;
+	border-radius: 999px;
 }
 
 .btn-primary:hover,
 .btn-primary:active,
 .btn-primary:focus {
-	background-color: #0092cc !important;
-	border-color: #0092cc !important;
+	background-color: var(--sp-teal-hover) !important;
+	border-color: var(--sp-teal-hover) !important;
+	color: #ffffff !important;
 }
 
+/* Outlined brand — white fill, teal text + border */
+.btn-outline-accent {
+	background-color: #ffffff !important;
+	border: 1px solid var(--sp-teal) !important;
+	color: var(--sp-teal) !important;
+	border-radius: 999px;
+}
+
+.btn-outline-accent:hover,
+.btn-outline-accent:active,
+.btn-outline-accent:focus {
+	background-color: rgba(167, 200, 204, 0.35) !important;
+	border-color: var(--sp-teal) !important;
+	color: var(--sp-teal) !important;
+}
+
+/* Links stay a light cyan mix; body copy stays black */
 a,
 .btn-link {
 	--icon-stroke: var(--sp-cyan);
 }
 
+.btn-link,
+.layout-main-section a:not(.btn):not(.dropdown-item):not(.standard-sidebar-item),
+.modal-body a:not(.btn),
+.form-message a {
+	color: var(--sp-cyan);
+}
+
+.btn-link:hover,
+.layout-main-section a:not(.btn):not(.dropdown-item):not(.standard-sidebar-item):hover,
+.modal-body a:not(.btn):hover,
+.form-message a:hover {
+	color: var(--sp-cyan-hover);
+}
+
 input[type="checkbox"]:checked,
 input[type="radio"]:checked {
 	accent-color: var(--sp-cyan);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+	--focus-ring: 0 0 0 3px rgba(17, 165, 221, 0.18);
 }

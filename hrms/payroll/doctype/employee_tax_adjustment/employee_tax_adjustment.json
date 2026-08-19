@@ -1,0 +1,255 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "autoname": "HR-TAX-ADJ-.#####",
+ "creation": "2026-08-19 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "payroll_period",
+  "column_break_type",
+  "adjustment_type",
+  "valid_from",
+  "valid_to",
+  "amended_from",
+  "agents_section",
+  "employees",
+  "tax_treatment_section",
+  "exclude_bonuses",
+  "exclude_incentives",
+  "column_break_exclusions",
+  "exclude_overtime",
+  "exclude_commissions",
+  "excluded_components",
+  "include_override_section",
+  "income_tax_slab",
+  "tax_amount_override",
+  "column_break_opening",
+  "opening_taxable_earnings",
+  "tax_deducted_till_date",
+  "reason_section",
+  "reason"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "payroll_period",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Tax Period",
+   "options": "Payroll Period",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_type",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "adjustment_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Adjustment Type",
+   "options": "Exclude from Tax Period\nInclude in Tax Period",
+   "reqd": 1
+  },
+  {
+   "description": "Leave blank to apply for the full tax period. Use dates to limit the change to part of the year.",
+   "fieldname": "valid_from",
+   "fieldtype": "Date",
+   "label": "Valid From"
+  },
+  {
+   "fieldname": "valid_to",
+   "fieldtype": "Date",
+   "label": "Valid To"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Employee Tax Adjustment",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "agents_section",
+   "fieldtype": "Section Break",
+   "label": "Agents"
+  },
+  {
+   "fieldname": "employees",
+   "fieldtype": "Table",
+   "label": "Agents",
+   "options": "Employee Tax Adjustment Employee",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tax_treatment_section",
+   "fieldtype": "Section Break",
+   "label": "Earnings to Exclude from Tax"
+  },
+  {
+   "default": "0",
+   "description": "Campaign bonuses, annual bonuses, and other Bonus pay components will not count toward taxable income.",
+   "fieldname": "exclude_bonuses",
+   "fieldtype": "Check",
+   "label": "Exclude Bonuses from Tax"
+  },
+  {
+   "default": "0",
+   "description": "QA scores, campaign incentives, and other Incentive pay will not count toward taxable income.",
+   "fieldname": "exclude_incentives",
+   "fieldtype": "Check",
+   "label": "Exclude Incentives from Tax"
+  },
+  {
+   "fieldname": "column_break_exclusions",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "exclude_overtime",
+   "fieldtype": "Check",
+   "label": "Exclude Overtime from Tax"
+  },
+  {
+   "default": "0",
+   "fieldname": "exclude_commissions",
+   "fieldtype": "Check",
+   "label": "Exclude Commissions from Tax"
+  },
+  {
+   "description": "Optional. Specific pay components that should not be taxed, in addition to the categories above.",
+   "fieldname": "excluded_components",
+   "fieldtype": "Table",
+   "label": "Additional Non-Taxable Components",
+   "options": "Employee Tax Adjustment Component"
+  },
+  {
+   "depends_on": "eval:doc.adjustment_type==\"Include in Tax Period\"",
+   "fieldname": "include_override_section",
+   "fieldtype": "Section Break",
+   "label": "Include / Override"
+  },
+  {
+   "depends_on": "eval:doc.adjustment_type==\"Include in Tax Period\"",
+   "description": "Used if the agent does not already have an Income Tax Slab on their pay rate setup.",
+   "fieldname": "income_tax_slab",
+   "fieldtype": "Link",
+   "label": "Income Tax Slab",
+   "options": "Income Tax Slab"
+  },
+  {
+   "description": "If set, this amount is deducted as income tax on each pay stub in the validity window instead of the calculated PAYE amount.",
+   "fieldname": "tax_amount_override",
+   "fieldtype": "Currency",
+   "label": "Tax Amount Override (per pay period)",
+   "options": "Company:company:default_currency"
+  },
+  {
+   "fieldname": "column_break_opening",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.adjustment_type==\"Include in Tax Period\"",
+   "description": "Taxable pay already earned this tax year before this period (mid-year hire or previous employer).",
+   "fieldname": "opening_taxable_earnings",
+   "fieldtype": "Currency",
+   "label": "Opening Taxable Earnings",
+   "options": "Company:company:default_currency"
+  },
+  {
+   "depends_on": "eval:doc.adjustment_type==\"Include in Tax Period\"",
+   "description": "Income tax already withheld this tax year before this period.",
+   "fieldname": "tax_deducted_till_date",
+   "fieldtype": "Currency",
+   "label": "Tax Already Deducted",
+   "options": "Company:company:default_currency"
+  },
+  {
+   "fieldname": "reason_section",
+   "fieldtype": "Section Break",
+   "label": "Reason"
+  },
+  {
+   "description": "Required for audit. Example: agent projected under $26,000, contractor, mid-year hire, bonus campaign excluded.",
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "reqd": 1
+  }
+ ],
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-08-19 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Payroll",
+ "name": "Employee Tax Adjustment",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "payroll_period,adjustment_type",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "adjustment_type",
+ "track_changes": 1
+}

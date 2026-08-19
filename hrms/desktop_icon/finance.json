@@ -1,0 +1,35 @@
+{
+ "app": "hrms",
+ "bg_color": "gray",
+ "creation": "2026-08-18 23:47:37.926885",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon": "file-text",
+ "icon_type": "Link",
+ "idx": 5,
+ "label": "Finance",
+ "link_to": "Finance",
+ "link_type": "Workspace Sidebar",
+ "modified": "2026-08-18 23:52:38.448893",
+ "modified_by": "Administrator",
+ "name": "Finance",
+ "owner": "Administrator",
+ "parent_icon": "Staff Pro BPO",
+ "restrict_removal": 0,
+ "roles": [
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Administrator"
+  }
+ ],
+ "standard": 1
+}

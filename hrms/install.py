@@ -8,8 +8,10 @@ def after_install():
 		print("Setting up Staff Pro BPO...")
 		setup()
 		from hrms.branding import apply_branding
+		from hrms.patches.v16_0.disable_app_onboarding import execute as disable_app_onboarding
 
 		apply_branding()
+		disable_app_onboarding()
 
 		click.secho("Thank you for installing Staff Pro BPO!", fg="green")
 

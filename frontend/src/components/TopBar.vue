@@ -297,17 +297,23 @@ function onDocumentClick(event) {
 
 async function setLanguage(code) {
 	languageOpen.value = false
-	if (code === currentLanguage.value || !user.data?.name) return
+	const normalized = String(code || "en").trim().toLowerCase().split("-")[0]
+	if (!normalized || !user.data?.name) return
 	try {
-		await call("frappe.client.set_value", {
-			doctype: "User",
-			name: user.data.name,
-			fieldname: "language",
-			value: code,
-		})
+		await call("hrms.boot.set_user_language", { language: normalized })
 		window.location.reload()
 	} catch (error) {
-		console.error("Failed to update language", error)
+		try {
+			await call("frappe.client.set_value", {
+				doctype: "User",
+				name: user.data.name,
+				fieldname: "language",
+				value: normalized,
+			})
+			window.location.reload()
+		} catch (fallbackError) {
+			console.error("Failed to update language", fallbackError)
+		}
 	}
 }
 
@@ -377,7 +383,7 @@ onBeforeUnmount(() => {
 	width: 0.5rem;
 	height: 0.5rem;
 	border-radius: 9999px;
-	background: var(--sp-cyan, #00a6e8);
+	background: var(--sp-cyan, #11a5dd);
 	flex-shrink: 0;
 }
 

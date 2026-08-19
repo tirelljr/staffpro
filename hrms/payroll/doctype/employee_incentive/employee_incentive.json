@@ -18,7 +18,8 @@
   "currency",
   "column_break_11",
   "payroll_date",
-  "incentive_amount"
+  "incentive_amount",
+  "exclude_from_tax"
  ],
  "fields": [
   {
@@ -36,6 +37,13 @@
    "non_negative": 1,
    "options": "currency",
    "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "If checked, this incentive is paid but does not count toward income tax.",
+   "fieldname": "exclude_from_tax",
+   "fieldtype": "Check",
+   "label": "Exclude from Income Tax"
   },
   {
    "fieldname": "payroll_date",

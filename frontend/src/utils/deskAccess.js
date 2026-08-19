@@ -23,12 +23,13 @@ export function canOpenDesk(user) {
 	return roles.some((role) => DESK_ROLES.has(role))
 }
 
-export const DESK_HOME = "/desk/workforce"
+export const DESK_HOME = "/desk/dashboard-view/Human Resource"
 
 export const DESK_SHORTCUTS = [
-	{ title: "People", path: "/desk/workforce", icon: "users" },
+	{ title: "People", path: "/desk/dashboard-view/Human Resource", icon: "users" },
 	{ title: "Time", path: "/desk/time", icon: "clock" },
 	{ title: "Pay", path: "/desk/pay", icon: "dollar-sign" },
 	{ title: "Talent", path: "/desk/talent", icon: "award" },
-	{ title: "Finance & Admin", path: "/desk/finance-&-admin", icon: "briefcase" },
+	{ title: "Finance", path: "/desk/finance", icon: "file-text" },
+	{ title: "Admin", path: "/desk/admin", icon: "settings" },
 ]

@@ -3,6 +3,8 @@
 # Maps link_to (DocType, Page, Report, Dashboard) to user-facing label.
 LINK_LABELS: dict[str, str] = {
 	"Employee": "Agents",
+	"Data Analytics": "Data Analytics",
+	"in-out-today": "In / Out today",
 	"organizational-chart": "Team Structure",
 	"Employee Onboarding": "New Hire Onboarding",
 	"Employee Separation": "Offboarding",
@@ -77,6 +79,7 @@ LINK_LABELS: dict[str, str] = {
 	"Employee CTC Break-up": "Agent CTC Breakdown",
 	"Provident Fund Deductions": "Provident Fund",
 	"Employee Tax Exemption Sub Category": "Exemption Sub Category",
+	"Employee Tax Adjustment": "Tax Period Adjustments",
 	"Employee Tax Exemption Proof Submission": "Tax Exemption Proof",
 	"Employee Tax Exemption Declaration": "Tax Exemption Declaration",
 	"Employee Benefit Application": "Benefits Enrollment",
@@ -105,6 +108,8 @@ LABEL_LABELS: dict[str, str] = {
 	"Income Tax Computation": "Tax Computation",
 	"Income Tax Deductions": "Tax Deductions",
 	"Professional Tax Deductions": "Professional Tax",
+	"Social Security Deductions": "Social Security",
+	"Social Security Contribution Table": "SS Contribution Table",
 	"Vehicle Expenses": "Fleet Expenses",
 	"Purpose of Travel": "Travel Purpose",
 	"Travel Request": "Travel Requests",

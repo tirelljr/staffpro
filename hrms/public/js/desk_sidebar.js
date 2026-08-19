@@ -10,6 +10,8 @@ const SIDEBAR_CSS = `
 .workspace-dock {
 	flex: 0 0 72px !important;
 	width: 72px !important;
+	display: flex !important;
+	flex-direction: column !important;
 	background: #ffffff !important;
 	border-right: 1px solid #ececec !important;
 	padding: 10px 0 12px !important;
@@ -24,15 +26,32 @@ const SIDEBAR_CSS = `
 	border-radius: 8px !important;
 }
 .workspace-dock .workspace-dock-items,
-.workspace-dock .workspace-dock-shortcuts {
+.workspace-dock .workspace-dock-shortcuts,
+.workspace-dock .staff-pro-dock-integrations {
 	width: 100% !important;
 	padding: 0 4px !important;
 	gap: 4px !important;
 	align-items: center !important;
 }
+.workspace-dock .workspace-dock-items {
+	flex: 1 1 auto !important;
+	min-height: 0 !important;
+	overflow-y: auto !important;
+	scrollbar-width: none !important;
+}
+.workspace-dock .workspace-dock-items::-webkit-scrollbar {
+	display: none !important;
+}
+.workspace-dock .staff-pro-dock-integrations {
+	flex: 0 0 auto !important;
+	display: flex !important;
+	flex-direction: column !important;
+	padding-bottom: 4px !important;
+}
 .workspace-dock > .workspace-dock-item,
 .workspace-dock .workspace-dock-items > .workspace-dock-item,
-.workspace-dock .workspace-dock-shortcuts > .workspace-dock-item {
+.workspace-dock .workspace-dock-shortcuts > .workspace-dock-item,
+.workspace-dock .staff-pro-dock-integrations > .workspace-dock-item {
 	display: flex !important;
 	flex-direction: column !important;
 	align-items: center !important;
@@ -102,6 +121,16 @@ const SIDEBAR_CSS = `
 	min-height: 22px !important;
 	color: #000000 !important;
 }
+.workspace-dock .staff-pro-dock-integrations .workspace-dock-item img,
+.workspace-dock .staff-pro-dock-integrations .workspace-dock-item svg {
+	width: 24px !important;
+	height: 24px !important;
+	min-width: 24px !important;
+	min-height: 24px !important;
+	color: unset !important;
+	object-fit: contain !important;
+	border-radius: 5px !important;
+}
 .workspace-dock button.workspace-dock-item:hover {
 	background: #ececee !important;
 }
@@ -128,13 +157,19 @@ const SIDEBAR_CSS = `
 	overflow: hidden !important;
 	word-break: break-word !important;
 }
-.workspace-dock .workspace-dock-shortcuts .workspace-dock-item {
-	min-height: 64px !important;
-	padding: 6px 2px 6px !important;
+.workspace-dock .workspace-dock-shortcuts .workspace-dock-item,
+.workspace-dock .staff-pro-dock-integrations .workspace-dock-item {
+	min-height: 56px !important;
+	padding: 4px 2px 4px !important;
 }
 .workspace-dock .workspace-dock-divider {
 	width: 28px !important;
+	height: 1px !important;
+	margin: 8px auto !important;
 	background: #e5e7eb !important;
+}
+.workspace-dock .staff-pro-integrations-divider {
+	flex: 0 0 auto !important;
 }
 
 :root {
@@ -225,7 +260,7 @@ const SIDEBAR_CSS = `
 	margin: 0 !important;
 	border-radius: 50% !important;
 	background: #0f1b2d !important;
-	color: var(--sp-icon-accent, #3ddcb0) !important;
+	color: var(--sp-icon-accent, #90ba93) !important;
 	flex-shrink: 0 !important;
 }
 .body-sidebar .standard-sidebar-item .sidebar-item-icon svg,
@@ -420,6 +455,16 @@ const SIDEBAR_CSS = `
 	border-right-color: transparent !important;
 	pointer-events: none;
 }
+
+/* Hide Frappe module onboarding (Getting Started / Accounting Onboarding) everywhere */
+.user-onboarding,
+.onb-panel,
+.body-sidebar .onboarding-sidebar,
+.onboarding-widget-box,
+.widget.onboarding-widget,
+.workspace-page .onboarding-widget {
+	display: none !important;
+}
 `;
 
 const PARENT_GLYPHS = {
@@ -440,24 +485,24 @@ const PARENT_GLYPHS = {
 };
 
 const PARENT_STYLES = [
-	{ test: /^dashboard$/i, glyph: "home", hue: "#3DDCB0" },
-	{ test: /^employee$|^people$|^team$/i, glyph: "person", hue: "#4DB0F5" },
-	{ test: /organizational|org chart/i, glyph: "plus", hue: "#3DDCB0" },
-	{ test: /onboarding|recruit|talent|hiring|job opening|job applicant|interview|job offer|appointment/i, glyph: "person", hue: "#60A5FA" },
-	{ test: /separation|grievance/i, glyph: "person", hue: "#F070A8" },
-	{ test: /expense|bill|claim|advance/i, glyph: "chevron", hue: "#4BE06A" },
-	{ test: /travel/i, glyph: "plane", hue: "#4BE06A" },
-	{ test: /payroll|pay$|salary|wallet/i, glyph: "wallet", hue: "#3DDCB0" },
-	{ test: /tax|benefit|exemption/i, glyph: "leaf", hue: "#F07888" },
-	{ test: /leave|holiday/i, glyph: "leaf", hue: "#5CE1B0" },
-	{ test: /time|attendance|shift|roster|overtime|checkin/i, glyph: "clock", hue: "#3DD6E8" },
-	{ test: /performance|appraisal|goal|kra/i, glyph: "bars", hue: "#3DDCB0" },
-	{ test: /accounting|account|journal|finance|chart of accounts/i, glyph: "bowtie", hue: "#3DDCB0" },
-	{ test: /admin|role|permission|user$/i, glyph: "gear", hue: "#A78BFA" },
-	{ test: /report/i, glyph: "bars", hue: "#F5C43C" },
-	{ test: /setup|settings/i, glyph: "gear", hue: "#A78BFA" },
-	{ test: /planning|staffing/i, glyph: "diamond", hue: "#F5C43C" },
-	{ test: /marketing/i, glyph: "diamond", hue: "#F5C43C" },
+	{ test: /^dashboard$/i, glyph: "home", hue: "#90BA93" },
+	{ test: /^employee$|^people$|^team$/i, glyph: "person", hue: "#11A5DD" },
+	{ test: /organizational|org chart/i, glyph: "plus", hue: "#90BA93" },
+	{ test: /onboarding|recruit|talent|hiring|job opening|job applicant|interview|job offer|appointment/i, glyph: "person", hue: "#11A5DD" },
+	{ test: /separation|grievance/i, glyph: "person", hue: "#16678C" },
+	{ test: /expense|bill|claim|advance/i, glyph: "chevron", hue: "#90BA93" },
+	{ test: /travel/i, glyph: "plane", hue: "#90BA93" },
+	{ test: /payroll|pay$|salary|wallet/i, glyph: "wallet", hue: "#90BA93" },
+	{ test: /tax|benefit|exemption/i, glyph: "leaf", hue: "#205B76" },
+	{ test: /leave|holiday/i, glyph: "leaf", hue: "#90BA93" },
+	{ test: /time|attendance|shift|roster|overtime|checkin/i, glyph: "clock", hue: "#11A5DD" },
+	{ test: /performance|appraisal|goal|kra/i, glyph: "bars", hue: "#90BA93" },
+	{ test: /accounting|account|journal|finance|chart of accounts/i, glyph: "bowtie", hue: "#90BA93" },
+	{ test: /admin|role|permission|user$/i, glyph: "gear", hue: "#16678C" },
+	{ test: /report/i, glyph: "bars", hue: "#11A5DD" },
+	{ test: /setup|settings/i, glyph: "gear", hue: "#16678C" },
+	{ test: /planning|staffing/i, glyph: "diamond", hue: "#11A5DD" },
+	{ test: /marketing/i, glyph: "diamond", hue: "#11A5DD" },
 ];
 
 const SUBMENU_ICONS = {
@@ -574,6 +619,11 @@ const SUBMENU_ICONS = {
 	"appointment letter": "file-text",
 	"additional salary": "piggy-bank",
 	"salary withholding": "banknote-x",
+	"social security": "shield",
+	"social security deductions": "shield",
+	"ss contribution table": "shield",
+	"social security contribution table": "shield",
+	"shift attendance": "clock",
 	"employee advance": "upload",
 	"employee checkin": "pointer",
 	"attendance request": "calendar-check",
@@ -585,6 +635,8 @@ const SUBMENU_ICONS = {
 	dashboard: "home",
 	settings: "settings",
 	agents: "square-user-round",
+	"data analytics": "bar-chart-2",
+	"in / out today": "log-in",
 	"team structure": "building-2",
 	"new hire onboarding": "user-star",
 	offboarding: "user-round-minus",
@@ -617,6 +669,8 @@ const SECTION_ICONS = {
 	reports: "notepad-text",
 	setup: "database",
 	"tax & benefits": "badge-alert",
+	"social security": "shield",
+	"other statutory": "landmark",
 	travel: "plane",
 	"time off admin": "sliders-horizontal",
 	"extra hours": "calendar-clock",
@@ -699,7 +753,7 @@ function parent_look(label) {
 	for (const rule of PARENT_STYLES) {
 		if (rule.test.test(label)) return rule;
 	}
-	return { glyph: "plus", hue: "#3DDCB0" };
+	return { glyph: "plus", hue: "#90BA93" };
 }
 
 function section_icon_name(label) {
@@ -836,28 +890,75 @@ function staff_pro_brand() {
 	);
 }
 
+const HR_SIDEBARS = [
+	"workforce",
+	"people",
+	"time",
+	"pay",
+	"ss and taxes",
+	"talent",
+	"finance",
+	"finance & admin",
+	"finance and admin",
+	"admin",
+];
+
+function staff_pro_is_hr_sidebar(name) {
+	return HR_SIDEBARS.includes(String(name || "").toLowerCase());
+}
+
+function staff_pro_hr_home_sidebar() {
+	if (staff_pro_sidebar_payload("Workforce")) return "Workforce";
+	if (staff_pro_sidebar_payload("People")) return "People";
+	return "Workforce";
+}
+
+function staff_pro_accounting_home_sidebar() {
+	if (staff_pro_sidebar_payload("Finance")) return "Finance";
+	if (staff_pro_sidebar_payload("Home")) return "Home";
+	if (staff_pro_sidebar_payload("Invoicing")) return "Invoicing";
+	if (staff_pro_sidebar_payload("Accounting")) return "Accounting";
+	return "Finance";
+}
+
+function staff_pro_admin_home_sidebar() {
+	if (staff_pro_sidebar_payload("Admin")) return "Admin";
+	return "Admin";
+}
+
 function staff_pro_current_portal() {
 	if (!should_use_staff_pro_desk_home()) return null;
 
 	const path = (window.location.pathname || "").replace(/\/$/, "");
-	if (path.startsWith("/app/")) {
+	const route = frappe.get_route?.() || [];
+
+	if (path.startsWith("/app")) {
 		return "admin";
 	}
 
-	const app = frappe.app?.sidebar?.get_sidebar_app?.();
-	if (app?.app_name === "erpnext") {
-		return "accounting";
+	if (is_already_on_staff_pro_desk_home(route)) {
+		return "hr";
+	}
+
+	const workspaceRoute = route[0] === "Workspaces" ? route[route.length - 1] : route[0];
+	if (staff_pro_is_hr_sidebar(workspaceRoute)) {
+		return "hr";
+	}
+
+	if (staff_pro_is_hr_sidebar(frappe.app?.sidebar?.sidebar_title)) {
+		return "hr";
 	}
 
 	const routes = frappe.boot?.staff_pro_portal_routes || {};
-	const accountingRoute = (routes.accounting || "/desk/home").replace(/\/$/, "");
+	const accountingRoute = (routes.accounting || "/desk/finance").replace(/\/$/, "");
 	if (path === accountingRoute || path.startsWith(`${accountingRoute}/`)) {
 		return "accounting";
 	}
 
-	if (app?.app_name === "frappe") {
-		return "admin";
-	}
+	const app = frappe.app?.sidebar?.get_sidebar_app?.();
+	if (app?.app_name === "hrms") return "hr";
+	if (app?.app_name === "frappe") return "admin";
+	if (app?.app_name === "erpnext") return "accounting";
 
 	return "hr";
 }
@@ -887,7 +988,7 @@ function shortcut_label($item) {
 
 function staff_pro_portal_route(key) {
 	const routes = frappe.boot?.staff_pro_portal_routes || {};
-	return routes[key] || (key === "accounting" ? "/desk/home" : "/app/build");
+	return routes[key] || (key === "accounting" ? "/desk/finance" : "/desk/admin");
 }
 
 function staff_pro_can_access_accounting() {
@@ -900,13 +1001,51 @@ function staff_pro_can_access_admin() {
 	return frappe.user.has_role(["System Manager", "Workspace Manager"]);
 }
 
-function staff_pro_open_portal(route) {
-	if (!route) return;
-	if (route.startsWith("/app/")) {
-		window.location.href = route;
-		return;
+function staff_pro_clear_pinned_sidebar() {
+	const sidebar = frappe.app?.sidebar;
+	if (sidebar) sidebar._staff_pro_pinned_sidebar = null;
+}
+
+function staff_pro_remember_sidebar(name) {
+	if (!name) return;
+	try {
+		localStorage.setItem("selected_sidebar", name);
+	} catch (e) {
+		/* ignore */
 	}
-	frappe.set_route(route);
+}
+
+function staff_pro_activate_sidebar(name) {
+	const sidebar = frappe.app?.sidebar;
+	staff_pro_remember_sidebar(name);
+	if (!sidebar || !name) return;
+	sidebar._staff_pro_pinned_sidebar = name;
+	sidebar.open();
+	if (staff_pro_sidebar_payload(name)) {
+		sidebar.select_sidebar(name);
+	}
+	sidebar.refresh_header?.();
+	sidebar.refresh_dock?.();
+}
+
+function staff_pro_open_portal(key) {
+	const homeSidebar =
+		key === "hr"
+			? staff_pro_hr_home_sidebar()
+			: key === "accounting"
+				? staff_pro_accounting_home_sidebar()
+				: key === "admin"
+					? staff_pro_admin_home_sidebar()
+					: null;
+	if (homeSidebar) {
+		staff_pro_activate_sidebar(homeSidebar);
+	} else {
+		staff_pro_clear_pinned_sidebar();
+	}
+
+	const route = typeof key === "string" && !key.startsWith("/") ? staff_pro_portal_route(key) : key;
+	if (!route) return;
+	window.location.href = route;
 }
 
 function staff_pro_dock_shortcuts() {
@@ -920,33 +1059,101 @@ function staff_pro_dock_shortcuts() {
 			label: __("HR"),
 			css_class: "staff-pro-dock-hr",
 			condition: () => staff_pro_can_access_hr(),
-			on_click: () => staff_pro_open_portal(staff_pro_portal_route("hr")),
-		});
-	}
-
-	if (portal !== "accounting") {
-		shortcuts.push({
-			name: "accounting",
-			icon: "book-open",
-			label: __("Accounting"),
-			css_class: "staff-pro-dock-accounting",
-			condition: () => staff_pro_can_access_accounting(),
-			on_click: () => staff_pro_open_portal(staff_pro_portal_route("accounting")),
-		});
-	}
-
-	if (portal !== "admin") {
-		shortcuts.push({
-			name: "admin",
-			icon: "settings",
-			label: __("Admin"),
-			css_class: "staff-pro-dock-admin",
-			condition: () => staff_pro_can_access_admin(),
-			on_click: () => staff_pro_open_portal(staff_pro_portal_route("admin")),
+			on_click: () => staff_pro_open_portal("hr"),
 		});
 	}
 
 	return shortcuts;
+}
+
+const STAFF_PRO_INTEGRATIONS_FALLBACK = [
+	{
+		name: "quickbooks",
+		label: "QuickBooks",
+		url: "https://qbo.intuit.com",
+		icon: "/assets/hrms/images/integrations/quickbooks.svg",
+	},
+	{
+		name: "whatsapp",
+		label: "WhatsApp",
+		url: "https://web.whatsapp.com",
+		icon: "/assets/hrms/images/integrations/whatsapp.svg",
+	},
+	{
+		name: "freshdesk",
+		label: "Freshdesk",
+		url: "https://freshdesk.com/login",
+		icon: "/assets/hrms/images/integrations/freshdesk.svg",
+	},
+	{
+		name: "teams",
+		label: "Teams",
+		url: "https://teams.microsoft.com",
+		icon: "/assets/hrms/images/integrations/teams.svg",
+	},
+];
+
+function staff_pro_integrations() {
+	const fromBoot = frappe.boot?.staff_pro_integrations;
+	const items = Array.isArray(fromBoot) && fromBoot.length ? fromBoot : STAFF_PRO_INTEGRATIONS_FALLBACK;
+	return items.map((item, index) => {
+		const fallback = STAFF_PRO_INTEGRATIONS_FALLBACK[index] || {};
+		const name = item.name || fallback.name;
+		return {
+			name,
+			label: __(item.label || fallback.label || name),
+			url: item.url || fallback.url,
+			icon: item.icon || `/assets/hrms/images/integrations/${name}.svg`,
+		};
+	});
+}
+
+function render_staff_pro_dock_integrations() {
+	if (!should_use_staff_pro_desk_home()) return;
+
+	const $dock = $(".workspace-dock");
+	if (!$dock.length) return;
+
+	let $wrap = $dock.children(".staff-pro-dock-integrations");
+	if (!$wrap.length) {
+		const $divider = $(
+			'<div class="workspace-dock-divider staff-pro-integrations-divider" role="separator"></div>'
+		);
+		$wrap = $('<div class="staff-pro-dock-integrations"></div>');
+		const $user = $dock.children(".workspace-dock-user");
+		if ($user.length) {
+			$user.before($divider, $wrap);
+		} else {
+			$dock.append($divider, $wrap);
+		}
+	}
+
+	const items = staff_pro_integrations().filter((item) => item.url);
+	const signature = items.map((item) => `${item.name}:${item.url}`).join("|");
+	if ($wrap.attr("data-sp-integrations") === signature && $wrap.children().length === items.length) {
+		return;
+	}
+
+	$wrap.empty();
+	items.forEach((item) => {
+		const label = frappe.utils.escape_html(item.label);
+		const $item = $(`
+			<button type="button" class="workspace-dock-item staff-pro-dock-integration"
+				data-sp-integration="${frappe.utils.escape_html(item.name)}"
+				aria-label="${label}"
+				title="${label}">
+				<span class="workspace-dock-icon" aria-hidden="true">
+					<img src="${frappe.utils.escape_html(item.icon)}" alt="" />
+				</span>
+				<span class="workspace-dock-label">${label}</span>
+			</button>
+		`);
+		$item.on("click", () => {
+			window.open(item.url, "_blank", "noopener,noreferrer");
+		});
+		$wrap.append($item);
+	});
+	$wrap.attr("data-sp-integrations", signature);
 }
 
 function patch_workspace_dock_shortcuts() {
@@ -997,20 +1204,28 @@ function patch_workspace_dock_logo() {
 		}
 
 		const brand = staff_pro_brand();
-		const homeRoute = staff_pro_desk_home_route();
+		const homePath = staff_pro_desk_home_path();
 
 		this.$logo.empty();
 		const $link = $(
-			`<a href="/desk/${homeRoute}" title="${frappe.utils.escape_html(brand.title)}" aria-label="${frappe.utils.escape_html(brand.title)}">
+			`<a href="${homePath}" title="${frappe.utils.escape_html(brand.title)}" aria-label="${frappe.utils.escape_html(brand.title)}">
 				<img src="${frappe.utils.escape_html(brand.logo_url)}" alt="${frappe.utils.escape_html(brand.title)}" />
 			</a>`
 		);
 		$link.on("click", (e) => {
 			e.preventDefault();
-			frappe.set_route(homeRoute);
+			staff_pro_open_portal("hr");
 		});
 		this.$logo.append($link);
 	};
+}
+
+function staff_pro_sidebar_workspace_title(sidebar) {
+	const name = sidebar?.sidebar_title;
+	if (!name) return staff_pro_brand().title;
+
+	const workspace = frappe.workspaces?.[frappe.router.slug(name)];
+	return workspace?.title || workspace?.label || name;
 }
 
 function patch_sidebar_header_branding() {
@@ -1021,7 +1236,7 @@ function patch_sidebar_header_branding() {
 	const originalTitle = Header.prototype.get_display_title;
 	Header.prototype.get_display_title = function () {
 		if (should_use_staff_pro_desk_home()) {
-			return staff_pro_brand().title;
+			return staff_pro_sidebar_workspace_title(this.sidebar);
 		}
 		return originalTitle.call(this);
 	};
@@ -1035,6 +1250,73 @@ function patch_sidebar_header_branding() {
 	};
 }
 
+function staff_pro_sidebar_payload(name) {
+	if (!name) return null;
+	return frappe.boot?.workspace_sidebar_item?.[(name || "").toLowerCase()] || null;
+}
+
+function patch_sidebar_workspace_switch() {
+	const Sidebar = frappe.ui && frappe.ui.Sidebar;
+	if (!Sidebar || Sidebar.prototype._staff_pro_workspace_switch) return;
+	Sidebar.prototype._staff_pro_workspace_switch = true;
+
+	const originalOpenWorkspace = Sidebar.prototype.open_workspace;
+	Sidebar.prototype.open_workspace = function (name) {
+		if (!should_use_staff_pro_desk_home()) {
+			return originalOpenWorkspace.call(this, name);
+		}
+
+		this._staff_pro_pinned_sidebar = name;
+		this.open();
+		if (staff_pro_sidebar_payload(name)) {
+			this.select_sidebar(name);
+		}
+
+		const route = this.get_first_sidebar_route?.(name);
+		if (route) {
+			frappe.set_route(route);
+			return;
+		}
+
+		return originalOpenWorkspace.call(this, name);
+	};
+
+	const originalSetWorkspaceSidebar = Sidebar.prototype.set_workspace_sidebar;
+	Sidebar.prototype.set_workspace_sidebar = function () {
+		if (should_use_staff_pro_desk_home()) {
+			const portal = staff_pro_current_portal();
+			let pinned = this._staff_pro_pinned_sidebar;
+
+			if (portal === "hr" && pinned && !staff_pro_is_hr_sidebar(pinned)) {
+				this._staff_pro_pinned_sidebar = null;
+				pinned = null;
+			}
+
+			if (
+				pinned &&
+				staff_pro_sidebar_payload(pinned) &&
+				(portal !== "hr" || staff_pro_is_hr_sidebar(pinned))
+			) {
+				this.select_sidebar(pinned);
+				this.set_active_workspace_item();
+				this.refresh_dock();
+				return;
+			}
+
+			if (portal === "hr" && !staff_pro_is_hr_sidebar(this.sidebar_title)) {
+				const home = staff_pro_hr_home_sidebar();
+				staff_pro_remember_sidebar(home);
+				this.select_sidebar(home);
+				this.set_active_workspace_item();
+				this.refresh_header?.();
+				this.refresh_dock();
+				return;
+			}
+		}
+		return originalSetWorkspaceSidebar.call(this);
+	};
+}
+
 function refresh_staff_pro_dock_shortcuts() {
 	if (!should_use_staff_pro_desk_home()) return;
 
@@ -1045,11 +1327,21 @@ function refresh_staff_pro_dock_shortcuts() {
 	if (!dock?.$shortcuts) return;
 
 	const portal = staff_pro_current_portal();
+	const expectedShortcuts = staff_pro_dock_shortcuts();
+	const hasExpectedShortcuts = expectedShortcuts.length
+		? Boolean(
+				dock.$shortcuts.children(
+					".staff-pro-dock-hr, .staff-pro-dock-accounting, .staff-pro-dock-admin"
+				).length
+			)
+		: true;
 	if (
 		dock._staff_pro_portal === portal &&
-		dock.$shortcuts.children(".staff-pro-dock-hr, .staff-pro-dock-accounting, .staff-pro-dock-admin").length
+		hasExpectedShortcuts &&
+		dock.$dock?.children(".staff-pro-dock-integrations").length
 	) {
 		label_workspace_dock();
+		render_staff_pro_dock_integrations();
 		return;
 	}
 
@@ -1058,7 +1350,9 @@ function refresh_staff_pro_dock_shortcuts() {
 	dock.$shortcuts.empty();
 	dock.render_shortcuts();
 	label_workspace_dock();
+	render_staff_pro_dock_integrations();
 	dock.render_logo();
+	frappe.app?.sidebar?.refresh_dock?.();
 }
 
 const DOCK_ICONS = {
@@ -1067,11 +1361,18 @@ const DOCK_ICONS = {
 	"ss and taxes": "shield-check",
 	time: "clock",
 	talent: "user-plus",
-	"finance & admin": "landmark",
-	"finance and admin": "landmark",
+	finance: "file-text",
+	"finance & admin": "file-text",
+	"finance and admin": "file-text",
 	hr: "briefcase",
-	accounting: "book-open",
+	accounting: "file-text",
 	admin: "settings",
+	"hr admin": "users",
+	invoicing: "file-text",
+	payments: "credit-card",
+	"financial reports": "bar-chart-2",
+	projects: "folder-kanban",
+	"erpnext settings": "settings",
 };
 
 function dock_icon_html(name) {
@@ -1085,6 +1386,9 @@ function dock_icon_html(name) {
 }
 
 function apply_dock_icon($item, label) {
+	if ($item.hasClass("staff-pro-dock-integration") || $item.closest(".staff-pro-dock-integrations").length) {
+		return;
+	}
 	const iconName = DOCK_ICONS[(label || "").toLowerCase()];
 	if (!iconName) return;
 	if ($item.attr("data-sp-dock-icon") === iconName) return;
@@ -1155,6 +1459,7 @@ function patch_workspace_dock() {
 	patch_workspace_dock_shortcuts();
 	patch_workspace_dock_logo();
 	patch_sidebar_header_branding();
+	patch_sidebar_workspace_switch();
 
 	const Dock = frappe.ui && frappe.ui.WorkspaceDock;
 	if (!Dock || Dock.prototype._staff_pro_labeled) return;
@@ -1180,98 +1485,133 @@ function patch_workspace_dock() {
 	};
 }
 
-function update_staff_pro_sidebar_title() {
-	if (!should_use_staff_pro_desk_home()) return;
-
-	const brand = staff_pro_brand();
-	const $title = $(
-		".body-sidebar .sidebar-header .header-title, .body-sidebar .sidebar-header .workspace-title"
-	).first();
-	if ($title.length && $title.text() !== brand.title) {
-		$title.text(brand.title);
+function disable_app_onboarding() {
+	if (frappe.boot) {
+		frappe.boot.sysdefaults = frappe.boot.sysdefaults || {};
+		frappe.boot.sysdefaults.enable_onboarding = 0;
 	}
+
+	const Sidebar = frappe.ui && frappe.ui.Sidebar;
+	if (Sidebar && !Sidebar.prototype._staff_pro_onboarding_disabled) {
+		Sidebar.prototype._staff_pro_onboarding_disabled = true;
+		Sidebar.prototype.setup_onboarding = function () {
+			this.remove_onboarding_wrapper?.();
+			this.wrapper?.find(".onboarding-sidebar").addClass("hidden");
+		};
+		Sidebar.prototype.remove_onboarding_wrapper = function () {
+			this.$onboarding?.empty();
+			this.wrapper?.find(".onboarding-sidebar").addClass("hidden");
+		};
+	}
+
+	document.querySelectorAll(".user-onboarding, .onb-panel").forEach((el) => el.remove());
+	document.querySelectorAll(".onboarding-sidebar").forEach((el) => el.classList.add("hidden"));
+
+	const onboardingStyles = document.getElementById("user-onboarding-styles");
+	if (onboardingStyles) onboardingStyles.remove();
+	document.querySelectorAll(".main-section").forEach((el) => {
+		if (el.style.paddingBottom === "90px") el.style.paddingBottom = "";
+	});
 }
 
 function watch_workspace_dock() {
 	inject_sidebar_css();
+	disable_app_onboarding();
 	patch_workspace_dock();
 	refresh_staff_pro_dock_shortcuts();
-	update_staff_pro_sidebar_title();
 	label_workspace_dock();
+	render_staff_pro_dock_integrations();
 	add_sidebar_search();
 	enhance_sidebar_menus();
 
 	const dock = document.querySelector(".workspace-dock");
 	const sidebar = document.querySelector(".body-sidebar");
-	if (!dock && !sidebar) {
+	const container = document.querySelector(".body-sidebar-container");
+	if (!dock && !sidebar && !container) {
 		setTimeout(watch_workspace_dock, 200);
 		return;
 	}
 
 	const observer = new MutationObserver(() => {
+		patch_workspace_dock();
 		refresh_staff_pro_dock_shortcuts();
-		update_staff_pro_sidebar_title();
 		label_workspace_dock();
+		render_staff_pro_dock_integrations();
 		add_sidebar_search();
 		enhance_sidebar_menus();
+		disable_app_onboarding();
 	});
 	if (dock) observer.observe(dock, { childList: true, subtree: true });
-	if (sidebar) observer.observe(sidebar, { childList: true, subtree: true });
+	if (container) observer.observe(container, { childList: true, subtree: true });
+	else if (sidebar) observer.observe(sidebar, { childList: true, subtree: true });
 }
 
 $(document).on("app_ready", watch_workspace_dock);
+$(document).on("app_ready", disable_app_onboarding);
+$(document).on("page-change", disable_app_onboarding);
 
-if (typeof frappe !== "undefined" && $(".workspace-dock, .body-sidebar").length) {
-	watch_workspace_dock();
+if (typeof frappe !== "undefined") {
+	disable_app_onboarding();
+	if ($(".workspace-dock, .body-sidebar").length) {
+		watch_workspace_dock();
+	}
 }
 
 function should_use_staff_pro_desk_home() {
 	return Boolean(frappe.boot?.staff_pro_skip_desktop);
 }
 
+const STAFF_PRO_DESK_HOME_FALLBACK = ["dashboard-view", "Human Resource"];
+
 function staff_pro_desk_home_route() {
-	return frappe.boot?.staff_pro_desk_home || "workforce";
+	const home = frappe.boot?.staff_pro_desk_home;
+	if (Array.isArray(home) && home.length) return home;
+	if (typeof home === "string" && home.includes("/")) return home.split("/");
+	if (typeof home === "string" && home) return [home];
+	return STAFF_PRO_DESK_HOME_FALLBACK;
 }
 
-function staff_pro_desk_home_slug() {
-	const home = staff_pro_desk_home_route();
-	return frappe.router?.slug?.(home) || home;
+function staff_pro_desk_home_path() {
+	const route = staff_pro_desk_home_route();
+	return `/desk/${route.map((part) => encodeURIComponent(part)).join("/")}`;
 }
 
 function is_already_on_staff_pro_desk_home(route = frappe.get_route?.() || []) {
-	const slug = staff_pro_desk_home_slug();
-	const path = (window.location.pathname || "").replace(/\/$/, "");
+	const homeRoute = staff_pro_desk_home_route();
+	const path = (window.location.pathname || "").replace(/\/$/, "") || "/";
 
-	if (path.endsWith(`/desk/${slug}`) || path.endsWith(`/desk/private/${slug}`)) {
+	if (route[0] === homeRoute[0] && (route[1] || "") === (homeRoute[1] || "")) {
 		return true;
 	}
 
-	if (route[0] === "Workspaces") {
-		const workspace = route[route.length - 1];
-		return frappe.router.slug(workspace) === slug;
+	if (path === staff_pro_desk_home_path()) {
+		return true;
 	}
 
-	return Boolean(frappe.workspaces?.[route[0]] && route[0] === slug);
+	return false;
 }
 
-function is_staff_pro_desktop_route(route = frappe.get_route?.() || []) {
+function is_staff_pro_desktop_route(route = frappe.get_route?.() || [], options = {}) {
 	if (is_already_on_staff_pro_desk_home(route)) return false;
 
-	const path = window.location.pathname || "";
+	const path = (window.location.pathname || "").replace(/\/$/, "") || "/";
 	const on_apps = route[0] === "apps" || path === "/apps" || path.endsWith("/apps");
 	const on_desktop_page = route[0] === "desktop";
-	const on_empty_desk_route = !route[0] && path === "/desk";
-	return on_apps || on_desktop_page || on_empty_desk_route;
+	const on_empty_desk_route = !route[0] && (path === "/desk" || path === "/");
+	const on_workforce_bootstrap =
+		options.includeWorkforceBootstrap &&
+		(route[0]?.toLowerCase() === "workforce" || /\/desk\/workforce\/?$/.test(path));
+	return on_apps || on_desktop_page || on_empty_desk_route || on_workforce_bootstrap;
 }
 
-function redirect_staff_pro_desk_home() {
+function redirect_staff_pro_desk_home(options = {}) {
 	if (!should_use_staff_pro_desk_home() || window._staff_pro_desk_redirecting) return;
 
 	const route = frappe.get_route?.() || [];
-	if (!is_staff_pro_desktop_route(route)) return;
+	if (!is_staff_pro_desktop_route(route, options)) return;
 
 	window._staff_pro_desk_redirecting = true;
-	Promise.resolve(frappe.set_route(staff_pro_desk_home_route())).finally(() => {
+	Promise.resolve(frappe.set_route(...staff_pro_desk_home_route())).finally(() => {
 		window._staff_pro_desk_redirecting = false;
 	});
 }
@@ -1292,8 +1632,7 @@ function patch_staff_pro_desktop_redirect() {
 }
 
 $(document).on("app_ready", patch_staff_pro_desktop_redirect);
-$(document).on("app_ready", redirect_staff_pro_desk_home);
-$(document).on("page-change", redirect_staff_pro_desk_home);
+$(document).on("app_ready", () => redirect_staff_pro_desk_home({ includeWorkforceBootstrap: true }));
+$(document).on("page-change", () => redirect_staff_pro_desk_home());
 $(document).on("page-change", refresh_staff_pro_dock_shortcuts);
-$(document).on("page-change", update_staff_pro_sidebar_title);
 $(document).on("page-change", enhance_sidebar_menus);

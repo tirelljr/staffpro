@@ -27,6 +27,20 @@
                       "default_workspace":  0,
                       "indent":  0,
                       "keep_closed":  0,
+                      "label":  "In / Out today",
+                      "open_in_new_tab":  0,
+                      "show_arrow":  0,
+                      "type":  "Link",
+                      "icon":  "log-in",
+                      "link_to":  "in-out-today",
+                      "link_type":  "Page"
+                  },
+                  {
+                      "child":  0,
+                      "collapsible":  1,
+                      "default_workspace":  0,
+                      "indent":  0,
+                      "keep_closed":  0,
                       "label":  "Agents",
                       "open_in_new_tab":  0,
                       "show_arrow":  0,
@@ -34,6 +48,20 @@
                       "icon":  "square-user-round",
                       "link_to":  "Employee",
                       "link_type":  "DocType"
+                  },
+                  {
+                      "child":  0,
+                      "collapsible":  1,
+                      "default_workspace":  0,
+                      "indent":  0,
+                      "keep_closed":  0,
+                      "label":  "Data Analytics",
+                      "open_in_new_tab":  0,
+                      "show_arrow":  0,
+                      "type":  "Link",
+                      "icon":  "bar-chart-2",
+                      "link_to":  "Data Analytics",
+                      "link_type":  "Dashboard"
                   },
                   {
                       "child":  0,

@@ -17,7 +17,8 @@ const HR_WORKSPACES = new Set([
 	"Pay",
 	"SS and Taxes",
 	"Talent",
-	"Finance & Admin",
+	"Finance",
+	"Admin",
 ]);
 
 // Key HR doctypes worth tracking navigation into. Kept explicit so we only ever

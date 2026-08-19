@@ -10,6 +10,7 @@ from frappe.utils import cstr, flt, get_first_day, get_last_day, getdate
 
 import erpnext
 
+import hrms
 from hrms.hr.utils import calculate_tax_with_marginal_relief
 
 
@@ -44,6 +45,7 @@ class IncomeTaxSlab(Document):
 			self.currency = erpnext.get_company_currency(self.company)
 
 
+@hrms.allow_regional
 def calculate_tax_by_tax_slab(annual_taxable_earning, tax_slab, eval_globals=None, eval_locals=None):
 	eval_globals = eval_globals or {}
 	eval_locals = eval_locals or {}

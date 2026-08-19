@@ -11,11 +11,13 @@ export default {
 		extend: {
 			colors: {
 				brand: {
-					navy: "#16607a",
-					cyan: "#00a6e8",
-					lime: "#8cc040",
-					ink: "#1e3a4c",
+					navy: "#16678C",
+					teal: "#16678C",
+					cyan: "#11A5DD",
+					lime: "#90BA93",
+					ink: "#111111",
 					black: "#000000",
+					lightCyan: "#A7C8CC",
 				},
 			},
 			screens: {

@@ -95,6 +95,11 @@ def update_erpnext_workspaces(disable: bool = True):
 		"Selling",
 		"Stock",
 		"Support",
+		"Invoicing",
+		"Payments",
+		"Financial Reports",
+		"Payables",
+		"Receivables",
 	]
 
 	for workspace in erpnext_workspaces:
@@ -103,6 +108,8 @@ def update_erpnext_workspaces(disable: bool = True):
 			workspace_doc.flags.ignore_links = True
 			workspace_doc.flags.ignore_validate = True
 			workspace_doc.public = 0 if disable else 1
+			if workspace_doc.meta.has_field("is_hidden"):
+				workspace_doc.is_hidden = 1 if disable else 0
 			workspace_doc.save()
 		except Exception:
 			frappe.clear_messages()

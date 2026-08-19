@@ -17,6 +17,7 @@
   "column_break_4",
   "depends_on_payment_days",
   "is_tax_applicable",
+  "earning_category",
   "deduct_full_tax_on_selected_payroll_date",
   "variable_based_on_taxable_salary",
   "is_income_tax_component",
@@ -78,6 +79,14 @@
    "fieldname": "is_tax_applicable",
    "fieldtype": "Check",
    "label": "Is Tax Applicable"
+  },
+  {
+   "depends_on": "eval:doc.type == \"Earning\"",
+   "description": "Used by Tax Adjustments to exclude bonuses, incentives, overtime, or commissions from taxable income.",
+   "fieldname": "earning_category",
+   "fieldtype": "Select",
+   "label": "Earning Category",
+   "options": "\nRegular\nBonus\nIncentive\nOvertime\nCommission"
   },
   {
    "default": "1",

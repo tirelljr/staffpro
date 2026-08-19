@@ -508,12 +508,20 @@ class IncomeTaxComputationReport:
 			if tax_slab:
 				tax_slab = frappe.get_cached_doc("Income Tax Slab", tax_slab)
 				eval_globals, eval_locals = self.get_data_for_eval(emp, emp_details)
-				tax_amount, other_taxes_and_charges = calculate_tax_by_tax_slab(
-					emp_details["total_taxable_amount"],
-					tax_slab,
-					eval_globals=eval_globals,
-					eval_locals=eval_locals,
-				)
+				previous_company = getattr(frappe.local.flags, "company", None)
+				frappe.local.flags.company = self.filters.company
+				try:
+					tax_amount, other_taxes_and_charges = calculate_tax_by_tax_slab(
+						emp_details["total_taxable_amount"],
+						tax_slab,
+						eval_globals=eval_globals,
+						eval_locals=eval_locals,
+					)
+				finally:
+					if previous_company:
+						frappe.local.flags.company = previous_company
+					elif hasattr(frappe.local.flags, "company"):
+						delattr(frappe.local.flags, "company")
 			else:
 				tax_amount = 0.0
 				other_taxes_and_charges = 0.0

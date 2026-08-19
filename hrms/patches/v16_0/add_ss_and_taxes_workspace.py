@@ -122,7 +122,7 @@ def execute():
 	_sync_from_fixture("Workspace Sidebar", "workspace_sidebar/ss_and_taxes.json")
 	_import_doc(_load_fixture("desktop_icon/ss_and_taxes.json"), "Desktop Icon")
 
-	for name, idx in (("Talent", 4), ("Finance & Admin", 5)):
+	for name, idx in (("Talent", 4), ("Finance", 5), ("Admin", 6)):
 		if frappe.db.exists("Desktop Icon", name):
 			frappe.db.set_value("Desktop Icon", name, "idx", idx, update_modified=False)
 
