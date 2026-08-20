@@ -6,7 +6,10 @@ import frappe
 from frappe import _
 from frappe.query_builder import DocType
 
-from hrms.payroll.report.provident_fund_deductions.provident_fund_deductions import get_conditions
+from hrms.payroll.report.provident_fund_deductions.provident_fund_deductions import (
+	get_conditions,
+	get_salary_components_by_regional_type,
+)
 
 
 def execute(filters=None):
@@ -40,16 +43,16 @@ def get_data(filters):
 	data = []
 	SalarySlip = DocType("Salary Slip")
 	SalaryDetail = DocType("Salary Detail")
-	SalaryComponent = DocType("Salary Component")
 
-	component_type_list = (
-		frappe.qb.from_(SalaryComponent)
-		.select(SalaryComponent.name, SalaryComponent.component_type)
-		.where(SalaryComponent.component_type == "Professional Tax")
-		.run(pluck="name")
-	)
-
-	if not len(component_type_list):
+	component_type_list = list(get_salary_components_by_regional_type(["Professional Tax"]))
+	if not component_type_list:
+		frappe.msgprint(
+			_(
+				"No Professional Tax salary component found. Create a deduction named Professional Tax, or set Component Type to Professional Tax on the Salary Component."
+			),
+			title=_("Missing Salary Components"),
+			indicator="orange",
+		)
 		return []
 
 	filter_clauses = get_conditions(filters)

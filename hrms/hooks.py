@@ -250,7 +250,13 @@ doc_events = {
 	"Expense Claim": {"on_submit": "hrms.telemetry.on_expense_claim_submit"},
 	"Attendance Request": {"on_submit": "hrms.telemetry.on_attendance_request_submit"},
 	"Shift Request": {"on_submit": "hrms.telemetry.on_shift_request_submit"},
-	"Employee Checkin": {"after_insert": "hrms.telemetry.on_employee_checkin"},
+	"Employee Checkin": {
+		"after_insert": [
+			"hrms.telemetry.on_employee_checkin",
+			"hrms.payroll.daily_pay.on_employee_checkin",
+		],
+		"on_update": "hrms.payroll.daily_pay.on_employee_checkin",
+	},
 	"Payroll Entry": {"on_submit": "hrms.telemetry.on_payroll_entry_submit"},
 	"Job Offer": {"on_submit": "hrms.telemetry.on_job_offer_submit"},
 	"Appraisal": {"on_submit": "hrms.telemetry.on_appraisal_submit"},

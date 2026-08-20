@@ -120,6 +120,9 @@ class EmployeeCheckin(Document):
 			self.overtime_type = shift_actual_timings.overtime_type or None
 
 	def validate_distance_from_shift_location(self):
+		if self.flags.get("ignore_geolocation"):
+			return
+
 		if not frappe.db.get_single_value("HR Settings", "allow_geolocation_tracking"):
 			return
 
@@ -300,7 +303,7 @@ def create_or_update_attendance(
 	out_time=None,
 	overtime_type=None,
 ):
-	"""Creates a new attendance or updates an existing half-day attendance."""
+	"""Creates a new attendance or updates an existing half-day or same-day attendance."""
 	if attendance := get_existing_half_day_attendance(employee, attendance_date):
 		frappe.db.set_value(
 			"Attendance",
@@ -317,6 +320,48 @@ def create_or_update_attendance(
 			},
 		)
 		return frappe.get_doc("Attendance", attendance.name)
+
+	existing = frappe.db.get_value(
+		"Attendance",
+		{"employee": employee, "attendance_date": attendance_date, "docstatus": ("<", 2)},
+		"name",
+	)
+	if existing:
+		values = {
+			"status": attendance_status,
+			"working_hours": working_hours,
+			"late_entry": late_entry,
+			"early_exit": early_exit,
+			"in_time": in_time,
+			"out_time": out_time,
+		}
+		if shift:
+			values["shift"] = shift
+		frappe.db.set_value("Attendance", existing, values, update_modified=False)
+		attendance = frappe.get_doc("Attendance", existing)
+		if attendance.docstatus == 0:
+			attendance.reload()
+			attendance.submit()
+		else:
+			from hrms.payroll.daily_pay import allocate_week_deductions, refresh_attendance_payroll
+
+			attendance.reload()
+			refresh_attendance_payroll(attendance)
+			if attendance.meta.has_field("daily_pay"):
+				frappe.db.set_value(
+					"Attendance",
+					existing,
+					{
+						"hour_rate": attendance.hour_rate,
+						"daily_pay": attendance.daily_pay,
+						"ss_deduction": attendance.ss_deduction,
+						"tax_deduction": attendance.tax_deduction,
+						"net_daily_pay": attendance.net_daily_pay,
+					},
+					update_modified=False,
+				)
+			allocate_week_deductions(attendance.employee, attendance.attendance_date)
+		return attendance
 	else:
 		attendance = frappe.new_doc("Attendance")
 		attendance.update(

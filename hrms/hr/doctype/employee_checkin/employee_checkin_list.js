@@ -1,11 +1,27 @@
 frappe.listview_settings["Employee Checkin"] = {
-	add_fields: ["offshift"],
+	add_fields: ["offshift", "device_id", "latitude", "longitude", "log_type", "time"],
+	hide_name_column: true,
 	get_indicator: function (doc) {
 		if (doc.offshift) {
 			return [__("Off-Shift"), "yellow", "offshift,=,1"];
 		}
 	},
+	formatters: {
+		time(value) {
+			return hrms.time?.format_clock ? hrms.time.format_clock(value) : value;
+		},
+		latitude(value, df, doc) {
+			return hrms.time?.format_gps ? hrms.time.format_gps(value, df, doc) : value;
+		},
+	},
 	onload: function (listview) {
+		if (hrms.time?.setup_range_filters) {
+			hrms.time.setup_range_filters(listview, {
+				date_field: "time",
+				datetime: true,
+			});
+		}
+
 		listview.page.add_action_item(__("Fetch Shifts"), () => {
 			const checkins = listview.get_checked_items().map((checkin) => checkin.name);
 			frappe.call({
@@ -18,7 +34,7 @@ frappe.listview_settings["Employee Checkin"] = {
 		});
 
 		if (frappe.perm.has_perm("Employee Checkin", 0, "create")) {
-			listview.page.add_inner_button(__("Add Checkin for Another Employee"), () =>
+			listview.page.add_inner_button(__("Add Entry"), () =>
 				frappe.new_doc("Employee Checkin"),
 			);
 		}

@@ -169,7 +169,7 @@ KEYWORD_ICON_RULES: list[tuple[re.Pattern[str], str]] = [
 	(re.compile(r"job|interview|recruit", re.I), "briefcase"),
 	(re.compile(r"department|branch|company", re.I), "building"),
 	(re.compile(r"type|category|component", re.I), "tag"),
-	(re.compile(r"dashboard", re.I), "layout-dashboard"),
+	(re.compile(r"dashboard", re.I), "home"),
 	(re.compile(r"attendance|checkin|time", re.I), "clock"),
 	(re.compile(r"expense|claim|advance", re.I), "receipt"),
 ]

@@ -2,7 +2,17 @@
 // License: GNU General Public License v3. See license.txt
 
 frappe.ui.form.on("Attendance", {
+	onload(frm) {
+		if (hrms.time?.redirect_new_attendance_form?.(frm)) {
+			return;
+		}
+	},
+
 	refresh(frm) {
+		if (hrms.time?.redirect_new_attendance_form?.(frm)) {
+			return;
+		}
+
 		if (frm.doc.__islocal && !frm.doc.attendance_date) {
 			frm.set_value("attendance_date", frappe.datetime.get_today());
 		}

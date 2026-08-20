@@ -9,10 +9,38 @@ from frappe.query_builder.functions import Extract
 from frappe.utils import getdate
 
 
+def get_salary_components_by_regional_type(component_types: list[str]) -> frappe._dict:
+	"""Map Salary Component name -> regional type (e.g. Professional Tax).
+
+	`component_type` is an India-localisation custom field and is not present
+	on every site. When the column is missing, match deduction components by name.
+	"""
+	mapping = frappe._dict()
+	if frappe.db.has_column("Salary Component", "component_type"):
+		rows = frappe.get_all(
+			"Salary Component",
+			filters={"component_type": ["in", list(component_types)]},
+			fields=["name", "component_type"],
+		)
+		mapping = frappe._dict({row.name: row.component_type for row in rows})
+		if mapping:
+			return mapping
+
+	for component_type in component_types:
+		for name in frappe.get_all(
+			"Salary Component",
+			filters={"type": "Deduction", "name": ["like", f"%{component_type}%"]},
+			pluck="name",
+		):
+			mapping[name] = component_type
+
+	return mapping
+
+
 def execute(filters=None):
 	data = []
 	provident_fund_components = ["Provident Fund", "Additional Provident Fund", "Provident Fund Loan"]
-	if not frappe.db.exists("Salary Component", {"component_type": ["in", provident_fund_components]}):
+	if not get_salary_components_by_regional_type(provident_fund_components):
 		frappe.msgprint(
 			_(
 				"Salary components of type Provident Fund, Additional Provident Fund or Provident Fund Loan are not set up."
@@ -79,11 +107,12 @@ def get_conditions(filters):
 
 def prepare_data(entry, component_type_dict):
 	data_list = {}
-	Employee = DocType("Employee")
-
-	employee_account_dict = frappe._dict(
-		frappe.qb.from_(Employee).select(Employee.name, Employee.provident_fund_account).run()
-	)
+	employee_account_dict = frappe._dict()
+	if frappe.db.has_column("Employee", "provident_fund_account"):
+		Employee = DocType("Employee")
+		employee_account_dict = frappe._dict(
+			frappe.qb.from_(Employee).select(Employee.name, Employee.provident_fund_account).run()
+		)
 
 	for d in entry:
 		component_type = component_type_dict.get(d.salary_component)
@@ -108,17 +137,10 @@ def get_data(filters):
 	data = []
 	SalarySlip = DocType("Salary Slip")
 	SalaryDetail = DocType("Salary Detail")
-	SalaryComponent = DocType("Salary Component")
 
 	filter_clauses = get_conditions(filters)
 	component_types = ["Provident Fund", "Additional Provident Fund", "Provident Fund Loan"]
-
-	component_type_dict = frappe._dict(
-		frappe.qb.from_(SalaryComponent)
-		.select(SalaryComponent.name, SalaryComponent.component_type)
-		.where(SalaryComponent.component_type.isin(component_types))
-		.run()
-	)
+	component_type_dict = get_salary_components_by_regional_type(component_types)
 
 	if not len(component_type_dict):
 		return []

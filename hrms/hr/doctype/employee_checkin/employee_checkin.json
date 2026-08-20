@@ -81,6 +81,7 @@
   {
    "fieldname": "device_id",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Location / Device ID"
   },
   {
@@ -143,7 +144,8 @@
   {
    "fieldname": "latitude",
    "fieldtype": "Float",
-   "label": "Latitude",
+   "in_list_view": 1,
+   "label": "GPS",
    "precision": "7",
    "read_only": 1
   },
@@ -282,8 +284,8 @@
   }
  ],
  "row_format": "Dynamic",
- "sort_field": "creation",
- "sort_order": "ASC",
+ "sort_field": "time",
+ "sort_order": "DESC",
  "states": [],
  "title_field": "employee_name",
  "track_changes": 1

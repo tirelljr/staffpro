@@ -35,7 +35,15 @@
   "overtime_type",
   "actual_overtime_duration",
   "column_break_idku",
-  "standard_working_hours"
+		"standard_working_hours",
+  "daily_pay_section",
+  "hours_paid",
+  "hour_rate",
+  "daily_pay",
+  "column_break_daily_pay",
+  "ss_deduction",
+  "tax_deduction",
+  "net_daily_pay"
  ],
  "fields": [
   {
@@ -81,7 +89,8 @@
    "depends_on": "working_hours",
    "fieldname": "working_hours",
    "fieldtype": "Float",
-   "label": "Working Hours",
+   "in_list_view": 1,
+   "label": "Hours",
    "precision": "2",
    "read_only": 1
   },
@@ -89,6 +98,7 @@
    "default": "Present",
    "fieldname": "status",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
    "no_copy": 1,
@@ -156,6 +166,7 @@
   {
    "fieldname": "shift",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Shift",
    "options": "Shift Type"
   },
@@ -195,17 +206,17 @@
    "label": "Details"
   },
   {
-   "depends_on": "shift",
    "fieldname": "in_time",
    "fieldtype": "Datetime",
-   "label": "In Time",
+   "in_list_view": 1,
+   "label": "In",
    "read_only": 1
   },
   {
-   "depends_on": "shift",
    "fieldname": "out_time",
    "fieldtype": "Datetime",
-   "label": "Out Time",
+   "in_list_view": 1,
+   "label": "Out",
    "read_only": 1
   },
   {
@@ -254,6 +265,58 @@
    "fieldname": "actual_overtime_duration",
    "fieldtype": "Float",
    "label": "Actual Overtime Duration",
+   "read_only": 1
+  },
+  {
+   "fieldname": "daily_pay_section",
+   "fieldtype": "Section Break",
+   "label": "Daily Pay"
+  },
+  {
+   "default": "0",
+   "description": "Approved hours count as paid time. Use Approve on Day View to mark entries paid.",
+   "fieldname": "hours_paid",
+   "fieldtype": "Check",
+   "label": "Hours Paid",
+   "read_only": 1
+  },
+  {
+   "fieldname": "hour_rate",
+   "fieldtype": "Currency",
+   "label": "Hour Rate",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "daily_pay",
+   "fieldtype": "Currency",
+   "label": "Daily Pay",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_daily_pay",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ss_deduction",
+   "fieldtype": "Currency",
+   "label": "Social Security",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tax_deduction",
+   "fieldtype": "Currency",
+   "label": "Income Tax",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "net_daily_pay",
+   "fieldtype": "Currency",
+   "label": "Net Daily Pay",
+   "options": "Company:company:default_currency",
    "read_only": 1
   }
  ],
@@ -322,7 +385,7 @@
  ],
  "row_format": "Dynamic",
  "search_fields": "employee,employee_name,attendance_date,status",
- "sort_field": "creation",
+ "sort_field": "attendance_date",
  "sort_order": "DESC",
  "states": [],
  "title_field": "employee_name",

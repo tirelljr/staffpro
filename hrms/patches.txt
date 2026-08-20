@@ -66,3 +66,11 @@ hrms.patches.v16_0.disable_app_onboarding #2026-08-18
 hrms.patches.v16_0.split_finance_and_admin #2026-08-18
 hrms.patches.v16_0.add_in_out_today_sidebar #2026-08-19
 hrms.patches.v16_0.add_data_analytics_dashboard #2026-08-19
+hrms.patches.v16_0.remove_sidebar_menu_items #2026-08-19
+hrms.patches.v16_0.flatten_time_sidebar #2026-08-19
+hrms.patches.v16_0.attendance_hours_dashboard #2026-08-19
+hrms.patches.v16_0.remove_hours_sidebar_item #2026-08-19
+hrms.patches.v16_0.add_day_view_sidebar #2026-08-19
+hrms.patches.v16_0.dedupe_time_dashboard_sidebar #2026-08-19
+hrms.patches.v16_0.remove_checkin_roster_sidebar #2026-08-20
+hrms.patches.v16_0.rename_in_out_today_page #2026-08-20

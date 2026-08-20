@@ -32,11 +32,18 @@ MILESTONE_DOCTYPE = "HR Telemetry Milestone"
 
 
 def _claim_milestone(event: str) -> bool:
+	# Lost claims are expected; a second insert toasts Duplicate Name to the user.
+	if frappe.db.exists(MILESTONE_DOCTYPE, event):
+		return False
+
 	claimed = False
 
 	with savepoint(catch=Exception):
 		frappe.get_doc({"doctype": MILESTONE_DOCTYPE, "event": event}).insert(ignore_permissions=True)
 		claimed = True
+
+	if not claimed:
+		frappe.clear_last_message()
 
 	return claimed
 

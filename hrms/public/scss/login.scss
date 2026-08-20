@@ -57,7 +57,7 @@ body[data-path="login"] .page_content {
 }
 
 .sp-login-card {
-	display: grid;
+	display: grid !important;
 	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 	background: #ffffff;
 	border-radius: 0;
@@ -80,6 +80,14 @@ body[data-path="login"] .page_content {
 .sp-login-form-col > section {
 	width: 100%;
 	max-width: 380px;
+}
+
+.sp-login-brand-col {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 40px;
+	background: #000000;
 }
 
 body[data-path="login"] .sp-login-brand-col {
@@ -153,13 +161,23 @@ body[data-path="login"] .password-field {
 	width: 100%;
 }
 
-body[data-path="login"] .sp-field-icon {
+body[data-path="login"] .sp-field-icon,
+body[data-path="login"] .password-field .toggle-password,
+body[data-path="login"] .password-field .icon {
 	position: absolute;
 	right: 14px;
 	top: 50%;
 	transform: translateY(-50%);
 	color: #9ca3af;
+	width: 18px;
+	height: 18px;
+	margin: 0;
 	pointer-events: none;
+}
+
+body[data-path="login"] .password-field .toggle-password {
+	pointer-events: auto;
+	cursor: pointer;
 }
 
 body[data-path="login"] .es-button[data-variant="solid"] {

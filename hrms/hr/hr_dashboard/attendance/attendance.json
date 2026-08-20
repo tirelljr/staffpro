@@ -13,24 +13,7 @@
    "card": "Early Exit (This Month)"
   }
  ],
- "charts": [
-  {
-   "chart": "Attendance Count",
-   "width": "Full"
-  },
-  {
-   "chart": "Timesheet Activity Breakup",
-   "width": "Half"
-  },
-  {
-   "chart": "Shift Assignment Breakup",
-   "width": "Half"
-  },
-  {
-   "chart": "Department wise Timesheet Hours",
-   "width": "Full"
-  }
- ],
+ "charts": [],
  "creation": "2022-08-21 14:13:18.835357",
  "dashboard_name": "Attendance",
  "docstatus": 0,

@@ -86,3 +86,37 @@ select:focus,
 textarea:focus {
 	--focus-ring: 0 0 0 3px rgba(17, 165, 221, 0.18);
 }
+
+/* Dropdown menus stay white throughout Desk */
+body.staff-pro-alive .dropdown-menu,
+body.staff-pro-alive .awesomplete > ul,
+body.staff-pro-alive .datepicker,
+body.staff-pro-alive .datepicker-dropdown {
+	background-color: #ffffff !important;
+	color: var(--sp-teal, #16678c);
+	border-color: var(--sp-teal, #16678c);
+}
+
+body.staff-pro-alive .dropdown-item,
+body.staff-pro-alive .dropdown-menu > li > a,
+body.staff-pro-alive .awesomplete > ul > li {
+	background: transparent !important;
+	color: var(--sp-teal, #16678c) !important;
+}
+
+body.staff-pro-alive .dropdown-item:hover,
+body.staff-pro-alive .dropdown-item:focus,
+body.staff-pro-alive .dropdown-item.active,
+body.staff-pro-alive .dropdown-menu > li > a:hover,
+body.staff-pro-alive .dropdown-menu > li.active > a,
+body.staff-pro-alive .awesomplete > ul > li:hover,
+body.staff-pro-alive .awesomplete > ul > li[aria-selected="true"] {
+	background: rgba(167, 200, 204, 0.35) !important;
+	color: var(--sp-teal, #16678c) !important;
+}
+
+body.staff-pro-alive .awesomplete mark {
+	background: transparent !important;
+	color: var(--sp-teal, #16678c) !important;
+	font-weight: 700;
+}

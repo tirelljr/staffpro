@@ -4,7 +4,8 @@
 LINK_LABELS: dict[str, str] = {
 	"Employee": "Agents",
 	"Data Analytics": "Data Analytics",
-	"in-out-today": "In / Out today",
+	"in-out-today": "Who Is In",
+	"day-view": "Day View",
 	"organizational-chart": "Team Structure",
 	"Employee Onboarding": "New Hire Onboarding",
 	"Employee Separation": "Offboarding",
@@ -88,6 +89,7 @@ LINK_LABELS: dict[str, str] = {
 
 # Section headers and items keyed by their current sidebar label.
 LABEL_LABELS: dict[str, str] = {
+	"In / Out today": "Who Is In",
 	"Leave Admin": "Time Off Admin",
 	"Overtime": "Extra Hours",
 	"Planning": "Workforce Planning",

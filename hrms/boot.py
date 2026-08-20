@@ -11,12 +11,6 @@ STAFF_PRO_PORTAL_ROUTES = {
 }
 STAFF_PRO_INTEGRATIONS = [
 	{
-		"name": "quickbooks",
-		"label": "QuickBooks",
-		"url": "https://qbo.intuit.com",
-		"icon": "/assets/hrms/images/integrations/quickbooks.svg",
-	},
-	{
 		"name": "whatsapp",
 		"label": "WhatsApp",
 		"url": "https://web.whatsapp.com",
@@ -27,12 +21,6 @@ STAFF_PRO_INTEGRATIONS = [
 		"label": "Freshdesk",
 		"url": "https://freshdesk.com/login",
 		"icon": "/assets/hrms/images/integrations/freshdesk.svg",
-	},
-	{
-		"name": "teams",
-		"label": "Teams",
-		"url": "https://teams.microsoft.com",
-		"icon": "/assets/hrms/images/integrations/teams.svg",
 	},
 ]
 STAFF_PRO_BRAND = {

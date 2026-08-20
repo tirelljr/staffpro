@@ -5,7 +5,15 @@ import frappe
 from frappe import _
 from frappe.query_builder import Criterion
 from frappe.query_builder.functions import Sum
-from frappe.utils import add_days, flt, formatdate, get_first_day, get_last_day, getdate
+from frappe.utils import (
+	add_days,
+	add_to_date,
+	flt,
+	formatdate,
+	get_first_day,
+	get_last_day,
+	getdate,
+)
 
 from erpnext.accounts.utils import build_qb_match_conditions
 
@@ -17,6 +25,29 @@ PERIOD_DAYS = {
 
 FALLBACK_LIMIT = 5
 PAYROLL_LIMIT = 8
+RELATIVE_FILTER_OPS = {"Timespan"}
+SPARKLINE_POINTS = 6
+
+
+@frappe.whitelist()
+def get_number_card_sparklines(card_names: str | list | None = None, points: int = SPARKLINE_POINTS) -> dict:
+	"""Return period series for dashboard KPI mini-charts."""
+	if isinstance(card_names, str):
+		card_names = frappe.parse_json(card_names)
+	if not card_names:
+		return {}
+
+	points = max(3, min(int(points or SPARKLINE_POINTS), 12))
+	out = {}
+	for name in card_names:
+		if not name or not frappe.db.exists("Number Card", name):
+			continue
+		try:
+			out[name] = _sparkline_for_card(name, points)
+		except Exception:
+			frappe.log_error(title=f"KPI sparkline failed: {name}")
+			out[name] = {"values": [], "kind": "bars"}
+	return out
 
 
 @frappe.whitelist()
@@ -93,28 +124,32 @@ def _get_payroll_rows(company, start_date, end_date):
 	salary_slip = frappe.qb.DocType("Salary Slip")
 	employee = frappe.qb.DocType("Employee")
 
+	select_fields = [
+		salary_slip.name,
+		salary_slip.employee,
+		salary_slip.employee_name,
+		salary_slip.end_date,
+		salary_slip.net_pay,
+		salary_slip.currency,
+		salary_slip.total_working_hours,
+		salary_slip.payment_days,
+		salary_slip.status,
+		salary_slip.docstatus,
+		salary_slip.journal_entry,
+		employee.designation,
+		employee.department,
+		employee.image,
+		employee.company_email,
+		employee.personal_email,
+	]
+	if frappe.db.has_column("Salary Slip", "ss_employee_amount"):
+		select_fields.append(salary_slip.ss_employee_amount)
+
 	slips = (
 		frappe.qb.from_(salary_slip)
 		.left_join(employee)
 		.on(salary_slip.employee == employee.name)
-		.select(
-			salary_slip.name,
-			salary_slip.employee,
-			salary_slip.employee_name,
-			salary_slip.end_date,
-			salary_slip.net_pay,
-			salary_slip.currency,
-			salary_slip.total_working_hours,
-			salary_slip.payment_days,
-			salary_slip.status,
-			salary_slip.docstatus,
-			salary_slip.journal_entry,
-			employee.designation,
-			employee.department,
-			employee.image,
-			employee.company_email,
-			employee.personal_email,
-		)
+		.select(*select_fields)
 		.where(salary_slip.company == company)
 		.where(salary_slip.start_date <= end_date)
 		.where(salary_slip.end_date >= start_date)
@@ -137,6 +172,7 @@ def _get_payroll_rows(company, start_date, end_date):
 
 	employees = _get_active_employees(company)
 	hours_by_employee = _attendance_hours_by_employee(company, start_date, end_date)
+	ss_by_employee = _ss_from_attendance(company, start_date, end_date)
 	currency = frappe.db.get_value("Company", company, "default_currency")
 
 	for emp in employees:
@@ -148,6 +184,7 @@ def _get_payroll_rows(company, start_date, end_date):
 				"image": emp.image,
 				"hours_worked": flt(hours_by_employee.get(emp.name)),
 				"net_pay": None,
+				"ss_contribution": flt(ss_by_employee.get(emp.name)),
 				"currency": currency,
 				"pay_date": end_date,
 				"pay_date_label": formatdate(end_date),
@@ -179,6 +216,7 @@ def _build_payroll_row(slip, start_date, end_date):
 		"image": slip.image,
 		"hours_worked": hours,
 		"net_pay": flt(slip.net_pay),
+		"ss_contribution": flt(slip.get("ss_employee_amount")),
 		"currency": slip.currency,
 		"pay_date": slip.end_date or end_date,
 		"pay_date_label": formatdate(slip.end_date or end_date),
@@ -198,6 +236,47 @@ def _payroll_status(slip):
 	if slip.status == "Withheld":
 		return "pending", _("Withheld")
 	return "pending", _("Pending")
+
+
+def _ss_from_attendance(company, start_date, end_date) -> dict:
+	"""Weekly SSB employee contribution from time clocks in the payroll period."""
+	from hrms.payroll.daily_pay import _weekly_ss, attendance_columns, pay_from_row, week_bounds
+
+	week_from, _unused = week_bounds(start_date)
+	_unused, week_to = week_bounds(end_date)
+	fields = attendance_columns(
+		"employee", "attendance_date", "working_hours", "hour_rate", "daily_pay", "company"
+	)
+	if "employee" not in fields:
+		fields.insert(0, "employee")
+	if "attendance_date" not in fields:
+		fields.insert(1, "attendance_date")
+
+	filters = {
+		"attendance_date": ["between", [week_from, week_to]],
+		"docstatus": ["<", 2],
+	}
+	if frappe.db.has_column("Attendance", "company"):
+		filters["company"] = company
+
+	week_pay = {}
+	for rec in frappe.get_all("Attendance", filters=filters, fields=fields):
+		if not rec.get("employee") or not rec.get("attendance_date"):
+			continue
+		week_start, week_end = week_bounds(rec.attendance_date)
+		if week_end < start_date or week_start > end_date:
+			continue
+		key = (rec.employee, week_start)
+		week_pay[key] = week_pay.get(key, 0.0) + pay_from_row(rec)
+
+	ss_by_employee = {}
+	for (employee, week_start), pay in week_pay.items():
+		_unused, week_end = week_bounds(week_start)
+		ss_by_employee[employee] = flt(
+			ss_by_employee.get(employee, 0.0) + _weekly_ss(employee, company, pay, week_start, week_end),
+			2,
+		)
+	return ss_by_employee
 
 
 def _attendance_hours_by_employee(company, start_date, end_date):
@@ -314,3 +393,150 @@ def _build_event(employee, event_type, event_date, years_completed=None):
 		event["years_completed"] = years_completed
 
 	return event
+
+
+def _sparkline_for_card(card_name: str, points: int) -> dict:
+	doc = frappe.get_cached_doc("Number Card", card_name)
+	if doc.type != "Document Type" or not doc.document_type:
+		return {"values": [], "kind": "bars"}
+
+	filters, date_field, interval, periodized = _prepare_sparkline_filters(doc)
+	values = []
+	for offset in range(points - 1, -1, -1):
+		start, end = _period_bounds(interval, offset)
+		period_filters = list(filters)
+		if periodized:
+			period_filters.append([doc.document_type, date_field, "between", [str(start), str(end)]])
+		else:
+			period_filters.append([doc.document_type, date_field, "<=", str(end)])
+		values.append(_aggregate_card_value(doc, period_filters))
+
+	kind = "bars"
+	return {"values": values, "kind": kind, "interval": interval}
+
+
+def _prepare_sparkline_filters(doc):
+	raw_filters = frappe.parse_json(doc.filters_json or "[]") or []
+	dynamic_filters = _resolve_dynamic_filters(doc.dynamic_filters_json)
+	filters = []
+	date_field = "creation"
+	timespan_value = None
+	periodized = False
+
+	for row in list(raw_filters) + list(dynamic_filters):
+		if not isinstance(row, (list, tuple)) or len(row) < 4:
+			continue
+		doctype, field, op, value = row[0], row[1], row[2], row[3]
+		if op in RELATIVE_FILTER_OPS or _looks_like_timespan(value):
+			date_field = field or date_field
+			timespan_value = value if isinstance(value, str) else timespan_value
+			periodized = True
+			continue
+		filters.append([doctype, field, op, value])
+
+	if not periodized:
+		# Cumulative headcount-style cards: grow by creation over time.
+		date_field = "creation"
+
+	interval = _infer_interval(timespan_value, doc.stats_time_interval)
+	return filters, date_field, interval, periodized
+
+
+def _resolve_dynamic_filters(dynamic_filters_json):
+	rows = frappe.parse_json(dynamic_filters_json or "[]") or []
+	resolved = []
+	for row in rows:
+		if not isinstance(row, (list, tuple)) or len(row) < 4:
+			continue
+		item = list(row)
+		expr = item[3]
+		if isinstance(expr, str):
+			try:
+				item[3] = frappe.safe_eval(
+					expr,
+					eval_globals={"frappe": frappe},
+					eval_locals={"frappe": frappe},
+				)
+			except Exception:
+				if "Company" in expr:
+					item[3] = frappe.defaults.get_user_default("Company")
+				else:
+					continue
+		resolved.append(item)
+	return resolved
+
+
+def _looks_like_timespan(value) -> bool:
+	if not isinstance(value, str):
+		return False
+	text = value.strip().lower()
+	return text.startswith(("this ", "last ", "next ")) or text in {
+		"today",
+		"yesterday",
+		"tomorrow",
+	}
+
+
+def _infer_interval(timespan_value, stats_interval: str | None) -> str:
+	text = (timespan_value or "").strip().lower()
+	if "day" in text or text in {"today", "yesterday", "tomorrow"}:
+		return "Daily"
+	if "week" in text:
+		return "Weekly"
+	if "year" in text:
+		return "Yearly"
+	if "quarter" in text:
+		return "Monthly"
+	if "month" in text:
+		return "Monthly"
+	if stats_interval in {"Daily", "Weekly", "Monthly", "Yearly"}:
+		return stats_interval
+	return "Monthly"
+
+
+def _period_bounds(interval: str, offset: int):
+	today = getdate()
+	if interval == "Daily":
+		day = getdate(add_to_date(today, days=-offset))
+		return day, day
+	if interval == "Weekly":
+		week_start = getdate(add_to_date(today, days=-today.weekday()))
+		start = getdate(add_to_date(week_start, days=-7 * offset))
+		end = getdate(add_to_date(start, days=6))
+		return start, end
+	if interval == "Yearly":
+		year = today.year - offset
+		return getdate(f"{year}-01-01"), getdate(f"{year}-12-31")
+
+	month_anchor = getdate(add_to_date(today, months=-offset))
+	start = get_first_day(month_anchor)
+	end = get_last_day(month_anchor)
+	return getdate(start), getdate(end)
+
+
+def _aggregate_card_value(doc, filters) -> float:
+	function_map = {
+		"Count": "COUNT",
+		"Sum": "SUM",
+		"Average": "AVG",
+		"Minimum": "MIN",
+		"Maximum": "MAX",
+	}
+	function = function_map.get(doc.function or "Count", "COUNT")
+	if function == "COUNT":
+		fields = [{"COUNT": "*", "as": "result"}]
+	else:
+		if not doc.aggregate_function_based_on:
+			return 0.0
+		fields = [{function: doc.aggregate_function_based_on, "as": "result"}]
+
+	rows = frappe.get_list(
+		doc.document_type,
+		fields=fields,
+		filters=filters,
+		parent_doctype=doc.parent_document_type,
+		order_by=None,
+	)
+	if not rows:
+		return 0.0
+	return flt(rows[0].get("result") or 0)

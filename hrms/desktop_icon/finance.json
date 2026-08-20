@@ -11,7 +11,7 @@
  "label": "Finance",
  "link_to": "Finance",
  "link_type": "Workspace Sidebar",
- "modified": "2026-08-18 23:52:38.448893",
+ "modified": "2026-08-19 19:45:13.150809",
  "modified_by": "Administrator",
  "name": "Finance",
  "owner": "Administrator",
@@ -31,5 +31,6 @@
    "role": "Administrator"
   }
  ],
- "standard": 1
+ "standard": 1,
+ "logo_url": "/assets/hrms/images/integrations/quickbooks.svg"
 }

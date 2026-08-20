@@ -1,5 +1,21 @@
 frappe.listview_settings["Attendance"] = {
-	add_fields: ["status", "attendance_date"],
+	add_fields: [
+		"status",
+		"attendance_date",
+		"employee_name",
+		"in_time",
+		"out_time",
+		"working_hours",
+		"daily_pay",
+		"shift",
+	],
+	hide_name_column: true,
+
+	primary_action: function () {
+		if (hrms.time?.open_add_attendance) {
+			hrms.time.open_add_attendance();
+		}
+	},
 
 	get_indicator: function (doc) {
 		if (["Present", "Work From Home"].includes(doc.status)) {
@@ -10,9 +26,41 @@ frappe.listview_settings["Attendance"] = {
 			return [__(doc.status), "orange", "status,=," + doc.status];
 		}
 	},
+
+	formatters: {
+		in_time(value) {
+			return hrms.time?.format_clock ? hrms.time.format_clock(value) : value;
+		},
+		out_time(value) {
+			return hrms.time?.format_clock ? hrms.time.format_clock(value) : value;
+		},
+		working_hours(value) {
+			return hrms.time?.format_hours ? hrms.time.format_hours(value) : value;
+		},
+	},
+
 	onload: function (list_view) {
-		let me = this;
+		if (hrms.time?.setup_range_filters) {
+			hrms.time.setup_range_filters(list_view, {
+				date_field: "attendance_date",
+				department_field: "department",
+			});
+		}
+
 		if (frappe.perm.has_perm("Attendance", 0, "create")) {
+			const open_entry = () => hrms.time.show_add_entry_dialog(list_view);
+			list_view.make_new_doc = open_entry;
+			list_view.set_primary_action = () => {
+				if (list_view.can_create && !frappe.boot.read_only) {
+					list_view.page.set_primary_action(__("Add Attendance"), open_entry);
+				} else {
+					list_view.page.clear_primary_action();
+				}
+			};
+			list_view.set_primary_action();
+			list_view.page.add_inner_button(__("Add Absence"), () =>
+				hrms.time.show_add_absence_dialog(list_view),
+			);
 			list_view.page.add_inner_button(__("Mark Attendance"), function () {
 				let first_day_of_month = moment().startOf("month");
 
@@ -34,7 +82,7 @@ frappe.listview_settings["Attendance"] = {
 								};
 							},
 							reqd: 1,
-							onchange: () => me.reset_dialog(dialog),
+							onchange: () => frappe.listview_settings["Attendance"].reset_dialog(dialog),
 						},
 						{
 							fieldtype: "Section Break",
@@ -47,7 +95,7 @@ frappe.listview_settings["Attendance"] = {
 							fieldname: "from_date",
 							reqd: 1,
 							default: frappe.datetime.obj_to_str(first_day_of_month),
-							onchange: () => me.get_unmarked_days(dialog),
+							onchange: () => frappe.listview_settings["Attendance"].get_unmarked_days(dialog),
 						},
 						{
 							label: __("Status"),
@@ -66,7 +114,7 @@ frappe.listview_settings["Attendance"] = {
 							fieldname: "to_date",
 							reqd: 1,
 							default: frappe.datetime.obj_to_str(moment()),
-							onchange: () => me.get_unmarked_days(dialog),
+							onchange: () => frappe.listview_settings["Attendance"].get_unmarked_days(dialog),
 						},
 						{
 							label: __("Shift"),
@@ -74,7 +122,6 @@ frappe.listview_settings["Attendance"] = {
 							fieldname: "shift",
 							options: "Shift Type",
 						},
-
 						{
 							fieldtype: "Section Break",
 							fieldname: "days_section",
@@ -84,7 +131,7 @@ frappe.listview_settings["Attendance"] = {
 							label: __("Exclude Holidays"),
 							fieldtype: "Check",
 							fieldname: "exclude_holidays",
-							onchange: () => me.get_unmarked_days(dialog),
+							onchange: () => frappe.listview_settings["Attendance"].get_unmarked_days(dialog),
 						},
 						{
 							label: __("Unmarked Attendance for days"),
@@ -126,6 +173,12 @@ frappe.listview_settings["Attendance"] = {
 				});
 				dialog.show();
 			});
+		}
+	},
+
+	refresh: function (list_view) {
+		if (hrms.time?.refresh_hours_totals) {
+			hrms.time.refresh_hours_totals(list_view);
 		}
 	},
 

@@ -219,6 +219,31 @@ class TestTelemetry(HRMSTestSuite):
 		leave_type = create_leave_type()
 		self.assertTrue(frappe.db.exists("Leave Type", leave_type.name))
 
+	def test_duplicate_claim_does_not_surface_duplicate_name(self):
+		"""A second check-in must not toast 'HR Telemetry Milestone … already exists'.
+
+		Covers both the common path (row already there) and the race where exists()
+		misses and insert hits the primary key — db_insert msgprints before raising.
+		"""
+		self.release_milestone("_test_claim")
+		_claim_milestone("_test_claim")
+		frappe.clear_messages()
+
+		self.assertFalse(_claim_milestone("_test_claim"))
+		self.assertFalse(any("already exists" in str(message) for message in frappe.message_log))
+
+		real_exists = frappe.db.exists
+
+		def exists_misses_milestone(dt, dn=None, *args, **kwargs):
+			if dt == MILESTONE_DOCTYPE and dn == "_test_claim":
+				return None
+			return real_exists(dt, dn, *args, **kwargs)
+
+		with patch.object(frappe.db, "exists", side_effect=exists_misses_milestone):
+			self.assertFalse(_claim_milestone("_test_claim"))
+
+		self.assertFalse(any("already exists" in str(message) for message in frappe.message_log))
+
 	def test_claim_is_enforced_by_the_database(self):
 		"""The exclusivity is a primary-key constraint, not application logic."""
 		self.release_milestone("_test_claim")

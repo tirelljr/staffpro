@@ -7,6 +7,7 @@ import frappe
 from frappe.utils import (
 	add_days,
 	add_months,
+	flt,
 	get_first_day,
 	get_last_day,
 	get_time,
@@ -22,10 +23,21 @@ from erpnext.setup.doctype.employee.test_employee import make_employee
 from hrms.hr.doctype.attendance.attendance import (
 	DuplicateAttendanceError,
 	OverlappingShiftAttendanceError,
+	add_absence,
+	add_hours_adjustment,
+	add_hours_entries,
+	add_hours_entry,
+	approve_hours_entries,
+	cancel_hours_entries,
+	cancel_hours_entry,
 	get_events,
+	get_hours_entry,
+	get_hours_rows,
+	get_hours_totals,
 	get_unmarked_days,
 	mark_attendance,
 	mark_bulk_attendance,
+	update_hours_entry,
 )
 from hrms.hr.doctype.holiday_list_assignment.test_holiday_list_assignment import (
 	assign_holiday_list,
@@ -325,6 +337,103 @@ class TestAttendance(HRMSTestSuite):
 		frappe.set_user("Administrator")
 		attendance_records = frappe.get_all("Attendance", {"employee": employee2})
 		self.assertEqual(len(attendance_records), 1)
+
+	def test_add_hours_entry_creates_attendance_and_checkins(self):
+		employee = make_employee("test_hours_entry@example.com", company="_Test Company")
+		date = nowdate()
+		name = add_hours_entry(employee, date, "09:00:00", "17:30:00")
+		attendance = frappe.get_doc("Attendance", name)
+
+		self.assertEqual(attendance.status, "Present")
+		self.assertEqual(attendance.working_hours, 8.5)
+		self.assertTrue(attendance.in_time)
+		self.assertTrue(attendance.out_time)
+
+		checkins = frappe.get_all(
+			"Employee Checkin",
+			filters={"employee": employee, "attendance": name},
+			fields=["log_type"],
+			order_by="time",
+		)
+		self.assertEqual([row.log_type for row in checkins], ["IN", "OUT"])
+
+		totals = get_hours_totals(from_date=date, to_date=date, employee=employee)
+		self.assertEqual(totals["total"], 8.5)
+		self.assertEqual(totals["paid"], 0)
+		self.assertEqual(totals["unpaid"], 8.5)
+
+		payload = get_hours_rows(from_date=date, to_date=date, employee=employee)
+		self.assertEqual(len(payload["rows"]), 1)
+		self.assertEqual(payload["rows"][0]["name"], name)
+		self.assertEqual(payload["totals"]["total"], 8.5)
+		self.assertEqual(payload["rows"][0]["reg"], 8.5)
+		self.assertEqual(payload["rows"][0]["paid"], 0)
+		self.assertEqual(payload["rows"][0]["unpaid"], 8.5)
+		self.assertEqual(payload["approval"], "Not Approved Yet")
+
+		self.assertEqual(approve_hours_entries([name]).get("approved"), [name])
+		payload = get_hours_rows(from_date=date, to_date=date, employee=employee)
+		self.assertEqual(payload["rows"][0]["paid"], 8.5)
+		self.assertEqual(payload["rows"][0]["unpaid"], 0)
+		self.assertEqual(payload["approval"], "Approved")
+
+		add_hours_entry(employee, add_days(date, 1), "09:00:00", "17:00:00", comment="test note")
+		payload = get_hours_rows(from_date=add_days(date, 1), to_date=add_days(date, 1), employee=employee)
+		self.assertTrue(payload["rows"][0]["comments"])
+		self.assertEqual(payload["rows"][0]["comments"][0]["content"], "test note")
+
+		cancel_hours_entry(name)
+		self.assertFalse(frappe.db.exists("Attendance", {"name": name, "docstatus": ("<", 2)}))
+
+	def test_update_hours_entry_changes_times(self):
+		employee = make_employee("test_hours_edit@example.com", company="_Test Company")
+		date = nowdate()
+		name = add_hours_entry(employee, date, "09:00:00", "17:00:00", comment="first")
+		new_name = update_hours_entry(name, date, "10:00:00", "18:00:00", comment="updated")
+		entry = get_hours_entry(new_name)
+		self.assertEqual(entry["in_time"], "10:00:00")
+		self.assertEqual(entry["out_time"], "18:00:00")
+		self.assertEqual(entry["comment"], "updated")
+
+	def test_add_hours_entries_creates_for_each_employee(self):
+		employee_one = make_employee("test_hours_bulk_one@example.com", company="_Test Company")
+		employee_two = make_employee("test_hours_bulk_two@example.com", company="_Test Company")
+		date = nowdate()
+		names = add_hours_entries(
+			[employee_one, employee_two],
+			date,
+			"09:00:00",
+			"18:00:00",
+		)
+		self.assertEqual(len(names), 2)
+		self.assertEqual(frappe.db.get_value("Attendance", names[0], "employee"), employee_one)
+		self.assertEqual(frappe.db.get_value("Attendance", names[1], "employee"), employee_two)
+
+	def test_add_hours_adjustment_updates_working_hours(self):
+		employee = make_employee("test_hours_adjustment@example.com", company="_Test Company")
+		date = nowdate()
+		name = add_hours_entry(employee, date, "09:00:00", "17:00:00")
+		add_hours_adjustment(employee, date, 1.5, "Overtime")
+		self.assertEqual(flt(frappe.db.get_value("Attendance", name, "working_hours")), 9.5)
+		add_hours_adjustment(employee, date, 0.5, direction="Deduction")
+		self.assertEqual(flt(frappe.db.get_value("Attendance", name, "working_hours")), 9.0)
+
+	def test_add_absence_marks_absent_days(self):
+		employee = make_employee("test_hours_absence@example.com", company="_Test Company")
+		date = nowdate()
+		result = add_absence(employee, date, date)
+		self.assertEqual(len(result["names"]), 1)
+		self.assertEqual(frappe.db.get_value("Attendance", result["names"][0], "status"), "Absent")
+
+	def test_cancel_hours_entries_removes_selected(self):
+		employee = make_employee("test_hours_bulk_cancel@example.com", company="_Test Company")
+		date = nowdate()
+		first = add_hours_entry(employee, date, "09:00:00", "17:00:00")
+		second = add_hours_entry(employee, add_days(date, 1), "09:00:00", "17:00:00")
+		self.assertEqual(approve_hours_entries([first]).get("approved"), [first])
+		cancel_hours_entries([first, second])
+		self.assertFalse(frappe.db.exists("Attendance", {"name": first, "docstatus": ("<", 2)}))
+		self.assertFalse(frappe.db.exists("Attendance", {"name": second, "docstatus": ("<", 2)}))
 
 	def tearDown(self):
 		frappe.db.rollback()

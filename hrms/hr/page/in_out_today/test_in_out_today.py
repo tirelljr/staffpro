@@ -70,6 +70,9 @@ class TestInOutToday(HRMSTestSuite):
 		self.assertTrue(all(row["department"] == self.dept_a for row in filtered["details"]))
 		self.assertEqual(by_employee[emp_in]["status"], "IN")
 		self.assertEqual({row["department"] for row in filtered["summary"]}, {self.dept_a})
+		self.assertEqual(filtered["totals"]["total"], len(filtered["details"]))
+		self.assertEqual(filtered["totals"]["in_count"], sum(1 for row in filtered["details"] if row["status"] == "IN"))
+		self.assertEqual(filtered["totals"]["out_count"], sum(1 for row in filtered["details"] if row["status"] == "OUT"))
 
 	def test_late_from_shift_grace(self):
 		shift = setup_shift_type(

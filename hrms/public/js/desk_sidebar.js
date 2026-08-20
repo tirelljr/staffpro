@@ -122,11 +122,12 @@ const SIDEBAR_CSS = `
 	color: #000000 !important;
 }
 .workspace-dock .staff-pro-dock-integrations .workspace-dock-item img,
-.workspace-dock .staff-pro-dock-integrations .workspace-dock-item svg {
-	width: 24px !important;
-	height: 24px !important;
-	min-width: 24px !important;
-	min-height: 24px !important;
+.workspace-dock .staff-pro-dock-integrations .workspace-dock-item svg,
+.workspace-dock button.workspace-dock-item.staff-pro-dock-brand-icon img {
+	width: 22px !important;
+	height: 22px !important;
+	min-width: 22px !important;
+	min-height: 22px !important;
 	color: unset !important;
 	object-fit: contain !important;
 	border-radius: 5px !important;
@@ -623,7 +624,6 @@ const SUBMENU_ICONS = {
 	"social security deductions": "shield",
 	"ss contribution table": "shield",
 	"social security contribution table": "shield",
-	"shift attendance": "clock",
 	"employee advance": "upload",
 	"employee checkin": "pointer",
 	"attendance request": "calendar-check",
@@ -895,6 +895,7 @@ const HR_SIDEBARS = [
 	"people",
 	"time",
 	"pay",
+	"payroll",
 	"ss and taxes",
 	"talent",
 	"finance",
@@ -1068,12 +1069,6 @@ function staff_pro_dock_shortcuts() {
 
 const STAFF_PRO_INTEGRATIONS_FALLBACK = [
 	{
-		name: "quickbooks",
-		label: "QuickBooks",
-		url: "https://qbo.intuit.com",
-		icon: "/assets/hrms/images/integrations/quickbooks.svg",
-	},
-	{
 		name: "whatsapp",
 		label: "WhatsApp",
 		url: "https://web.whatsapp.com",
@@ -1085,27 +1080,27 @@ const STAFF_PRO_INTEGRATIONS_FALLBACK = [
 		url: "https://freshdesk.com/login",
 		icon: "/assets/hrms/images/integrations/freshdesk.svg",
 	},
-	{
-		name: "teams",
-		label: "Teams",
-		url: "https://teams.microsoft.com",
-		icon: "/assets/hrms/images/integrations/teams.svg",
-	},
 ];
 
 function staff_pro_integrations() {
 	const fromBoot = frappe.boot?.staff_pro_integrations;
 	const items = Array.isArray(fromBoot) && fromBoot.length ? fromBoot : STAFF_PRO_INTEGRATIONS_FALLBACK;
-	return items.map((item, index) => {
-		const fallback = STAFF_PRO_INTEGRATIONS_FALLBACK[index] || {};
-		const name = item.name || fallback.name;
-		return {
-			name,
-			label: __(item.label || fallback.label || name),
-			url: item.url || fallback.url,
-			icon: item.icon || `/assets/hrms/images/integrations/${name}.svg`,
-		};
-	});
+	return items
+		.filter((item) => {
+			const name = String(item.name || "").toLowerCase();
+			return name !== "quickbooks" && name !== "teams";
+		})
+		.map((item) => {
+			const fallback =
+				STAFF_PRO_INTEGRATIONS_FALLBACK.find((row) => row.name === item.name) || {};
+			const name = item.name || fallback.name;
+			return {
+				name,
+				label: __(item.label || fallback.label || name),
+				url: item.url || fallback.url,
+				icon: item.icon || `/assets/hrms/images/integrations/${name}.svg`,
+			};
+		});
 }
 
 function render_staff_pro_dock_integrations() {
@@ -1137,13 +1132,14 @@ function render_staff_pro_dock_integrations() {
 	$wrap.empty();
 	items.forEach((item) => {
 		const label = frappe.utils.escape_html(item.label);
+		const icon = frappe.utils.escape_html(item.icon);
 		const $item = $(`
-			<button type="button" class="workspace-dock-item staff-pro-dock-integration"
+			<button type="button" class="workspace-dock-item staff-pro-dock-integration staff-pro-dock-brand-icon"
 				data-sp-integration="${frappe.utils.escape_html(item.name)}"
 				aria-label="${label}"
 				title="${label}">
 				<span class="workspace-dock-icon" aria-hidden="true">
-					<img src="${frappe.utils.escape_html(item.icon)}" alt="" />
+					<img src="${icon}" alt="" />
 				</span>
 				<span class="workspace-dock-label">${label}</span>
 			</button>
@@ -1355,15 +1351,20 @@ function refresh_staff_pro_dock_shortcuts() {
 	frappe.app?.sidebar?.refresh_dock?.();
 }
 
+const DOCK_LABELS = {
+	pay: "Payroll",
+};
+
 const DOCK_ICONS = {
-	people: "users",
+	people: "/assets/hrms/images/integrations/teams.svg",
 	pay: "coins",
-	"ss and taxes": "shield-check",
+	payroll: "coins",
+	"ss and taxes": "/assets/hrms/images/belize-ssb-logo.png",
 	time: "clock",
 	talent: "user-plus",
-	finance: "file-text",
-	"finance & admin": "file-text",
-	"finance and admin": "file-text",
+	finance: "/assets/hrms/images/integrations/quickbooks.svg",
+	"finance & admin": "/assets/hrms/images/integrations/quickbooks.svg",
+	"finance and admin": "/assets/hrms/images/integrations/quickbooks.svg",
 	hr: "briefcase",
 	accounting: "file-text",
 	admin: "settings",
@@ -1374,6 +1375,15 @@ const DOCK_ICONS = {
 	projects: "folder-kanban",
 	"erpnext settings": "settings",
 };
+
+function display_dock_label(label) {
+	if (!label) return label;
+	return DOCK_LABELS[String(label).toLowerCase()] || label;
+}
+
+function is_dock_image_icon(icon) {
+	return typeof icon === "string" && (icon.startsWith("/") || /\.(svg|png|jpe?g|webp)(\?|$)/i.test(icon));
+}
 
 function dock_icon_html(name) {
 	try {
@@ -1393,8 +1403,14 @@ function apply_dock_icon($item, label) {
 	if (!iconName) return;
 	if ($item.attr("data-sp-dock-icon") === iconName) return;
 
-	const html = dock_icon_html(iconName);
-	if (!html || !String(html).includes("svg")) return;
+	const isImage = is_dock_image_icon(iconName);
+	let html = "";
+	if (isImage) {
+		html = `<img src="${frappe.utils.escape_html(iconName)}" alt="" />`;
+	} else {
+		html = dock_icon_html(iconName);
+		if (!html || !String(html).includes("svg")) return;
+	}
 
 	let $wrap = $item.children(".workspace-dock-icon, .sidebar-item-icon").first();
 	if (!$wrap.length) {
@@ -1402,6 +1418,7 @@ function apply_dock_icon($item, label) {
 		$item.prepend($wrap);
 	}
 	$wrap.html(html);
+	$item.toggleClass("staff-pro-dock-brand-icon", isImage);
 	$item.children("svg, .icon, img").not($wrap.find("svg, .icon, img")).remove();
 	$item.attr("data-sp-dock-icon", iconName);
 }
@@ -1419,8 +1436,12 @@ function dock_item_label($item) {
 function label_workspace_dock() {
 	$(".workspace-dock button.workspace-dock-item").each(function () {
 		const $item = $(this);
-		const label = dock_item_label($item);
-		if (!label) return;
+		const rawLabel = dock_item_label($item);
+		if (!rawLabel) return;
+		const label = display_dock_label(rawLabel);
+		if (label !== rawLabel) {
+			$item.attr("aria-label", label);
+		}
 
 		apply_dock_icon($item, label);
 
@@ -1467,9 +1488,10 @@ function patch_workspace_dock() {
 
 	const orig = Dock.prototype.make_workspace_item;
 	Dock.prototype.make_workspace_item = function (workspace) {
-		const label = workspace.title || workspace.label || workspace.name || "";
-		const mappedIcon = DOCK_ICONS[String(label).toLowerCase()];
-		if (mappedIcon) {
+		const rawLabel = workspace.title || workspace.label || workspace.name || "";
+		const label = display_dock_label(rawLabel);
+		const mappedIcon = DOCK_ICONS[String(label).toLowerCase()] || DOCK_ICONS[String(rawLabel).toLowerCase()];
+		if (mappedIcon && !is_dock_image_icon(mappedIcon)) {
 			workspace = Object.assign({}, workspace, { icon: mappedIcon });
 		}
 		const $item = orig.call(this, workspace);

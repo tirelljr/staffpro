@@ -45,7 +45,29 @@ def _clean_row(row) -> dict:
 	return data
 
 
+def _dedupe_sidebar_rows(rows: list[dict]) -> list[dict]:
+	"""Keep one Dashboard link per sidebar. URL + Dashboard rows both resolve to the same page."""
+	out = []
+	seen_dashboard = False
+	for row in rows:
+		label = (row.get("label") or "").strip()
+		if label == "Dashboard":
+			if seen_dashboard:
+				continue
+			seen_dashboard = True
+		out.append(row)
+	return out
+
+
 def _update_child_table(doc, fieldname: str, rows: list[dict]):
+	rows = _dedupe_sidebar_rows(rows)
+	doctype = doc.doctype
+	name = doc.name
+	frappe.db.delete(
+		"Workspace Sidebar Item",
+		{"parent": name, "parenttype": doctype, "parentfield": fieldname},
+	)
+	doc = frappe.get_doc(doctype, name)
 	doc.set(fieldname, [])
 	for row in rows:
 		doc.append(fieldname, row)
@@ -56,7 +78,7 @@ def _update_child_table(doc, fieldname: str, rows: list[dict]):
 
 def _load_fixture(relative_path: str) -> dict:
 	path = Path(frappe.get_app_path("hrms", *relative_path.split("/")))
-	return json.loads(path.read_text(encoding="utf-8"))
+	return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
 def _rows_from_fixture(data: dict, fieldname: str) -> list[dict]:
