@@ -19,6 +19,7 @@ import { IonicVue } from "@ionic/vue"
 import { session } from "@/data/session"
 import { userResource } from "@/data/user"
 import { employeeResource } from "@/data/employee"
+import { syncNotificationResources } from "@/data/notifications"
 
 import dayjs from "@/utils/dayjs"
 import getIonicConfig from "@/utils/ionicConfig"
@@ -97,12 +98,16 @@ const registerServiceWorker = async () => {
 
 router.isReady().then(async () => {
 	if (import.meta.env.DEV) {
-		await frappeRequest({
-			url: "/api/method/hrms.www.hrms.get_context_for_dev",
-		}).then(async (values) => {
-			if (!window.frappe) window.frappe = {}
-			window.frappe.boot = values
-		})
+		try {
+			await frappeRequest({
+				url: "/api/method/hrms.www.hrms.get_context_for_dev",
+			}).then(async (values) => {
+				if (!window.frappe) window.frappe = {}
+				window.frappe.boot = values
+			})
+		} catch (error) {
+			console.error("Failed to load HRMS boot context", error)
+		}
 	}
 
 	await translationsPlugin.isReady();
@@ -114,7 +119,10 @@ router.beforeEach(async (to, _, next) => {
 	let isLoggedIn = session.isLoggedIn
 
 	try {
-		if (isLoggedIn) await userResource.reload()
+		if (isLoggedIn) {
+			await userResource.reload()
+			syncNotificationResources()
+		}
 	} catch (error) {
 		isLoggedIn = false
 	}
@@ -134,7 +142,7 @@ router.beforeEach(async (to, _, next) => {
 		// since all views are employee specific
 		if (
 			!employeeResource?.data ||
-			employeeResource?.data?.user_id !== userResource.data.name
+			employeeResource?.data?.user_id !== userResource.data?.name
 		) {
 			next({ name: "InvalidEmployee" })
 		} else if (["Login", "ForgotPassword"].includes(to.name)) {

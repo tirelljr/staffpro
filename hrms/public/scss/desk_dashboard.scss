@@ -132,7 +132,7 @@ body.staff-pro-alive #page-Workspaces .page-head {
 
 .sp-dash-split {
 	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
+	grid-template-columns: minmax(0, 0.84fr) minmax(0, 1.16fr);
 	gap: 16px;
 	margin: 0;
 	padding: 18px 20px;
@@ -674,12 +674,13 @@ body.staff-pro-alive #page-Workspaces .page-head {
 .sp-payroll__row {
 	display: grid;
 	grid-template-columns:
-		minmax(0, 1.4fr)
+		minmax(0, 1.35fr)
+		minmax(68px, 0.65fr)
+		minmax(80px, 0.7fr)
+		minmax(48px, 0.45fr)
 		minmax(72px, 0.7fr)
-		minmax(84px, 0.8fr)
-		minmax(52px, 0.5fr)
-		minmax(64px, 0.6fr)
-		minmax(72px, 0.8fr);
+		minmax(48px, 0.45fr)
+		minmax(72px, 0.75fr);
 	align-items: center;
 	column-gap: 10px;
 	width: 100%;
@@ -815,6 +816,7 @@ body.staff-pro-alive #page-Workspaces .page-head {
 
 .sp-payroll__date,
 .sp-payroll__hours,
+.sp-payroll__gross,
 .sp-payroll__ss,
 .sp-payroll__amount {
 	min-width: 0;
@@ -831,10 +833,12 @@ body.staff-pro-alive #page-Workspaces .page-head {
 	font-variant-numeric: tabular-nums;
 }
 
+.sp-payroll__row .sp-payroll__gross,
 .sp-payroll__row .sp-payroll__ss {
 	font-variant-numeric: tabular-nums;
 }
 
+.sp-payroll__table-head .sp-payroll__gross,
 .sp-payroll__table-head .sp-payroll__ss {
 	font-size: inherit;
 	font-weight: inherit;
@@ -860,6 +864,29 @@ body.staff-pro-alive #page-Workspaces .page-head {
 .sp-dash-inout {
 	margin: 0;
 	padding: 18px 20px 12px;
+}
+
+.sp-clock-btn {
+	height: 32px;
+	padding: 0 16px;
+	border: 0;
+	border-radius: 4px;
+	background: #f2ae5d;
+	color: #fff;
+	font-family: inherit;
+	font-size: 13px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	line-height: 1;
+	text-transform: uppercase;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.sp-clock-btn:hover,
+.sp-clock-btn:focus {
+	background: #e9a04f;
+	color: #fff;
 }
 
 .sp-inout-dash__open {
@@ -970,6 +997,31 @@ body.staff-pro-alive #page-Workspaces .page-head {
 }
 
 .sp-inout-dash__agent {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+
+.sp-inout-dash__avatar {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	overflow: hidden;
+	background: #eef2f6;
+	flex-shrink: 0;
+}
+
+.sp-inout-dash__avatar .sp-celebrations__avatar-img,
+.sp-inout-dash__avatar .sp-celebrations__avatar-fallback {
+	width: 100%;
+	height: 100%;
+}
+
+.sp-inout-dash__agent-meta {
 	min-width: 0;
 }
 
@@ -1544,6 +1596,33 @@ body.staff-pro-alive .frappe-list .list-row-container {
 	border-radius: 12px;
 }
 
+body.staff-pro-alive .frappe-list .list-row-head > .level-right,
+body.staff-pro-alive .frappe-list .list-row-head .level-right,
+body.staff-pro-alive .frappe-list .list-row > .level-right,
+body.staff-pro-alive .frappe-list .list-row .level-right,
+body.staff-pro-alive .frappe-list .list-count,
+body.staff-pro-alive .frappe-list .list-liked-by-me,
+body.staff-pro-alive .frappe-list .list-row-activity,
+body.staff-pro-alive .frappe-list .list-row-likes,
+body.staff-pro-alive .result-list .list-row-head > .level-right,
+body.staff-pro-alive .result-list .list-row > .level-right,
+body.staff-pro-alive .result-list .list-count,
+body.staff-pro-alive .result-list .list-row-activity,
+body.staff-pro-alive .page-container[id^="page-List/"] .list-row-head > .level-right,
+body.staff-pro-alive .page-container[id^="page-List/"] .list-row > .level-right {
+	display: none !important;
+	width: 0 !important;
+	min-width: 0 !important;
+	max-width: 0 !important;
+	padding: 0 !important;
+	margin: 0 !important;
+	overflow: hidden !important;
+	visibility: hidden !important;
+	pointer-events: none !important;
+	border: 0 !important;
+	flex: 0 0 0 !important;
+}
+
 /* Attendance dashboard: keep the four month cards, drop charts */
 body.staff-pro-alive #page-dashboard-view.sp-dash--hours .dashboard-graph .widget-group:not(:has(.number-widget-box)),
 body.staff-pro-alive #page-dashboard-view.sp-dash--hours .dashboard-widget-box,
@@ -1753,7 +1832,8 @@ body.staff-pro-alive #page-dashboard-view.sp-dash--hours .sp-empty-chart {
 }
 
 .sp-hours__table-head,
-.sp-hours__row-main {
+.sp-hours__row-main,
+.sp-hours__group-head {
 	display: grid;
 	grid-template-columns:
 		minmax(120px, 1.4fr)
@@ -1761,14 +1841,16 @@ body.staff-pro-alive #page-dashboard-view.sp-dash--hours .sp-empty-chart {
 		minmax(72px, 0.7fr)
 		minmax(72px, 0.7fr)
 		minmax(72px, 0.7fr)
-		minmax(80px, 0.8fr)
 		minmax(72px, 0.8fr)
 		minmax(88px, 0.9fr)
+		minmax(80px, 0.8fr)
+		minmax(72px, 0.7fr)
+		minmax(80px, 0.8fr)
 		minmax(88px, 0.8fr);
 	align-items: center;
 	column-gap: 10px;
 	width: 100%;
-	min-width: 840px;
+	min-width: 1000px;
 }
 
 .sp-hours__table-head {
@@ -1881,16 +1963,20 @@ body.staff-pro-alive #page-dashboard-view.sp-dash--hours .sp-empty-chart {
 }
 
 .sp-hours__group-head {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 12px;
 	padding: 8px 4px;
 	margin-top: 4px;
 	background: #f3f4f6;
 	font-size: 12px;
 	font-weight: 700;
 	color: var(--sp-ink);
+}
+
+.sp-hours__group-label {
+	grid-column: 1 / 5;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .sp-hours__date-head {
@@ -1903,7 +1989,7 @@ body.staff-pro-alive #page-dashboard-view.sp-dash--hours .sp-empty-chart {
 	color: var(--sp-soft);
 }
 
-.sp-hours__group:first-child .sp-hours__group-head {
+.sp-hours__week:first-child .sp-hours__group-head {
 	margin-top: 0;
 }
 
@@ -1970,6 +2056,7 @@ body.staff-pro-alive #page-dashboard-view.sp-dash--hours .sp-empty-chart {
 
 	.sp-payroll__date,
 	.sp-payroll__hours,
+	.sp-payroll__gross,
 	.sp-payroll__ss,
 	.sp-payroll__amount {
 		padding-left: 46px;
@@ -1984,6 +2071,22 @@ body.staff-pro-alive #page-dashboard-view.sp-dash--hours .sp-empty-chart {
 		grid-template-columns: 1fr 1fr;
 		gap: 8px;
 		padding: 0;
+	}
+
+	.sp-hours__group-head {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: flex-start;
+		gap: 8px 16px;
+	}
+
+	.sp-hours__group-label {
+		flex: 1 1 100%;
+		grid-column: auto;
+	}
+
+	.sp-hours__group-head > span:empty {
+		display: none;
 	}
 
 	.sp-hours__comment {
@@ -2596,4 +2699,8 @@ body.staff-pro-alive .sp-hours__field .awesomplete mark {
 	.sp-entry__times {
 		grid-template-columns: 1fr;
 	}
+}
+
+.report-footer {
+	display: none !important;
 }

@@ -130,7 +130,7 @@
    "allow_on_submit": 1,
    "fieldname": "ctc",
    "fieldtype": "Currency",
-   "label": "Total Cost To Company (CTC)",
+   "label": "Agent Hourly",
    "read_only": 1
   },
   {
@@ -175,6 +175,7 @@
    "depends_on": "employee",
    "fieldname": "payroll_payable_account",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Payroll Payable Account",
    "options": "Account"
   },

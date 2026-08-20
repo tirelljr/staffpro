@@ -1,4 +1,9 @@
 frappe.listview_settings["Salary Slip"] = {
+	formatters: {
+		payroll_frequency: function (value) {
+			return hrms.payroll_frequency_label ? hrms.payroll_frequency_label(value) : __(value);
+		},
+	},
 	onload: function (listview) {
 		if (
 			!has_common(frappe.user_roles, [

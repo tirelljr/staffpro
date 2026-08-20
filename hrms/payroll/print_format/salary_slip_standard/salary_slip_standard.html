@@ -1,0 +1,132 @@
+{%- set earnings = doc.earnings or [] -%}
+{%- set deductions = doc.deductions or [] -%}
+{%- set row_count = [earnings|length, deductions|length]|max -%}
+{%- set logo = staff_pro_logo_url() if staff_pro_logo_url is defined else "/assets/hrms/images/staff-pro-bpo-logo.png" -%}
+
+<div style="background:#000;margin-bottom:18px;">
+	<table style="width:100%;border:none;" cellpadding="14" cellspacing="0">
+		<tr>
+			<td style="border:none;width:58%;vertical-align:middle;">
+				<img src="{{ logo }}" alt="Staff Pro BPO" style="max-height:58px;max-width:220px;">
+			</td>
+			<td style="border:none;width:42%;text-align:right;color:#fff;vertical-align:middle;">
+				<div style="font-size:18px;font-weight:600;">{{ _("Salary Slip") }}</div>
+				<div style="font-size:12px;margin-top:4px;opacity:0.9;">{{ doc.name }}</div>
+			</td>
+		</tr>
+	</table>
+</div>
+
+<table class="table table-bordered" style="margin-bottom:16px;">
+	<tbody>
+		<tr>
+			<td style="width:25%;"><b>{{ _("Employee") }}</b></td>
+			<td style="width:25%;">{{ doc.employee or "" }}</td>
+			<td style="width:25%;"><b>{{ _("Company") }}</b></td>
+			<td style="width:25%;">{{ doc.company or "" }}</td>
+		</tr>
+		<tr>
+			<td><b>{{ _("Employee Name") }}</b></td>
+			<td>{{ doc.employee_name or "" }}</td>
+			<td><b>{{ _("Department") }}</b></td>
+			<td>{{ doc.department or "" }}</td>
+		</tr>
+		<tr>
+			<td><b>{{ _("Designation") }}</b></td>
+			<td>{{ doc.designation or "" }}</td>
+			<td><b>{{ _("Branch") }}</b></td>
+			<td>{{ doc.branch or "" }}</td>
+		</tr>
+		<tr>
+			<td><b>{{ _("Start Date") }}</b></td>
+			<td>{{ doc.get_formatted("start_date") }}</td>
+			<td><b>{{ _("End Date") }}</b></td>
+			<td>{{ doc.get_formatted("end_date") }}</td>
+		</tr>
+		{%- if doc.salary_slip_based_on_timesheet -%}
+		<tr>
+			<td><b>{{ _("Working Hours") }}</b></td>
+			<td>{{ doc.get_formatted("total_working_hours") }}</td>
+			<td><b>{{ _("Hour Rate") }}</b></td>
+			<td>{{ doc.get_formatted("hour_rate") }}</td>
+		</tr>
+		{%- else -%}
+		<tr>
+			<td><b>{{ _("Working Days") }}</b></td>
+			<td>{{ doc.get_formatted("total_working_days") }}</td>
+			<td><b>{{ _("Leave Without Pay") }}</b></td>
+			<td>{{ doc.get_formatted("leave_without_pay") }}</td>
+		</tr>
+		<tr>
+			<td><b>{{ _("Payment Days") }}</b></td>
+			<td colspan="3">{{ doc.get_formatted("payment_days") }}</td>
+		</tr>
+		{%- endif -%}
+	</tbody>
+</table>
+
+<table class="table table-bordered" style="margin-bottom:16px;">
+	<thead>
+		<tr>
+			<th style="width:30%;">{{ _("Earnings") }}</th>
+			<th style="width:20%;text-align:right;">{{ _("Amount") }}</th>
+			<th style="width:30%;">{{ _("Deductions") }}</th>
+			<th style="width:20%;text-align:right;">{{ _("Amount") }}</th>
+		</tr>
+	</thead>
+	<tbody>
+		{%- for i in range(row_count) -%}
+		<tr>
+			{%- if i < earnings|length -%}
+			<td>{{ earnings[i].salary_component }}</td>
+			<td style="text-align:right;">{{ earnings[i].get_formatted("amount") }}</td>
+			{%- else -%}
+			<td></td>
+			<td></td>
+			{%- endif -%}
+			{%- if i < deductions|length -%}
+			<td>{{ deductions[i].salary_component }}</td>
+			<td style="text-align:right;">{{ deductions[i].get_formatted("amount") }}</td>
+			{%- else -%}
+			<td></td>
+			<td></td>
+			{%- endif -%}
+		</tr>
+		{%- endfor -%}
+	</tbody>
+</table>
+
+<table class="table table-bordered">
+	<tbody>
+		<tr>
+			<td style="width:50%;"><b>{{ _("Gross Pay") }}</b></td>
+			<td style="width:50%;text-align:right;">{{ doc.get_formatted("gross_pay") }}</td>
+		</tr>
+		<tr>
+			<td><b>{{ _("Total Deduction") }}</b></td>
+			<td style="text-align:right;">{{ doc.get_formatted("total_deduction") }}</td>
+		</tr>
+		<tr>
+			<td><b>{{ _("Net Pay") }}</b></td>
+			<td style="text-align:right;">{{ doc.get_formatted("net_pay") }}</td>
+		</tr>
+		{%- if doc.rounded_total -%}
+		<tr>
+			<td><b>{{ _("Rounded Total") }}</b></td>
+			<td style="text-align:right;">{{ doc.get_formatted("rounded_total") }}</td>
+		</tr>
+		{%- endif -%}
+		{%- if doc.year_to_date -%}
+		<tr>
+			<td><b>{{ _("Year To Date") }}</b></td>
+			<td style="text-align:right;">{{ doc.get_formatted("year_to_date") }}</td>
+		</tr>
+		{%- endif -%}
+		{%- if doc.month_to_date -%}
+		<tr>
+			<td><b>{{ _("Month To Date") }}</b></td>
+			<td style="text-align:right;">{{ doc.get_formatted("month_to_date") }}</td>
+		</tr>
+		{%- endif -%}
+	</tbody>
+</table>

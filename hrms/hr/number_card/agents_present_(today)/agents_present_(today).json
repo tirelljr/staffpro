@@ -1,0 +1,22 @@
+{
+ "color": "#29CD42",
+ "creation": "2026-08-20 12:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "document_type": "Attendance",
+ "dynamic_filters_json": "[[\"Attendance\",\"company\",\"=\",\"frappe.defaults.get_user_default(\\\"Company\\\")\"]]",
+ "filters_json": "[[\"Attendance\",\"docstatus\",\"=\",\"1\"],[\"Attendance\",\"status\",\"in\",[\"Present\",\"Half Day\",\"Work From Home\"]],[\"Attendance\",\"attendance_date\",\"Timespan\",\"today\"]]",
+ "function": "Count",
+ "idx": 0,
+ "is_public": 1,
+ "is_standard": 1,
+ "label": "Agents Present (Today)",
+ "modified": "2026-08-20 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HR",
+ "name": "Agents Present (Today)",
+ "owner": "Administrator",
+ "show_percentage_stats": 1,
+ "stats_time_interval": "Daily",
+ "type": "Document Type"
+}

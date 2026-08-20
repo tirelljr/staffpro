@@ -1,13 +1,14 @@
 # Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and Contributors
 # License: GNU General Public License v3. See license.txt
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import frappe
 from frappe.utils import getdate, now_datetime
 
 from erpnext.setup.doctype.employee.test_employee import make_employee
 
+from hrms.hr.doctype.attendance.attendance import mark_attendance
 from hrms.hr.doctype.employee_checkin.test_employee_checkin import make_checkin
 from hrms.hr.doctype.leave_type.test_leave_type import create_leave_type
 from hrms.hr.doctype.shift_type.test_shift_type import setup_shift_type
@@ -135,3 +136,41 @@ class TestInOutToday(HRMSTestSuite):
 		self.assertEqual(row["status"], "OUT")
 		self.assertIn("DOCUMENT PROVIDED", row["pto_code"])
 		self.assertIn(leave_type.name, row["pto_code"])
+
+	def test_status_ignores_future_out_punch(self):
+		employee = make_employee(
+			"inout.today.future@example.com",
+			company=self.company,
+			department=self.dept_a,
+			first_name="StillIn",
+			last_name="Today",
+		)
+		now = now_datetime()
+		make_checkin(employee, time=now - timedelta(hours=1), log_type="IN")
+		make_checkin(employee, time=now + timedelta(hours=2), log_type="OUT")
+
+		payload = get_in_out_today(department=self.dept_a)
+		row = next(item for item in payload["details"] if item["employee"] == employee)
+		self.assertEqual(row["status"], "IN")
+
+	def test_status_from_attendance_when_no_checkins(self):
+		employee = make_employee(
+			"inout.today.attendance@example.com",
+			company=self.company,
+			department=self.dept_a,
+			first_name="AttOnly",
+			last_name="Today",
+		)
+		attendance = mark_attendance(employee, getdate(), "Present")
+		frappe.db.set_value(
+			"Attendance",
+			attendance,
+			"in_time",
+			now_datetime() - timedelta(hours=2),
+			update_modified=False,
+		)
+
+		payload = get_in_out_today(department=self.dept_a)
+		row = next(item for item in payload["details"] if item["employee"] == employee)
+		self.assertEqual(row["status"], "IN")
+		self.assertTrue(row["time"])

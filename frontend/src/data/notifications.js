@@ -5,12 +5,12 @@ export const unreadNotificationsCount = createResource({
 	url: "hrms.api.get_unread_notifications_count",
 	cache: "hrms:unread_notifications_count",
 	initialData: 0,
-	auto: true,
+	auto: false,
 })
 
 export const notifications = createListResource({
 	doctype: "PWA Notification",
-	filters: { to_user: userResource.data.name },
+	filters: {},
 	fields: [
 		"name",
 		"from_user",
@@ -31,5 +31,16 @@ export const notifications = createListResource({
 export const arePushNotificationsEnabled = createResource({
 	url: "hrms.api.are_push_notifications_enabled",
 	cache: "hrms:push_notifications_enabled",
-	auto: true,
+	auto: false,
 })
+
+export function syncNotificationResources() {
+	const userName = userResource.data?.name
+	if (!userName) return
+
+	notifications.filters.to_user = userName
+	unreadNotificationsCount.reload()
+	if (!arePushNotificationsEnabled.data && !arePushNotificationsEnabled.loading) {
+		arePushNotificationsEnabled.reload()
+	}
+}

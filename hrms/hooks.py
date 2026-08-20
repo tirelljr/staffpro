@@ -29,7 +29,10 @@ website_context = {
 	"splash_image": "/assets/hrms/images/staff-pro-bpo-logo.png",
 	"app_name": "Staff Pro BPO",
 	"brand_html": "Staff Pro BPO",
+	"footer_powered": "Staff Pro BPO<br>developed by Tirell Arzu",
 }
+
+update_website_context = ["hrms.branding.update_website_context"]
 
 # Includes in <head>
 # ------------------
@@ -68,8 +71,17 @@ doctype_js = {
 	"Journal Entry": "public/js/erpnext/journal_entry.js",
 	"Delivery Trip": "public/js/erpnext/delivery_trip.js",
 	"Bank Transaction": "public/js/erpnext/bank_transaction.js",
+	"Holiday List": "public/js/erpnext/holiday_list.js",
+	"System Settings": "public/js/erpnext/system_settings.js",
+	"Sales Invoice": "public/js/erpnext/sales_invoice.js",
 }
-# doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
+doctype_list_js = {
+	"Employee": "public/js/erpnext/employee_list.js",
+	"Sales Invoice": "public/js/erpnext/sales_invoice_list.js",
+	"Dashboard Chart": "public/js/bpo_dashboard_list.js",
+	"Number Card": "public/js/bpo_dashboard_list.js",
+	"Dashboard": "public/js/bpo_dashboard_list.js",
+}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 
@@ -103,6 +115,7 @@ website_route_rules = [
 jinja = {
 	"methods": [
 		"hrms.utils.get_country",
+		"hrms.branding.staff_pro_logo_url",
 	],
 }
 
@@ -114,10 +127,12 @@ after_install = "hrms.install.after_install"
 after_migrate = [
 	"hrms.setup.update_select_perm_after_install",
 	"hrms.branding.apply_branding",
+	"hrms.hr.bpo_employee_labels.apply_bpo_employee_labels",
 	"hrms.patches.v16_0.remove_workspace_sidebar_home_links.execute",
 	"hrms.patches.v16_0.disable_app_onboarding.execute",
 	"hrms.patches.v16_0.split_finance_and_admin.execute",
 	"hrms.boot.hide_unused_erpnext_workspaces",
+	"hrms.overrides.bpo_dashboards.hide_non_bpo_dashboard_records",
 ]
 
 setup_wizard_requires = "assets/hrms/js/setup_wizard.js"
@@ -161,13 +176,11 @@ before_app_uninstall = "hrms.setup.before_app_uninstall"
 # -----------
 # Permissions evaluated in scripted ways
 
-# permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
-# }
-#
-# has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
-# }
+permission_query_conditions = {
+	"Dashboard Chart": "hrms.overrides.bpo_dashboards.get_chart_permission_query_conditions",
+	"Number Card": "hrms.overrides.bpo_dashboards.get_card_permission_query_conditions",
+	"Dashboard": "hrms.overrides.bpo_dashboards.get_dashboard_permission_query_conditions",
+}
 
 has_upload_permission = {"Employee": "erpnext.setup.doctype.employee.employee.has_upload_permission"}
 
@@ -202,6 +215,7 @@ doc_events = {
 		"on_trash": "hrms.overrides.company.handle_linked_docs",
 	},
 	"Holiday List": {
+		"validate": "hrms.utils.holiday_list.validate_holiday_list_pay_toggles",
 		"on_update": "hrms.utils.holiday_list.invalidate_cache",
 		"on_trash": "hrms.utils.holiday_list.invalidate_cache",
 	},
@@ -294,6 +308,8 @@ scheduler_events = {
 		"hrms.hr.doctype.shift_assignment.shift_assignment.mark_expired_shift_assignments_as_inactive",
 		"hrms.hr.doctype.job_opening.job_opening.close_expired_job_openings",
 		"hrms.telemetry.capture_daily_attendance_pulse",
+		"hrms.payroll.auto_payroll.run_scheduled_payroll",
+		"hrms.payroll.auto_client_invoice.run_scheduled_invoices",
 	],
 	"daily_long": [
 		"hrms.hr.doctype.leave_ledger_entry.leave_ledger_entry.process_expired_allocation",

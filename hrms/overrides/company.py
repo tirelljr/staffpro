@@ -101,12 +101,8 @@ def set_default_hr_accounts(doc, method=None):
 	if frappe.local.flags.ignore_chart_of_accounts:
 		return
 
-	if not doc.default_payroll_payable_account:
-		payroll_payable_account = frappe.db.get_value(
-			"Account", {"account_name": _("Payroll Payable"), "company": doc.name, "is_group": 0}
-		)
-
-		doc.db_set("default_payroll_payable_account", payroll_payable_account)
+	# Payroll Payable is unused: agents are paid via Bank or Cash directly.
+	# Do not auto-link default_payroll_payable_account.
 
 	if not doc.default_employee_advance_account:
 		employe_advance_account = frappe.db.get_value(

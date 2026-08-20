@@ -19,6 +19,45 @@ hrms.time.comment_field = function () {
 	};
 };
 
+hrms.time.parse_clock = function (value) {
+	if (!value) {
+		return null;
+	}
+	const parsed = moment(value);
+	if (parsed.isValid()) {
+		return parsed;
+	}
+	const as_time = moment(String(value), ["HH:mm:ss", "HH:mm", "hh:mm a", "hh:mm A"], true);
+	return as_time.isValid() ? as_time : null;
+};
+
+hrms.time.hours_between = function (in_time, out_time) {
+	const start = hrms.time.parse_clock(in_time);
+	const end = hrms.time.parse_clock(out_time);
+	if (!start || !end) {
+		return 0;
+	}
+	let minutes = end.diff(start, "minutes");
+	if (minutes < 0) {
+		minutes += 24 * 60;
+	}
+	return minutes > 0 ? Math.round(minutes) / 60 : 0;
+};
+
+hrms.time.hours_for_row = function (row) {
+	if (!row) {
+		return 0;
+	}
+	const stored = flt(row.working_hours);
+	if (stored) {
+		return stored;
+	}
+	if (row.kind === "lunch") {
+		return stored;
+	}
+	return hrms.time.hours_between(row.in_time, row.out_time);
+};
+
 hrms.time.format_hours = function (value) {
 	if (value === null || value === undefined || value === "") {
 		return "";
@@ -199,10 +238,12 @@ hrms.time.refresh_hours_totals = function (listview) {
 			const totals = r.message || {};
 			hrms.time.render_totals(
 				listview,
-				__("Total Hours: {0}    Paid Hours: {1}    Pay: {2}", [
+				__("Total Hours: {0}    Paid Hours: {1}    Gross: {2}    SS: {3}    Net: {4}", [
 					hrms.time.format_hours(totals.total),
 					hrms.time.format_hours(totals.paid),
 					format_currency(Number(totals.daily_pay || 0)),
+					format_currency(Number(totals.ss_deduction || 0)),
+					format_currency(Number(totals.net_daily_pay || 0)),
 				]),
 			);
 		},
@@ -625,10 +666,15 @@ hrms.time.show_add_entry_dialog = function (listview, opts) {
 	});
 };
 
-hrms.time.show_edit_entry_dialog = function (listview, name) {
+hrms.time.show_edit_entry_dialog = function (listview, name, pair = {}) {
+	const args = { name };
+	if (pair && pair.in_log) {
+		args.in_log = pair.in_log;
+		args.out_log = pair.out_log || null;
+	}
 	frappe.call({
 		method: "hrms.hr.doctype.attendance.attendance.get_hours_entry",
-		args: { name },
+		args,
 		callback(r) {
 			const row = r.message || {};
 			const dialog = new frappe.ui.Dialog({
@@ -683,9 +729,14 @@ hrms.time.show_edit_entry_dialog = function (listview, name) {
 					dialog.hide();
 				},
 				primary_action(values) {
+					const payload = Object.assign({ name }, values);
+					if (row.in_log) {
+						payload.in_log = row.in_log;
+						payload.out_log = row.out_log || null;
+					}
 					frappe.call({
 						method: "hrms.hr.doctype.attendance.attendance.update_hours_entry",
-						args: Object.assign({ name }, values),
+						args: payload,
 						freeze: true,
 						callback(res) {
 							if (res.message) {

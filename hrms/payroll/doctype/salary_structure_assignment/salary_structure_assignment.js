@@ -70,12 +70,12 @@ frappe.ui.form.on("Salary Structure Assignment", {
 		frm.page.set_inner_btn_group_as_primary(__("Create"));
 
 		frm.add_custom_button(
-			__("See CTC Break-up"),
+			__("See Agent Hourly Breakdown"),
 			function () {
 				if (!frm.doc.ctc) {
 					frm.scroll_to_field("ctc");
 					frappe.throw(
-						__("Please set employee's total cost to company to see CTC breakup."),
+						__("Please set Agent Hourly to see the breakdown."),
 					);
 				}
 				frappe.set_route("query-report", "Employee CTC Break-up", {
@@ -104,16 +104,7 @@ frappe.ui.form.on("Salary Structure Assignment", {
 	},
 
 	company: function (frm) {
-		if (frm.doc.company) {
-			frappe.db.get_value(
-				"Company",
-				frm.doc.company,
-				"default_payroll_payable_account",
-				(r) => {
-					frm.set_value("payroll_payable_account", r.default_payroll_payable_account);
-				},
-			);
-		}
+		// Payroll Payable is unused for BPO direct Bank/Cash payments.
 	},
 
 	salary_structure: (frm) => {

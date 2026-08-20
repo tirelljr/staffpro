@@ -1,6 +1,6 @@
 {
  "aggregate_function_based_on": "planned_vacancies",
- "chart_name": "Designation Wise Openings",
+ "chart_name": "Openings by Role",
  "chart_type": "Group By",
  "creation": "2020-07-22 11:56:32.820217",
  "custom_options": "",

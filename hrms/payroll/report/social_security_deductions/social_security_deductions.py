@@ -37,13 +37,6 @@ def get_columns():
 			"width": 160,
 		},
 		{
-			"label": _("Team Group"),
-			"fieldname": "employee_group",
-			"fieldtype": "Link",
-			"options": "Employee Group",
-			"width": 140,
-		},
-		{
 			"label": _("Salary Slip"),
 			"fieldname": "salary_slip",
 			"fieldtype": "Link",
@@ -140,17 +133,10 @@ def get_data(filters):
 	if filters.get("ss_number"):
 		query = query.where(SalarySlip.ss_number == filters.ss_number)
 
-	group_employees = _employees_in_group(filters.get("employee_group"))
-	if filters.get("employee_group"):
-		if not group_employees:
-			return []
-		query = query.where(SalarySlip.employee.isin(group_employees))
-
 	rows = query.orderby(SalarySlip.employee_name).orderby(SalarySlip.ss_number).orderby(SalarySlip.start_date).run(
 		as_dict=True
 	)
 	ssn_map = _employee_ssn_map([row.employee for row in rows])
-	group_map = _employee_group_map([row.employee for row in rows])
 
 	data = []
 	for row in rows:
@@ -163,32 +149,10 @@ def get_data(filters):
 			{
 				**row,
 				"ss_number": ss_number,
-				"employee_group": group_map.get(row.employee),
 				"total": employee_ss + employer_ss,
 			}
 		)
 	return data
-
-
-def _employees_in_group(employee_group: str | None) -> list[str]:
-	if not employee_group or not frappe.db.table_exists("Employee Group Table"):
-		return []
-	return frappe.get_all(
-		"Employee Group Table",
-		filters={"parent": employee_group, "parenttype": "Employee Group"},
-		pluck="employee",
-	)
-
-
-def _employee_group_map(employees: list[str]) -> dict[str, str]:
-	if not employees or not frappe.db.table_exists("Employee Group Table"):
-		return {}
-	rows = frappe.get_all(
-		"Employee Group Table",
-		filters={"employee": ["in", employees], "parenttype": "Employee Group"},
-		fields=["employee", "parent"],
-	)
-	return {row.employee: row.parent for row in rows}
 
 
 def _employee_ssn_map(employees: list[str]) -> dict[str, str]:

@@ -110,6 +110,7 @@ import {
 	notifications,
 	arePushNotificationsEnabled,
 } from "@/data/notifications"
+import { userResource } from "@/data/user"
 
 const dayjs = inject("$dayjs")
 const router = useRouter()
@@ -120,7 +121,7 @@ const pageLength = 10
 
 const allowPushNotifications = computed(
 	() =>
-		window.frappe?.boot.push_relay_server_url &&
+		window.frappe?.boot?.push_relay_server_url &&
 		arePushNotificationsEnabled.data
 )
 
@@ -150,8 +151,11 @@ function getItemRoute(item) {
 }
 
 onMounted(() => {
-	notifications.start = 0,
-	notifications.pageLength = 10,
+	notifications.start = 0
+	notifications.pageLength = 10
+	if (userResource.data?.name) {
+		notifications.filters.to_user = userResource.data.name
+	}
 	notifications.fetch()
 })
 

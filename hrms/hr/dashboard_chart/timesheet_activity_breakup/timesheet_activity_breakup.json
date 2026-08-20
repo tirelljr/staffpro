@@ -1,7 +1,7 @@
 {
  "aggregate_function_based_on": "hours",
  "based_on": "",
- "chart_name": "Timesheet Activity Breakup",
+ "chart_name": "Timesheet by Activity",
  "chart_type": "Group By",
  "creation": "2025-07-15 13:15:12.817847",
  "docstatus": 0,

@@ -25,7 +25,7 @@ frappe.in_out_today = {
 	make(page) {
 		this.page = page;
 		const $existing = page.main.find(".sp-inout-page");
-		if ($existing.length && $existing.find(".sp-dash-inout").length) {
+		if ($existing.length && $existing.find(".sp-dash-inout").length && $existing.find(".sp-clock-btn").length) {
 			this.$body = $existing;
 			this.refresh();
 			return;
@@ -39,6 +39,20 @@ frappe.in_out_today = {
 
 	escape(value) {
 		return frappe.utils.escape_html(value == null ? "" : String(value));
+	},
+
+	avatar(row) {
+		if (row.image) {
+			return `<img class="sp-celebrations__avatar-img" src="${this.escape(row.image)}" alt="">`;
+		}
+		const initials = String(row.employee_name || row.employee || "")
+			.trim()
+			.split(/\s+/)
+			.slice(0, 2)
+			.map((part) => part[0] || "")
+			.join("")
+			.toUpperCase();
+		return `<span class="sp-celebrations__avatar-fallback">${this.escape(initials)}</span>`;
 	},
 
 	select_html(className, variant, label, options, value) {
@@ -72,6 +86,7 @@ frappe.in_out_today = {
 								"",
 							)}
 						</div>
+						<button type="button" class="sp-clock-btn">${this.escape(__("CLOCK"))}</button>
 						<div class="sp-dash-panel__filter">
 							${this.select_html(
 								"sp-inout-dash__status",
@@ -110,6 +125,7 @@ frappe.in_out_today = {
 	bind() {
 		const me = this;
 		this.$body.on("click", ".sp-inout-refresh", () => me.refresh());
+		this.$body.on("click", ".sp-clock-btn", () => me.open_clock());
 		this.$body.on("change", ".sp-inout-dash__department", function () {
 			me.department = $(this).val() || "";
 			me.render_panel();
@@ -124,6 +140,30 @@ frappe.in_out_today = {
 				frappe.set_route("Form", "Employee", employee);
 			}
 		});
+	},
+
+	open_clock() {
+		if (!hrms.time?.show_add_entry_dialog) {
+			frappe.set_route("List", "Attendance");
+			return;
+		}
+		const me = this;
+		const department = this.department && this.department !== "__none__" ? this.department : "";
+		hrms.time.show_add_entry_dialog(
+			{
+				doctype: "Attendance",
+				refresh() {
+					me.refresh();
+				},
+				filter_area: {
+					get() {
+						return department ? [["Attendance", "department", "=", department]] : [];
+					},
+				},
+				page: { wrapper: me.$body, page_form: me.$body.find(".sp-dash-panel__filters") },
+			},
+			{ department },
+		);
 	},
 
 	department_options(payload) {
@@ -310,8 +350,11 @@ frappe.in_out_today = {
 					(row) => `
 				<button type="button" class="sp-inout-dash__row" data-employee="${this.escape(row.employee)}">
 					<span class="sp-inout-dash__agent">
-						<span class="sp-inout-dash__name">${this.escape(row.employee_name || row.employee || "")}</span>
-						${row.department ? `<span class="sp-inout-dash__dept">${this.escape(row.department)}</span>` : ""}
+						<span class="sp-inout-dash__avatar">${this.avatar(row)}</span>
+						<span class="sp-inout-dash__agent-meta">
+							<span class="sp-inout-dash__name">${this.escape(row.employee_name || row.employee || "")}</span>
+							${row.department ? `<span class="sp-inout-dash__dept">${this.escape(row.department)}</span>` : ""}
+						</span>
 					</span>
 					<span class="sp-inout-dash__status-pill ${this.status_class(row)}">${this.escape(this.status_label(row))}</span>
 					<span class="sp-inout-dash__time">${this.escape(row.time || "—")}</span>

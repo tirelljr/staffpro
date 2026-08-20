@@ -234,6 +234,67 @@ class TestSocialSecuritySalarySlip(HRMSTestSuite):
 		self.assertEqual(slip.ss_category, SS_CATEGORY_INJURY_ONLY)
 		self.assertEqual(slip.ss_employer_amount, 2.60)
 
+	def test_apply_social_security_without_contribution_table(self):
+		from unittest.mock import patch
+
+		employee = make_employee(
+			"ss_no_table_agent@example.com",
+			company="_Test Company",
+			date_of_birth="1990-05-01",
+			date_of_joining="2018-01-01",
+		)
+		structure = make_salary_structure(
+			"SS No Table Structure",
+			"Weekly",
+			employee=employee,
+			company="_Test Company",
+			from_date="2026-05-04",
+			earnings=[
+				{
+					"salary_component": "SS Test Basic",
+					"abbr": "SSTB",
+					"amount": 80,
+					"depends_on_payment_days": 0,
+				}
+			],
+			deductions=[],
+		)
+		with patch("hrms.payroll.social_security.get_active_contribution_table", return_value=None):
+			slip = make_salary_slip(structure.name, employee=employee, posting_date="2026-05-04")
+			if not slip.start_date:
+				slip.start_date = "2026-05-04"
+				slip.end_date = "2026-05-10"
+				slip.payroll_frequency = "Weekly"
+				slip.calculate_net_pay()
+
+		ss_row = next((d for d in slip.deductions if d.salary_component == SS_EMPLOYEE_COMPONENT), None)
+		self.assertIsNotNone(ss_row)
+		self.assertEqual(ss_row.amount, 1.69)
+		self.assertEqual(slip.ss_employee_amount, 1.69)
+
+	def test_payroll_row_computes_ss_when_slip_amount_is_zero(self):
+		from hrms.hr.desk_dashboard import _ss_amount_for_slip
+
+		employee = make_employee(
+			"ss_dashboard_agent@example.com",
+			company="_Test Company",
+			date_of_birth="1990-05-01",
+			date_of_joining="2018-01-01",
+		)
+		amount = _ss_amount_for_slip(
+			frappe._dict(
+				ss_employee_amount=0,
+				gross_pay=80,
+				net_pay=80,
+				payroll_frequency="Weekly",
+				start_date="2026-05-04",
+				end_date="2026-05-10",
+				employee=employee,
+				company="_Test Company",
+			)
+		)
+		self.assertEqual(amount, 1.69)
+
 	def test_report_returns_columns(self):
 		columns, data = ss_report(
 			{"company": "_Test Company", "from_date": "2026-01-01", "to_date": "2026-12-31"}

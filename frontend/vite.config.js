@@ -75,7 +75,6 @@ export default defineConfig({
 		},
 		sourcemap: true,
 		rollupOptions: {
-			external: [/^\/assets\//],
 			output: {
 				manualChunks: {
 					"frappe-ui": ["frappe-ui"],

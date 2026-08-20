@@ -32,6 +32,8 @@ header.staff-pro-topbar {
 	height: 56px !important;
 	padding: 0 16px !important;
 	gap: 16px !important;
+	overflow: visible !important;
+	position: relative !important;
 }
 .staff-pro-topbar__left {
 	display: flex !important;
@@ -76,14 +78,28 @@ header.staff-pro-topbar {
 	justify-content: center !important;
 	flex: 1 1 auto !important;
 	min-width: 0 !important;
+	position: relative !important;
+	left: auto !important;
+	top: auto !important;
+	transform: none !important;
+	overflow: visible !important;
+	pointer-events: auto !important;
+	width: auto !important;
+	max-width: none !important;
+}
+.staff-pro-topbar__search-wrap {
+	position: relative !important;
+	width: 320px !important;
+	max-width: 100% !important;
+	overflow: visible !important;
+	flex-shrink: 0 !important;
 }
 .staff-pro-topbar__search {
 	display: flex !important;
 	flex-direction: row !important;
 	align-items: center !important;
 	gap: 10px !important;
-	width: 320px !important;
-	max-width: 100% !important;
+	width: 100% !important;
 	height: 36px !important;
 	margin: 0 !important;
 	padding: 0 10px 0 14px !important;
@@ -91,12 +107,16 @@ header.staff-pro-topbar {
 	border-radius: 999px !important;
 	background: #f3f4f6 !important;
 	box-shadow: none !important;
-	cursor: pointer !important;
+	cursor: text !important;
 	color: #9ca3af !important;
 	font: inherit !important;
 	line-height: 1 !important;
 	appearance: none !important;
 	-webkit-appearance: none !important;
+}
+.staff-pro-topbar__search.is-open {
+	background: #eceef1 !important;
+	box-shadow: 0 0 0 1px #e5e7eb !important;
 }
 .staff-pro-topbar__search .icon,
 .staff-pro-topbar__search svg {
@@ -104,6 +124,29 @@ header.staff-pro-topbar {
 	height: 15px !important;
 	stroke: #9ca3af !important;
 	flex-shrink: 0 !important;
+}
+.staff-pro-topbar__search-input,
+.staff-pro-topbar__search-field {
+	flex: 1 1 auto !important;
+	min-width: 0 !important;
+	height: 100% !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	border: 0 !important;
+	outline: none !important;
+	background: transparent !important;
+	box-shadow: none !important;
+	font-size: 13px !important;
+	font-weight: 400 !important;
+	color: #111827 !important;
+	line-height: 36px !important;
+	appearance: none !important;
+	-webkit-appearance: none !important;
+}
+.staff-pro-topbar__search-input::placeholder,
+.staff-pro-topbar__search-field::placeholder {
+	color: #9ca3af !important;
+	opacity: 1 !important;
 }
 .staff-pro-topbar__search-placeholder {
 	flex: 1 1 auto !important;
@@ -114,6 +157,122 @@ header.staff-pro-topbar {
 	overflow: hidden !important;
 	text-overflow: ellipsis !important;
 	text-align: left !important;
+}
+.staff-pro-topbar__search-panel {
+	position: fixed !important;
+	z-index: 2000 !important;
+	width: min(480px, calc(100vw - 24px)) !important;
+	max-height: min(420px, calc(100vh - 80px)) !important;
+	display: flex !important;
+	flex-direction: column !important;
+	margin: 0 !important;
+	border-radius: 12px !important;
+	background: #fff !important;
+	border: 1px solid #eef0f2 !important;
+	box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12) !important;
+	pointer-events: auto !important;
+	overflow: hidden !important;
+}
+.staff-pro-topbar__search-panel.hidden {
+	display: none !important;
+}
+.staff-pro-topbar__search-panel-field {
+	display: none !important;
+	align-items: center !important;
+	gap: 10px !important;
+	padding: 10px 12px !important;
+	border-bottom: 1px solid #eef0f2 !important;
+}
+.staff-pro-topbar__search-panel-field .icon,
+.staff-pro-topbar__search-panel-field svg {
+	width: 15px !important;
+	height: 15px !important;
+	stroke: #9ca3af !important;
+	flex-shrink: 0 !important;
+}
+.staff-pro-topbar__search-results {
+	flex: 1 1 auto !important;
+	min-height: 0 !important;
+	overflow-y: auto !important;
+	padding: 6px !important;
+}
+.staff-pro-topbar__search-item {
+	display: flex !important;
+	flex-direction: column !important;
+	align-items: flex-start !important;
+	gap: 2px !important;
+	width: 100% !important;
+	padding: 8px 10px !important;
+	border: 0 !important;
+	border-radius: 8px !important;
+	background: transparent !important;
+	text-align: left !important;
+	cursor: pointer !important;
+	color: #111827 !important;
+}
+.staff-pro-topbar__search-item:hover,
+.staff-pro-topbar__search-item.is-active {
+	background: #f3f4f6 !important;
+}
+.staff-pro-topbar__search-item-label {
+	font-size: 13px !important;
+	font-weight: 500 !important;
+	line-height: 1.35 !important;
+	color: #111827 !important;
+}
+.staff-pro-topbar__search-item-label b,
+.staff-pro-topbar__search-item-label mark,
+.staff-pro-topbar__search-item-label strong {
+	font-weight: 700 !important;
+	background: transparent !important;
+	color: #11a5dd !important;
+}
+.staff-pro-topbar__search-item-meta {
+	font-size: 11px !important;
+	color: #9ca3af !important;
+	line-height: 1.3 !important;
+}
+.staff-pro-topbar__search-empty {
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	min-height: 88px !important;
+	padding: 16px !important;
+	font-size: 13px !important;
+	color: #6b7280 !important;
+	text-align: center !important;
+}
+.staff-pro-topbar__search-footer {
+	display: flex !important;
+	flex-wrap: wrap !important;
+	align-items: center !important;
+	gap: 10px 14px !important;
+	padding: 8px 12px !important;
+	border-top: 1px solid #eef0f2 !important;
+	background: #fafafa !important;
+	font-size: 11px !important;
+	color: #6b7280 !important;
+}
+.staff-pro-topbar__search-hint {
+	display: inline-flex !important;
+	align-items: center !important;
+	gap: 4px !important;
+	white-space: nowrap !important;
+}
+.staff-pro-topbar__search-hint kbd,
+.staff-pro-topbar__search-hint .staff-pro-topbar__search-key {
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	min-width: 18px !important;
+	height: 18px !important;
+	padding: 0 4px !important;
+	border-radius: 4px !important;
+	background: #fff !important;
+	border: 1px solid #e5e7eb !important;
+	font-size: 10px !important;
+	font-weight: 600 !important;
+	color: #6b7280 !important;
 }
 .staff-pro-topbar__shortcut {
 	display: inline-flex !important;
@@ -361,9 +520,24 @@ header.staff-pro-topbar {
 	background: #f3f4f6 !important;
 }
 .staff-pro-topbar__search-toggle { display: none !important; }
+body.staff-pro-has-topbar .modal:has(.cool-awesomebar-modal-footer),
+body.staff-pro-has-topbar .modal:has(.navbar-modal-wrapper) {
+	display: none !important;
+}
+body.staff-pro-has-topbar.staff-pro-search-open,
+body.staff-pro-has-topbar.staff-pro-search-open.modal-open {
+	overflow: auto !important;
+	padding-right: 0 !important;
+}
+body.staff-pro-has-topbar.staff-pro-search-open .modal-backdrop {
+	display: none !important;
+	opacity: 0 !important;
+}
 @media (max-width: 767px) {
 	.staff-pro-topbar__center { display: none !important; }
 	.staff-pro-topbar__search-toggle { display: inline-flex !important; }
+	.staff-pro-topbar__search-toggle.is-open { background: #eceef1 !important; }
+	.staff-pro-topbar__search-panel-field { display: flex !important; }
 	.staff-pro-topbar__lang { display: none !important; }
 }
 `;
@@ -373,6 +547,10 @@ hrms.ui.TopBar = class {
 		this.$wrapper = null;
 		this.language_open = false;
 		this.notifications_open = false;
+		this.search_open = false;
+		this.search_items = [];
+		this.search_index = -1;
+		this.search_seq = 0;
 		this.notifications_loaded = false;
 		this.notifications_loading = false;
 		this.notification_items = [];
@@ -380,6 +558,7 @@ hrms.ui.TopBar = class {
 		this.on_reposition_menu = () => {
 			this.position_language_menu();
 			this.position_notifications_panel();
+			this.position_search_panel();
 		};
 		this.inject_css();
 		this.make();
@@ -418,9 +597,147 @@ hrms.ui.TopBar = class {
 		if (!this.$wrapper) return;
 		this.ensure_language_picker();
 		this.ensure_notifications_picker();
+		this.ensure_search_picker();
+		this.patch_native_awesomebar();
 		this.bind();
 		this.refresh_context();
 		this.refresh_notifications();
+	}
+
+	search_shortcut_label() {
+		if (frappe.ui.keys?.get_shortcut_label) {
+			return frappe.ui.keys.get_shortcut_label("ctrl+k");
+		}
+		return frappe.utils.is_mac() ? "⌘K" : "Ctrl+K";
+	}
+
+	global_search_shortcut_label() {
+		if (frappe.ui.keys?.get_shortcut_label) {
+			return frappe.ui.keys.get_shortcut_label("ctrl+g");
+		}
+		return frappe.utils.is_mac() ? "⌘G" : "Ctrl+G";
+	}
+
+	search_footer_html() {
+		const close_key = frappe.utils.escape_html(this.search_shortcut_label());
+		const global_key = frappe.utils.escape_html(this.global_search_shortcut_label());
+		return `
+			<span class="staff-pro-topbar__search-hint">
+				<span class="staff-pro-topbar__search-key">↑</span>
+				<span class="staff-pro-topbar__search-key">↓</span>
+				${__("to navigate")}
+			</span>
+			<span class="staff-pro-topbar__search-hint">
+				<span class="staff-pro-topbar__search-key">↵</span>
+				${__("to select")}
+			</span>
+			<span class="staff-pro-topbar__search-hint">
+				<span class="staff-pro-topbar__search-key">${close_key}</span>
+				${__("to close")}
+			</span>
+			<span class="staff-pro-topbar__search-hint">
+				<span class="staff-pro-topbar__search-key">${global_key}</span>
+				${__("to open Global Search")}
+			</span>
+		`;
+	}
+
+	search_panel() {
+		const $body_panel = $("body > .staff-pro-topbar__search-panel");
+		if ($body_panel.length) return $body_panel.first();
+		return $(".staff-pro-topbar__search-panel").first();
+	}
+
+	search_fields() {
+		return this.$wrapper
+			.find(".staff-pro-topbar__search-field")
+			.add(this.search_panel().find(".staff-pro-topbar__search-field"));
+	}
+
+	mount_search_panel() {
+		const $nested = this.$wrapper.find(".staff-pro-topbar__search-panel");
+		let $panel = $("body > .staff-pro-topbar__search-panel").first();
+		if (!$panel.length && $nested.length) {
+			$panel = $nested.first();
+		}
+		if (!$panel.length) {
+			$panel = $(`
+				<div class="staff-pro-topbar__search-panel hidden" role="listbox" aria-label="${__("Search")}">
+					<div class="staff-pro-topbar__search-panel-field">
+						${frappe.utils.icon("search", "sm")}
+						<input class="staff-pro-topbar__search-field" type="text" autocomplete="off" spellcheck="false" placeholder="${__("Search employees, payroll, knowledge, help")}" aria-label="${__("Search")}" />
+					</div>
+					<div class="staff-pro-topbar__search-results"></div>
+					<div class="staff-pro-topbar__search-footer"></div>
+				</div>
+			`);
+		}
+		$nested.not($panel).remove();
+		if (!$panel.parent().is("body")) {
+			$("body").append($panel);
+		}
+		$panel.find(".staff-pro-topbar__search-footer").html(this.search_footer_html());
+		this.bind_search_panel_events($panel);
+		return $panel;
+	}
+
+	bind_search_panel_events($panel) {
+		$panel.off(".staff-pro-search");
+		$panel.on("click.staff-pro-search", (e) => {
+			e.stopPropagation();
+		});
+		$panel.on("input.staff-pro-search", ".staff-pro-topbar__search-field", (e) => {
+			this.sync_search_fields(e.currentTarget.value);
+			this.schedule_search(e.currentTarget.value);
+		});
+		$panel.on("keydown.staff-pro-search", ".staff-pro-topbar__search-field", (e) => {
+			this.on_search_keydown(e);
+		});
+		$panel.on("click.staff-pro-search", ".staff-pro-topbar__search-item", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			this.select_search_item(cint($(e.currentTarget).attr("data-index")));
+		});
+		$panel.on("mouseenter.staff-pro-search", ".staff-pro-topbar__search-item", (e) => {
+			this.set_search_index(cint($(e.currentTarget).attr("data-index")));
+		});
+	}
+
+	ensure_search_picker() {
+		const shortcut = frappe.utils.escape_html(this.search_shortcut_label());
+		let $wrap = this.$wrapper.find(".staff-pro-topbar__search-wrap");
+		const $old = this.$wrapper.find(".staff-pro-topbar__search").first();
+
+		if (!$wrap.length) {
+			const picker = $(`
+				<div class="staff-pro-topbar__search-wrap">
+					<div class="staff-pro-topbar__search" data-action="search" role="combobox" aria-expanded="false" aria-haspopup="listbox">
+						${frappe.utils.icon("search", "sm")}
+						<input class="staff-pro-topbar__search-input staff-pro-topbar__search-field" type="text" autocomplete="off" spellcheck="false" placeholder="${__("Search employees, payroll, knowledge, help")}" aria-label="${__("Search")}" />
+						<kbd class="staff-pro-topbar__shortcut">${shortcut}</kbd>
+					</div>
+				</div>
+			`);
+			if ($old.length) {
+				$old.replaceWith(picker);
+			} else {
+				this.$wrapper.find(".staff-pro-topbar__center").append(picker);
+			}
+			$wrap = this.$wrapper.find(".staff-pro-topbar__search-wrap");
+		}
+
+		if (!$wrap.find(".staff-pro-topbar__search-input").length) {
+			$wrap.find(".staff-pro-topbar__search-placeholder").replaceWith(
+				`<input class="staff-pro-topbar__search-input staff-pro-topbar__search-field" type="text" autocomplete="off" spellcheck="false" placeholder="${__("Search employees, payroll, knowledge, help")}" aria-label="${__("Search")}" />`
+			);
+		}
+
+		$wrap.find(".staff-pro-topbar__search").attr({
+			role: "combobox",
+			"aria-expanded": "false",
+			"aria-haspopup": "listbox",
+		});
+		this.mount_search_panel();
 	}
 
 	ensure_notifications_picker() {
@@ -524,12 +841,12 @@ hrms.ui.TopBar = class {
 						</div>
 					</div>
 					<div class="staff-pro-topbar__center">
-						<div class="staff-pro-topbar__search" data-action="search" role="button" tabindex="0">
-							${frappe.utils.icon("search", "sm")}
-							<span class="staff-pro-topbar__search-placeholder">
-								${__("Search employees, payroll, knowledge, help")}
-							</span>
-							<kbd class="staff-pro-topbar__shortcut">${frappe.utils.escape_html(shortcut)}</kbd>
+						<div class="staff-pro-topbar__search-wrap">
+							<div class="staff-pro-topbar__search" data-action="search" role="combobox" aria-expanded="false" aria-haspopup="listbox">
+								${frappe.utils.icon("search", "sm")}
+								<input class="staff-pro-topbar__search-input staff-pro-topbar__search-field" type="text" autocomplete="off" spellcheck="false" placeholder="${__("Search employees, payroll, knowledge, help")}" aria-label="${__("Search")}" />
+								<kbd class="staff-pro-topbar__shortcut">${frappe.utils.escape_html(shortcut)}</kbd>
+							</div>
 						</div>
 					</div>
 					<div class="staff-pro-topbar__right">
@@ -567,7 +884,20 @@ hrms.ui.TopBar = class {
 		if (!this.bound) {
 			this.bound = true;
 
-			this.$wrapper.on("click", "[data-action='search']", () => this.open_search());
+			this.$wrapper.on("click", "[data-action='search']", (e) => {
+				e.stopPropagation();
+				this.open_search_panel();
+			});
+			this.$wrapper.on("input", ".staff-pro-topbar__search-field", (e) => {
+				this.sync_search_fields(e.currentTarget.value);
+				this.schedule_search(e.currentTarget.value);
+			});
+			this.$wrapper.on("focus", ".staff-pro-topbar__search-field", () => {
+				this.open_search_panel();
+			});
+			this.$wrapper.on("keydown", ".staff-pro-topbar__search-field", (e) => {
+				this.on_search_keydown(e);
+			});
 			this.$wrapper.on("click", "[data-action='notifications']", (e) => {
 				e.stopPropagation();
 				this.toggle_notifications_panel();
@@ -579,6 +909,7 @@ hrms.ui.TopBar = class {
 				this.toggle_language_menu();
 			});
 			this.$wrapper.on("keydown", "[data-action]", (e) => {
+				if ($(e.target).is(".staff-pro-topbar__search-field")) return;
 				if (e.key === "Enter" || e.key === " ") {
 					e.preventDefault();
 					$(e.currentTarget).trigger("click");
@@ -589,6 +920,7 @@ hrms.ui.TopBar = class {
 				this.refresh_context();
 				this.close_notifications_panel();
 				this.close_language_menu();
+				this.close_search_panel();
 			});
 
 			if (frappe.router?.on) {
@@ -617,6 +949,13 @@ hrms.ui.TopBar = class {
 			) {
 				this.close_notifications_panel();
 			}
+			if (
+				!$(e.target).closest(".staff-pro-topbar__search-wrap").length &&
+				!$(e.target).closest(".staff-pro-topbar__search-panel").length &&
+				!$(e.target).closest(".staff-pro-topbar__search-toggle").length
+			) {
+				this.close_search_panel();
+			}
 		});
 
 		$(document).on("mousedown.staff-pro-topbar", (e) => {
@@ -633,6 +972,7 @@ hrms.ui.TopBar = class {
 			if (e.key === "Escape") {
 				this.close_language_menu();
 				this.close_notifications_panel();
+				this.close_search_panel();
 			}
 		});
 	}
@@ -714,18 +1054,443 @@ hrms.ui.TopBar = class {
 		}
 	}
 
+	patch_native_awesomebar() {
+		if (this._awesomebar_patched) return;
+		this._awesomebar_patched = true;
+
+		const self = this;
+		if (frappe.search && typeof frappe.search.open_awesomebar_from_global_search_shortcut === "function") {
+			frappe.search.open_awesomebar_from_global_search_shortcut = function (e) {
+				e?.preventDefault?.();
+				e?.stopPropagation?.();
+				self.open_search_panel();
+				return false;
+			};
+		}
+
+		$(document).on("show.bs.modal.staff-pro-search", (e) => {
+			const $modal = $(e.target);
+			if (
+				$modal.find(".cool-awesomebar-modal-footer").length ||
+				$modal.find(".navbar-modal-wrapper").length ||
+				$modal.find("#navbar-search").length
+			) {
+				e.preventDefault();
+				e.stopImmediatePropagation();
+				setTimeout(() => $modal.modal("hide"), 0);
+				self.open_search_panel();
+			}
+		});
+
+		$(document).on("click.staff-pro-search", "#navbar-modal-search, #small-search-button, #full-search-button", (e) => {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+			self.open_search_panel();
+		});
+	}
+
+	search_anchor() {
+		const $toggle = this.$wrapper.find(".staff-pro-topbar__search-toggle");
+		if ($toggle.length && $toggle.is(":visible")) {
+			return $toggle.get(0);
+		}
+		return this.$wrapper.find(".staff-pro-topbar__search").get(0);
+	}
+
+	visible_search_field() {
+		const $mobile = this.search_panel().find(".staff-pro-topbar__search-panel-field .staff-pro-topbar__search-field");
+		if ($mobile.length && $mobile.is(":visible")) {
+			return $mobile.get(0);
+		}
+		return this.$wrapper.find(".staff-pro-topbar__search-input").get(0);
+	}
+
+	sync_search_fields(value) {
+		this.search_fields().each((_, el) => {
+			if (el.value !== value) el.value = value;
+		});
+	}
+
+	schedule_search(value) {
+		clearTimeout(this._search_timer);
+		this._search_timer = setTimeout(() => this.run_search(value), 50);
+	}
+
+	collect_search_utils(txt, methods) {
+		const utils = frappe.search?.utils;
+		if (!utils) return [];
+		const out = [];
+		methods.forEach((name) => {
+			const fn = utils[name];
+			if (typeof fn !== "function") return;
+			try {
+				const result = fn.call(utils, txt);
+				if (Array.isArray(result) && result.length) {
+					out.push(...result);
+				}
+			} catch (e) {
+				// Ignore optional search sources that are unavailable on this desk version.
+			}
+		});
+		return out;
+	}
+
+	deduplicate_search_options(options) {
+		const out = [];
+		const routes = [];
+		(options || []).forEach((option) => {
+			if (option?.route) {
+				if (
+					Array.isArray(option.route) &&
+					option.route[0] === "List" &&
+					option.route[2] !== "Report" &&
+					option.route[2] !== "Inbox"
+				) {
+					option.route.splice(2);
+				}
+				const str_route =
+					typeof option.route === "string" ? option.route : option.route.join("/");
+				if (option.description || routes.indexOf(str_route) === -1) {
+					out.push(option);
+					routes.push(str_route);
+				} else {
+					const old = routes.indexOf(str_route);
+					if (out[old].index < option.index && !option.recent) {
+						out[old] = option;
+					}
+				}
+			} else {
+				out.push(option);
+				routes.push("");
+			}
+		});
+		return out;
+	}
+
+	add_search_defaults(txt, options) {
+		if (txt.charAt(0) !== "#") {
+			options.unshift({
+				label: __("Search for {0}", [frappe.utils.xss_sanitise(txt).bold()]),
+				value: __("Search for {0}", [frappe.utils.xss_sanitise(txt)]),
+				match: txt,
+				index: 100,
+				default: "Search",
+				onclick: () => {
+					if (frappe.searchdialog?.search?.init_search) {
+						frappe.searchdialog.search.init_search(txt, "global_search");
+					} else if (frappe.searchdialog?.search?.open_global_search_dialog) {
+						frappe.searchdialog.search.open_global_search_dialog(txt);
+					}
+				},
+			});
+		}
+
+		const route = frappe.get_route?.() || [];
+		if (route[0] === "List" && txt.indexOf(" in") === -1) {
+			const doctype = frappe.container?.page?.list_view?.doctype;
+			if (doctype) {
+				const meta = frappe.get_meta(doctype);
+				const search_field = meta?.title_field || "name";
+				options.push({
+					label: __("Find {0} in {1}", [
+						frappe.utils.xss_sanitise(txt).bold(),
+						__(route[1]).bold(),
+					]),
+					value: __("Find {0} in {1}", [frappe.utils.xss_sanitise(txt), __(route[1])]),
+					route_options: { [search_field]: ["like", "%" + txt + "%"] },
+					onclick: () => cur_list?.show?.(),
+					index: 90,
+					default: "Current",
+					match: txt,
+				});
+			}
+		}
+
+		const first = txt.substr(0, 1);
+		if (first == parseInt(first, 10) || first === "(" || first === "=") {
+			try {
+				const expr = first === "=" ? txt.substr(1) : txt;
+				const val = frappe.utils.eval_expression ? frappe.utils.eval_expression(expr) : null;
+				if (val !== undefined && val !== null && !Number.isNaN(val)) {
+					const result = typeof format_number === "function" ? format_number(val) : String(val);
+					options.push({
+						label: __("{0} = {1}", [frappe.utils.xss_sanitise(txt), `<b>${frappe.utils.escape_html(result)}</b>`]),
+						value: __("{0} = {1}", [frappe.utils.xss_sanitise(txt), result]),
+						match: result,
+						index: 80,
+						default: "Calculator",
+						onclick: () => frappe.msgprint(__("{0} = {1}", [frappe.utils.xss_sanitise(txt), result]), __("Result")),
+					});
+				}
+			} catch (e) {
+				// Not a calculator expression.
+			}
+		}
+
+		if (txt.toLowerCase().includes("random")) {
+			options.push({
+				label: __("Generate Random Password"),
+				value: frappe.utils.get_random(16),
+				onclick: () => frappe.msgprint(frappe.utils.get_random(16), __("Result")),
+			});
+		}
+
+		return options;
+	}
+
+	build_search_options(txt) {
+		frappe.search?.utils?.setup_recent?.();
+		let options = [];
+
+		if (txt && txt.length > 1) {
+			if (txt.charAt(0) === "#" && frappe.tags?.utils?.get_tags) {
+				options = frappe.tags.utils.get_tags(txt) || [];
+			} else {
+				options = this.collect_search_utils(txt, [
+					"get_creatables",
+					"get_search_in_list",
+					"get_doctypes",
+					"get_doctype_layouts",
+					"get_reports",
+					"get_pages",
+					"get_workspaces",
+					"get_desktop_icons",
+					"get_dashboards",
+					"get_recent_pages",
+					"get_executables",
+					"get_marketplace_apps",
+				]);
+				options = this.add_search_defaults(txt, options);
+			}
+		} else {
+			options = this.collect_search_utils(txt || "", ["get_recent_pages"]);
+			options = options.concat(this.collect_search_utils("", ["get_frequent_links"]));
+		}
+
+		options = this.deduplicate_search_options(options);
+		options.sort((a, b) => (b.index || 0) - (a.index || 0));
+		return options.slice(0, 20);
+	}
+
+	run_search(value) {
+		if (!this.search_open) return;
+		const txt = String(value || "")
+			.trim()
+			.replace(/\s\s+/g, " ");
+		this.search_seq += 1;
+		const seq = this.search_seq;
+		const options = this.build_search_options(txt);
+		this.render_search_results(options);
+
+		if (txt.length > 1 && frappe.boot?.has_awesomebar_search) {
+			frappe.call({
+				method: "frappe.desk.search.awesomebar_search",
+				args: { txt },
+				callback: (r) => {
+					if (seq !== this.search_seq || !r.message?.length) return;
+					const merged = this.deduplicate_search_options(this.search_items.concat(r.message));
+					merged.sort((a, b) => (b.index || 0) - (a.index || 0));
+					this.render_search_results(merged.slice(0, 20));
+				},
+			});
+		}
+	}
+
+	search_item_label(item) {
+		return item.label || item.value || "";
+	}
+
+	search_item_meta(item) {
+		if (item.description && item.description !== item.value) {
+			return item.description;
+		}
+		return item.type || item.default || "";
+	}
+
+	render_search_results(options) {
+		this.search_items = options || [];
+		const $results = this.search_panel().find(".staff-pro-topbar__search-results");
+		if (!this.search_items.length) {
+			this.search_index = -1;
+			$results.html(`<div class="staff-pro-topbar__search-empty">${__("No results found")}</div>`);
+			return;
+		}
+
+		const html = this.search_items
+			.map((item, index) => {
+				const meta = this.search_item_meta(item);
+				return `
+					<button type="button" class="staff-pro-topbar__search-item" data-index="${index}" role="option">
+						<span class="staff-pro-topbar__search-item-label">${this.search_item_label(item)}</span>
+						${meta ? `<span class="staff-pro-topbar__search-item-meta">${frappe.utils.escape_html(String(meta))}</span>` : ""}
+					</button>
+				`;
+			})
+			.join("");
+
+		$results.html(html);
+		this.set_search_index(0);
+	}
+
+	set_search_index(index) {
+		if (!this.search_items.length) {
+			this.search_index = -1;
+			return;
+		}
+		const max = this.search_items.length - 1;
+		this.search_index = Math.max(0, Math.min(max, index));
+		const $items = this.search_panel().find(".staff-pro-topbar__search-item");
+		$items.removeClass("is-active");
+		const $active = $items.eq(this.search_index).addClass("is-active");
+		$active.get(0)?.scrollIntoView({ block: "nearest" });
+	}
+
+	on_search_keydown(e) {
+		if (e.key === "ArrowDown") {
+			e.preventDefault();
+			this.set_search_index(this.search_index + 1);
+			return;
+		}
+		if (e.key === "ArrowUp") {
+			e.preventDefault();
+			this.set_search_index(this.search_index - 1);
+			return;
+		}
+		if (e.key === "Enter") {
+			e.preventDefault();
+			if (this.search_index >= 0) {
+				this.select_search_item(this.search_index);
+			}
+			return;
+		}
+		if (e.key === "Escape") {
+			e.preventDefault();
+			this.close_search_panel();
+			return;
+		}
+		if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === "k") {
+			e.preventDefault();
+			this.close_search_panel();
+			return;
+		}
+		if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === "g") {
+			e.preventDefault();
+			this.open_global_search();
+		}
+	}
+
+	open_global_search() {
+		const txt = this.$wrapper.find(".staff-pro-topbar__search-input").val() || "";
+		this.close_search_panel();
+		if (frappe.searchdialog?.search?.open_global_search_dialog) {
+			frappe.searchdialog.search.open_global_search_dialog(txt);
+			return;
+		}
+		if (frappe.searchdialog?.search?.init_search) {
+			frappe.searchdialog.search.init_search(txt, "global_search");
+			return;
+		}
+		if (frappe.search?.open_global_search_from_navbar_shortcut) {
+			frappe.search.open_global_search_from_navbar_shortcut({ preventDefault() {} });
+		}
+	}
+
+	select_search_item(index) {
+		const item = this.search_items[index];
+		if (!item) return;
+		this.close_search_panel();
+
+		if (item.route_options) {
+			frappe.route_options = item.route_options;
+		}
+
+		if (item.onclick) {
+			item.onclick(item.match);
+			return;
+		}
+
+		const route = item.route;
+		const first = Array.isArray(route) ? route[0] : route;
+		if (typeof first === "string" && (first.startsWith("https://") || first.startsWith("http://"))) {
+			window.open(first, "_blank");
+			return;
+		}
+		if (typeof first === "string" && first.startsWith("/") && !first.startsWith("//")) {
+			if (first.startsWith("/app/") || first.startsWith("/desk/")) {
+				frappe.set_route(first);
+			} else {
+				window.location.href = first;
+			}
+			return;
+		}
+		if (route) {
+			frappe.set_route(route);
+		}
+	}
+
+	position_search_panel() {
+		if (!this.search_open || !this.$wrapper) return;
+		const $panel = this.search_panel();
+		const anchor = this.search_anchor();
+		if (!anchor) return;
+
+		const rect = anchor.getBoundingClientRect();
+		const width = Math.min(Math.max(rect.width, 480), window.innerWidth - 24);
+		let left = rect.left;
+		if (left + width > window.innerWidth - 12) {
+			left = Math.max(12, window.innerWidth - width - 12);
+		}
+		$panel.css({
+			top: `${rect.bottom + 8}px`,
+			left: `${left}px`,
+			width: `${width}px`,
+			right: "auto",
+		});
+	}
+
+	open_search_panel() {
+		if (!this.$wrapper) return;
+		if (this.search_open) {
+			this.visible_search_field()?.focus();
+			return;
+		}
+
+		this.close_language_menu();
+		this.close_notifications_panel();
+		this.search_open = true;
+		$("body").addClass("staff-pro-search-open");
+		this.$wrapper.find(".staff-pro-topbar__search").addClass("is-open").attr("aria-expanded", "true");
+		this.$wrapper.find(".staff-pro-topbar__search-toggle").addClass("is-open");
+		this.mount_search_panel().removeClass("hidden");
+		this.position_search_panel();
+		$(window).on("resize.staff-pro-topbar scroll.staff-pro-topbar", this.on_reposition_menu);
+
+		const field = this.visible_search_field();
+		const value = field?.value || "";
+		this.run_search(value);
+		setTimeout(() => field?.focus(), 0);
+	}
+
+	close_search_panel(keep_query = false) {
+		if (!this.search_open) return;
+		this.search_open = false;
+		this.search_seq += 1;
+		clearTimeout(this._search_timer);
+		if (!this.language_open && !this.notifications_open) {
+			$(window).off("resize.staff-pro-topbar scroll.staff-pro-topbar", this.on_reposition_menu);
+		}
+		$("body").removeClass("staff-pro-search-open");
+		this.search_panel().addClass("hidden");
+		this.$wrapper?.find(".staff-pro-topbar__search").removeClass("is-open").attr("aria-expanded", "false");
+		this.$wrapper?.find(".staff-pro-topbar__search-toggle").removeClass("is-open");
+		this.visible_search_field()?.blur();
+		if (!keep_query) {
+			this.sync_search_fields("");
+		}
+	}
+
 	open_search() {
-		if (frappe.search?.open_awesomebar_from_global_search_shortcut) {
-			frappe.search.open_awesomebar_from_global_search_shortcut({ preventDefault() {} });
-			return;
-		}
-		if (frappe.searchdialog?.search?.toggle_global_search_dialog) {
-			frappe.searchdialog.search.toggle_global_search_dialog();
-			return;
-		}
-		if (frappe.searchdialog?.search?.search_dialog?.show) {
-			frappe.searchdialog.search.search_dialog.show();
-		}
+		this.open_search_panel();
 	}
 
 	position_notifications_panel() {
@@ -926,6 +1691,7 @@ hrms.ui.TopBar = class {
 		}
 
 		this.close_language_menu();
+		this.close_search_panel();
 		const $panel = this.$wrapper.find(".staff-pro-topbar__notifications-panel");
 		const $btn = this.$wrapper.find("[data-action='notifications']");
 		$panel.html(this.render_notifications_shell());
@@ -944,7 +1710,7 @@ hrms.ui.TopBar = class {
 
 	close_notifications_panel() {
 		this.notifications_open = false;
-		if (!this.language_open) {
+		if (!this.language_open && !this.search_open) {
 			$(window).off("resize.staff-pro-topbar scroll.staff-pro-topbar", this.on_reposition_menu);
 		}
 		this.$wrapper?.find(".staff-pro-topbar__notifications-panel").addClass("hidden");
@@ -1099,6 +1865,7 @@ hrms.ui.TopBar = class {
 		const $btn = this.$wrapper.find("[data-action='language']");
 		if (!this.language_open) {
 			this.close_notifications_panel();
+			this.close_search_panel();
 			$menu.html(`<div class="staff-pro-topbar__menu-item is-active">${__("Loading...")}</div>`);
 			$menu.removeClass("hidden");
 			$btn.addClass("is-open").attr("aria-expanded", "true");
@@ -1117,7 +1884,7 @@ hrms.ui.TopBar = class {
 
 	close_language_menu() {
 		this.language_open = false;
-		if (!this.notifications_open) {
+		if (!this.notifications_open && !this.search_open) {
 			$(window).off("resize.staff-pro-topbar scroll.staff-pro-topbar", this.on_reposition_menu);
 		}
 		this.$wrapper?.find(".staff-pro-topbar__menu").addClass("hidden");

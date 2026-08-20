@@ -50,6 +50,7 @@ class PayrollEntry(Document):
 		company: DF.Link
 		cost_center: DF.Link
 		currency: DF.Link
+		deduct_social_security: DF.Check
 		deduct_tax_for_unsubmitted_tax_exemption_proof: DF.Check
 		department: DF.Link | None
 		designation: DF.Link | None
@@ -61,8 +62,8 @@ class PayrollEntry(Document):
 		number_of_employees: DF.Int
 		overtime_step: DF.Literal["", "Create", "Submit"]
 		payment_account: DF.Link | None
-		payroll_frequency: DF.Literal["", "Monthly", "Fortnightly", "Bimonthly", "Weekly", "Daily"]
-		payroll_payable_account: DF.Link
+		payroll_frequency: DF.Literal["Weekly", "Fortnightly", "Monthly"]
+		payroll_payable_account: DF.Link | None
 		posting_date: DF.Date
 		project: DF.Link | None
 		salary_slip_based_on_timesheet: DF.Check
@@ -94,6 +95,7 @@ class PayrollEntry(Document):
 
 	def validate(self):
 		self.number_of_employees = len(self.employees)
+		self.deduct_social_security = 1
 		self.set_status()
 
 	def set_status(self, status=None, update=False):
@@ -107,7 +109,6 @@ class PayrollEntry(Document):
 
 	def before_submit(self):
 		self.validate_existing_salary_slips()
-		self.validate_payroll_payable_account()
 		if self.get_employees_with_unmarked_attendance():
 			frappe.throw(_("Cannot submit. Attendance is not marked for some employees."))
 
@@ -147,18 +148,8 @@ class PayrollEntry(Document):
 			)
 
 	def validate_payroll_payable_account(self):
-		payroll_payable_account_type = frappe.db.get_value(
-			"Account", self.payroll_payable_account, "account_type"
-		)
-		if payroll_payable_account_type != "Payable":
-			frappe.throw(
-				_(
-					"Account type should be set {0} for payroll payable account {1}, please set and try again"
-				).format(
-					frappe.bold("Payable"),
-					frappe.bold(get_link_to_form("Account", self.payroll_payable_account)),
-				)
-			)
+		"""Payroll Payable is no longer used; agents are paid via Bank or Cash directly."""
+		return
 
 	def on_cancel(self):
 		self.ignore_linked_doctypes = ("GL Entry", "Salary Slip", "Journal Entry")
@@ -252,12 +243,9 @@ class PayrollEntry(Document):
 			currency=self.currency,
 			start_date=self.start_date,
 			end_date=self.end_date,
-			payroll_payable_account=self.payroll_payable_account,
 			salary_slip_based_on_timesheet=self.salary_slip_based_on_timesheet,
+			payroll_frequency=self.payroll_frequency,
 		)
-
-		if not self.salary_slip_based_on_timesheet:
-			filters.update(dict(payroll_frequency=self.payroll_frequency))
 
 		return filters
 
@@ -269,11 +257,10 @@ class PayrollEntry(Document):
 
 		if not employees:
 			error_msg = _(
-				"No employees found for the mentioned criteria:<br>Company: {0}<br> Currency: {1}<br>Payroll Payable Account: {2}"
+				"No employees found for the mentioned criteria:<br>Company: {0}<br> Currency: {1}"
 			).format(
 				frappe.bold(self.company),
 				frappe.bold(self.currency),
-				frappe.bold(self.payroll_payable_account),
 			)
 			if self.branch:
 				error_msg += "<br>" + _("Branch: {0}").format(frappe.bold(self.branch))
@@ -323,7 +310,10 @@ class PayrollEntry(Document):
 					"currency": self.currency,
 				}
 			)
-			if len(employees) > 30 or frappe.flags.enqueue_payroll_entry:
+			enqueue = (len(employees) > 30 or frappe.flags.enqueue_payroll_entry) and not getattr(
+				frappe.flags, "skip_payroll_enqueue", False
+			)
+			if enqueue:
 				self.db_set("status", "Queued")
 				frappe.enqueue(
 					create_salary_slips_for_employees,
@@ -368,7 +358,10 @@ class PayrollEntry(Document):
 		self.check_permission("write")
 		salary_slips = self.get_sal_slip_list(ss_status=0)
 
-		if len(salary_slips) > 30 or frappe.flags.enqueue_payroll_entry:
+		enqueue = (len(salary_slips) > 30 or frappe.flags.enqueue_payroll_entry) and not getattr(
+			frappe.flags, "skip_payroll_enqueue", False
+		)
+		if enqueue:
 			self.db_set("status", "Queued")
 			frappe.enqueue(
 				submit_salary_slips_for_employees,
@@ -607,10 +600,11 @@ class PayrollEntry(Document):
 		self.employee_based_payroll_payable_entries = {}
 		self._advance_deduction_entries = []
 
+		# Always track per-employee amounts so net pay can be split by Bank vs Cash
 		earnings = (
 			self.get_salary_component_total(
 				component_type="earnings",
-				employee_wise_accounting_enabled=employee_wise_accounting_enabled,
+				employee_wise_accounting_enabled=True,
 			)
 			or {}
 		)
@@ -618,7 +612,7 @@ class PayrollEntry(Document):
 		deductions = (
 			self.get_salary_component_total(
 				component_type="deductions",
-				employee_wise_accounting_enabled=employee_wise_accounting_enabled,
+				employee_wise_accounting_enabled=True,
 			)
 			or {}
 		)
@@ -653,30 +647,128 @@ class PayrollEntry(Document):
 				payable_amount,
 			)
 
-			self.set_payable_amount_against_payroll_payable_account(
+			payment_accounts = self.set_payable_amount_against_payment_accounts(
 				accounts,
 				currencies,
 				company_currency,
 				accounting_dimensions,
 				precision,
 				payable_amount,
-				self.payroll_payable_account,
 				employee_wise_accounting_enabled,
 			)
 
-			# when party is not required, skip the validation in journal & gl entry
+			voucher_type = self.get_direct_payment_voucher_type(payment_accounts)
+			title_account = next(iter(payment_accounts), self.payment_account)
+
 			self.make_journal_entry(
 				accounts,
 				currencies,
-				self.payroll_payable_account,
-				voucher_type="Journal Entry",
-				user_remark=_("Accrual Journal Entry for salaries from {0} to {1}").format(
+				title_account,
+				voucher_type=voucher_type,
+				user_remark=_("Payment Journal Entry for salaries from {0} to {1}").format(
 					self.start_date, self.end_date
 				),
 				submit_journal_entry=True,
 				submitted_salary_slips=submitted_salary_slips,
 				employee_wise_accounting_enabled=employee_wise_accounting_enabled,
 			)
+
+	def get_direct_payment_account(self, salary_mode: str | None) -> str:
+		"""Resolve Bank or Cash ledger from Company defaults (Bank Transfer / Cash)."""
+		mode = (salary_mode or "Bank").strip()
+		if mode == "Cash":
+			account = frappe.db.get_value("Company", self.company, "default_cash_account")
+			label = _("Default Cash Account")
+		else:
+			# Bank, Cheque, or blank -> bank transfer
+			account = frappe.db.get_value("Company", self.company, "default_bank_account")
+			label = _("Default Bank Account")
+
+		if not account and self.payment_account:
+			account = self.payment_account
+
+		if not account:
+			frappe.throw(
+				_("Set {0} on Company {1} for payroll payments.").format(
+					frappe.bold(label), frappe.bold(self.company)
+				)
+			)
+
+		return account
+
+	def get_direct_payment_voucher_type(self, payment_accounts: set | list) -> str:
+		if not payment_accounts:
+			return "Journal Entry"
+
+		account_types = {
+			frappe.db.get_value("Account", account, "account_type") for account in payment_accounts
+		}
+		account_types.discard(None)
+
+		if account_types == {"Cash"}:
+			return "Cash Entry"
+		if account_types == {"Bank"}:
+			return "Bank Entry"
+		return "Journal Entry"
+
+	def get_employee_salary_modes(self, employees: list[str]) -> dict[str, str]:
+		if not employees:
+			return {}
+
+		modes = {}
+		for row in frappe.get_all(
+			"Employee", filters={"name": ("in", employees)}, fields=["name", "salary_mode"]
+		):
+			modes[row.name] = row.salary_mode or "Bank"
+		return modes
+
+	def set_payable_amount_against_payment_accounts(
+		self,
+		accounts,
+		currencies,
+		company_currency,
+		accounting_dimensions,
+		precision,
+		payable_amount,
+		employee_wise_accounting_enabled,
+	) -> set[str]:
+		"""Credit Bank/Cash directly instead of Payroll Payable, split by salary_mode."""
+		employees = list(self.employee_based_payroll_payable_entries.keys())
+		salary_modes = self.get_employee_salary_modes(employees)
+		payment_accounts_used: set[str] = set()
+		amounts_by_account: dict[str, float] = {}
+
+		if self.employee_based_payroll_payable_entries:
+			for employee, employee_details in self.employee_based_payroll_payable_entries.items():
+				amount = (employee_details.get("earnings", 0) or 0) - (
+					employee_details.get("deductions", 0) or 0
+				)
+				if not amount:
+					continue
+				payment_account = self.get_direct_payment_account(salary_modes.get(employee))
+				amounts_by_account[payment_account] = amounts_by_account.get(payment_account, 0) + amount
+		elif payable_amount:
+			payment_account = self.get_direct_payment_account("Bank")
+			amounts_by_account[payment_account] = payable_amount
+
+		for payment_account, amount in amounts_by_account.items():
+			payment_accounts_used.add(payment_account)
+			# When tagging is enabled, still credit Bank/Cash without Employee party
+			# (party belongs on liability accounts, not bank/cash).
+			self.get_accounting_entries_and_payable_amount(
+				payment_account,
+				self.cost_center,
+				amount,
+				currencies,
+				company_currency,
+				0,
+				accounting_dimensions,
+				precision,
+				entry_type="payable",
+				accounts=accounts,
+			)
+
+		return payment_accounts_used
 
 	def make_journal_entry(
 		self,
@@ -698,13 +790,20 @@ class PayrollEntry(Document):
 		journal_entry.user_remark = user_remark
 		journal_entry.company = self.company
 		journal_entry.posting_date = self.posting_date
-		journal_entry.party_not_required = True if not employee_wise_accounting_enabled else False
+		# Direct Bank/Cash credits do not use Employee party on payment accounts
+		journal_entry.party_not_required = True
 
 		journal_entry.set("accounts", accounts)
 		journal_entry.multi_currency = multi_currency
 
-		if voucher_type == "Journal Entry":
+		if payroll_payable_account:
 			journal_entry.title = payroll_payable_account
+
+		if voucher_type in ("Bank Entry", "Cash Entry") and submit_journal_entry:
+			if not journal_entry.cheque_no:
+				journal_entry.cheque_no = self.name
+			if not journal_entry.cheque_date:
+				journal_entry.cheque_date = self.posting_date
 
 		journal_entry.save(ignore_permissions=True)
 
@@ -933,20 +1032,26 @@ class PayrollEntry(Document):
 		je = frappe.qb.DocType("Journal Entry")
 		jea = frappe.qb.DocType("Journal Entry Account")
 
-		bank_entries = (
+		# Direct payment posts Bank Entry, Cash Entry, or Journal Entry on slip submit
+		payment_entries = (
 			frappe.qb.from_(je)
 			.inner_join(jea)
 			.on(je.name == jea.parent)
 			.select(je.name)
 			.where(
-				((je.voucher_type == "Bank Entry") | (je.voucher_type == "Cash Entry"))
+				(
+					(je.voucher_type == "Bank Entry")
+					| (je.voucher_type == "Cash Entry")
+					| (je.voucher_type == "Journal Entry")
+				)
 				& (jea.reference_name == self.name)
 				& (jea.reference_type == "Payroll Entry")
+				& (je.docstatus < 2)
 			)
 		).run(as_dict=True)
 
 		return {
-			"has_bank_entries": bool(bank_entries),
+			"has_bank_entries": bool(payment_entries),
 			"has_bank_entries_for_withheld_salaries": not any(
 				employee.is_salary_withheld for employee in self.employees
 			),
@@ -1370,12 +1475,13 @@ def get_salary_structure(
 			& (SalaryStructure.is_active == "Yes")
 			& (SalaryStructure.company == company)
 			& (SalaryStructure.currency == currency)
-			& (SalaryStructure.salary_slip_based_on_timesheet == salary_slip_based_on_timesheet)
 		)
 	)
 
-	if not salary_slip_based_on_timesheet:
+	if payroll_frequency:
 		query = query.where(SalaryStructure.payroll_frequency == payroll_frequency)
+	elif salary_slip_based_on_timesheet:
+		query = query.where(SalaryStructure.salary_slip_based_on_timesheet == 1)
 
 	return query.run(pluck=True)
 
@@ -1405,10 +1511,14 @@ def get_filtered_employees(
 			& ((Employee.date_of_joining <= filters.end_date) | (Employee.date_of_joining.isnull()))
 			& ((Employee.relieving_date >= filters.start_date) | (Employee.relieving_date.isnull()))
 			& (SalaryStructureAssignment.salary_structure.isin(sal_struct))
-			& (SalaryStructureAssignment.payroll_payable_account == filters.payroll_payable_account)
 			& (filters.end_date >= SalaryStructureAssignment.from_date)
 		)
 	)
+
+	if filters.get("payroll_payable_account"):
+		query = query.where(
+			SalaryStructureAssignment.payroll_payable_account == filters.payroll_payable_account
+		)
 
 	query = set_fields_to_select(query, fields)
 	query = set_searchfield(query, searchfield, search_string, qb_object=Employee)
@@ -1494,6 +1604,20 @@ def get_start_end_dates(
 	payroll_frequency: str, start_date: str | datetime.date | None = None, company: str | None = None
 ) -> frappe._dict:
 	"""Returns dict of start and end dates for given payroll frequency based on start_date"""
+	from hrms.payroll.auto_payroll import canonical_frequency, days_for_frequency
+
+	payroll_frequency = canonical_frequency(payroll_frequency)
+
+	if payroll_frequency in ("Weekly", "Fortnightly"):
+		interval = days_for_frequency(payroll_frequency)
+		end_date = add_days(getdate(start_date), interval - 1)
+		return frappe._dict({"start_date": start_date, "end_date": end_date})
+
+	if payroll_frequency == "Monthly":
+		interval = days_for_frequency(payroll_frequency)
+		if interval not in (28, 29, 30, 31):
+			end_date = add_days(getdate(start_date), interval - 1)
+			return frappe._dict({"start_date": start_date, "end_date": end_date})
 
 	if payroll_frequency == "Monthly" or payroll_frequency == "Bimonthly" or payroll_frequency == "":
 		fiscal_year = get_fiscal_year(start_date, company=company)[0]
@@ -1511,10 +1635,10 @@ def get_start_end_dates(
 			end_date = m["month_end_date"]
 
 	if payroll_frequency == "Weekly":
-		end_date = add_days(start_date, 6)
+		end_date = add_days(start_date, days_for_frequency("Weekly") - 1)
 
 	if payroll_frequency == "Fortnightly":
-		end_date = add_days(start_date, 13)
+		end_date = add_days(start_date, days_for_frequency("Fortnightly") - 1)
 
 	if payroll_frequency == "Daily":
 		end_date = start_date
@@ -1534,13 +1658,22 @@ def get_frequency_kwargs(frequency_name):
 
 @frappe.whitelist()
 def get_end_date(start_date: str | datetime.date, frequency: str) -> dict:
+	from hrms.payroll.auto_payroll import canonical_frequency, days_for_frequency
+
 	start_date = getdate(start_date)
-	frequency = frequency.lower() if frequency else "monthly"
-	kwargs = get_frequency_kwargs(frequency) if frequency != "bimonthly" else get_frequency_kwargs("monthly")
+	frequency = canonical_frequency(frequency) or "Monthly"
+	if frequency in ("Weekly", "Fortnightly") or (
+		frequency == "Monthly" and days_for_frequency(frequency) not in (28, 29, 30, 31)
+	):
+		end_date = add_days(start_date, days_for_frequency(frequency) - 1)
+		return dict(end_date=end_date.strftime(DATE_FORMAT))
+
+	frequency_key = frequency.lower() if frequency else "monthly"
+	kwargs = get_frequency_kwargs(frequency_key) if frequency_key != "bimonthly" else get_frequency_kwargs("monthly")
 
 	# weekly, fortnightly and daily intervals have fixed days so no problems
 	end_date = add_to_date(start_date, **kwargs) - relativedelta(days=1)
-	if frequency != "bimonthly":
+	if frequency_key != "bimonthly":
 		return dict(end_date=end_date.strftime(DATE_FORMAT))
 
 	else:

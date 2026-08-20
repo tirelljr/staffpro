@@ -1,6 +1,6 @@
 {
  "aggregate_function_based_on": "planned_vacancies",
- "chart_name": "Department Wise Openings",
+ "chart_name": "Openings by Team",
  "chart_type": "Group By",
  "creation": "2020-07-22 11:56:32.849775",
  "custom_options": "",

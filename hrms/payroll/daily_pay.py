@@ -5,10 +5,10 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, time, timedelta
 
 import frappe
-from frappe.utils import cint, flt, get_first_day_of_week, getdate, time_diff_in_hours
+from frappe.utils import cint, flt, get_datetime, get_first_day_of_week, getdate
 
 from hrms.payroll.social_security import calculate_contribution, get_active_contribution_table
 
@@ -19,6 +19,8 @@ HOURS_PER_PERIOD = {
 	"Bimonthly": 86.67,
 	"Monthly": 173.33,
 }
+
+STANDARD_DAY_HOURS = 8.0
 
 PAYROLL_FIELDS = ("hour_rate", "daily_pay", "ss_deduction", "tax_deduction", "net_daily_pay", "hours_paid")
 
@@ -64,24 +66,91 @@ def get_assignment(employee: str, on_date):
 
 
 def get_hour_rate(employee: str, on_date) -> float:
-	assignment = get_assignment(employee, on_date)
-	if not assignment:
+	if not employee:
 		return 0.0
+	cache = frappe.flags.setdefault("hour_rate_cache", {})
+	key = (employee, str(getdate(on_date) if on_date else ""))
+	if key in cache:
+		return cache[key]
 
+	assignment = get_assignment(employee, on_date)
 	hour_rate = 0.0
 	frequency = "Weekly"
-	base = flt(assignment.base)
-	if assignment.salary_structure and frappe.db.exists("Salary Structure", assignment.salary_structure):
-		structure = frappe.get_cached_doc("Salary Structure", assignment.salary_structure)
-		hour_rate = flt(structure.hour_rate)
-		frequency = structure.payroll_frequency or frequency
+	base = 0.0
+	if assignment:
+		base = flt(assignment.base)
+		if assignment.salary_structure and frappe.db.exists("Salary Structure", assignment.salary_structure):
+			structure = frappe.get_cached_doc("Salary Structure", assignment.salary_structure)
+			hour_rate = flt(structure.hour_rate)
+			frequency = structure.payroll_frequency or frequency
 
 	if hour_rate:
-		return flt(hour_rate, 6)
+		cache[key] = flt(hour_rate, 6)
+		return cache[key]
 
 	period_hours = HOURS_PER_PERIOD.get(frequency, 40.0)
 	if base and period_hours:
-		return flt(base / period_hours, 6)
+		cache[key] = flt(base / period_hours, 6)
+		return cache[key]
+
+	rate = (
+		_hour_rate_from_salary_slip(employee)
+		or _hour_rate_from_past_attendance(employee)
+		or _hour_rate_from_company_structure(employee)
+	)
+	cache[key] = flt(rate, 6)
+	return cache[key]
+
+
+def _hour_rate_from_past_attendance(employee: str) -> float:
+	if not employee or not attendance_has_payroll_fields():
+		return 0.0
+	rows = frappe.get_all(
+		"Attendance",
+		filters={"employee": employee, "docstatus": ("<", 2), "hour_rate": (">", 0)},
+		fields=["hour_rate"],
+		order_by="attendance_date desc",
+		limit=1,
+	)
+	return flt(rows[0].hour_rate, 6) if rows else 0.0
+
+
+def _hour_rate_from_company_structure(employee: str) -> float:
+	company = frappe.db.get_value("Employee", employee, "company") if employee else None
+	if not company or not frappe.db.table_exists("Salary Structure"):
+		return 0.0
+	rows = frappe.get_all(
+		"Salary Structure",
+		filters={"company": company, "docstatus": 1, "is_active": "Yes"},
+		fields=["hour_rate", "is_default"],
+		order_by="is_default desc, modified desc",
+		limit=20,
+	)
+	for row in rows:
+		if flt(row.hour_rate):
+			return flt(row.hour_rate, 6)
+	return 0.0
+
+
+def _hour_rate_from_salary_slip(employee: str) -> float:
+	if not employee or not frappe.db.table_exists("Salary Slip"):
+		return 0.0
+	slips = frappe.get_all(
+		"Salary Slip",
+		filters={"employee": employee, "docstatus": ("<", 2)},
+		fields=["hour_rate", "gross_pay", "net_pay", "total_working_hours"],
+		order_by="end_date desc",
+		limit=1,
+	)
+	if not slips:
+		return 0.0
+	slip = slips[0]
+	if flt(slip.hour_rate):
+		return flt(slip.hour_rate, 6)
+	hours = flt(slip.total_working_hours)
+	pay = flt(slip.gross_pay) or flt(slip.net_pay)
+	if hours and pay:
+		return flt(pay / hours, 6)
 	return 0.0
 
 
@@ -151,20 +220,160 @@ def week_attendance_rows(employee: str, on_date) -> list[dict]:
 
 def apply_daily_pay_to_doc(doc) -> None:
 	"""Set hour rate and daily pay on a single Attendance doc."""
+	ensure_working_hours_from_times(doc)
 	if not attendance_has_payroll_fields():
 		return
 	if not doc.employee or not doc.attendance_date:
 		return
-	if (doc.status or "") == "Absent":
-		doc.hour_rate = get_hour_rate(doc.employee, doc.attendance_date)
+
+	doc.hour_rate = get_hour_rate(doc.employee, doc.attendance_date)
+	status = doc.status or ""
+
+	# Leave uses hours-based pay only (no holiday statutory gift).
+	if status in ("On Leave", "Half Day"):
+		doc.daily_pay = flt(flt(doc.hour_rate) * flt(doc.working_hours), 2)
+		return
+
+	holiday = get_public_holiday_pay_context(doc.employee, doc.attendance_date)
+	if holiday:
+		hours = flt(doc.working_hours)
+		has_clock = bool(getattr(doc, "in_time", None) or getattr(doc, "out_time", None))
+		# Premium only when the employee actually clocked; otherwise statutory 8 × rate.
+		worked = status != "Absent" and hours > 0 and has_clock
+		if not worked:
+			if hours <= 0:
+				doc.working_hours = STANDARD_DAY_HOURS
+			doc.daily_pay = calculate_holiday_daily_pay(doc.hour_rate, 0, holiday["premium_multiplier"])
+			return
+		doc.daily_pay = calculate_holiday_daily_pay(doc.hour_rate, hours, holiday["premium_multiplier"])
+		return
+
+	if status == "Absent":
 		doc.daily_pay = 0
 		doc.ss_deduction = 0
 		doc.tax_deduction = 0
 		doc.net_daily_pay = 0
 		return
 
-	doc.hour_rate = get_hour_rate(doc.employee, doc.attendance_date)
 	doc.daily_pay = flt(flt(doc.hour_rate) * flt(doc.working_hours), 2)
+
+
+def get_public_holiday_pay_context(employee: str, on_date) -> dict | None:
+	"""Return pay context when `on_date` is a public holiday (not weekly off), else None."""
+	if not employee or not on_date:
+		return None
+	try:
+		from hrms.utils.holiday_list import get_holiday_list_for_employee
+
+		holiday_list = get_holiday_list_for_employee(employee, raise_exception=False, as_on=on_date)
+	except Exception:
+		holiday_list = None
+	if not holiday_list:
+		return None
+
+	on_date = getdate(on_date)
+	is_public = frappe.db.exists(
+		"Holiday",
+		{"parent": holiday_list, "holiday_date": on_date, "weekly_off": 0},
+	)
+	if not is_public:
+		return None
+
+	tah = 0
+	dt = 0
+	meta = frappe.get_meta("Holiday List")
+	if meta.has_field("pay_time_and_a_half"):
+		tah = cint(frappe.db.get_value("Holiday List", holiday_list, "pay_time_and_a_half"))
+	if meta.has_field("pay_double_time"):
+		dt = cint(frappe.db.get_value("Holiday List", holiday_list, "pay_double_time"))
+	# Prefer double time if both somehow set (validate should prevent this).
+	if dt:
+		premium = 1.0
+		tah = 0
+	elif tah:
+		premium = 0.5
+	else:
+		premium = 0.0
+
+	return {
+		"holiday_list": holiday_list,
+		"premium_multiplier": premium,
+		"pay_time_and_a_half": bool(tah),
+		"pay_double_time": bool(dt),
+	}
+
+
+def calculate_holiday_daily_pay(rate: float, hours: float, premium_multiplier: float) -> float:
+	"""Holiday-plus-premium: 8h regular + premium on hours worked (or 8h if unworked)."""
+	rate = flt(rate)
+	hours = flt(hours)
+	premium_multiplier = flt(premium_multiplier)
+	base = STANDARD_DAY_HOURS * rate
+	if hours <= 0:
+		return flt(base, 2)
+	if premium_multiplier <= 0:
+		return flt(max(STANDARD_DAY_HOURS, hours) * rate, 2)
+	return flt(base + (hours * premium_multiplier * rate), 2)
+
+
+def ensure_paid_holiday_attendance(
+	from_date,
+	to_date,
+	employee: str | None = None,
+	department: str | None = None,
+) -> list[str]:
+	"""Create Present / 8h attendance for public holidays with no existing row."""
+	from frappe.utils import add_days
+
+	from_date = getdate(from_date)
+	to_date = getdate(to_date)
+	if not from_date or not to_date or to_date < from_date:
+		return []
+
+	# Require an employee or department filter to avoid mass-creating for every Active employee.
+	if not employee and not department:
+		return []
+
+	employees = _employees_for_holiday_ensure(employee, department)
+	created = []
+	for emp in employees:
+		day = from_date
+		while day <= to_date:
+			ctx = get_public_holiday_pay_context(emp, day)
+			if not ctx:
+				day = add_days(day, 1)
+				continue
+			existing = frappe.db.exists(
+				"Attendance",
+				{"employee": emp, "attendance_date": day, "docstatus": ("<", 2)},
+			)
+			if existing:
+				day = add_days(day, 1)
+				continue
+			doc = frappe.get_doc(
+				{
+					"doctype": "Attendance",
+					"employee": emp,
+					"attendance_date": day,
+					"status": "Present",
+					# 0 hours → apply_daily_pay treats as unworked statutory holiday (8 × rate).
+					"working_hours": 0,
+					"hours_paid": 0,
+				}
+			)
+			doc.insert(ignore_permissions=True)
+			created.append(doc.name)
+			day = add_days(day, 1)
+	return created
+
+
+def _employees_for_holiday_ensure(employee: str | None, department: str | None) -> list[str]:
+	if employee:
+		return [employee]
+	filters = {"status": "Active"}
+	if department:
+		filters["department"] = department
+	return frappe.get_all("Employee", filters=filters, pluck="name", order_by="name asc")
 
 
 def allocate_week_deductions(employee: str, on_date, overlay: dict | None = None) -> None:
@@ -213,7 +422,17 @@ def allocate_week_deductions(employee: str, on_date, overlay: dict | None = None
 def refresh_attendance_payroll(doc) -> dict:
 	"""Apply pay + this day's share of weekly SS/tax onto `doc`."""
 	apply_daily_pay_to_doc(doc)
-	if not attendance_has_payroll_fields() or (doc.status or "") == "Absent":
+	if not attendance_has_payroll_fields():
+		return {
+			"hour_rate": flt(getattr(doc, "hour_rate", 0)),
+			"daily_pay": 0.0,
+			"ss_deduction": 0.0,
+			"tax_deduction": 0.0,
+			"net_daily_pay": 0.0,
+		}
+
+	# Unpaid absent (non-holiday) — no SS/tax share.
+	if (doc.status or "") == "Absent" and not flt(doc.daily_pay):
 		return {
 			"hour_rate": flt(getattr(doc, "hour_rate", 0)),
 			"daily_pay": 0.0,
@@ -271,47 +490,200 @@ def on_attendance_update(doc, method=None):
 	)
 
 
-def _hours_from_logs(logs: list[dict]) -> tuple:
-	ins = [row for row in logs if (row.log_type or "IN") == "IN"]
-	outs = [row for row in logs if row.log_type == "OUT"]
-	in_time = ins[0].time if ins else None
-	out_time = outs[-1].time if outs else None
-	hours = flt(time_diff_in_hours(in_time, out_time), 2) if in_time and out_time else 0.0
-	return in_time, out_time, hours
+PAID_LUNCH_HOURS = 1.0
 
 
-def sync_attendance_from_checkin(checkin) -> str | None:
-	"""Create or update today's attendance when an agent punches, then recalc pay."""
-	if not checkin or not checkin.employee or not checkin.time:
+def _log_type(log) -> str:
+	value = getattr(log, "log_type", None) if not isinstance(log, dict) else log.get("log_type")
+	return (value or "IN").upper()
+
+
+def _log_time(log):
+	return getattr(log, "time", None) if not isinstance(log, dict) else log.get("time")
+
+
+def _log_name(log) -> str | None:
+	return getattr(log, "name", None) if not isinstance(log, dict) else log.get("name")
+
+
+def _log_shift(log) -> str | None:
+	return getattr(log, "shift", None) if not isinstance(log, dict) else log.get("shift")
+
+
+def _as_datetime(value) -> datetime | None:
+	"""Normalize clock values from MariaDB/Frappe (datetime, time, timedelta, or string)."""
+	if value is None or value == "":
 		return None
-	if frappe.flags.in_daily_pay_sync:
-		return getattr(checkin, "attendance", None)
+	if isinstance(value, datetime):
+		if value.tzinfo is not None:
+			value = value.replace(tzinfo=None)
+		return value.replace(microsecond=0)
+	if isinstance(value, timedelta):
+		return datetime.combine(date.today(), (datetime.min + value).time())
+	if isinstance(value, time):
+		return datetime.combine(date.today(), value)
+	if isinstance(value, date):
+		return datetime.combine(value, time())
+	parsed = get_datetime(value)
+	if parsed is None:
+		return None
+	if isinstance(parsed, timedelta):
+		return datetime.combine(date.today(), (datetime.min + parsed).time())
+	if isinstance(parsed, datetime):
+		if parsed.tzinfo is not None:
+			parsed = parsed.replace(tzinfo=None)
+		return parsed.replace(microsecond=0)
+	return None
 
-	day = getdate(checkin.time)
-	existing = checkin.attendance or frappe.db.get_value(
-		"Attendance",
-		{"employee": checkin.employee, "attendance_date": day, "docstatus": ("<", 2)},
-		"name",
+
+def _hours_between(start, end) -> float:
+	"""Worked hours from an IN clock to an OUT clock (out - in). Overnight shifts wrap +1 day."""
+	start_dt = _as_datetime(start)
+	end_dt = _as_datetime(end)
+	if not start_dt or not end_dt:
+		return 0.0
+	if end_dt < start_dt:
+		end_dt += timedelta(days=1)
+	hours = (end_dt - start_dt).total_seconds() / 3600.0
+	return flt(hours, 2) if hours > 0 else 0.0
+
+
+def ensure_working_hours_from_times(doc) -> float:
+	"""Fill working_hours from in/out when it was left at 0."""
+	if (getattr(doc, "status", None) or "") in ("Absent", "On Leave"):
+		return flt(getattr(doc, "working_hours", 0))
+	hours = flt(getattr(doc, "working_hours", 0))
+	if hours:
+		return hours
+	hours = _hours_between(getattr(doc, "in_time", None), getattr(doc, "out_time", None))
+	if hours:
+		doc.working_hours = hours
+	return hours
+
+
+def pair_checkin_logs(logs: list) -> dict:
+	"""Pair consecutive IN/OUT punches and add 1h lunch when they clocked out and back in.
+
+	Returns:
+	  pairs: list of {in_time, out_time, hours, in_log, out_log, open}
+	  lunch_hours: 1.0 when a completed pair is followed by a later IN, else 0
+	  in_time / out_time: first IN and last OUT (or None while still clocked in)
+	  pair_hours: sum of completed pair durations
+	  working_hours: pair_hours + lunch_hours
+	"""
+	ordered = sorted(
+		[log for log in (logs or []) if _log_time(log)],
+		key=lambda row: (_as_datetime(_log_time(row)) or datetime.min, _log_name(row) or ""),
 	)
-	logs = frappe.get_all(
+	pairs: list[dict] = []
+	pending_in = None
+
+	for log in ordered:
+		log_type = _log_type(log)
+		when = _log_time(log)
+		if log_type == "IN":
+			if pending_in is None:
+				pending_in = log
+			# Extra IN without OUT is ignored; keep earliest open IN.
+			continue
+		if log_type == "OUT" and pending_in is not None:
+			in_when = _log_time(pending_in)
+			hours = _hours_between(in_when, when)
+			pairs.append(
+				{
+					"in_time": in_when,
+					"out_time": when,
+					"hours": hours,
+					"in_log": _log_name(pending_in),
+					"out_log": _log_name(log),
+					"open": False,
+				}
+			)
+			pending_in = None
+
+	if pending_in is not None:
+		pairs.append(
+			{
+				"in_time": _log_time(pending_in),
+				"out_time": None,
+				"hours": 0.0,
+				"in_log": _log_name(pending_in),
+				"out_log": None,
+				"open": True,
+			}
+		)
+
+	completed = [pair for pair in pairs if not pair["open"]]
+	# Lunch: at least one completed pair AND a later IN (they left and returned).
+	has_return_in = any(pair["open"] for pair in pairs) or len(completed) >= 2
+	lunch_hours = PAID_LUNCH_HOURS if (completed and has_return_in) else 0.0
+	pair_hours = flt(sum(flt(pair["hours"]) for pair in completed), 2)
+	working_hours = flt(pair_hours + lunch_hours, 2)
+
+	ins = [row for row in ordered if _log_type(row) == "IN" and _log_time(row)]
+	outs = [row for row in ordered if _log_type(row) == "OUT" and _log_time(row)]
+	in_time = _log_time(ins[0]) if ins else None
+	# Keep out_time blank while still clocked in (open trailing IN).
+	out_time = None if any(pair["open"] for pair in pairs) else (_log_time(outs[-1]) if outs else None)
+
+	return {
+		"pairs": pairs,
+		"lunch_hours": flt(lunch_hours, 2),
+		"in_time": in_time,
+		"out_time": out_time,
+		"pair_hours": pair_hours,
+		"working_hours": working_hours,
+	}
+
+
+def _hours_from_logs(logs: list[dict]) -> tuple:
+	"""Compatibility wrapper: first IN, last OUT (blank if open), pair-sum + lunch hours."""
+	result = pair_checkin_logs(logs)
+	return result["in_time"], result["out_time"], result["working_hours"]
+
+
+def get_day_checkins(employee: str, day) -> list[dict]:
+	day = getdate(day)
+	return frappe.get_all(
 		"Employee Checkin",
-		filters={"employee": checkin.employee, "time": ["between", [f"{day} 00:00:00", f"{day} 23:59:59"]]},
-		fields=["log_type", "time", "shift"],
+		filters={"employee": employee, "time": ["between", [f"{day} 00:00:00", f"{day} 23:59:59"]]},
+		fields=["name", "log_type", "time", "shift", "attendance"],
 		order_by="time asc",
 	)
-	in_time, out_time, hours = _hours_from_logs(logs)
-	shift = checkin.shift or (logs[0].shift if logs else None)
+
+
+def resync_attendance_from_day_logs(employee: str, day, attendance_name: str | None = None) -> str | None:
+	"""Recompute Attendance times/hours from the day's checkins (pair sum + lunch)."""
+	day = getdate(day)
+	logs = get_day_checkins(employee, day)
+	result = pair_checkin_logs(logs)
+	existing = attendance_name or frappe.db.get_value(
+		"Attendance",
+		{"employee": employee, "attendance_date": day, "docstatus": ("<", 2)},
+		"name",
+	)
+	shift = next((_log_shift(log) for log in logs if _log_shift(log)), None)
 
 	frappe.flags.in_daily_pay_sync = True
 	try:
+		if not logs:
+			if existing:
+				doc = frappe.get_doc("Attendance", existing)
+				if doc.docstatus == 1:
+					doc.cancel()
+				elif doc.docstatus == 0:
+					doc.delete()
+			return None
+
 		if existing:
 			doc = frappe.get_doc("Attendance", existing)
 			if doc.docstatus == 2:
 				return existing
 			updates = {
-				"in_time": in_time,
-				"out_time": out_time,
-				"working_hours": hours or doc.working_hours,
+				"in_time": result["in_time"],
+				"out_time": result["out_time"],
+				"working_hours": result["working_hours"],
+				"status": "Present" if doc.status not in ("On Leave", "Half Day") else doc.status,
 			}
 			if shift and not doc.shift:
 				updates["shift"] = shift
@@ -335,34 +707,52 @@ def sync_attendance_from_checkin(checkin) -> str | None:
 			else:
 				doc.update(updates)
 				doc.save(ignore_permissions=True)
-			if not checkin.attendance:
-				frappe.db.set_value("Employee Checkin", checkin.name, "attendance", existing, update_modified=False)
+			for log in logs:
+				if not log.get("attendance"):
+					frappe.db.set_value(
+						"Employee Checkin", log.name, "attendance", existing, update_modified=False
+					)
 			return existing
 
 		doc = frappe.get_doc(
 			{
 				"doctype": "Attendance",
-				"employee": checkin.employee,
+				"employee": employee,
 				"attendance_date": day,
 				"status": "Present",
-				"in_time": in_time,
-				"out_time": out_time,
-				"working_hours": hours,
+				"in_time": result["in_time"],
+				"out_time": result["out_time"],
+				"working_hours": result["working_hours"],
 				"shift": shift,
 				"hours_paid": 0,
 			}
 		)
 		doc.insert(ignore_permissions=True)
-		frappe.db.set_value("Employee Checkin", checkin.name, "attendance", doc.name, update_modified=False)
+		for log in logs:
+			frappe.db.set_value("Employee Checkin", log.name, "attendance", doc.name, update_modified=False)
 		return doc.name
 	finally:
 		frappe.flags.in_daily_pay_sync = False
 
 
+def sync_attendance_from_checkin(checkin) -> str | None:
+	"""Create or update today's attendance when an agent punches, then recalc pay."""
+	if not checkin or not checkin.employee or not checkin.time:
+		return None
+	if frappe.flags.in_daily_pay_sync:
+		return getattr(checkin, "attendance", None)
+
+	day = getdate(checkin.time)
+	existing = checkin.attendance or frappe.db.get_value(
+		"Attendance",
+		{"employee": checkin.employee, "attendance_date": day, "docstatus": ("<", 2)},
+		"name",
+	)
+	return resync_attendance_from_day_logs(checkin.employee, day, attendance_name=existing)
+
+
 def on_employee_checkin(doc, method=None):
 	if frappe.flags.in_test and not frappe.flags.get("apply_daily_pay"):
-		return
-	if cint(getattr(doc, "skip_auto_attendance", 0)):
 		return
 	try:
 		sync_attendance_from_checkin(doc)

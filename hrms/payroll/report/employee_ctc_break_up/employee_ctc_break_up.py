@@ -7,6 +7,7 @@ from frappe.utils import flt, get_link_to_form, has_common
 from frappe.utils.formatters import fmt_money
 from frappe.utils.jinja import render_template
 
+from hrms.payroll.auto_payroll import frequency_label
 from hrms.payroll.doctype.salary_structure.salary_structure import _make_salary_slip
 
 
@@ -52,7 +53,7 @@ class SalaryBreakupReport:
 	def validate_ctc(self):
 		if not self.ctc:
 			frappe.throw(
-				_("Please set cost to company(CTC) for employee {0} in the {1}").format(
+				_("Please set Agent Hourly for employee {0} in the {1}").format(
 					frappe.bold(self.employee),
 					get_link_to_form(
 						"Salary Structure Assignment",
@@ -60,7 +61,7 @@ class SalaryBreakupReport:
 						"Salary Structure Assignment",
 					),
 				),
-				title=_("CTC Missing for Employee"),
+				title=_("Agent Hourly Missing for Employee"),
 			)
 
 	def get_data(self):
@@ -264,7 +265,7 @@ class SalaryBreakupReport:
 				"fixed": 1,
 			},
 			{
-				"label": _(self.payroll_frequency),
+				"label": _(frequency_label(self.payroll_frequency) or self.payroll_frequency),
 				"fieldname": "per_cycle",
 				"fieldtype": "Currency",
 				"width": 250,
@@ -280,7 +281,7 @@ class SalaryBreakupReport:
 				"fixed": 1,
 			},
 			{
-				"label": _("Percent of CTC (%)"),
+				"label": _("Percent of Agent Hourly (%)"),
 				"fieldname": "percent_of_ctc",
 				"fieldtype": "Percent",
 				"width": 200,
@@ -340,7 +341,7 @@ def execute(filters: dict | None = None):
 	)
 	if missing_filter:
 		frappe.throw(
-			_("Please set {0} to get CTC report").format(frappe.bold(missing_filter)),
+			_("Please set {0} to get Agent Hourly report").format(frappe.bold(missing_filter)),
 			title=_("Missing value for filters"),
 		)
 
@@ -363,7 +364,7 @@ def validate_employee_access(employee: str):
 
 	if not can_view_any_employee and not is_own_record:
 		frappe.throw(
-			_("You are not permitted to access the CTC report of another employee."),
+			_("You are not permitted to access the Agent Hourly report of another employee."),
 			frappe.PermissionError,
 			title=_("Not Permitted"),
 		)

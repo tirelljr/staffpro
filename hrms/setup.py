@@ -9,6 +9,18 @@ from frappe.permissions import add_permission, update_permission_property
 
 from hrms.overrides.company import delete_company_fixtures
 
+HIDDEN_EMPLOYEE_FIELDS = (
+	"salutation",
+	"prefered_contact_email",
+	"unsubscribed",
+	"attendance_device_id",
+	"provident_fund_account",
+	"employee_advance_account",
+	"health_insurance_section",
+	"health_insurance_provider",
+	"health_insurance_no",
+)
+
 
 def after_install():
 	create_custom_fields(get_custom_fields(), ignore_validate=True)
@@ -61,6 +73,14 @@ def get_regional_custom_fields():
 
 
 def get_customizations():
+	from hrms.hr.bpo_employee_labels import EMPLOYEE_FIELD_LABELS, OTHER_DOCTYPE_FIELD_LABELS
+	from hrms.payroll.bpo_sales_invoice import (
+		HIDDEN_SALES_INVOICE_FIELDS,
+		HIDDEN_SALES_INVOICE_ITEM_FIELDS,
+		SALES_INVOICE_ITEM_LABELS,
+		SALES_INVOICE_LABELS,
+	)
+
 	field_sources = [get_custom_fields(), *get_regional_custom_fields()]
 	if "lending" in frappe.get_installed_apps():
 		field_sources.append(get_salary_slip_loan_fields())
@@ -77,6 +97,48 @@ def get_customizations():
 		"Property Setter": [
 			{"doc_type": "Salary Slip", "field_name": "rounded_total", "property": "hidden"},
 			{"doc_type": "Salary Slip", "field_name": "rounded_total", "property": "print_hide"},
+			{"doc_type": "Salary Slip", "field_name": "total_in_words", "property": "hidden"},
+			{"doc_type": "Salary Slip", "field_name": "total_in_words", "property": "print_hide"},
+			{"doc_type": "Salary Slip", "field_name": "base_total_in_words", "property": "hidden"},
+			{"doc_type": "Salary Slip", "field_name": "base_total_in_words", "property": "print_hide"},
+			{"doc_type": "Salary Slip", "field_name": "section_break_55", "property": "hidden"},
+			{"doc_type": "Salary Slip", "field_name": "section_break_55", "property": "print_hide"},
+			{"doc_type": "Salary Slip", "field_name": "column_break_69", "property": "hidden"},
+			{"doc_type": "Salary Slip", "field_name": "column_break_69", "property": "print_hide"},
+			{"doc_type": "Salary Slip", "field_name": "year_to_date", "property": "description"},
+			{"doc_type": "Salary Slip", "field_name": "month_to_date", "property": "description"},
+			{"doc_type": "Employee", "property": "default_view"},
+			{"doc_type": "System Settings", "field_name": "default_app", "property": "hidden"},
+			{"doc_type": "System Settings", "field_name": "app_tab", "property": "hidden"},
+			*[
+				{"doc_type": "Employee", "field_name": fieldname, "property": "hidden"}
+				for fieldname in HIDDEN_EMPLOYEE_FIELDS
+			],
+			*[
+				{"doc_type": "Sales Invoice", "field_name": fieldname, "property": "hidden"}
+				for fieldname in HIDDEN_SALES_INVOICE_FIELDS
+			],
+			*[
+				{"doc_type": "Sales Invoice", "field_name": fieldname, "property": "label"}
+				for fieldname in SALES_INVOICE_LABELS
+			],
+			*[
+				{"doc_type": "Sales Invoice Item", "field_name": fieldname, "property": "hidden"}
+				for fieldname in HIDDEN_SALES_INVOICE_ITEM_FIELDS
+			],
+			*[
+				{"doc_type": "Sales Invoice Item", "field_name": fieldname, "property": "label"}
+				for fieldname in SALES_INVOICE_ITEM_LABELS
+			],
+			*[
+				{"doc_type": "Employee", "field_name": fieldname, "property": "label"}
+				for fieldname in EMPLOYEE_FIELD_LABELS
+			],
+			*[
+				{"doc_type": doctype, "field_name": fieldname, "property": "label"}
+				for doctype, labels in OTHER_DOCTYPE_FIELD_LABELS.items()
+				for fieldname in labels
+			],
 		],
 		"Custom DocPerm": [
 			{"parent": doctype, "role": role}
@@ -149,6 +211,7 @@ def get_custom_fields():
 				"depends_on": "eval:!doc.__islocal",
 				"fieldname": "default_payroll_payable_account",
 				"fieldtype": "Link",
+				"hidden": 1,
 				"ignore_user_permissions": 1,
 				"label": _("Default Payroll Payable Account"),
 				"no_copy": 1,
@@ -270,12 +333,14 @@ def get_custom_fields():
 				"collapsible": 1,
 				"fieldname": "health_insurance_section",
 				"fieldtype": "Section Break",
+				"hidden": 1,
 				"label": _("Health Insurance"),
 				"insert_after": "health_details",
 			},
 			{
 				"fieldname": "health_insurance_provider",
 				"fieldtype": "Link",
+				"hidden": 1,
 				"label": _("Health Insurance Provider"),
 				"options": "Employee Health Insurance",
 				"insert_after": "health_insurance_section",
@@ -284,6 +349,7 @@ def get_custom_fields():
 				"depends_on": "eval:doc.health_insurance_provider",
 				"fieldname": "health_insurance_no",
 				"fieldtype": "Data",
+				"hidden": 1,
 				"label": _("Health Insurance No"),
 				"insert_after": "health_insurance_provider",
 			},
@@ -325,6 +391,7 @@ def get_custom_fields():
 			{
 				"fieldname": "employee_advance_account",
 				"fieldtype": "Link",
+				"hidden": 1,
 				"label": _("Employee Advance Account"),
 				"options": "Account",
 				"insert_after": "salary_mode",
@@ -342,6 +409,59 @@ def get_custom_fields():
 				"label": _("Payroll Cost Center"),
 				"options": "Cost Center",
 				"insert_after": "salary_cb",
+			},
+			{
+				"fieldname": "billing_section",
+				"fieldtype": "Section Break",
+				"label": _("Client Billing"),
+				"insert_after": "payroll_cost_center",
+			},
+			{
+				"fieldname": "bill_to_customer",
+				"fieldtype": "Link",
+				"label": _("Bill To Client"),
+				"options": "Customer",
+				"insert_after": "billing_section",
+			},
+			{
+				"default": "USD",
+				"fieldname": "billing_currency",
+				"fieldtype": "Link",
+				"hidden": 1,
+				"label": _("Billing Currency"),
+				"options": "Currency",
+				"insert_after": "bill_to_customer",
+				"read_only": 1,
+			},
+			{
+				"description": _(
+					"Hourly rate billed to the client in USD. This is not the agent's pay, which stays in salary currency (BZD)."
+				),
+				"fieldname": "billing_rate",
+				"fieldtype": "Currency",
+				"label": _("Billing Rate (Hourly)"),
+				"options": "billing_currency",
+				"insert_after": "billing_currency",
+			},
+		],
+		"Customer": [
+			{
+				"default": "USD",
+				"fieldname": "billing_currency",
+				"fieldtype": "Link",
+				"hidden": 1,
+				"label": _("Billing Currency"),
+				"options": "Currency",
+				"insert_after": "customer_type",
+				"read_only": 1,
+			},
+			{
+				"description": _("Default hourly rate billed to this client in USD."),
+				"fieldname": "default_billing_rate",
+				"fieldtype": "Currency",
+				"label": _("Default Billing Rate"),
+				"options": "billing_currency",
+				"insert_after": "billing_currency",
 			},
 		],
 		"Project": [
@@ -382,6 +502,33 @@ def get_custom_fields():
 				"fieldtype": "Check",
 				"label": _("HR"),
 				"insert_after": "buying",
+			},
+		],
+		"Holiday List": [
+			{
+				"fieldname": "holiday_pay_section",
+				"fieldtype": "Section Break",
+				"label": _("Holiday Pay"),
+				"insert_after": "weekly_off",
+			},
+			{
+				"fieldname": "pay_time_and_a_half",
+				"fieldtype": "Check",
+				"label": _("Pay Time and a Half"),
+				"insert_after": "holiday_pay_section",
+				"description": _("Public holidays only. Mutually exclusive with Double Time."),
+			},
+			{
+				"fieldname": "column_break_holiday_pay",
+				"fieldtype": "Column Break",
+				"insert_after": "pay_time_and_a_half",
+			},
+			{
+				"fieldname": "pay_double_time",
+				"fieldtype": "Check",
+				"label": _("Pay Double Time"),
+				"insert_after": "column_break_holiday_pay",
+				"description": _("Public holidays only. Mutually exclusive with Time and a Half."),
 			},
 		],
 	}
@@ -551,7 +698,9 @@ def setup_notifications():
 
 def update_hr_defaults():
 	hr_settings = frappe.get_doc("HR Settings")
-	hr_settings.emp_created_by = "Naming Series"
+	hr_settings.emp_created_by = "Full Name"
+	hr_settings.standard_working_hours = 40
+	hr_settings.send_birthday_reminders = 1
 	hr_settings.leave_approval_notification_template = _("Leave Approval Notification")
 	hr_settings.leave_status_notification_template = _("Leave Status Notification")
 

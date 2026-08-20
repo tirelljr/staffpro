@@ -16,6 +16,7 @@
   "posting_date",
   "currency",
   "status",
+  "billing_frequency",
   "agents_section",
   "agents",
   "totals_section",
@@ -87,11 +88,13 @@
    "reqd": 1
   },
   {
-   "fetch_from": "company.default_currency",
+   "default": "USD",
+   "description": "Clients are billed in USD. Agent payroll stays in the company salary currency (BZD).",
    "fieldname": "currency",
    "fieldtype": "Link",
    "label": "Currency",
    "options": "Currency",
+   "read_only": 1,
    "reqd": 1
   },
   {
@@ -103,6 +106,13 @@
    "label": "Status",
    "options": "Draft\nSubmitted\nCancelled",
    "read_only": 1
+  },
+  {
+   "fieldname": "billing_frequency",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Billing Frequency",
+   "options": "Weekly\nFortnightly\nMonthly"
   },
   {
    "fieldname": "agents_section",
@@ -148,7 +158,7 @@
   {
    "fieldname": "sales_invoice",
    "fieldtype": "Link",
-   "label": "Sales Invoice",
+   "label": "Posted Invoice",
    "no_copy": 1,
    "options": "Sales Invoice",
    "print_hide": 1,
@@ -166,7 +176,7 @@
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-08-17 08:00:00.000000",
+ "modified": "2026-08-20 22:30:00.000000",
  "modified_by": "Administrator",
  "module": "Payroll",
  "name": "Client Invoice",

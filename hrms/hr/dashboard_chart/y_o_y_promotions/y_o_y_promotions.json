@@ -1,6 +1,6 @@
 {
  "based_on": "promotion_date",
- "chart_name": "Y-O-Y Promotions",
+ "chart_name": "Promotions",
  "chart_type": "Count",
  "creation": "2022-08-21 13:34:12.830736",
  "docstatus": 0,

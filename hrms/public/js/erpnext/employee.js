@@ -241,7 +241,20 @@ frappe.ui.form.on("Employee", {
 				};
 			});
 		}
-		frm.set_df_property("holiday_list", "hidden", 1);
+		for (const fieldname of [
+			"salutation",
+			"prefered_contact_email",
+			"unsubscribed",
+			"attendance_device_id",
+			"provident_fund_account",
+			"employee_advance_account",
+			"health_insurance_section",
+			"health_insurance_provider",
+			"health_insurance_no",
+			"holiday_list",
+		]) {
+			frm.set_df_property(fieldname, "hidden", 1);
+		}
 
 		// hide naming series field based on hr settings
 		frappe.db.get_single_value("HR Settings", "emp_created_by").then((value) => {
@@ -249,6 +262,12 @@ frappe.ui.form.on("Employee", {
 		});
 
 		frm.trigger("add_assignment_actions");
+		setup_employee_form_chrome(frm);
+		setTimeout(() => setup_employee_form_chrome(frm), 200);
+		setTimeout(() => setup_employee_form_chrome(frm), 800);
+	},
+	timeline_refresh: function (frm) {
+		setup_employee_form_chrome(frm);
 	},
 
 	add_assignment_actions: async function (frm) {
@@ -279,3 +298,51 @@ frappe.ui.form.on("Employee", {
 		});
 	},
 });
+
+function setup_employee_form_chrome(frm) {
+	const $page = frm.page?.wrapper || frm.$wrapper;
+	if (!$page?.length) {
+		return;
+	}
+
+	$page.find(".form-sidebar .modified-by, .form-sidebar .created-by").each(function () {
+		$(this).closest(".sidebar-section").hide();
+	});
+
+	const $after = $page.find(".after-save");
+	if (!$after.length) {
+		return;
+	}
+
+	replace_employee_own_text($after, [__("Comments"), "Comments"], __("Collab"));
+	$after.find(".timeline-item.activity-title h4, .activity-title h4").text(__("Audit Logs"));
+	replace_employee_own_text($after, [__("Activity"), "Activity"], __("Audit Logs"));
+
+	$after.find("button.action-btn, .action-btn").each(function () {
+		const label = ($(this).text() || "").replace(/\s+/g, " ").trim();
+		if (label.includes(__("New Email")) || label.includes("New Email")) {
+			$(this).closest(".timeline-actions").length
+				? $(this).closest(".timeline-actions").hide()
+				: $(this).hide();
+		}
+	});
+}
+
+function replace_employee_own_text($root, from_labels, to_label) {
+	const labels = new Set(from_labels.filter(Boolean));
+	$root.find("h4, h5, span, div, label").each(function () {
+		const own = Array.from(this.childNodes)
+			.filter((node) => node.nodeType === Node.TEXT_NODE)
+			.map((node) => (node.textContent || "").trim())
+			.filter(Boolean)
+			.join(" ");
+		if (!labels.has(own)) {
+			return;
+		}
+		Array.from(this.childNodes).forEach((node) => {
+			if (node.nodeType === Node.TEXT_NODE && labels.has((node.textContent || "").trim())) {
+				node.textContent = to_label;
+			}
+		});
+	});
+}

@@ -43,6 +43,9 @@ frappe.ui.form.on("Salary Structure", {
 			};
 		});
 		frm.trigger("set_earning_deduction_component");
+		if (hrms.relabel_payroll_frequency) {
+			hrms.relabel_payroll_frequency(frm);
+		}
 	},
 
 	mode_of_payment: function (frm) {
@@ -177,6 +180,9 @@ frappe.ui.form.on("Salary Structure", {
 			frm.fields_dict.deductions.grid.update_docfield_property(field, "read_only", 1);
 		});
 		frm.trigger("set_earning_deduction_component");
+		if (hrms.relabel_payroll_frequency) {
+			hrms.relabel_payroll_frequency(frm);
+		}
 	},
 
 	salary_slip_based_on_timesheet: function (frm) {

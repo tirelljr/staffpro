@@ -44,3 +44,26 @@ body.staff-pro-alive .page-container[data-page-route="in-out-today"] .page-head 
 .sp-inout-page .sp-inout-dash__list.is-loading {
 	min-height: 160px;
 }
+
+.sp-inout-page .sp-clock-btn {
+	height: 32px;
+	padding: 0 16px;
+	border: 0;
+	border-radius: 4px;
+	background: #f2ae5d;
+	color: #fff;
+	font-family: inherit;
+	font-size: 13px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	line-height: 1;
+	text-transform: uppercase;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.sp-inout-page .sp-clock-btn:hover,
+.sp-inout-page .sp-clock-btn:focus {
+	background: #e9a04f;
+	color: #fff;
+}

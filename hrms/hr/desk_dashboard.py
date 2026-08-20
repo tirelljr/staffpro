@@ -128,14 +128,18 @@ def _get_payroll_rows(company, start_date, end_date):
 		salary_slip.name,
 		salary_slip.employee,
 		salary_slip.employee_name,
+		salary_slip.start_date,
 		salary_slip.end_date,
+		salary_slip.gross_pay,
 		salary_slip.net_pay,
 		salary_slip.currency,
+		salary_slip.payroll_frequency,
 		salary_slip.total_working_hours,
 		salary_slip.payment_days,
 		salary_slip.status,
 		salary_slip.docstatus,
 		salary_slip.journal_entry,
+		salary_slip.company,
 		employee.designation,
 		employee.department,
 		employee.image,
@@ -160,22 +164,27 @@ def _get_payroll_rows(company, start_date, end_date):
 
 	rows = []
 	seen_employees = set()
+	attendance_ss = _ss_from_attendance(company, start_date, end_date)
 
 	for slip in slips:
 		if slip.employee in seen_employees:
 			continue
 		seen_employees.add(slip.employee)
-		rows.append(_build_payroll_row(slip, start_date, end_date))
+		rows.append(_build_payroll_row(slip, start_date, end_date, attendance_ss))
 
 	if rows:
 		return rows
 
 	employees = _get_active_employees(company)
 	hours_by_employee = _attendance_hours_by_employee(company, start_date, end_date)
+	pay_by_employee = _attendance_pay_by_employee(company, start_date, end_date)
 	ss_by_employee = _ss_from_attendance(company, start_date, end_date)
 	currency = frappe.db.get_value("Company", company, "default_currency")
 
 	for emp in employees:
+		pay = pay_by_employee.get(emp.name) or {}
+		gross = pay.get("gross")
+		net = pay.get("net")
 		rows.append(
 			{
 				"employee": emp.name,
@@ -183,7 +192,8 @@ def _get_payroll_rows(company, start_date, end_date):
 				"subtitle": _employee_subtitle(emp),
 				"image": emp.image,
 				"hours_worked": flt(hours_by_employee.get(emp.name)),
-				"net_pay": None,
+				"gross_pay": gross,
+				"net_pay": net,
 				"ss_contribution": flt(ss_by_employee.get(emp.name)),
 				"currency": currency,
 				"pay_date": end_date,
@@ -198,7 +208,7 @@ def _get_payroll_rows(company, start_date, end_date):
 	return rows
 
 
-def _build_payroll_row(slip, start_date, end_date):
+def _build_payroll_row(slip, start_date, end_date, attendance_ss=None):
 	hours = flt(slip.total_working_hours)
 	if not hours and slip.payment_days:
 		hours = flt(slip.payment_days) * 8
@@ -209,14 +219,19 @@ def _build_payroll_row(slip, start_date, end_date):
 	if email:
 		subtitle = email
 
+	ss_amount = _ss_amount_for_slip(slip)
+	if not ss_amount and attendance_ss:
+		ss_amount = flt(attendance_ss.get(slip.employee))
+
 	return {
 		"employee": slip.employee,
 		"employee_name": slip.employee_name,
 		"subtitle": subtitle,
 		"image": slip.image,
 		"hours_worked": hours,
+		"gross_pay": flt(slip.gross_pay),
 		"net_pay": flt(slip.net_pay),
-		"ss_contribution": flt(slip.get("ss_employee_amount")),
+		"ss_contribution": ss_amount,
 		"currency": slip.currency,
 		"pay_date": slip.end_date or end_date,
 		"pay_date_label": formatdate(slip.end_date or end_date),
@@ -224,6 +239,51 @@ def _build_payroll_row(slip, start_date, end_date):
 		"status_label": status_label,
 		"salary_slip": slip.name,
 	}
+
+
+def _ss_amount_for_slip(slip) -> float:
+	amount = flt(slip.get("ss_employee_amount"))
+	if amount:
+		return amount
+
+	if slip.get("name") and frappe.db.table_exists("Salary Detail"):
+		deductions = frappe.get_all(
+			"Salary Detail",
+			filters={
+				"parent": slip.name,
+				"parenttype": "Salary Slip",
+				"parentfield": "deductions",
+				"salary_component": "Social Security",
+			},
+			pluck="amount",
+		)
+		amount = flt(sum(flt(value) for value in deductions), 2)
+		if amount:
+			return amount
+
+	gross = flt(slip.get("gross_pay") or slip.get("net_pay"))
+	if gross <= 0:
+		return 0.0
+
+	from hrms.payroll.social_security import calculate_contribution, get_active_contribution_table
+
+	table = get_active_contribution_table(slip.get("company"), slip.get("end_date") or slip.get("start_date"))
+	emp_fields = ["date_of_birth"]
+	if frappe.get_meta("Employee").has_field("receiving_ss_benefit"):
+		emp_fields.append("receiving_ss_benefit")
+	emp = frappe.db.get_value("Employee", slip.employee, emp_fields, as_dict=True) or {}
+	result = calculate_contribution(
+		gross,
+		slip.get("payroll_frequency") or "Monthly",
+		slip.get("start_date"),
+		slip.get("end_date"),
+		date_of_birth=emp.get("date_of_birth"),
+		receiving_ss_benefit=bool(emp.get("receiving_ss_benefit")),
+		bands=table.bands if table else None,
+		injury_only_employee_amount=flt(table.injury_only_employee_amount) if table else 0.0,
+		injury_only_employer_amount=flt(table.injury_only_employer_amount) if table else 2.60,
+	)
+	return flt(result.get("employee_amount"), 2)
 
 
 def _payroll_status(slip):
@@ -279,6 +339,36 @@ def _ss_from_attendance(company, start_date, end_date) -> dict:
 	return ss_by_employee
 
 
+def _attendance_pay_by_employee(company, start_date, end_date):
+	if not frappe.db.has_column("Attendance", "daily_pay"):
+		return {}
+
+	attendance = frappe.qb.DocType("Attendance")
+	select_fields = [attendance.employee, Sum(attendance.daily_pay).as_("gross")]
+	has_net = frappe.db.has_column("Attendance", "net_daily_pay")
+	if has_net:
+		select_fields.append(Sum(attendance.net_daily_pay).as_("net"))
+
+	query = (
+		frappe.qb.from_(attendance)
+		.select(*select_fields)
+		.where(attendance.company == company)
+		.where(attendance.docstatus < 2)
+		.where(attendance.attendance_date.between(start_date, end_date))
+		.groupby(attendance.employee)
+	)
+	rows = query.run(as_dict=True)
+
+	out = {}
+	for row in rows:
+		gross = flt(row.gross) or None
+		net = flt(row.net) if has_net and row.get("net") is not None else None
+		if gross is None and net is None:
+			continue
+		out[row.employee] = {"gross": gross, "net": net}
+	return out
+
+
 def _attendance_hours_by_employee(company, start_date, end_date):
 	attendance = frappe.qb.DocType("Attendance")
 	rows = (
@@ -308,7 +398,8 @@ def _collect_employee_events(employees, today):
 
 	for employee in employees:
 		if employee.date_of_birth:
-			event_date = _next_occurrence(employee.date_of_birth, today)
+			date_of_birth = getdate(employee.date_of_birth)
+			event_date = _next_occurrence(date_of_birth, today)
 			if event_date >= today:
 				events.append(
 					_build_event(
@@ -319,14 +410,15 @@ def _collect_employee_events(employees, today):
 				)
 
 		if employee.date_of_joining:
-			event_date = _next_occurrence(employee.date_of_joining, today)
-			if event_date >= today and event_date.year > employee.date_of_joining.year:
+			date_of_joining = getdate(employee.date_of_joining)
+			event_date = _next_occurrence(date_of_joining, today)
+			if event_date >= today and event_date.year > date_of_joining.year:
 				events.append(
 					_build_event(
 						employee,
 						event_type="anniversary",
 						event_date=event_date,
-						years_completed=event_date.year - employee.date_of_joining.year,
+						years_completed=event_date.year - date_of_joining.year,
 					)
 				)
 
@@ -373,6 +465,9 @@ def _build_event(employee, event_type, event_date, years_completed=None):
 	elif employee.department:
 		subtitle = employee.department
 
+	source_date = (
+		getdate(employee.date_of_joining) if event_type == "anniversary" else getdate(employee.date_of_birth)
+	)
 	event = {
 		"employee": employee.name,
 		"employee_name": employee.employee_name,
@@ -380,6 +475,7 @@ def _build_event(employee, event_type, event_date, years_completed=None):
 		"image": employee.image,
 		"event_type": event_type,
 		"event_date": event_date,
+		"source_date": source_date,
 		"day": event_date.day,
 		"month": event_date.strftime("%b"),
 	}

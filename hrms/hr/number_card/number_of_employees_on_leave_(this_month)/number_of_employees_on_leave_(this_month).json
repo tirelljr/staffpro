@@ -11,7 +11,7 @@
  "idx": 0,
  "is_public": 1,
  "is_standard": 1,
- "label": "Number of Employees on Leave (This Month)",
+ "label": "Agents on Time Off (This Month)",
  "modified": "2026-01-09 23:00:12.873808",
  "modified_by": "Administrator",
  "module": "HR",

@@ -1,14 +1,67 @@
 {
- "cards": [],
- "charts": [],
+ "cards": [
+  {
+   "card": "Total Employees"
+  },
+  {
+   "card": "Agents Present (Today)"
+  },
+  {
+   "card": "Hours Worked (This Week)"
+  },
+  {
+   "card": "Daily Pay (This Week)"
+  },
+  {
+   "card": "Total Outgoing Salary(Last month)"
+  }
+ ],
+ "charts": [
+  {
+   "chart": "Hours Worked",
+   "width": "Full"
+  },
+  {
+   "chart": "Floor Attendance",
+   "width": "Half"
+  },
+  {
+   "chart": "Shift Assignment Breakup",
+   "width": "Half"
+  },
+  {
+   "chart": "Daily Pay",
+   "width": "Half"
+  },
+  {
+   "chart": "Clock-ins",
+   "width": "Half"
+  },
+  {
+   "chart": "Outgoing Salary",
+   "width": "Half"
+  },
+  {
+   "chart": "Social Security Contributions",
+   "width": "Half"
+  },
+  {
+   "chart": "Designation Wise Employee Count",
+   "width": "Half"
+  },
+  {
+   "chart": "Hiring vs Attrition Count",
+   "width": "Half"
+  }
+ ],
  "creation": "2023-11-17 14:10:56.741833",
  "dashboard_name": "Human Resource",
  "docstatus": 0,
  "doctype": "Dashboard",
  "idx": 0,
- "is_default": 0,
+ "is_default": 1,
  "is_standard": 1,
- "modified": "2026-08-19 00:00:00.000000",
+ "modified": "2026-08-20 12:30:00.000000",
  "modified_by": "Administrator",
  "module": "HR",
  "name": "Human Resource",

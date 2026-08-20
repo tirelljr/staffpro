@@ -61,15 +61,16 @@ body.staff-pro-has-topbar .main-section > #body {
 }
 
 .staff-pro-topbar__center {
-	position: absolute;
-	left: 50%;
-	top: 50%;
-	transform: translate(-50%, -50%);
+	position: relative;
+	left: auto;
+	top: auto;
+	transform: none;
 	display: flex;
 	justify-content: center;
-	width: 28rem;
-	max-width: calc(100% - 22rem);
-	pointer-events: none;
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: visible;
+	pointer-events: auto;
 }
 
 .staff-pro-topbar__search {

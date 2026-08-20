@@ -8,6 +8,7 @@ from frappe.utils import add_days, flt, getdate
 from erpnext.setup.doctype.employee.test_employee import make_employee
 
 from hrms.patches.v16_0.add_invoicing_workspace import ensure_bpo_agent_hours_item
+from hrms.payroll.doctype.client_invoice.client_invoice import CLIENT_BILLING_CURRENCY
 from hrms.setup import get_custom_fields
 from hrms.tests.utils import HRMSTestSuite
 
@@ -49,14 +50,13 @@ class TestClientInvoice(HRMSTestSuite):
 
 	def _make_agent(self, email: str, rate: float) -> str:
 		employee = make_employee(email, company="_Test Company")
-		frappe.db.set_value(
-			"Employee",
-			employee,
-			{
-				"bill_to_customer": self.customer,
-				"billing_rate": rate,
-			},
-		)
+		values = {
+			"bill_to_customer": self.customer,
+			"billing_rate": rate,
+		}
+		if frappe.get_meta("Employee").has_field("billing_currency"):
+			values["billing_currency"] = CLIENT_BILLING_CURRENCY
+		frappe.db.set_value("Employee", employee, values)
 		return employee
 
 	def _mark_attendance(self, employee: str, date, status: str, working_hours: float | None = None):
@@ -98,13 +98,13 @@ class TestClientInvoice(HRMSTestSuite):
 				"from_date": self.from_date,
 				"to_date": self.to_date,
 				"posting_date": self.to_date,
-				"currency": frappe.db.get_value("Company", "_Test Company", "default_currency") or "INR",
 			}
 		)
 		invoice.insert()
 		invoice.get_agents()
 		invoice.save()
 
+		self.assertEqual(invoice.currency, CLIENT_BILLING_CURRENCY)
 		self.assertEqual(len(invoice.agents), 2)
 
 		by_employee = {row.employee: row for row in invoice.agents}
@@ -128,6 +128,7 @@ class TestClientInvoice(HRMSTestSuite):
 		si = frappe.get_doc("Sales Invoice", invoice.sales_invoice)
 		self.assertEqual(si.docstatus, 1)
 		self.assertEqual(si.customer, self.customer)
+		self.assertEqual(si.currency, CLIENT_BILLING_CURRENCY)
 		self.assertEqual(len(si.items), 2)
 		self.assertAlmostEqual(flt(si.grand_total), 525.0)
 
@@ -137,3 +138,32 @@ class TestClientInvoice(HRMSTestSuite):
 		self.assertEqual(invoice.status, "Cancelled")
 		si.reload()
 		self.assertEqual(si.docstatus, 2)
+
+	def test_adding_agent_fills_hours_rate_and_usd_amount(self):
+		agent = self._make_agent("test_client_invoice_manual@example.com", 20)
+		self._mark_attendance(agent, self.from_date, "Present", 6.5)
+
+		invoice = frappe.get_doc(
+			{
+				"doctype": "Client Invoice",
+				"customer": self.customer,
+				"company": "_Test Company",
+				"from_date": self.from_date,
+				"to_date": self.to_date,
+				"posting_date": self.to_date,
+				"agents": [{"employee": agent}],
+			}
+		)
+		invoice.insert()
+
+		self.assertEqual(invoice.currency, CLIENT_BILLING_CURRENCY)
+		self.assertEqual(len(invoice.agents), 1)
+		self.assertAlmostEqual(flt(invoice.agents[0].hours), 6.5)
+		self.assertAlmostEqual(flt(invoice.agents[0].billing_rate), 20.0)
+		self.assertAlmostEqual(flt(invoice.agents[0].amount), 130.0)
+		self.assertAlmostEqual(flt(invoice.total_hours), 6.5)
+		self.assertAlmostEqual(flt(invoice.total_amount), 130.0)
+
+		company_currency = frappe.db.get_value("Company", "_Test Company", "default_currency")
+		if company_currency and company_currency != CLIENT_BILLING_CURRENCY:
+			self.assertNotEqual(invoice.currency, company_currency)

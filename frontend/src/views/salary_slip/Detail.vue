@@ -81,7 +81,7 @@ formFields.reload()
 const tabs = [
 	{ name: "Details", lastField: "payment_days" },
 	{ name: "Earnings & Deductions", lastField: "base_total_deduction" },
-	{ name: "Net Pay Info", lastField: "base_total_in_words" },
+	{ name: "Net Pay Info", lastField: "base_month_to_date" },
 	{ name: "Income Tax Breakup", lastField: "total_income_tax" },
 	{ name: "Bank Details", lastField: "bank_account_no" },
 ]
@@ -109,18 +109,22 @@ watch(
 )
 
 function getFilteredFields(fields) {
-	const hasTimesheets = salarySlip.value?.timesheets?.length
-	if (hasTimesheets) return fields
-
 	const excludeFields = [
-		"timesheets_section",
-		"timesheets",
-		"total_working_hours",
-		"hour_rate",
-		"base_hour_rate",
 		"help_section",
 		"earning_deduction_sb",
+		"section_break_55",
+		"total_in_words",
+		"base_total_in_words",
 	]
+	if (!salarySlip.value?.timesheets?.length) {
+		excludeFields.push(
+			"timesheets_section",
+			"timesheets",
+			"total_working_hours",
+			"hour_rate",
+			"base_hour_rate",
+		)
+	}
 	return fields.filter((field) => !excludeFields.includes(field.fieldname))
 }
 

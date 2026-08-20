@@ -300,3 +300,14 @@ def invalidate_cache(doc, method=None):
 	from hrms.payroll.doctype.salary_slip.salary_slip import HOLIDAYS_BETWEEN_DATES
 
 	frappe.cache().delete_value(HOLIDAYS_BETWEEN_DATES)
+
+
+def validate_holiday_list_pay_toggles(doc, method=None):
+	"""Time and a Half and Double Time cannot both be enabled."""
+	from frappe.utils import cint
+
+	tah = cint(getattr(doc, "pay_time_and_a_half", 0))
+	dt = cint(getattr(doc, "pay_double_time", 0))
+	if tah and dt:
+		frappe.throw(_("Pay Time and a Half and Pay Double Time cannot both be enabled."))
+

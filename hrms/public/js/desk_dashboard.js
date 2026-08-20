@@ -32,12 +32,70 @@ const DASH_PILL_CSS = `
 .sp-dash-pill__label{white-space:nowrap}
 `;
 
+const LIST_META_CSS = `
+.frappe-list .list-row-head > .level-right,
+.frappe-list .list-row > .level-right,
+.frappe-list .list-row-head .level-right,
+.frappe-list .list-row .level-right,
+.frappe-list .list-count,
+.frappe-list .list-liked-by-me,
+.frappe-list .list-row-activity,
+.frappe-list .list-row-likes,
+.result-list .list-row-head > .level-right,
+.result-list .list-row > .level-right,
+.result-list .list-count,
+.result-list .list-row-activity,
+.result-list .list-row-likes,
+.page-container[id^="page-List/"] .list-row-head > .level-right,
+.page-container[id^="page-List/"] .list-row > .level-right {
+	display:none!important;
+	width:0!important;
+	min-width:0!important;
+	max-width:0!important;
+	padding:0!important;
+	margin:0!important;
+	overflow:hidden!important;
+	visibility:hidden!important;
+	pointer-events:none!important;
+	border:0!important;
+	flex:0 0 0!important;
+}
+`;
+
 function inject_dash_css() {
-	if (document.getElementById("staff-pro-dash-css")) return;
-	const style = document.createElement("style");
-	style.id = "staff-pro-dash-css";
-	style.textContent = DASH_PILL_CSS;
-	document.head.appendChild(style);
+	if (!document.getElementById("staff-pro-dash-css")) {
+		const style = document.createElement("style");
+		style.id = "staff-pro-dash-css";
+		style.textContent = DASH_PILL_CSS;
+		document.head.appendChild(style);
+	}
+	if (!document.getElementById("staff-pro-list-meta-css")) {
+		const style = document.createElement("style");
+		style.id = "staff-pro-list-meta-css";
+		style.textContent = LIST_META_CSS;
+		document.head.appendChild(style);
+	}
+}
+
+function patch_list_view_meta() {
+	const proto = window.frappe?.views?.ListView?.prototype;
+	if (!proto || proto._staff_pro_hide_list_meta) return;
+	proto._staff_pro_hide_list_meta = true;
+
+	proto.get_meta_html = function () {
+		return "";
+	};
+
+	if (typeof proto.render_count === "function") {
+		proto.render_count = function () {};
+	}
+
+	if (typeof proto.get_header_html_skeleton === "function") {
+		const original = proto.get_header_html_skeleton;
+		proto.get_header_html_skeleton = function (left = "", _right = "") {
+			return original.call(this, left, "");
+		};
+	}
 }
 
 const HOURS_SORT_COLUMNS = [
@@ -46,9 +104,11 @@ const HOURS_SORT_COLUMNS = [
 	["in_time", "In"],
 	["out_time", "Out"],
 	["working_hours", "Hours"],
-	["daily_pay", "Pay"],
 	["status", "Status"],
 	["shift", "Shift"],
+	["daily_pay", "Gross"],
+	["week_ss", "SS"],
+	["net_daily_pay", "Net"],
 ];
 const HOURS_DEFAULT_SORT = { field: "attendance_date", order: "desc" };
 
@@ -73,7 +133,7 @@ const DASHBOARDS = {
 		pills: [
 			{ label: __("Add Agent"), icon: "userPlus", hue: "#11A5DD", doctype: "Employee" },
 			{ label: __("Import Agents"), icon: "upload", hue: "#11A5DD", action: "import-employee" },
-			{ label: __("Agents"), icon: "users", hue: "#90BA93", route: ["List", "Employee"] },
+			{ label: __("Agents"), icon: "users", hue: "#90BA93", route: ["List", "Employee", "Image"] },
 			{ label: __("Who Is In"), icon: "clock", hue: "#11A5DD", route: ["in-out-today"] },
 			{ label: __("Team Structure"), icon: "org", hue: "#90BA93", route: ["organizational-chart"] },
 			{ label: __("New Hire Onboarding"), icon: "spark", hue: "#11A5DD", route: ["List", "Employee Onboarding"] },
@@ -89,7 +149,7 @@ const DASHBOARDS = {
 		create_doctype: "Employee",
 		pills: [
 			{ label: __("Add Agent"), icon: "userPlus", hue: "#11A5DD", doctype: "Employee" },
-			{ label: __("Agents"), icon: "users", hue: "#90BA93", route: ["List", "Employee"] },
+			{ label: __("Agents"), icon: "users", hue: "#90BA93", route: ["List", "Employee", "Image"] },
 			{ label: __("Headcount Analytics"), icon: "chart", hue: "#11A5DD", route: ["query-report", "Employee Analytics"] },
 		],
 	},
@@ -179,9 +239,15 @@ const LIST_EMPTY = {
 	},
 	"Salary Slip": {
 		title: __("No salary slips yet"),
-		text: __("Run payroll and slips will land in this list automatically."),
+		text: __("Payroll runs on the schedule set in Payroll Settings. Slips land here after each run."),
 		button: __("Open Payroll Entry"),
 		route: ["List", "Payroll Entry"],
+	},
+	"Payroll Entry": {
+		title: __("Payroll runs on a schedule"),
+		text: __("Entries are created automatically every 10 days, or however often you set in Payroll Settings. You can still add one by hand if you need to."),
+		button: __("Open Payroll Settings"),
+		route: ["Form", "Payroll Settings"],
 	},
 };
 
@@ -258,6 +324,32 @@ function open_hours_add_entry() {
 		return;
 	}
 	frappe.set_route("List", "Attendance");
+}
+
+function open_inout_clock_entry($widget) {
+	if (!hrms.time?.show_add_entry_dialog) {
+		frappe.set_route("List", "Attendance");
+		return;
+	}
+	const department = inout_department_value($widget);
+	const preset = department && department !== inout_none_department() ? department : "";
+	hrms.time.show_add_entry_dialog(
+		{
+			doctype: "Attendance",
+			refresh() {
+				load_inout($widget);
+				const $hours = $(".sp-dash-hours").first();
+				if ($hours.length) load_hours($hours);
+			},
+			filter_area: {
+				get() {
+					return preset ? [["Attendance", "department", "=", preset]] : [];
+				},
+			},
+			page: { wrapper: $widget, page_form: $widget.find(".sp-dash-panel__filters") },
+		},
+		{ department: preset },
+	);
 }
 
 function run_pill(pill) {
@@ -841,6 +933,8 @@ function inject_celebrations($root) {
 	if (
 		$existingHome.length &&
 		$existingHome.find(".sp-inout-dash__department").length &&
+		$existingHome.find(".sp-clock-btn").length &&
+		$existingHome.find(".sp-payroll__gross").length &&
 		$existingHome.find(".sp-payroll__ss").length
 	) {
 		return;
@@ -913,6 +1007,7 @@ function inject_celebrations($root) {
 							<span>${escape_html(__("Status"))}</span>
 							<span>${escape_html(__("Pay Date"))}</span>
 							<span>${escape_html(__("Hours"))}</span>
+							<span class="sp-payroll__gross">${escape_html(__("Gross Pay"))}</span>
 							<span class="sp-payroll__ss">${escape_html(__("SS"))}</span>
 							<span>${escape_html(__("Net Pay"))}</span>
 						</div>
@@ -933,6 +1028,7 @@ function inject_celebrations($root) {
 								options: [{ value: "", label: __("All Departments") }],
 							})}
 						</div>
+						<button type="button" class="sp-clock-btn">${escape_html(__("CLOCK"))}</button>
 						<div class="sp-dash-panel__filter">
 							${dash_select_html({
 								className: "sp-inout-dash__status",
@@ -982,6 +1078,7 @@ function inject_celebrations($root) {
 
 	const $inout = $home.find(".sp-dash-inout");
 	$inout.find(".sp-inout-dash__open").on("click", () => go(["in-out-today"]));
+	$inout.find(".sp-clock-btn").on("click", () => open_inout_clock_entry($inout));
 	$inout.find(".sp-inout-dash__department").on("change", function () {
 		render_inout_panel($inout);
 	});
@@ -1017,6 +1114,11 @@ function format_pay_amount(row) {
 	return format_payroll_money(row.net_pay, row.currency);
 }
 
+function format_gross_amount(row) {
+	if (row.gross_pay == null || row.gross_pay === "") return "—";
+	return format_payroll_money(row.gross_pay, row.currency);
+}
+
 function format_ss_amount(row) {
 	if (row.ss_contribution == null || row.ss_contribution === "") return "—";
 	return format_payroll_money(row.ss_contribution, row.currency);
@@ -1048,6 +1150,7 @@ function render_payroll_rows(rows) {
 				</span>
 				<span class="sp-payroll__date">${escape_html(row.pay_date_label || "")}</span>
 				<span class="sp-payroll__hours">${escape_html(format_hours(row.hours_worked))}</span>
+				<span class="sp-payroll__gross">${escape_html(format_gross_amount(row))}</span>
 				<span class="sp-payroll__ss">${escape_html(format_ss_amount(row))}</span>
 				<span class="sp-payroll__amount">${escape_html(format_pay_amount(row))}</span>
 			</button>
@@ -1231,8 +1334,11 @@ function render_inout_rows($widget) {
 				(row) => `
 			<button type="button" class="sp-inout-dash__row" data-employee="${escape_html(row.employee)}">
 				<span class="sp-inout-dash__agent">
-					<span class="sp-inout-dash__name">${escape_html(row.employee_name || row.employee || "")}</span>
-					${row.department ? `<span class="sp-inout-dash__dept">${escape_html(row.department)}</span>` : ""}
+					<span class="sp-inout-dash__avatar">${celebration_avatar(row)}</span>
+					<span class="sp-inout-dash__agent-meta">
+						<span class="sp-inout-dash__name">${escape_html(row.employee_name || row.employee || "")}</span>
+						${row.department ? `<span class="sp-inout-dash__dept">${escape_html(row.department)}</span>` : ""}
+					</span>
 				</span>
 				<span class="sp-inout-dash__status-pill ${inout_status_class(row)}">${escape_html(inout_status_label(row))}</span>
 				<span class="sp-inout-dash__time">${escape_html(row.time || "—")}</span>
@@ -1353,9 +1459,13 @@ function hours_sort_value(row, field) {
 		case "out_time":
 			return row.out_time || "";
 		case "working_hours":
-			return Number(row.working_hours || 0);
+			return row_working_hours(row);
 		case "daily_pay":
 			return Number(row.daily_pay || 0);
+		case "week_ss":
+			return Number(row.week_ss || 0);
+		case "net_daily_pay":
+			return Number(row.net_daily_pay || 0);
 		case "status":
 			return String(row.status || "").toLowerCase();
 		case "shift":
@@ -1492,6 +1602,11 @@ function format_hours_duration(value) {
 	return value == null || value === "" ? "" : String(value);
 }
 
+function row_working_hours(row) {
+	if (hrms.time?.hours_for_row) return hrms.time.hours_for_row(row);
+	return Number(row?.working_hours || 0);
+}
+
 function format_hours_money(value) {
 	return format_currency(Number(value || 0));
 }
@@ -1500,8 +1615,9 @@ function render_hours_totals_text(totals) {
 	const parts = [
 		__("Total Hours: {0}", [format_hours_duration(totals.total)]),
 		__("Paid Hours: {0}", [format_hours_duration(totals.paid)]),
-		__("Pay: {0}", [format_hours_money(totals.daily_pay)]),
+		__("Gross: {0}", [format_hours_money(totals.daily_pay)]),
 		__("SS: {0}", [format_hours_money(totals.ss_deduction)]),
+		__("Net: {0}", [format_hours_money(totals.net_daily_pay)]),
 	];
 	if (Number(totals.tax_deduction || 0) > 0) {
 		parts.push(__("Tax: {0}", [format_hours_money(totals.tax_deduction)]));
@@ -1528,36 +1644,33 @@ function render_hours_comments(comments) {
 }
 
 function render_hours_row(row) {
+	const kind = row.kind || "attendance";
+	const is_lunch = kind === "lunch";
+	const actions = is_lunch
+		? ""
+		: `<span class="sp-hours__row-actions">
+					<button type="button" class="sp-hours__link" data-act="edit">${escape_html(__("edit"))}</button>
+					<button type="button" class="sp-hours__link" data-act="del">${escape_html(__("del"))}</button>
+				</span>`;
 	return `
-		<div class="sp-hours__row" data-name="${escape_html(row.name)}">
+		<div class="sp-hours__row" data-name="${escape_html(row.name || "")}" data-kind="${escape_html(
+			kind,
+		)}" data-in-log="${escape_html(row.in_log || "")}" data-out-log="${escape_html(row.out_log || "")}">
 			<div class="sp-hours__row-main">
 				<span>${escape_html(row.employee_name || row.employee || "")}</span>
 				<span>${escape_html(hours_date_label(row.attendance_date))}</span>
 				<span>${escape_html(format_hours_clock(row.in_time))}</span>
 				<span>${escape_html(format_hours_clock(row.out_time))}</span>
-				<span>${escape_html(format_hours_duration(row.working_hours))}</span>
-				<span>${escape_html(format_hours_money(row.daily_pay))}</span>
+				<span>${escape_html(format_hours_duration(row_working_hours(row)))}</span>
 				<span>${escape_html(__(row.status || ""))}</span>
-				<span>${escape_html(row.shift || row.leave_type || "")}</span>
-				<span class="sp-hours__row-actions">
-					<button type="button" class="sp-hours__link" data-act="edit">${escape_html(__("edit"))}</button>
-					<button type="button" class="sp-hours__link" data-act="del">${escape_html(__("del"))}</button>
-				</span>
+				<span>${escape_html(row.shift || row.leave_type || row.job || "")}</span>
+				<span>${escape_html(format_hours_money(row.daily_pay))}</span>
+				<span class="sp-hours__ss"></span>
+				<span class="sp-hours__net">${escape_html(format_hours_money(row.net_daily_pay))}</span>
+				${actions || "<span class=\"sp-hours__row-actions\"></span>"}
 			</div>
 			${render_hours_comments(row.comments)}
 		</div>`;
-}
-
-function unique_week_ss(rows) {
-	const seen = new Set();
-	let total = 0;
-	(rows || []).forEach((row) => {
-		const key = `${row.employee || ""}|${row.week_start || ""}`;
-		if (!row.week_start || seen.has(key)) return;
-		seen.add(key);
-		total += Number(row.week_ss || 0);
-	});
-	return total;
 }
 
 function hours_week_label(start, end) {
@@ -1581,14 +1694,27 @@ function group_hours_by_week(rows) {
 				rows: [],
 				hours: 0,
 				pay: 0,
+				ss: 0,
+				tax: 0,
+				net: 0,
+				seen_employees: {},
 			};
 			weeks.push(index[key]);
 		}
 		const week = index[key];
 		week.rows.push(row);
-		week.hours += Number(row.working_hours || 0);
+		week.hours += row_working_hours(row);
 		week.pay += Number(row.daily_pay || 0);
+		const employee = row.employee || "";
+		if (employee && !week.seen_employees[employee]) {
+			week.seen_employees[employee] = true;
+			week.ss += Number(row.week_ss || 0);
+			week.tax += Number(row.week_tax || 0);
+		}
 		if (row.week_end) week.end = row.week_end;
+	});
+	weeks.forEach((week) => {
+		week.net = week.pay - week.ss - week.tax;
 	});
 	return weeks;
 }
@@ -1603,7 +1729,7 @@ function render_hours_date_groups(rows) {
 			groups.push(index[key]);
 		}
 		index[key].rows.push(row);
-		index[key].hours += Number(row.working_hours || 0);
+		index[key].hours += row_working_hours(row);
 	});
 	return groups
 		.map((group) => {
@@ -1621,21 +1747,20 @@ function render_hours_date_groups(rows) {
 }
 
 function render_hours_week_group(week, group_by_date) {
-	const ss = unique_week_ss(week.rows);
 	const inner = group_by_date
 		? render_hours_date_groups(week.rows)
 		: week.rows.map(render_hours_row).join("");
 	return `
-		<div class="sp-hours__group">
+		<div class="sp-hours__week">
 			<div class="sp-hours__group-head">
-				<span>${escape_html(hours_week_label(week.start, week.end))}</span>
-				<span>${escape_html(
-					__("{0}    Pay: {1}    SS: {2}", [
-						format_hours_duration(week.hours),
-						format_hours_money(week.pay),
-						format_hours_money(ss),
-					]),
-				)}</span>
+				<span class="sp-hours__group-label">${escape_html(hours_week_label(week.start, week.end))}</span>
+				<span>${escape_html(format_hours_duration(week.hours))}</span>
+				<span></span>
+				<span></span>
+				<span>${escape_html(format_hours_money(week.pay))}</span>
+				<span class="sp-hours__ss">${escape_html(format_hours_money(week.ss))}</span>
+				<span class="sp-hours__net">${escape_html(format_hours_money(week.net))}</span>
+				<span></span>
 			</div>
 			${inner}
 		</div>`;
@@ -1652,18 +1777,28 @@ function render_hours_rows(rows, group_by_date) {
 
 function bind_hours_row_actions($panel, $list) {
 	$list.find(".sp-hours__link").on("click", function () {
-		const name = $(this).closest(".sp-hours__row").data("name");
+		const $row = $(this).closest(".sp-hours__row");
+		const name = $row.attr("data-name");
+		const in_log = $row.attr("data-in-log") || null;
+		const out_log = $row.attr("data-out-log") || null;
+		const kind = $row.attr("data-kind");
 		const act = $(this).data("act");
+		if (kind === "lunch") {
+			return;
+		}
 		if (act === "edit") {
 			if (hrms.time?.show_edit_entry_dialog) {
-				hrms.time.show_edit_entry_dialog(hours_listview_stub($panel), name);
+				hrms.time.show_edit_entry_dialog(hours_listview_stub($panel), name, {
+					in_log,
+					out_log,
+				});
 			}
 			return;
 		}
 		frappe.confirm(__("Remove this hours entry?"), () => {
 			frappe.call({
 				method: "hrms.hr.doctype.attendance.attendance.cancel_hours_entry",
-				args: { name },
+				args: { name, in_log, out_log },
 				callback() {
 					load_hours($panel);
 				},
@@ -1719,7 +1854,7 @@ function inject_hours_board($root) {
 		return $(this).find(".number-widget-box").length;
 	}).first();
 	const $existing = $root.find(".sp-dash-hours");
-	if ($existing.length && $existing.data("sp-hours-select-v5")) {
+	if ($existing.length && $existing.data("sp-hours-select-v7")) {
 		if ($kpiGroup.length && !$kpiGroup.next().is(".sp-dash-hours")) {
 			$kpiGroup.after($existing);
 		}
@@ -1792,7 +1927,7 @@ function inject_hours_board($root) {
 	$panel.data("hours-presets", local_hours_presets());
 	$panel.data("hours-range", "today");
 	$panel.data("hours-sort", { ...HOURS_DEFAULT_SORT });
-	$panel.data("sp-hours-select-v5", true);
+	$panel.data("sp-hours-select-v7", true);
 
 	const reload = () => load_hours($panel);
 	const controls = {
@@ -2326,9 +2461,211 @@ function enhance_list_empty() {
 	});
 }
 
+const BPO_DASHBOARD_MENU = new Set([
+	"Human Resource",
+	"Data Analytics",
+	"SS and Taxes",
+	"Attendance",
+	"Payroll",
+	"Recruitment",
+]);
+
+const BPO_DASHBOARD_ORDER = [
+	"Human Resource",
+	"Attendance",
+	"Payroll",
+	"SS and Taxes",
+	"Recruitment",
+	"Data Analytics",
+];
+
+const BPO_DASHBOARD_LABELS = {
+	"Human Resource": "People",
+	"Attendance": "Time",
+	"Recruitment": "Talent",
+};
+
+const DASHBOARD_MENU_ACTIONS = new Set(["Edit", "New", "Refresh All"]);
+
+const HIDDEN_DASHBOARD_MENU = new Set([
+	"Stock",
+	"Buying",
+	"Selling",
+	"Project",
+	"Projects",
+	"CRM",
+	"Accounts",
+	"Accounting",
+	"Asset",
+	"Assets",
+	"Manufacturing",
+	"Payments",
+	"Quality",
+	"Support",
+	"Website",
+	"Home",
+	"Invoicing",
+	"Payables",
+	"Receivables",
+	"Financial Reports",
+	"Performance",
+	"Leaves",
+	"Expense Claims",
+	"Employee Lifecycle",
+	"All",
+]);
+
+function dashboard_menu_label(name) {
+	const mapped = BPO_DASHBOARD_LABELS[name] || name;
+	return typeof __ === "function" ? __(mapped) : mapped;
+}
+
+function is_dashboard_view_route() {
+	const route = frappe.get_route?.() || [];
+	return route[0] === "dashboard-view" || route[0] === "dashboard";
+}
+
+function is_allowed_dashboard_menu_label(label) {
+	const name = String(label || "").replace(/\s+/g, " ").trim();
+	if (!name) return false;
+	if (DASHBOARD_MENU_ACTIONS.has(name)) return true;
+	if (name === __("Edit") || name === __("New") || name === __("Refresh All")) return true;
+	if (BPO_DASHBOARD_MENU.has(name)) return true;
+	return Object.values(BPO_DASHBOARD_LABELS).some((display) => name === display || name === __(display));
+}
+
+function is_hidden_dashboard_menu_label(label) {
+	const name = String(label || "").replace(/\s+/g, " ").trim();
+	if (!name || is_allowed_dashboard_menu_label(name)) return false;
+	return HIDDEN_DASHBOARD_MENU.has(name);
+}
+
+function is_page_menu_parent(page, opts) {
+	if (!page?.menu || !opts?.parent) return false;
+	const parent = opts.parent;
+	const parentEl = parent.jquery ? parent.get(0) : parent;
+	const menuEl = page.menu.jquery ? page.menu.get(0) : page.menu;
+	return Boolean(parentEl && menuEl && parentEl === menuEl);
+}
+
+function staff_pro_dashboard_set_dropdown() {
+	this.page.clear_menu();
+
+	this.page.add_menu_item(__("Edit"), () => {
+		frappe.set_route("Form", "Dashboard", frappe.dashboard.dashboard_name);
+	});
+	this.page.add_menu_item(__("New"), () => {
+		frappe.new_doc("Dashboard");
+	});
+	this.page.add_menu_item(__("Refresh All"), () => {
+		this.chart_group && this.chart_group.widgets_list.forEach((chart) => chart.refresh());
+		this.number_card_group && this.number_card_group.widgets_list.forEach((card) => card.render_card());
+	});
+
+	const current = this.dashboard_name;
+	BPO_DASHBOARD_ORDER.filter((name) => name !== current).forEach((name) => {
+		this.page.add_menu_item(dashboard_menu_label(name), () => frappe.set_route("dashboard-view", name), 1);
+	});
+}
+
+function patch_page_menu_filter() {
+	const Page = frappe.ui && frappe.ui.Page;
+	if (!Page || Page.prototype._staff_pro_dash_menu) return;
+	Page.prototype._staff_pro_dash_menu = true;
+
+	const original = Page.prototype.add_dropdown_item;
+	Page.prototype.add_dropdown_item = function (opts) {
+		if (is_dashboard_view_route() && is_page_menu_parent(this, opts)) {
+			const label = String(opts?.label || "").trim();
+			if (!is_allowed_dashboard_menu_label(label)) {
+				return $();
+			}
+			const display = dashboard_menu_label(label);
+			if (display !== label) {
+				opts = Object.assign({}, opts, { label: display });
+			}
+		}
+		return original.call(this, opts);
+	};
+
+	if (typeof Page.prototype.build_dropdown_options === "function") {
+		const original_build = Page.prototype.build_dropdown_options;
+		Page.prototype.build_dropdown_options = function ($parent) {
+			const options = original_build.call(this, $parent);
+			if (!is_dashboard_view_route() || !$parent || !this.menu || !$parent.is(this.menu)) {
+				return options;
+			}
+			return filter_dashboard_menu_options(options);
+		};
+	}
+}
+
+function filter_dashboard_menu_options(options) {
+	if (!Array.isArray(options)) return options;
+	return options
+		.map((row) => {
+			if (row && Array.isArray(row.options)) {
+				const nested = filter_dashboard_menu_options(row.options);
+				return nested.length ? Object.assign({}, row, { options: nested }) : null;
+			}
+			const label = String(row?.label || "").trim();
+			if (!is_allowed_dashboard_menu_label(label)) return null;
+			const display = dashboard_menu_label(label);
+			return display === label ? row : Object.assign({}, row, { label: display });
+		})
+		.filter(Boolean);
+}
+
+function patch_live_dashboard_menu() {
+	const dash = frappe.dashboard;
+	if (!dash || typeof dash.set_dropdown !== "function") return;
+	if (dash._staff_pro_dropdown) return;
+
+	dash._staff_pro_dropdown = true;
+	dash.set_dropdown = staff_pro_dashboard_set_dropdown;
+	if (dash.dashboard_name) {
+		dash.set_dropdown();
+	}
+}
+
+function strip_hidden_dashboard_menu_items() {
+	if (!is_dashboard_view_route()) return;
+
+	const $store = frappe.dashboard?.page?.menu;
+	if ($store?.length) {
+		$store.find("li, a, button, .dropdown-item").each(function () {
+			const label = ($(this).text() || "").replace(/\s+/g, " ").trim();
+			if (is_hidden_dashboard_menu_label(label)) {
+				$(this).closest("li").addBack("li").first().remove();
+			}
+		});
+	}
+
+	document.querySelectorAll(".es-menu .es-menu__item").forEach((el) => {
+		const label = (
+			el.querySelector(".es-menu__label")?.textContent ||
+			el.textContent ||
+			""
+		)
+			.replace(/\s+/g, " ")
+			.trim();
+		if (is_hidden_dashboard_menu_label(label)) {
+			el.remove();
+		}
+	});
+}
+
+function install_dashboard_menu_filter() {
+	patch_page_menu_filter();
+	patch_live_dashboard_menu();
+	strip_hidden_dashboard_menu_items();
+}
+
 function enhance() {
 	inject_dash_css();
+	patch_list_view_meta();
 	document.body.classList.add("staff-pro-alive");
+	install_dashboard_menu_filter();
 	const route = frappe.get_route?.() || [];
 	const $root = page_root();
 

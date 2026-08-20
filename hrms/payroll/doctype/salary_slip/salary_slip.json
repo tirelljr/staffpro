@@ -2,6 +2,7 @@
  "actions": [],
  "allow_import": 1,
  "creation": "2013-01-10 16:34:15",
+ "default_print_format": "Salary Slip Standard",
  "doctype": "DocType",
  "document_type": "Setup",
  "engine": "InnoDB",
@@ -398,6 +399,7 @@
   {
    "fieldname": "gross_pay",
    "fieldtype": "Currency",
+   "in_list_view": 1,
    "label": "Gross Pay",
    "options": "currency",
    "read_only": 1
@@ -414,6 +416,7 @@
   {
    "fieldname": "net_pay",
    "fieldtype": "Currency",
+   "in_list_view": 1,
    "label": "Net Pay",
    "options": "currency",
    "read_only": 1
@@ -428,7 +431,9 @@
   },
   {
    "fieldname": "section_break_55",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "hidden": 1,
+   "print_hide": 1
   },
   {
    "fieldname": "amended_from",
@@ -485,8 +490,10 @@
   {
    "fieldname": "total_in_words",
    "fieldtype": "Data",
+   "hidden": 1,
    "label": "Total in words",
    "length": 240,
+   "print_hide": 1,
    "read_only": 1
   },
   {
@@ -542,16 +549,19 @@
   {
    "fieldname": "base_total_in_words",
    "fieldtype": "Data",
+   "hidden": 1,
    "label": "Total in words (Company Currency)",
    "length": 240,
+   "print_hide": 1,
    "read_only": 1
   },
   {
    "fieldname": "column_break_69",
-   "fieldtype": "Column Break"
+   "fieldtype": "Column Break",
+   "hidden": 1,
+   "print_hide": 1
   },
   {
-   "description": "Total salary booked for this employee from the beginning of the year (payroll period or fiscal year) up to the current salary slip's end date.",
    "fieldname": "year_to_date",
    "fieldtype": "Currency",
    "label": "Year To Date",
@@ -559,7 +569,6 @@
    "read_only": 1
   },
   {
-   "description": "Total salary booked for this employee from the beginning of the month up to the current salary slip's end date.",
    "fieldname": "month_to_date",
    "fieldtype": "Currency",
    "label": "Month To Date",
@@ -654,7 +663,7 @@
   {
    "fieldname": "ctc",
    "fieldtype": "Currency",
-   "label": "CTC",
+   "label": "Agent Hourly",
    "options": "currency",
    "read_only": 1
   },
@@ -830,7 +839,7 @@
  "idx": 9,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-09-19 21:25:42.584589",
+ "modified": "2026-08-20 08:50:00.000000",
  "modified_by": "Administrator",
  "module": "Payroll",
  "name": "Salary Slip",

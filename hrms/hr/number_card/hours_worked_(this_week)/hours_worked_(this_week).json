@@ -1,0 +1,23 @@
+{
+ "aggregate_function_based_on": "working_hours",
+ "color": "#0f766e",
+ "creation": "2026-08-20 12:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "document_type": "Attendance",
+ "dynamic_filters_json": "[[\"Attendance\",\"company\",\"=\",\"frappe.defaults.get_user_default(\\\"Company\\\")\"]]",
+ "filters_json": "[[\"Attendance\",\"docstatus\",\"=\",\"1\"],[\"Attendance\",\"status\",\"in\",[\"Present\",\"Half Day\",\"Work From Home\"]],[\"Attendance\",\"attendance_date\",\"Timespan\",\"this week\"]]",
+ "function": "Sum",
+ "idx": 0,
+ "is_public": 1,
+ "is_standard": 1,
+ "label": "Hours Worked (This Week)",
+ "modified": "2026-08-20 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HR",
+ "name": "Hours Worked (This Week)",
+ "owner": "Administrator",
+ "show_percentage_stats": 1,
+ "stats_time_interval": "Weekly",
+ "type": "Document Type"
+}

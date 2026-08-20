@@ -494,6 +494,122 @@
 	color: var(--sp-sidebar-muted);
 }
 
+/* Employee / Agents roster, Payroll Entry, and Client Invoice: hide extra page-head menu / view switcher */
+[id="page-List/Employee/List"] .menu-btn-group,
+[id="page-List/Employee/Image"] .menu-btn-group,
+[id^="page-List/Employee/"] .menu-btn-group,
+[id="page-List/Payroll Entry/List"] .menu-btn-group,
+[id^="page-List/Payroll Entry/"] .menu-btn-group,
+[id="page-List/Salary Structure Assignment/List"] .menu-btn-group,
+[id^="page-List/Salary Structure Assignment/"] .menu-btn-group,
+[id="page-List/Client Invoice/List"] .menu-btn-group,
+[id^="page-List/Client Invoice/"] .menu-btn-group,
+[id="page-List/Payroll Entry/List"] .view-switcher,
+[id="page-List/Payroll Entry/List"] .views-switcher,
+[id^="page-List/Payroll Entry/"] .view-switcher,
+[id^="page-List/Payroll Entry/"] .views-switcher,
+[id="page-List/Salary Structure Assignment/List"] .view-switcher,
+[id^="page-List/Salary Structure Assignment/"] .view-switcher,
+[id="page-List/Client Invoice/List"] .view-switcher,
+[id="page-List/Client Invoice/List"] .views-switcher,
+[id^="page-List/Client Invoice/"] .view-switcher,
+[id^="page-List/Client Invoice/"] .views-switcher {
+	display: none !important;
+}
+
+[id^="page-Payroll Entry"] [data-fieldname="deduct_social_security"] {
+	opacity: 0.65;
+	pointer-events: none;
+}
+
+[id^="page-Payroll Entry"] [data-fieldname="deduct_social_security"] input {
+	cursor: not-allowed;
+}
+
+[id^="page-List/Employee"] {
+	.image-view-container .image-view-item {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		overflow: visible;
+		border: none;
+		background: transparent;
+		box-shadow: none;
+	}
+
+	.image-view-container .image-view-item .image-view-header {
+		width: 180px;
+		border-radius: 50%;
+	}
+
+	.image-view-container .image-view-item .image-view-body,
+	.image-view-container .image-view-item .image-view-body > a,
+	.image-view-container .image-view-item .image-view-body .image-field {
+		display: block;
+		width: 180px;
+		height: 180px;
+		border-radius: 50%;
+		overflow: hidden;
+	}
+
+	.image-view-container .image-view-item .image-view-body .image-field {
+		background: var(--subtle-fg, #f4f5f7);
+		box-shadow: inset 0 0 0 1px var(--border-color, #ececec);
+	}
+
+	.image-view-container .image-view-item .image-view-body .image-field img {
+		width: 100%;
+		height: 100%;
+		min-width: 100%;
+		min-height: 100%;
+		object-fit: cover;
+		object-position: center top;
+		border-radius: 50%;
+	}
+
+	.image-view-container .image-view-item .image-view-body .image-field .placeholder-text,
+	.image-view-container .image-view-item .image-view-body .image-hover,
+	.image-view-container .image-view-item .image-view-body .image-overlay-wrapper,
+	.image-view-container .image-view-item .image-view-body .no-image {
+		border-radius: 50%;
+	}
+
+	.image-view-container .image-view-item .image-view-footer {
+		min-height: auto;
+		align-items: center;
+		flex-direction: column;
+		gap: 2px;
+		width: 100%;
+		padding-top: 10px;
+		border-top: none;
+		text-align: center;
+	}
+
+	.image-view-container .image-view-item .image-title {
+		font-weight: 600;
+		line-height: 1.3;
+		width: 100%;
+		text-align: center;
+	}
+
+	.staff-pro-employee-card__info {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		width: 100%;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		text-align: center;
+	}
+
+	.staff-pro-employee-card__meta {
+		font-size: 12px;
+		line-height: 1.3;
+		color: var(--text-muted, #6a6c6f);
+	}
+}
+
 /* Hide Frappe module onboarding (Getting Started / Accounting Onboarding) everywhere */
 .user-onboarding,
 .onb-panel,
@@ -514,5 +630,43 @@
 		background: transparent !important;
 		border-right-color: transparent !important;
 		pointer-events: none;
+	}
+}
+
+/* Form Assign / Attachments sidebar + toggle: only Employee and User profiles */
+body.staff-pro-hide-form-sidebar {
+	.layout-side-section.right,
+	.sidebar-toggle-btn {
+		display: none !important;
+	}
+
+	.layout-main.layout-two-column {
+		display: flex;
+	}
+
+	.layout-main-section-wrapper {
+		flex: 1 1 100% !important;
+		width: 100% !important;
+		max-width: 100% !important;
+	}
+}
+
+/* HR Settings: drop email composer from the audit trail */
+[id="page-HR Settings"] {
+	.timeline-actions,
+	.document-email-link-container {
+		display: none !important;
+	}
+}
+
+/* Employee: hide last-edited/created stats and New Email */
+[id="page-Employee"] {
+	.form-sidebar .modified-by,
+	.form-sidebar .created-by,
+	.form-sidebar .sidebar-section:has(.modified-by),
+	.form-sidebar .sidebar-section.text-muted.pt-3,
+	.timeline-actions,
+	.document-email-link-container {
+		display: none !important;
 	}
 }

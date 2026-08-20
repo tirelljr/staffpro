@@ -38,7 +38,7 @@ def get_columns(is_indian_company: bool) -> list[dict]:
 
 	if is_indian_company:
 		columns.append(
-			{"label": _("PAN Number"), "fieldname": "pan_number", "fieldtype": "Data", "width": 140}
+			{"label": _("Tax Number"), "fieldname": "pan_number", "fieldtype": "Data", "width": 140}
 		)
 
 	columns += [

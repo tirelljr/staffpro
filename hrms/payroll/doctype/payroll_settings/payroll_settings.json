@@ -31,11 +31,34 @@
   "process_payroll_accounting_entry_based_on_employee",
   "mandatory_benefit_application",
   "column_break_zi9y",
-  "create_overtime_slip"
+  "create_overtime_slip",
+  "automatic_payroll_section",
+  "enable_automatic_payroll",
+  "automatic_payroll_weekly_days",
+  "automatic_payroll_fortnightly_days",
+  "automatic_payroll_monthly_days",
+  "automatic_payroll_submit_slips",
+  "column_break_auto_pay",
+  "automatic_payroll_company",
+  "automatic_payroll_branch",
+  "automatic_payroll_cycle_start",
+  "automatic_payroll_interval_days",
+  "automatic_payroll_frequency",
+  "last_automatic_payroll_run",
+  "last_automatic_payroll_entry",
+  "automatic_invoice_section",
+  "enable_automatic_client_invoice",
+  "automatic_invoice_weekly_days",
+  "automatic_invoice_fortnightly_days",
+  "automatic_invoice_monthly_days",
+  "client_invoice_item",
+  "column_break_auto_invoice",
+  "last_automatic_invoice_run",
+  "last_automatic_client_invoice"
  ],
  "fields": [
   {
-   "default": "Leave",
+   "default": "Attendance",
    "fieldname": "payroll_based_on",
    "fieldtype": "Select",
    "label": "Calculate Payroll Working Days Based On",
@@ -93,6 +116,7 @@
    "label": "Password Policy"
   },
   {
+   "default": "Present",
    "depends_on": "eval:doc.payroll_based_on == 'Attendance'",
    "fieldname": "consider_unmarked_attendance_as",
    "fieldtype": "Select",
@@ -198,13 +222,186 @@
    "fieldname": "mandatory_benefit_application",
    "fieldtype": "Check",
    "label": "Mandatory Benefit Application"
+  },
+  {
+   "fieldname": "automatic_payroll_section",
+   "fieldtype": "Section Break",
+   "label": "Automatic Payroll"
+  },
+  {
+   "default": "1",
+   "description": "Create and submit Payroll Entry on a schedule. Set how often below. You do not need to add Payroll Entry by hand.",
+   "fieldname": "enable_automatic_payroll",
+   "fieldtype": "Check",
+   "label": "Run Payroll Automatically"
+  },
+  {
+   "default": "0",
+   "depends_on": "enable_automatic_payroll",
+   "description": "Pay period length for Weekly payroll. Set 0 to skip this template.",
+   "fieldname": "automatic_payroll_weekly_days",
+   "fieldtype": "Int",
+   "label": "Weekly Days",
+   "non_negative": 1
+  },
+  {
+   "default": "0",
+   "depends_on": "enable_automatic_payroll",
+   "description": "Pay period length for 2-week payroll. Set 0 to skip this template.",
+   "fieldname": "automatic_payroll_fortnightly_days",
+   "fieldtype": "Int",
+   "label": "2-weeks Days",
+   "non_negative": 1
+  },
+  {
+   "default": "0",
+   "depends_on": "enable_automatic_payroll",
+   "description": "Pay period length for Monthly payroll. Set 0 to skip this template.",
+   "fieldname": "automatic_payroll_monthly_days",
+   "fieldtype": "Int",
+   "label": "Monthly Days",
+   "non_negative": 1
+  },
+  {
+   "default": "10",
+   "depends_on": "enable_automatic_payroll",
+   "description": "Pay period length in days. Payroll runs the morning after a period ends. Default is 10 days.",
+   "fieldname": "automatic_payroll_interval_days",
+   "fieldtype": "Int",
+   "hidden": 1,
+   "label": "Run Every (Days)",
+   "non_negative": 1
+  },
+  {
+   "default": "Fortnightly",
+   "depends_on": "enable_automatic_payroll",
+   "description": "Must match the Salary Structure frequency so employees are included.",
+   "hidden": 1,
+   "fieldname": "automatic_payroll_frequency",
+   "fieldtype": "Select",
+   "label": "Payroll Frequency",
+   "options": "Monthly\nFortnightly\nBimonthly\nWeekly\nDaily"
+  },
+  {
+   "default": "1",
+   "depends_on": "enable_automatic_payroll",
+   "description": "Submit salary slips after they are created. Bank payment is still made by hand.",
+   "fieldname": "automatic_payroll_submit_slips",
+   "fieldtype": "Check",
+   "label": "Submit Salary Slips Automatically"
+  },
+  {
+   "fieldname": "column_break_auto_pay",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "enable_automatic_payroll",
+   "description": "Leave blank to use the default company.",
+   "fieldname": "automatic_payroll_company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "depends_on": "enable_automatic_payroll",
+   "description": "Leave blank to include all branches.",
+   "fieldname": "automatic_payroll_branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch"
+  },
+  {
+   "depends_on": "enable_automatic_payroll",
+   "description": "First day of the first automatic period. If empty, the first run covers the most recent completed period.",
+   "fieldname": "automatic_payroll_cycle_start",
+   "fieldtype": "Date",
+   "label": "First Period Start Date"
+  },
+  {
+   "depends_on": "enable_automatic_payroll",
+   "fieldname": "last_automatic_payroll_run",
+   "fieldtype": "Date",
+   "label": "Last Automatic Run",
+   "read_only": 1
+  },
+  {
+   "depends_on": "enable_automatic_payroll",
+   "fieldname": "last_automatic_payroll_entry",
+   "fieldtype": "Link",
+   "label": "Last Payroll Entry",
+   "options": "Payroll Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "automatic_invoice_section",
+   "fieldtype": "Section Break",
+   "label": "Automatic Client Invoices"
+  },
+  {
+   "default": "1",
+   "description": "Create and submit Client Invoice on a schedule. Set how often below.",
+   "fieldname": "enable_automatic_client_invoice",
+   "fieldtype": "Check",
+   "label": "Run Client Invoices Automatically"
+  },
+  {
+   "default": "0",
+   "depends_on": "enable_automatic_client_invoice",
+   "description": "Billing period length for weekly client invoices. Set 0 to skip.",
+   "fieldname": "automatic_invoice_weekly_days",
+   "fieldtype": "Int",
+   "label": "Weekly Days",
+   "non_negative": 1
+  },
+  {
+   "default": "0",
+   "depends_on": "enable_automatic_client_invoice",
+   "description": "Billing period length for 2-week client invoices. Set 0 to skip.",
+   "fieldname": "automatic_invoice_fortnightly_days",
+   "fieldtype": "Int",
+   "label": "2-weeks Days",
+   "non_negative": 1
+  },
+  {
+   "default": "0",
+   "depends_on": "enable_automatic_client_invoice",
+   "description": "Billing period length for monthly client invoices. Set 0 to skip.",
+   "fieldname": "automatic_invoice_monthly_days",
+   "fieldtype": "Int",
+   "label": "Monthly Days",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "client_invoice_item",
+   "fieldtype": "Link",
+   "label": "Client Invoice Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "column_break_auto_invoice",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "enable_automatic_client_invoice",
+   "fieldname": "last_automatic_invoice_run",
+   "fieldtype": "Date",
+   "label": "Last Automatic Invoice Run",
+   "read_only": 1
+  },
+  {
+   "depends_on": "enable_automatic_client_invoice",
+   "fieldname": "last_automatic_client_invoice",
+   "fieldtype": "Link",
+   "label": "Last Client Invoice",
+   "options": "Client Invoice",
+   "read_only": 1
   }
  ],
  "icon": "fa fa-cog",
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-06 13:01:43.187327",
+ "modified": "2026-08-20 21:30:00.000000",
  "modified_by": "Administrator",
  "module": "Payroll",
  "name": "Payroll Settings",

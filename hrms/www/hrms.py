@@ -33,6 +33,9 @@ def get_boot():
 
 	bootinfo.lang = frappe.local.lang
 	load_translations(bootinfo)
+	from hrms.boot import apply_payroll_frequency_translations
+
+	apply_payroll_frequency_translations(bootinfo)
 
 	return bootinfo
 

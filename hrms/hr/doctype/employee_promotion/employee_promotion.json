@@ -104,7 +104,7 @@
    "fetch_if_empty": 1,
    "fieldname": "current_ctc",
    "fieldtype": "Currency",
-   "label": "Current CTC",
+   "label": "Current Agent Hourly",
    "mandatory_depends_on": "revised_ctc",
    "non_negative": 1,
    "options": "salary_currency"
@@ -113,7 +113,7 @@
    "depends_on": "current_ctc",
    "fieldname": "revised_ctc",
    "fieldtype": "Currency",
-   "label": "Revised CTC",
+   "label": "Revised Agent Hourly",
    "non_negative": 1,
    "options": "salary_currency"
   }

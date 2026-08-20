@@ -18,6 +18,30 @@ $.extend(hrms, {
 		}
 	},
 
+	PAYROLL_FREQUENCY_LABELS: {
+		Fortnightly: "2-weeks",
+		Bimonthly: "Twice a Month",
+	},
+
+	payroll_frequency_label: (value) => {
+		if (!value) return value || "";
+		const mapped = hrms.PAYROLL_FREQUENCY_LABELS[value];
+		return mapped ? __(mapped) : __(value);
+	},
+
+	relabel_payroll_frequency: (frm, fieldname = "payroll_frequency") => {
+		const field = frm?.fields_dict?.[fieldname];
+		const $input = field?.$input;
+		if (!$input?.length) return;
+		$input.find("option").each(function () {
+			const $opt = $(this);
+			const value = $opt.attr("value") || $opt.val();
+			if (hrms.PAYROLL_FREQUENCY_LABELS[value]) {
+				$opt.text(hrms.payroll_frequency_label(value));
+			}
+		});
+	},
+
 	get_current_employee: async (frm) => {
 		const employee = (
 			await frappe.db.get_value("Employee", { user_id: frappe.session.user }, "name")
@@ -301,3 +325,163 @@ $.extend(hrms, {
 		);
 	},
 });
+
+(function applyDesignationUiLabels() {
+	const messagesToApply = {
+		Designation: "Role",
+		Designations: "Roles",
+		"Add Designation": "Add Role",
+		"New Designation": "New Role",
+	};
+
+	const applyMessages = () => {
+		const messages = frappe._messages || frappe.boot?.__messages || {};
+		Object.assign(messages, messagesToApply);
+		frappe._messages = messages;
+		if (frappe.boot) {
+			frappe.boot.__messages = messages;
+		}
+	};
+
+	const setListTitle = (list_view) => {
+		if (!list_view?.page) return;
+		const title = __("Roles");
+		list_view.page_title = title;
+		list_view.page.set_title(title);
+	};
+
+	const setListPrimaryAction = (list_view) => {
+		if (!list_view?.page) return;
+		const make_new = list_view.make_new_doc?.bind(list_view);
+		list_view.set_primary_action = () => {
+			const can_add =
+				!frappe.boot?.read_only &&
+				(frappe.model.can_create?.("Designation") || list_view.can_create);
+			if (can_add && make_new) {
+				list_view.page.set_primary_action(__("Add Role"), () => make_new());
+			} else {
+				list_view.page.clear_primary_action();
+			}
+		};
+		list_view.set_primary_action();
+	};
+
+	const relabelDesignationForm = (frm) => {
+		if (!frm?.page) return;
+		if (frm.is_new()) {
+			frm.page.set_title(__("New Role"));
+		}
+		if (frm.fields_dict?.designation_name) {
+			frm.set_df_property("designation_name", "label", __("Role"));
+		}
+	};
+
+	const relabelDesignationModal = ($modal) => {
+		const $title = $modal.find(".title-section, .modal-title").first();
+		const title = ($title.text() || "").replace(/\s+/g, " ").trim();
+		if (!/designation/i.test(title) && title !== __("New Role")) return;
+
+		$modal.find(".title-section, .modal-title").each(function () {
+			const text = ($(this).text() || "").replace(/\s+/g, " ").trim();
+			if (/designation/i.test(text)) {
+				$(this).text(text.replace(/Designation/gi, __("Role")));
+			}
+		});
+		$modal.find("label.control-label").each(function () {
+			const $label = $(this);
+			if (($label.text() || "").replace(/\s+/g, " ").trim() === "Designation") {
+				$label.text(__("Role"));
+			}
+		});
+	};
+
+	applyMessages();
+
+	frappe.ui.form.on("Designation", {
+		onload(frm) {
+			relabelDesignationForm(frm);
+		},
+		refresh(frm) {
+			relabelDesignationForm(frm);
+		},
+	});
+
+	$(document).on("shown.bs.modal", ".modal", function () {
+		relabelDesignationModal($(this));
+	});
+
+	const installList = () => {
+		applyMessages();
+		const existing = frappe.listview_settings.Designation || {};
+		const existing_onload = existing.onload;
+		const existing_refresh = existing.refresh;
+		frappe.listview_settings.Designation = Object.assign({}, existing, {
+			onload(list_view) {
+				existing_onload?.(list_view);
+				setListTitle(list_view);
+				setListPrimaryAction(list_view);
+			},
+			refresh(list_view) {
+				existing_refresh?.(list_view);
+				setListTitle(list_view);
+				list_view.set_primary_action?.();
+			},
+		});
+	};
+
+	if (typeof frappe.ready === "function") {
+		frappe.ready(installList);
+	} else {
+		installList();
+	}
+})();
+
+(function applyPayrollFrequencyUiLabels() {
+	const applyMessages = () => {
+		const label = "2-weeks";
+		const messages = frappe._messages || frappe.boot?.__messages || {};
+		messages.Fortnightly = label;
+		messages["2 Weeks"] = label;
+		frappe._messages = messages;
+		if (frappe.boot) {
+			frappe.boot.__messages = messages;
+		}
+	};
+	applyMessages();
+
+	const forms = [
+		["Payroll Entry", "payroll_frequency"],
+		["Salary Structure", "payroll_frequency"],
+		["Salary Slip", "payroll_frequency"],
+		["Salary Withholding", "payroll_frequency"],
+		["Payroll Settings", "automatic_payroll_frequency"],
+	];
+	forms.forEach(([doctype, fieldname]) => {
+		frappe.ui.form.on(doctype, {
+			onload(frm) {
+				hrms.relabel_payroll_frequency(frm, fieldname);
+			},
+			refresh(frm) {
+				hrms.relabel_payroll_frequency(frm, fieldname);
+			},
+		});
+	});
+
+	const installListFormatters = () => {
+		applyMessages();
+		["Payroll Entry", "Salary Slip", "Salary Structure", "Salary Withholding"].forEach((doctype) => {
+			const existing = frappe.listview_settings[doctype] || {};
+			existing.formatters = Object.assign({}, existing.formatters, {
+				payroll_frequency(value) {
+					return hrms.payroll_frequency_label(value);
+				},
+			});
+			frappe.listview_settings[doctype] = existing;
+		});
+	};
+	if (typeof frappe.ready === "function") {
+		frappe.ready(installListFormatters);
+	} else {
+		installListFormatters();
+	}
+})();

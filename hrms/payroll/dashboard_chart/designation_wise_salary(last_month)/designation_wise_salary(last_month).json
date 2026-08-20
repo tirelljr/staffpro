@@ -1,6 +1,6 @@
 {
  "aggregate_function_based_on": "rounded_total",
- "chart_name": "Designation Wise Salary(Last Month)",
+ "chart_name": "Pay by Role (Last Month)",
  "chart_type": "Group By",
  "creation": "2020-07-22 11:56:34.550339",
  "custom_options": "",

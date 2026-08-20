@@ -385,6 +385,27 @@ class TestAttendance(HRMSTestSuite):
 		cancel_hours_entry(name)
 		self.assertFalse(frappe.db.exists("Attendance", {"name": name, "docstatus": ("<", 2)}))
 
+	def test_add_hours_entry_same_day_appends_pair(self):
+		employee = make_employee("test_hours_append@example.com", company="_Test Company")
+		date = nowdate()
+		first = add_hours_entry(employee, date, "09:00:00", "12:00:00")
+		second = add_hours_entry(employee, date, "13:00:00", "17:00:00")
+		self.assertEqual(first, second)
+
+		checkins = frappe.get_all(
+			"Employee Checkin",
+			filters={"employee": employee, "attendance": first},
+			fields=["log_type", "time"],
+			order_by="time",
+		)
+		self.assertEqual([row.log_type for row in checkins], ["IN", "OUT", "IN", "OUT"])
+		self.assertEqual(flt(frappe.db.get_value("Attendance", first, "working_hours")), 8)
+
+		payload = get_hours_rows(from_date=date, to_date=date, employee=employee)
+		self.assertEqual(len(payload["rows"]), 3)
+		self.assertEqual(sum(1 for row in payload["rows"] if row["kind"] == "pair"), 2)
+		self.assertEqual(sum(1 for row in payload["rows"] if row["kind"] == "lunch"), 1)
+
 	def test_update_hours_entry_changes_times(self):
 		employee = make_employee("test_hours_edit@example.com", company="_Test Company")
 		date = nowdate()

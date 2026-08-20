@@ -12,7 +12,16 @@ frappe.ui.form.on("Payroll Entry", {
 		if (!frm.doc.posting_date) {
 			frm.doc.posting_date = frappe.datetime.nowdate();
 		}
-		frm.toggle_reqd(["payroll_frequency"], !frm.doc.salary_slip_based_on_timesheet);
+		frm.toggle_reqd(["payroll_frequency"], 1);
+		if (frm.is_new()) {
+			if (!cint(frm.doc.salary_slip_based_on_timesheet)) {
+				frm.set_value("salary_slip_based_on_timesheet", 1);
+			}
+			if (!frm.doc.payroll_frequency) {
+				frm.set_value("payroll_frequency", "Fortnightly");
+			}
+			frm.set_value("deduct_social_security", 1);
+		}
 
 		erpnext.accounts.dimensions.setup_dimension_filters(frm, frm.doctype);
 		frm.events.department_filters(frm);
@@ -62,6 +71,12 @@ frappe.ui.form.on("Payroll Entry", {
 	},
 
 	refresh: (frm) => {
+		frm.set_df_property("deduct_social_security", "read_only", 1);
+		frm.toggle_reqd(["payroll_frequency"], 1);
+		if (hrms.relabel_payroll_frequency) {
+			hrms.relabel_payroll_frequency(frm);
+		}
+
 		if (frm.doc.status === "Queued") frm.page.btn_secondary.hide();
 
 		if (frm.doc.docstatus === 0 && !frm.is_new()) {
@@ -166,6 +181,8 @@ frappe.ui.form.on("Payroll Entry", {
 			frm.doc.salary_slips_submitted ||
 			(frm.doc.__onload && frm.doc.__onload.submitted_ss)
 		) {
+			// Payment is booked directly on salary slip submit (Bank/Cash).
+			// Keep withheld-salary release only when needed.
 			frm.events.add_bank_entry_button(frm);
 		} else if (frm.doc.salary_slips_created && frm.doc.status !== "Queued") {
 			frm.add_custom_button(__("Submit Salary Slip"), function () {
@@ -180,11 +197,11 @@ frappe.ui.form.on("Payroll Entry", {
 
 	add_bank_entry_button: function (frm) {
 		frm.call("has_bank_entries").then((r) => {
-			if (!r.message.has_bank_entries) {
-				frm.add_custom_button(__("Make Bank Entry"), function () {
-					make_bank_entry(frm);
-				}).addClass("btn-primary");
-			} else if (!r.message.has_bank_entries_for_withheld_salaries) {
+			// Direct payment already creates Bank/Cash Entry on slip submit.
+			if (r.message.has_bank_entries) {
+				return;
+			}
+			if (!r.message.has_bank_entries_for_withheld_salaries) {
 				frm.add_custom_button(__("Release Withheld Salaries"), function () {
 					make_bank_entry(frm, (for_withheld_salaries = 1));
 				}).addClass("btn-primary");
@@ -242,7 +259,6 @@ frappe.ui.form.on("Payroll Entry", {
 			"start_date",
 			"end_date",
 			"payroll_frequency",
-			"payroll_payable_account",
 			"currency",
 			"department",
 			"branch",
@@ -282,14 +298,6 @@ frappe.ui.form.on("Payroll Entry", {
 		frappe.db.get_value("Company", { name: frm.doc.company }, "default_currency", (r) => {
 			frm.set_value("currency", r.default_currency);
 		});
-		frappe.db.get_value(
-			"Company",
-			{ name: frm.doc.company },
-			"default_payroll_payable_account",
-			(r) => {
-				frm.set_value("payroll_payable_account", r.default_payroll_payable_account);
-			},
-		);
 	},
 
 	currency: function (frm) {
@@ -354,7 +362,10 @@ frappe.ui.form.on("Payroll Entry", {
 	},
 
 	salary_slip_based_on_timesheet: function (frm) {
-		frm.toggle_reqd(["payroll_frequency"], !frm.doc.salary_slip_based_on_timesheet);
+		frm.toggle_reqd(["payroll_frequency"], 1);
+		if (!frm.doc.payroll_frequency) {
+			frm.set_value("payroll_frequency", "Fortnightly");
+		}
 	},
 
 	set_start_end_dates: function (frm) {

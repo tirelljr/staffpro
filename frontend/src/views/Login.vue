@@ -34,7 +34,7 @@
 			<div v-else class="flex h-screen w-screen flex-col justify-center bg-black">
 				<div class="flex flex-col mx-auto gap-3 items-center px-6">
 					<img
-						src="/assets/hrms/images/staff-pro-bpo-logo.png"
+						:src="logoUrl"
 						alt="Staff Pro BPO"
 						class="h-28 w-auto"
 					/>
@@ -133,6 +133,9 @@
 import { IonPage, IonContent } from "@ionic/vue"
 import { inject, reactive, ref } from "vue"
 import { Input, Button, ErrorMessage, Dialog, createResource } from "frappe-ui"
+import { STAFF_PRO_LOGO_URL } from "@/utils/branding"
+
+const logoUrl = STAFF_PRO_LOGO_URL
 
 const email = ref(null)
 const password = ref(null)

@@ -6,6 +6,10 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt, getdate
 
+# Clients are billed in USD. Agent payroll stays in the company salary currency (BZD).
+CLIENT_BILLING_CURRENCY = "USD"
+BILLABLE_ATTENDANCE_STATUSES = ("Present", "Half Day", "Work From Home")
+
 
 class ClientInvoice(Document):
 	# begin: auto-generated types
@@ -20,6 +24,7 @@ class ClientInvoice(Document):
 
 		agents: DF.Table[ClientInvoiceItem]
 		amended_from: DF.Link | None
+		billing_frequency: DF.Literal["Weekly", "Fortnightly", "Monthly"] | None
 		company: DF.Link
 		currency: DF.Link
 		customer: DF.Link
@@ -34,6 +39,11 @@ class ClientInvoice(Document):
 		total_hours: DF.Float
 	# end: auto-generated types
 
+	def before_validate(self):
+		self.set_billing_currency()
+		self.fill_missing_agent_billing()
+		self.calculate_totals()
+
 	def validate(self):
 		self.validate_dates()
 		self.calculate_totals()
@@ -43,6 +53,24 @@ class ClientInvoice(Document):
 	def validate_dates(self):
 		if getdate(self.from_date) > getdate(self.to_date):
 			frappe.throw(_("From Date cannot be after To Date"))
+
+	def set_billing_currency(self):
+		self.currency = CLIENT_BILLING_CURRENCY
+
+	def fill_missing_agent_billing(self):
+		"""Fill hours and USD billing rate when an agent is added without values."""
+		if not self.customer or not self.from_date or not self.to_date:
+			return
+
+		employees = [row.employee for row in self.agents if row.employee]
+		hours_by_employee = get_hours_by_employee(employees, self.from_date, self.to_date)
+		for row in self.agents:
+			if not row.employee:
+				continue
+			if not flt(row.hours):
+				row.hours = flt(hours_by_employee.get(row.employee))
+			if not flt(row.billing_rate):
+				row.billing_rate = get_employee_billing_rate(row.employee, self.customer)
 
 	def calculate_totals(self):
 		total_hours = 0.0
@@ -57,9 +85,28 @@ class ClientInvoice(Document):
 		self.total_amount = total_amount
 
 	@frappe.whitelist()
+	def get_agent_billing_row(self, employee: str) -> dict:
+		"""Hours, USD billing rate, and amount for one agent in this invoice period."""
+		if not employee:
+			return {"hours": 0, "billing_rate": 0, "amount": 0}
+
+		hours = 0.0
+		if self.from_date and self.to_date:
+			hours = flt(get_hours_by_employee([employee], self.from_date, self.to_date).get(employee))
+		rate = get_employee_billing_rate(employee, self.customer)
+		employee_name = frappe.db.get_value("Employee", employee, "employee_name")
+		return {
+			"employee_name": employee_name,
+			"hours": hours,
+			"billing_rate": rate,
+			"amount": flt(hours) * flt(rate),
+		}
+
+	@frappe.whitelist()
 	def get_agents(self):
 		"""Fill agents table from attendance for employees billed to this customer."""
 		self.validate_dates()
+		self.set_billing_currency()
 		if not self.customer or not self.company:
 			frappe.throw(_("Client and Company are required before fetching agents"))
 
@@ -77,37 +124,15 @@ class ClientInvoice(Document):
 				_("No active agents are assigned to client {0}").format(frappe.bold(self.customer))
 			)
 
-		default_rate = flt(frappe.db.get_value("Customer", self.customer, "default_billing_rate"))
-		standard_hours = flt(frappe.db.get_single_value("HR Settings", "standard_working_hours")) or 8.0
-
 		employee_names = [e.name for e in employees]
-		attendance_rows = frappe.get_all(
-			"Attendance",
-			filters={
-				"employee": ("in", employee_names),
-				"attendance_date": ("between", [self.from_date, self.to_date]),
-				"status": ("in", ["Present", "Half Day"]),
-				"docstatus": 1,
-			},
-			fields=["employee", "status", "working_hours"],
-		)
-
-		hours_by_employee: dict[str, float] = {}
-		for row in attendance_rows:
-			hours = flt(row.working_hours)
-			if not hours:
-				if row.status == "Half Day":
-					hours = standard_hours / 2.0
-				else:
-					hours = standard_hours
-			hours_by_employee[row.employee] = hours_by_employee.get(row.employee, 0.0) + hours
+		hours_by_employee = get_hours_by_employee(employee_names, self.from_date, self.to_date)
 
 		self.set("agents", [])
 		for employee in employees:
 			hours = flt(hours_by_employee.get(employee.name))
 			if not hours:
 				continue
-			rate = flt(employee.billing_rate) or default_rate
+			rate = get_employee_billing_rate(employee.name, self.customer, employee.billing_rate)
 			if not rate:
 				frappe.throw(
 					_("Set a billing rate on agent {0} or a default billing rate on client {1}").format(
@@ -128,7 +153,7 @@ class ClientInvoice(Document):
 
 		if not self.agents:
 			frappe.throw(
-				_("No Present or Half Day attendance found for agents of {0} between {1} and {2}").format(
+				_("No billable attendance found for agents of {0} between {1} and {2}").format(
 					frappe.bold(self.customer), self.from_date, self.to_date
 				)
 			)
@@ -139,6 +164,7 @@ class ClientInvoice(Document):
 	def on_submit(self):
 		if not self.agents:
 			frappe.throw(_("Add at least one agent before submitting"))
+		self.set_billing_currency()
 		self.calculate_totals()
 		sales_invoice = self.create_sales_invoice()
 		self.db_set(
@@ -159,19 +185,23 @@ class ClientInvoice(Document):
 		item_code = frappe.db.get_single_value("Payroll Settings", "client_invoice_item")
 		if not item_code:
 			frappe.throw(
-				_("Set Client Invoice Item in {0}").format(
-					frappe.bold(_("Payroll Settings"))
-				)
+				_("Set Client Invoice Item in {0}").format(frappe.bold(_("Payroll Settings")))
 			)
 		if not frappe.db.exists("Item", item_code):
 			frappe.throw(_("Client Invoice Item {0} does not exist").format(frappe.bold(item_code)))
+
+		currency = self.currency or CLIENT_BILLING_CURRENCY
+		company_currency = frappe.get_cached_value("Company", self.company, "default_currency")
+		conversion_rate = get_conversion_rate(currency, company_currency, self.posting_date)
 
 		si = frappe.new_doc("Sales Invoice")
 		si.customer = self.customer
 		si.company = self.company
 		si.posting_date = self.posting_date
 		si.due_date = self.posting_date
-		si.currency = self.currency
+		si.currency = currency
+		si.conversion_rate = conversion_rate
+		si.plc_conversion_rate = conversion_rate
 		si.set_posting_time = 1
 
 		for row in self.agents:
@@ -194,3 +224,52 @@ class ClientInvoice(Document):
 		si.insert()
 		si.submit()
 		return si
+
+
+def get_hours_by_employee(employees: list[str], from_date, to_date) -> dict[str, float]:
+	if not employees or not from_date or not to_date:
+		return {}
+
+	standard_hours = flt(frappe.db.get_single_value("HR Settings", "standard_working_hours")) or 8.0
+	attendance_rows = frappe.get_all(
+		"Attendance",
+		filters={
+			"employee": ("in", employees),
+			"attendance_date": ("between", [from_date, to_date]),
+			"status": ("in", list(BILLABLE_ATTENDANCE_STATUSES)),
+			"docstatus": ("<", 2),
+		},
+		fields=["employee", "status", "working_hours"],
+	)
+
+	hours_by_employee: dict[str, float] = {}
+	for row in attendance_rows:
+		hours = flt(row.working_hours)
+		if not hours:
+			if row.status == "Half Day":
+				hours = standard_hours / 2.0
+			else:
+				hours = standard_hours
+		hours_by_employee[row.employee] = hours_by_employee.get(row.employee, 0.0) + hours
+	return hours_by_employee
+
+
+def get_employee_billing_rate(employee: str, customer: str | None = None, known_rate=None) -> float:
+	"""USD hourly rate billed to the client — not the agent's BZD pay rate."""
+	rate = flt(known_rate)
+	if not rate and employee:
+		rate = flt(frappe.db.get_value("Employee", employee, "billing_rate"))
+	if not rate and customer:
+		rate = flt(frappe.db.get_value("Customer", customer, "default_billing_rate"))
+	return rate
+
+
+def get_conversion_rate(from_currency: str, to_currency: str, date) -> float:
+	if not from_currency or not to_currency or from_currency == to_currency:
+		return 1.0
+	try:
+		from erpnext.setup.utils import get_exchange_rate
+
+		return flt(get_exchange_rate(from_currency, to_currency, date)) or 1.0
+	except Exception:
+		return 1.0

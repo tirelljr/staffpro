@@ -67,7 +67,7 @@
    "label": "Retirement Age (In Years)"
   },
   {
-   "default": "Naming Series",
+   "default": "Full Name",
    "description": "Employee records are created using the selected option",
    "fieldname": "emp_created_by",
    "fieldtype": "Select",
@@ -133,6 +133,7 @@
    "options": "Email Template"
   },
   {
+   "default": "40",
    "fieldname": "standard_working_hours",
    "fieldtype": "Float",
    "label": "Standard Working Hours",
@@ -381,7 +382,7 @@
  "idx": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-06 13:01:43.187327",
+ "modified": "2026-08-20 13:20:00.000000",
  "modified_by": "Administrator",
  "module": "HR",
  "name": "HR Settings",

@@ -10,6 +10,25 @@ frappe.ui.form.on("Payroll Settings", {
 				},
 			};
 		});
+
+		hide_payroll_settings_menu(frm);
+
+		if (frm.doc.enable_automatic_payroll && !frm.is_new()) {
+			frm.add_custom_button(__("Run Payroll Now"), () => {
+				frappe.call({
+					method: "hrms.payroll.auto_payroll.run_automatic_payroll_now",
+					freeze: true,
+					freeze_message: __("Running payroll..."),
+					callback: function (r) {
+						frm.reload_doc();
+						if (r.message && r.message.message) {
+							frappe.msgprint(r.message.message);
+						}
+					},
+				});
+			});
+			show_automatic_payroll_intro(frm);
+		}
 	},
 
 	encrypt_salary_slips_in_emails: function (frm) {
@@ -37,3 +56,33 @@ frappe.ui.form.on("Payroll Settings", {
 		}
 	},
 });
+
+function hide_payroll_settings_menu(frm) {
+	const page = frm?.page;
+	if (!page) return;
+	if (typeof page.hide_menu === "function") {
+		page.hide_menu();
+	}
+	page.menu_btn_group?.addClass("hidden hide").hide();
+	page.wrapper?.find(".menu-btn-group").addClass("hidden hide").hide();
+}
+
+function show_automatic_payroll_intro(frm) {
+	const parts = [];
+	if (cint(frm.doc.automatic_payroll_weekly_days)) {
+		parts.push(__("Weekly every {0} days", [frm.doc.automatic_payroll_weekly_days]));
+	}
+	if (cint(frm.doc.automatic_payroll_fortnightly_days)) {
+		parts.push(__("2-weeks every {0} days", [frm.doc.automatic_payroll_fortnightly_days]));
+	}
+	if (cint(frm.doc.automatic_payroll_monthly_days)) {
+		parts.push(__("Monthly every {0} days", [frm.doc.automatic_payroll_monthly_days]));
+	}
+	const schedule = parts.length ? parts.join(", ") : __("set days on each pay template");
+	frm.set_intro(
+		__("Payroll runs by itself after each pay period ends: {0}. Use Run Payroll Now to process a completed period immediately.", [
+			schedule,
+		]),
+		"blue",
+	);
+}

@@ -61,6 +61,7 @@
    "fetch_from": ".default_payroll_payable_account",
    "fieldname": "payroll_payable_account",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Payroll Payable Account",
    "options": "Account"
   },

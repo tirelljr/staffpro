@@ -98,8 +98,8 @@ class TestPayrollEntry(HRMSTestSuite):
 			exchange_rate=70,
 			company=company.name,
 			cost_center="Main - _TC",
+			payment_account="Cash - _TC",
 		)
-		payroll_entry.make_bank_entry()
 
 		salary_slip = frappe.db.get_value("Salary Slip", {"payroll_entry": payroll_entry.name}, "name")
 		salary_slip = frappe.get_doc("Salary Slip", salary_slip)
@@ -124,8 +124,9 @@ class TestPayrollEntry(HRMSTestSuite):
 			.where((je.voucher_type == "Bank Entry") | (je.voucher_type == "Cash Entry"))
 			.where(jea.reference_name == payroll_entry.name)
 		).run(as_dict=1)
-		self.assertEqual(salary_slip.base_net_pay, payment_entry[0].total_debit)
-		self.assertEqual(salary_slip.base_net_pay, payment_entry[0].total_credit)
+		# Direct payment JE totals equal gross (earnings vs deductions + Bank/Cash)
+		self.assertEqual(salary_slip.base_gross_pay, payment_entry[0].total_debit)
+		self.assertEqual(salary_slip.base_gross_pay, payment_entry[0].total_credit)
 
 	@HRMSTestSuite.change_settings(
 		"Payroll Settings", {"process_payroll_accounting_entry_based_on_employee": 0}
@@ -164,7 +165,7 @@ class TestPayrollEntry(HRMSTestSuite):
 			.orderby(jea.cost_center)
 		).run()
 		expected_je = (
-			("_Test Payroll Payable - _TC", "Main - _TC", 0.0, 155600.0),
+			("Cash - _TC", "Main - _TC", 0.0, 155600.0),
 			("Salary - _TC", "_Test Cost Center - _TC", 124800.0, 0.0),
 			("Salary - _TC", "_Test Cost Center 2 - _TC", 31200.0, 0.0),
 			("Salary Deductions - _TC", "_Test Cost Center - _TC", 0.0, 320.0),
@@ -434,15 +435,12 @@ class TestPayrollEntry(HRMSTestSuite):
 			cost_center="Main - _TC",
 			payment_account="Cash - _TC",
 		)
-		payroll_entry.make_bank_entry()
-		submit_bank_entry(payroll_entry.name)
+		# Direct payment JE is already submitted with the salary slips
+		journal_entries = get_linked_journal_entries(payroll_entry.name, docstatus=1)
+		self.assertEqual(len(journal_entries), 1)
 
 		salary_slip = frappe.db.get_value("Salary Slip", {"payroll_entry": payroll_entry.name}, "name")
 		self.assertIsNotNone(salary_slip)
-
-		# 2 submitted JVs
-		journal_entries = get_linked_journal_entries(payroll_entry.name, docstatus=1)
-		self.assertEqual(len(journal_entries), 2)
 
 		frappe.flags.enqueue_payroll_entry = True
 		payroll_entry.cancel()
@@ -452,9 +450,9 @@ class TestPayrollEntry(HRMSTestSuite):
 		salary_slip = frappe.db.get_value("Salary Slip", {"payroll_entry": payroll_entry.name}, "name")
 		self.assertIsNone(salary_slip)
 
-		# 2 cancelled JVs
+		# 1 cancelled JV
 		journal_entries = get_linked_journal_entries(payroll_entry.name, docstatus=2)
-		self.assertEqual(len(journal_entries), 2)
+		self.assertEqual(len(journal_entries), 1)
 
 	def test_payroll_entry_cancellation_with_hr_manager(self):
 		company_doc = frappe.get_doc("Company", "_Test Company")
@@ -527,9 +525,6 @@ class TestPayrollEntry(HRMSTestSuite):
 			payment_account="Cash - _TC",
 		)
 
-		payroll_entry.make_bank_entry()
-		submit_bank_entry(payroll_entry.name)
-
 		# cancel the salary slip
 		salary_slip = frappe.db.get_value("Salary Slip", {"payroll_entry": payroll_entry.name}, "name")
 		salary_slip = frappe.get_doc("Salary Slip", salary_slip)
@@ -565,6 +560,7 @@ class TestPayrollEntry(HRMSTestSuite):
 			currency=company_doc.default_currency,
 			company=company_doc.name,
 			cost_center="Main - _TC",
+			payment_account="Cash - _TC",
 		)
 
 		salary_slip = frappe.db.get_value("Salary Slip", {"payroll_entry": payroll_entry.name}, "name")
@@ -574,10 +570,9 @@ class TestPayrollEntry(HRMSTestSuite):
 
 		if payroll_je:
 			payroll_je_doc = frappe.get_doc("Journal Entry", payroll_je)
-			for account in payroll_je_doc.accounts:
-				if account.account == company_doc.default_payroll_payable_account:
-					self.assertEqual(account.party_type, "Employee")
-					self.assertEqual(account.party, employee)
+			cash_lines = [account for account in payroll_je_doc.accounts if account.account == "Cash - _TC"]
+			self.assertTrue(cash_lines, "Expected Cash credit for direct payroll payment")
+			self.assertTrue(any(flt(line.credit) > 0 for line in cash_lines))
 
 	@HRMSTestSuite.change_settings(
 		"Payroll Settings", {"process_payroll_accounting_entry_based_on_employee": 0}
@@ -599,6 +594,7 @@ class TestPayrollEntry(HRMSTestSuite):
 			currency=company_doc.default_currency,
 			company=company_doc.name,
 			cost_center="Main - _TC",
+			payment_account="Cash - _TC",
 		)
 
 		salary_slip = frappe.db.get_value("Salary Slip", {"payroll_entry": payroll_entry.name}, "name")
@@ -609,7 +605,7 @@ class TestPayrollEntry(HRMSTestSuite):
 		if payroll_je:
 			payroll_je_doc = frappe.get_doc("Journal Entry", payroll_je)
 			for account in payroll_je_doc.accounts:
-				if account.account == company_doc.default_payroll_payable_account:
+				if account.account == "Cash - _TC":
 					self.assertEqual(account.party_type, None)
 					self.assertEqual(account.party, None)
 
@@ -652,9 +648,8 @@ class TestPayrollEntry(HRMSTestSuite):
 			currency=company_doc.default_currency,
 			company=company_doc.name,
 			cost_center="Main - _TC",
+			payment_account="Cash - _TC",
 		)
-
-		# check advance deduction entry correctly mapped in accrual entry
 		deduction_entry = frappe.get_all(
 			"Journal Entry Account",
 			fields=["account", "party", "debit", "credit"],
@@ -678,6 +673,7 @@ class TestPayrollEntry(HRMSTestSuite):
 		"Payroll Settings", {"process_payroll_accounting_entry_based_on_employee": 1}
 	)
 	def test_employee_wise_bank_entry_with_cost_centers(self):
+		"""Direct Bank/Cash payment is booked on slip submit; no separate payable bank entry."""
 		department = create_department("Cost Center Test")
 		employee1 = make_employee(
 			"test_emp1@example.com",
@@ -701,47 +697,90 @@ class TestPayrollEntry(HRMSTestSuite):
 			cost_center="Main - _TC",
 		)
 		payroll_entry.reload()
-		payroll_entry.make_bank_entry()
 
-		debit_entries = frappe.db.get_all(
+		je_name = frappe.db.get_value("Salary Slip", {"payroll_entry": payroll_entry.name}, "journal_entry")
+		self.assertTrue(je_name)
+
+		cash_credit = frappe.db.get_value(
 			"Journal Entry Account",
-			fields=["party", "account", "cost_center", "debit", "credit"],
-			filters={
-				"reference_type": "Payroll Entry",
-				"reference_name": payroll_entry.name,
-				"docstatus": 0,
-			},
-			order_by="party, cost_center",
+			{"parent": je_name, "account": "Cash - _TC"},
+			"credit",
+		)
+		self.assertEqual(flt(cash_credit), 155600.0)
+		self.assertFalse(
+			frappe.db.exists(
+				"Journal Entry Account",
+				{"parent": je_name, "account": "_Test Payroll Payable - _TC"},
+			)
 		)
 
-		expected_entries = [
-			# 100% in a single cost center
-			{
-				"party": employee1,
-				"account": "_Test Payroll Payable - _TC",
-				"cost_center": "_Test Cost Center - _TC",
-				"debit": 77800.0,
-				"credit": 0.0,
-			},
-			# 60% of 77800.0
-			{
-				"party": employee2,
-				"account": "_Test Payroll Payable - _TC",
-				"cost_center": "_Test Cost Center - _TC",
-				"debit": 46680.0,
-				"credit": 0.0,
-			},
-			# 40% of 77800.0
-			{
-				"party": employee2,
-				"account": "_Test Payroll Payable - _TC",
-				"cost_center": "_Test Cost Center 2 - _TC",
-				"debit": 31120.0,
-				"credit": 0.0,
-			},
-		]
+	@HRMSTestSuite.change_settings(
+		"Payroll Settings", {"process_payroll_accounting_entry_based_on_employee": 0}
+	)
+	def test_direct_payment_splits_bank_and_cash(self):
+		"""Bank Transfer and Cash employees credit the matching Company payment accounts."""
+		company = frappe.get_doc("Company", "_Test Company")
+		department = create_department("Pay Mode Split")
 
-		self.assertEqual(debit_entries, expected_entries)
+		bank_account = frappe.db.get_value(
+			"Account", {"account_type": "Bank", "company": company.name, "is_group": 0}, "name"
+		)
+		cash_account = "Cash - _TC"
+		if not bank_account:
+			parent = frappe.db.get_value(
+				"Account", {"is_group": 1, "company": company.name, "root_type": "Asset"}, "name"
+			)
+			doc = frappe.get_doc(
+				{
+					"doctype": "Account",
+					"account_name": "_Test Payroll Bank",
+					"parent_account": parent,
+					"company": company.name,
+					"account_type": "Bank",
+					"is_group": 0,
+				}
+			).insert(ignore_permissions=True)
+			bank_account = doc.name
+
+		frappe.db.set_value("Company", company.name, "default_bank_account", bank_account)
+		frappe.db.set_value("Company", company.name, "default_cash_account", cash_account)
+
+		employee_bank = make_employee(
+			"test_bank_pay@example.com",
+			department=department,
+			company=company.name,
+			salary_mode="Bank",
+		)
+		employee_cash = make_employee(
+			"test_cash_pay@example.com",
+			department=department,
+			company=company.name,
+			salary_mode="Cash",
+		)
+		setup_salary_structure(employee_bank, company)
+		setup_salary_structure(employee_cash, company, salary_structure="_Test Salary Structure Cash Mode")
+
+		dates = get_start_end_dates("Monthly", nowdate())
+		payroll_entry = make_payroll_entry(
+			start_date=dates.start_date,
+			end_date=dates.end_date,
+			currency=company.default_currency,
+			department=department,
+			company=company.name,
+			cost_center="Main - _TC",
+			payment_account=cash_account,
+		)
+
+		je_name = frappe.db.get_value("Salary Slip", {"payroll_entry": payroll_entry.name}, "journal_entry")
+		accounts = frappe.get_all(
+			"Journal Entry Account",
+			filters={"parent": je_name, "credit": (">", 0)},
+			fields=["account", "credit"],
+		)
+		credited = {row.account for row in accounts}
+		self.assertIn(bank_account, credited)
+		self.assertIn(cash_account, credited)
+		self.assertNotIn("_Test Payroll Payable - _TC", credited)
 
 	def test_validate_attendance(self):
 		company = frappe.get_doc("Company", "_Test Company")
@@ -866,12 +905,8 @@ class TestPayrollEntry(HRMSTestSuite):
 		salary_slip = frappe.get_doc("Salary Slip", salary_slip_name)
 		payroll_entry.reload()
 
-		initial_gross_pay = flt(salary_slip.gross_pay) - flt(salary_slip.total_deduction)
-		loan_repayment_amount = flt(salary_slip.total_loan_repayment)
-		expected_bank_entry_amount = initial_gross_pay - loan_repayment_amount
-
-		payroll_entry.make_bank_entry()
-		submit_bank_entry(payroll_entry.name)
+		self.assertTrue(flt(salary_slip.total_loan_repayment) > 0)
+		self.assertTrue(salary_slip.journal_entry)
 
 		je = frappe.qb.DocType("Journal Entry")
 		jea = frappe.qb.DocType("Journal Entry Account")
@@ -886,10 +921,16 @@ class TestPayrollEntry(HRMSTestSuite):
 			.limit(1)
 		).run(as_dict=True)
 
-		total_debit = bank_entry[0].get("total_debit", 0)
-		total_credit = bank_entry[0].get("total_credit", 0)
-		self.assertEqual(total_debit, expected_bank_entry_amount)
-		self.assertEqual(total_credit, expected_bank_entry_amount)
+		self.assertTrue(bank_entry)
+		self.assertEqual(bank_entry[0].get("total_debit"), bank_entry[0].get("total_credit"))
+		self.assertNotIn(
+			"_Test Payroll Payable - _TC",
+			frappe.get_all(
+				"Journal Entry Account",
+				filters={"parent": salary_slip.journal_entry},
+				pluck="account",
+			),
+		)
 
 	@if_lending_app_installed
 	@HRMSTestSuite.change_settings(
@@ -1016,7 +1057,8 @@ class TestPayrollEntry(HRMSTestSuite):
 
 		accounts = [d.account for d in journal_entry.accounts]
 		self.assertIn("Salary - _TC", accounts)
-		self.assertIn(company.default_payroll_payable_account, accounts)
+		self.assertIn("Cash - _TC", accounts)
+		self.assertNotIn(company.default_payroll_payable_account, accounts)
 		self.assertNotIn("ESIC Payable - _TC", accounts, "ESIC component wrongly included in JE")
 
 	def test_employee_benefits_accruals_in_salary_slip(self):
@@ -1218,8 +1260,7 @@ def make_payroll_entry(**args):
 	payroll_entry = get_payroll_entry(**args)
 	payroll_entry.submit()
 	payroll_entry.submit_salary_slips()
-	if payroll_entry.get_sal_slip_list(ss_status=1):
-		payroll_entry.make_bank_entry()
+	# Payment Journal Entry (Bank/Cash) is created on slip submit; no separate bank entry.
 
 	return payroll_entry
 

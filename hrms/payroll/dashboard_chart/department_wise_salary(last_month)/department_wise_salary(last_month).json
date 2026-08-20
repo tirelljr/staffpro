@@ -1,6 +1,6 @@
 {
  "aggregate_function_based_on": "rounded_total",
- "chart_name": "Department Wise Salary(Last Month)",
+ "chart_name": "Pay by Team (Last Month)",
  "chart_type": "Group By",
  "creation": "2020-07-22 11:56:34.511940",
  "custom_options": "",

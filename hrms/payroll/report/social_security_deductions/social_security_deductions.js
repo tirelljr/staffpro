@@ -34,12 +34,6 @@ frappe.query_reports["Social Security Deductions"] = {
 			reqd: 1,
 		},
 		{
-			fieldname: "employee_group",
-			label: __("Team Group"),
-			fieldtype: "Link",
-			options: "Employee Group",
-		},
-		{
 			fieldname: "employee",
 			label: __("Agent"),
 			fieldtype: "Link",

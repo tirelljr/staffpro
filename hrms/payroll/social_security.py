@@ -364,8 +364,9 @@ def apply_social_security(salary_slip) -> None:
 	table = get_active_contribution_table(
 		salary_slip.company, salary_slip.end_date or salary_slip.posting_date or salary_slip.start_date
 	)
-	if not table:
-		return
+	bands = table.bands if table else None
+	injury_employee = flt(table.injury_only_employee_amount) if table else 0.0
+	injury_employer = flt(table.injury_only_employer_amount) if table else 2.60
 
 	employee_fields = ["date_of_birth", "employee_name"]
 	meta = frappe.get_meta("Employee")
@@ -388,9 +389,9 @@ def apply_social_security(salary_slip) -> None:
 		end_date=salary_slip.end_date,
 		date_of_birth=employee.get("date_of_birth"),
 		receiving_ss_benefit=employee.get("receiving_ss_benefit"),
-		bands=table.bands,
-		injury_only_employee_amount=table.injury_only_employee_amount,
-		injury_only_employer_amount=table.injury_only_employer_amount,
+		bands=bands,
+		injury_only_employee_amount=injury_employee,
+		injury_only_employer_amount=injury_employer,
 	)
 
 	if employee.get("employee_name"):

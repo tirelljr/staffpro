@@ -56,7 +56,7 @@ def get_custom_fields():
 			},
 			{
 				"fieldname": "pan_number",
-				"label": "PAN Number",
+				"label": "Tax Number",
 				"fieldtype": "Data",
 				"insert_after": "payroll_cost_center",
 				"print_hide": 1,
@@ -75,6 +75,7 @@ def get_custom_fields():
 				"fieldname": "provident_fund_account",
 				"label": "Provident Fund Account",
 				"fieldtype": "Data",
+				"hidden": 1,
 				"insert_after": "pan_number",
 				"translatable": 0,
 			},

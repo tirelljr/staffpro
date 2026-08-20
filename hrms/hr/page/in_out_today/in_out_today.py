@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, cint, get_datetime, get_time, getdate
+from frappe.utils import add_days, cint, get_datetime, get_time, getdate, now_datetime
 
 
 @frappe.whitelist()
@@ -36,7 +36,7 @@ def get_in_out_today(department: str | None = None):
 def _get_active_employees(today):
 	employees = frappe.get_list(
 		"Employee",
-		fields=["name", "employee_name", "department", "default_shift", "date_of_joining", "relieving_date"],
+		fields=["name", "employee_name", "department", "default_shift", "date_of_joining", "relieving_date", "image"],
 		filters={"status": "Active"},
 		order_by="employee_name",
 	)
@@ -56,12 +56,18 @@ def _build_details(employees, today):
 
 	employee_ids = [row.name for row in employees]
 	punches_by_employee = _get_todays_punches(employee_ids, today)
+	attendance_by_employee = _get_todays_attendance(employee_ids, today)
 	leave_by_employee = _get_todays_leave(employee_ids, today)
-	shift_map = _get_shift_map(employees, punches_by_employee)
+	shift_map = _get_shift_map(employees, punches_by_employee, attendance_by_employee)
+	now = now_datetime()
 
 	details = []
 	for employee in employees:
-		punches = punches_by_employee.get(employee.name) or []
+		punches = _clocks_as_of_now(
+			punches_by_employee.get(employee.name) or [],
+			attendance_by_employee.get(employee.name),
+			now,
+		)
 		latest = punches[-1] if punches else None
 		first_in = next((punch for punch in punches if (punch.log_type or "IN") == "IN"), None)
 		status = "IN" if latest and (latest.log_type or "IN") != "OUT" else "OUT"
@@ -74,6 +80,7 @@ def _build_details(employees, today):
 			{
 				"employee": employee.name,
 				"employee_name": employee.employee_name or employee.name,
+				"image": employee.image or "",
 				"department": employee.department or "",
 				"status": status,
 				"late": bool(late),
@@ -107,6 +114,51 @@ def _get_todays_punches(employee_ids, today):
 	return by_employee
 
 
+def _get_todays_attendance(employee_ids, today):
+	if not employee_ids:
+		return {}
+	rows = frappe.get_all(
+		"Attendance",
+		fields=["employee", "in_time", "out_time", "shift", "status"],
+		filters=[
+			["employee", "in", employee_ids],
+			["attendance_date", "=", today],
+			["docstatus", "<", 2],
+		],
+	)
+	return {row.employee: row for row in rows}
+
+
+def _clocks_as_of_now(punches, attendance, now):
+	"""Use punches that have already happened; fall back to Attendance in/out times."""
+	occurred = [punch for punch in punches if punch.time and get_datetime(punch.time) <= now]
+	if punches:
+		return occurred
+	if not attendance:
+		return []
+
+	synthetic = []
+	if attendance.in_time and get_datetime(attendance.in_time) <= now:
+		synthetic.append(
+			frappe._dict(
+				log_type="IN",
+				time=attendance.in_time,
+				device_id="",
+				shift=attendance.shift,
+			)
+		)
+	if attendance.out_time and get_datetime(attendance.out_time) <= now:
+		synthetic.append(
+			frappe._dict(
+				log_type="OUT",
+				time=attendance.out_time,
+				device_id="",
+				shift=attendance.shift,
+			)
+		)
+	return synthetic
+
+
 def _get_todays_leave(employee_ids, today):
 	rows = frappe.get_all(
 		"Leave Application",
@@ -126,12 +178,15 @@ def _get_todays_leave(employee_ids, today):
 	return by_employee
 
 
-def _get_shift_map(employees, punches_by_employee):
+def _get_shift_map(employees, punches_by_employee, attendance_by_employee=None):
 	names = {row.default_shift for row in employees if row.default_shift}
 	for punches in punches_by_employee.values():
 		for punch in punches:
 			if punch.shift:
 				names.add(punch.shift)
+	for attendance in (attendance_by_employee or {}).values():
+		if attendance and attendance.shift:
+			names.add(attendance.shift)
 	if not names:
 		return {}
 	rows = frappe.get_all(

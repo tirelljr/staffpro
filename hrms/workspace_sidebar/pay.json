@@ -133,34 +133,6 @@
                       "icon":  "alert-circle"
                   },
                   {
-                      "child":  1,
-                      "collapsible":  1,
-                      "default_workspace":  0,
-                      "indent":  0,
-                      "keep_closed":  0,
-                      "label":  "General Ledger",
-                      "open_in_new_tab":  0,
-                      "show_arrow":  0,
-                      "type":  "Link",
-                      "link_to":  "General Ledger",
-                      "link_type":  "Report",
-                      "icon":  "book-open"
-                  },
-                  {
-                      "child":  1,
-                      "collapsible":  1,
-                      "default_workspace":  0,
-                      "indent":  0,
-                      "keep_closed":  0,
-                      "label":  "Accounts Payable",
-                      "open_in_new_tab":  0,
-                      "show_arrow":  0,
-                      "type":  "Link",
-                      "link_to":  "Accounts Payable",
-                      "link_type":  "Report",
-                      "icon":  "arrow-up-right"
-                  },
-                  {
                       "child":  0,
                       "collapsible":  1,
                       "default_workspace":  0,

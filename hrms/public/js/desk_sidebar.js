@@ -457,6 +457,31 @@ const SIDEBAR_CSS = `
 	pointer-events: none;
 }
 
+body.staff-pro-hide-form-sidebar .layout-side-section.right,
+body.staff-pro-hide-form-sidebar .sidebar-toggle-btn {
+	display: none !important;
+}
+body.staff-pro-hide-form-sidebar .layout-main.layout-two-column {
+	display: flex;
+}
+body.staff-pro-hide-form-sidebar .layout-main-section-wrapper {
+	flex: 1 1 100% !important;
+	width: 100% !important;
+	max-width: 100% !important;
+}
+[id="page-HR Settings"] .timeline-actions,
+[id="page-HR Settings"] .document-email-link-container {
+	display: none !important;
+}
+[id="page-Employee"] .form-sidebar .modified-by,
+[id="page-Employee"] .form-sidebar .created-by,
+[id="page-Employee"] .form-sidebar .sidebar-section:has(.modified-by),
+[id="page-Employee"] .form-sidebar .sidebar-section.text-muted.pt-3,
+[id="page-Employee"] .timeline-actions,
+[id="page-Employee"] .document-email-link-container {
+	display: none !important;
+}
+
 /* Hide Frappe module onboarding (Getting Started / Accounting Onboarding) everywhere */
 .user-onboarding,
 .onb-panel,
@@ -658,6 +683,12 @@ const SUBMENU_ICONS = {
 	"pay stubs": "wallet",
 	reimbursements: "arrow-down-from-line",
 	"cash advances": "upload",
+	"client invoices": "receipt",
+	clients: "building",
+	"posted invoices": "file-text",
+	"outstanding invoices": "arrow-down-left",
+	"record payment": "credit-card",
+	"unpaid reimbursements": "alert-circle",
 };
 
 const SECTION_ICONS = {
@@ -830,9 +861,50 @@ function is_section_header($item) {
 	return Boolean($item.find(".sidebar-item-control .drop-icon").length && !$item.find(".item-anchor[href]").length);
 }
 
+function hidden_has(list, value) {
+	if (!value || !list || !list.length) return false;
+	const needle = String(value).toLowerCase();
+	return list.some((item) => String(item).toLowerCase() === needle);
+}
+
+function is_hidden_sidebar_item($item) {
+	const maps = bpo_sidebar_maps();
+	const hiddenLabels = maps.hidden_labels || [];
+	const hiddenLinks = maps.hidden_links || [];
+	const label = sidebar_item_label($item);
+	const href = ($item.find(".item-anchor").attr("href") || "").trim();
+
+	// Section headers stay so nested BPO links (Clients, Posted Invoices) remain visible
+	// until migrate replaces the Finance sidebar. Leaf ERP items are removed immediately.
+	if (!is_section_header($item) && hidden_has(hiddenLabels, label)) {
+		return true;
+	}
+
+	const linkKey = sidebar_href_to_link(href);
+	if (hidden_has(hiddenLinks, linkKey) || hidden_has(hiddenLabels, linkKey)) {
+		return true;
+	}
+
+	let path = href;
+	try {
+		path = decodeURIComponent(new URL(href, window.location.origin).pathname);
+	} catch (e) {
+		/* keep raw href */
+	}
+	const last = path.replace(/\/$/, "").split("/").filter(Boolean).pop() || "";
+	if (hidden_has(hiddenLinks, last) || hidden_has(hiddenLinks, last.replace(/-/g, " "))) {
+		return true;
+	}
+	return /\/query-report\/(General Ledger|Accounts Payable)\/?$/i.test(path);
+}
+
 function enhance_sidebar_menus() {
 	$(".body-sidebar .standard-sidebar-item").each(function () {
 		const $item = $(this);
+		if (is_hidden_sidebar_item($item)) {
+			$item.closest(".sidebar-item-container").hide();
+			return;
+		}
 		apply_bpo_sidebar_label($item);
 		const nested = $item.closest(".nested-container").length > 0;
 		const $anchor = $item.find(".item-anchor").first();
@@ -858,6 +930,8 @@ function enhance_sidebar_menus() {
 			apply_top_level_icon($item, $icon, label);
 		}
 
+		prefer_employee_image_sidebar_link($anchor);
+
 		const $wrapper = $item.parent();
 		const $nested = $wrapper.children(".nested-container");
 		const $drop = $item.find(".sidebar-item-control .drop-icon").first();
@@ -869,6 +943,27 @@ function enhance_sidebar_menus() {
 			}
 		}
 	});
+}
+
+function employee_image_view_href() {
+	return "/desk/employee/view/image";
+}
+
+function is_employee_list_href(href) {
+	if (!href) return false;
+	try {
+		const path = new URL(href, window.location.origin).pathname.replace(/\/$/, "") || "/";
+		return /^\/(desk|app)\/employee(?:\/view\/list)?$/i.test(path);
+	} catch (e) {
+		return false;
+	}
+}
+
+function prefer_employee_image_sidebar_link($anchor) {
+	if (!$anchor?.length) return;
+	const href = ($anchor.attr("href") || "").trim();
+	if (!is_employee_list_href(href)) return;
+	$anchor.attr("href", employee_image_view_href());
 }
 
 function inject_sidebar_css() {
@@ -1540,6 +1635,8 @@ function watch_workspace_dock() {
 	inject_sidebar_css();
 	disable_app_onboarding();
 	patch_workspace_dock();
+	patch_form_sidebar_policy();
+	apply_form_sidebar_policy();
 	refresh_staff_pro_dock_shortcuts();
 	label_workspace_dock();
 	render_staff_pro_dock_integrations();
@@ -1653,8 +1750,116 @@ function patch_staff_pro_desktop_redirect() {
 	};
 }
 
+function employee_list_view_from_route(route = frappe.get_route?.() || []) {
+	const path = (window.location.pathname || "").replace(/\/$/, "").toLowerCase();
+	if (/\/employee\/view\/image$/i.test(path)) return "Image";
+	if (route[0] === "List" && route[1] === "Employee") return route[2] || "List";
+	if (path === "/desk/employee" || path === "/app/employee") return "List";
+	if (/\/employee\/view\/list$/i.test(path)) return "List";
+	return null;
+}
+
+function prefer_employee_image_view() {
+	try {
+		const meta = frappe.get_meta?.("Employee");
+		if (meta) meta.default_view = "Image";
+	} catch (e) {
+		// Meta may not be loaded yet.
+	}
+
+	const settings = frappe.model?.user_settings;
+	if (settings) {
+		settings.Employee = settings.Employee || {};
+		if (settings.Employee.last_view !== "Image") {
+			settings.Employee.last_view = "Image";
+			settings.save?.("Employee", "last_view", "Image");
+		}
+	}
+
+	const view = employee_list_view_from_route();
+	if (view !== "List") return;
+	if (window._staff_pro_employee_image_redirecting) return;
+
+	window._staff_pro_employee_image_redirecting = true;
+	Promise.resolve(frappe.set_route("List", "Employee", "Image")).finally(() => {
+		window._staff_pro_employee_image_redirecting = false;
+	});
+}
+
+const LIST_PAGES_HIDE_MENU = new Set([
+	"Employee",
+	"Payroll Entry",
+	"Salary Structure Assignment",
+	"Client Invoice",
+]);
+const LIST_PAGES_HIDE_VIEW_SWITCHER = new Set([
+	"Payroll Entry",
+	"Salary Structure Assignment",
+	"Client Invoice",
+]);
+
+function hide_employee_list_menu() {
+	const route = frappe.get_route?.() || [];
+	if (route[0] !== "List") return;
+	const doctype = route[1];
+	if (LIST_PAGES_HIDE_MENU.has(doctype)) {
+		document.querySelectorAll(`[id^="page-List/${doctype}"] .menu-btn-group`).forEach((el) => {
+			el.classList.add("hidden", "hide");
+			el.style.display = "none";
+		});
+	}
+	if (LIST_PAGES_HIDE_VIEW_SWITCHER.has(doctype)) {
+		document
+			.querySelectorAll(
+				`[id^="page-List/${doctype}"] .view-switcher, [id^="page-List/${doctype}"] .views-switcher`,
+			)
+			.forEach((el) => {
+				el.classList.add("hidden", "hide");
+				el.style.display = "none";
+			});
+	}
+}
+
+const PROFILE_FORM_DOCTYPES = new Set(["Employee", "User"]);
+
+function staff_pro_current_form_doctype() {
+	const route = frappe.get_route?.() || [];
+	if (route[0] === "Form" && route[1]) {
+		return route[1];
+	}
+	if (typeof cur_frm !== "undefined" && cur_frm?.doctype && cur_frm.page?.wrapper?.is(":visible")) {
+		return cur_frm.doctype;
+	}
+	return null;
+}
+
+function apply_form_sidebar_policy() {
+	const doctype = staff_pro_current_form_doctype();
+	const hide = Boolean(doctype) && !PROFILE_FORM_DOCTYPES.has(doctype);
+	document.body.classList.toggle("staff-pro-hide-form-sidebar", hide);
+}
+
+function patch_form_sidebar_policy() {
+	const Form = frappe.ui?.form?.Form;
+	if (!Form || Form.prototype._staff_pro_sidebar_policy) return;
+	Form.prototype._staff_pro_sidebar_policy = true;
+
+	const original = Form.prototype.refresh;
+	Form.prototype.refresh = function (...args) {
+		const result = original.apply(this, args);
+		apply_form_sidebar_policy();
+		return result;
+	};
+}
+
 $(document).on("app_ready", patch_staff_pro_desktop_redirect);
 $(document).on("app_ready", () => redirect_staff_pro_desk_home({ includeWorkforceBootstrap: true }));
+$(document).on("app_ready", prefer_employee_image_view);
+$(document).on("app_ready", patch_form_sidebar_policy);
+$(document).on("app_ready", apply_form_sidebar_policy);
 $(document).on("page-change", () => redirect_staff_pro_desk_home());
 $(document).on("page-change", refresh_staff_pro_dock_shortcuts);
 $(document).on("page-change", enhance_sidebar_menus);
+$(document).on("page-change", prefer_employee_image_view);
+$(document).on("page-change", hide_employee_list_menu);
+$(document).on("page-change", apply_form_sidebar_policy);

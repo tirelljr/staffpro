@@ -1,0 +1,23 @@
+{
+ "aggregate_function_based_on": "daily_pay",
+ "color": "#2563eb",
+ "creation": "2026-08-20 12:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "document_type": "Attendance",
+ "dynamic_filters_json": "[[\"Attendance\",\"company\",\"=\",\"frappe.defaults.get_user_default(\\\"Company\\\")\"]]",
+ "filters_json": "[[\"Attendance\",\"docstatus\",\"<\",\"2\"],[\"Attendance\",\"attendance_date\",\"Timespan\",\"this week\"]]",
+ "function": "Sum",
+ "idx": 0,
+ "is_public": 1,
+ "is_standard": 1,
+ "label": "Daily Pay (This Week)",
+ "modified": "2026-08-20 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HR",
+ "name": "Daily Pay (This Week)",
+ "owner": "Administrator",
+ "show_percentage_stats": 1,
+ "stats_time_interval": "Weekly",
+ "type": "Document Type"
+}

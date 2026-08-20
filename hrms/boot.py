@@ -1,6 +1,13 @@
 import frappe
 from frappe import _
 
+BPO_DOCTYPE_UI_MESSAGES = {
+	"Designation": "Role",
+	"Designations": "Roles",
+	"Add Designation": "Add Role",
+	"New Designation": "New Role",
+}
+
 STAFF_PRO_DESK_HOME_DASHBOARD = "Human Resource"
 STAFF_PRO_DESK_HOME = f"desk/dashboard-view/{STAFF_PRO_DESK_HOME_DASHBOARD}"
 STAFF_PRO_DESK_HOME_ROUTE = ["dashboard-view", STAFF_PRO_DESK_HOME_DASHBOARD]
@@ -37,6 +44,22 @@ WORKSPACE_DASHBOARD_ALIASES = {
 	"Talent": "Recruitment",
 	"SS and Taxes": "SS and Taxes",
 }
+# Left-nav / dock sidebars kept for call-center BPO (everything else stripped from boot).
+BPO_WORKSPACE_SIDEBARS = frozenset(
+	{
+		"workforce",
+		"people",
+		"time",
+		"pay",
+		"payroll",
+		"ss and taxes",
+		"talent",
+		"finance",
+		"finance & admin",
+		"finance and admin",
+		"admin",
+	}
+)
 
 
 def resolve_dashboard_name(dashboard_name: str) -> str:
@@ -136,6 +159,62 @@ def extend_bootinfo(bootinfo):
 			first_name = full_name.split()[0] if full_name else ""
 	bootinfo["staff_pro_user"] = {"first_name": first_name}
 	bootinfo["staff_pro_bpo_sidebar_labels"] = get_sidebar_label_maps()
+	apply_payroll_frequency_translations(bootinfo)
+	_filter_bpo_workspace_sidebars(bootinfo)
+	_filter_bpo_app_workspaces(bootinfo)
+
+
+def apply_payroll_frequency_translations(bootinfo):
+	"""Show 2-weeks in the UI; stored payroll frequency stays Fortnightly."""
+	from hrms.payroll.auto_payroll import FREQUENCY_LABELS
+
+	label = FREQUENCY_LABELS.get("Fortnightly", "2-weeks")
+	messages = bootinfo.get("__messages")
+	if not isinstance(messages, dict):
+		messages = {}
+		bootinfo["__messages"] = messages
+	messages["Fortnightly"] = label
+	messages["2 Weeks"] = label
+	messages["Add Sales Invoice"] = "Add Client Invoice"
+	messages["New Sales Invoice"] = "New Client Invoice"
+	messages["Sales Invoice"] = "Client Invoice"
+	messages.update(BPO_DOCTYPE_UI_MESSAGES)
+
+
+def _is_bpo_workspace_name(name) -> bool:
+	if isinstance(name, dict):
+		name = name.get("name") or name.get("title") or name.get("label")
+	return str(name or "").lower() in BPO_WORKSPACE_SIDEBARS
+
+
+def _filter_bpo_workspace_sidebars(bootinfo):
+	"""Drop Stock/Buying/Selling/etc. from the Desk workspace switcher payload."""
+	sidebars = bootinfo.get("workspace_sidebar_item")
+	if not isinstance(sidebars, dict):
+		return
+	bootinfo["workspace_sidebar_item"] = {
+		key: value
+		for key, value in sidebars.items()
+		if str(key).lower() in BPO_WORKSPACE_SIDEBARS
+	}
+
+
+def _filter_bpo_app_workspaces(bootinfo):
+	"""Keep dock / apps-screen workspace lists on call-center HR and payroll."""
+	app_data = bootinfo.get("app_data")
+	if isinstance(app_data, list):
+		for app in app_data:
+			if not isinstance(app, dict):
+				continue
+			workspaces = app.get("workspaces")
+			if isinstance(workspaces, list):
+				app["workspaces"] = [name for name in workspaces if _is_bpo_workspace_name(name)]
+
+	workspaces = bootinfo.get("workspaces")
+	if isinstance(workspaces, dict):
+		pages = workspaces.get("pages")
+		if isinstance(pages, list):
+			workspaces["pages"] = [page for page in pages if _is_bpo_workspace_name(page)]
 
 
 def _disable_app_onboarding_bootinfo(bootinfo):
@@ -175,5 +254,5 @@ def hide_unused_erpnext_workspaces():
 	"""Hide ERPNext module workspaces so they do not appear beside Staff Pro BPO."""
 	from hrms.subscription_utils import update_erpnext_workspaces
 
-	# Always hide stock/CRM/etc. Accounting is surfaced via the Finance workspace.
+	# Always hide stock/CRM/etc. Client billing is surfaced via the Finance workspace.
 	update_erpnext_workspaces(disable=True)

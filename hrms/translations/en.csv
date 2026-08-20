@@ -1,0 +1,17 @@
+Fortnightly,2-weeks
+2 Weeks,2-weeks
+2 Weeks Days,2-weeks Days
+"2 Weeks every {0} days","2-weeks every {0} days"
+"Set days for Weekly, 2 Weeks, or Monthly.","Set days for Weekly, 2-weeks, or Monthly."
+"Set auto-run days for Weekly, 2 Weeks, or Monthly.","Set auto-run days for Weekly, 2-weeks, or Monthly."
+"Set days for Weekly, 2 Weeks, or Monthly so automatic payroll knows when to run.","Set days for Weekly, 2-weeks, or Monthly so automatic payroll knows when to run."
+"Cost to Company (CTC)",Agent Hourly
+PAN Number,Tax Number
+"Total Cost To Company (CTC)",Agent Hourly
+CTC,Agent Hourly
+Current CTC,Current Agent Hourly
+Revised CTC,Revised Agent Hourly
+Annual CTC,Annual Agent Hourly
+"See CTC Break-up",See Agent Hourly Breakdown
+"Percent of CTC (%)",Percent of Agent Hourly (%)
+"Employee CTC Break-up",Agent Hourly Breakdown

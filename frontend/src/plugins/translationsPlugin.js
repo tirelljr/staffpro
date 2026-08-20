@@ -11,19 +11,35 @@ function makeTranslationFunction() {
 	async function setup() {
 		if (window.frappe?.boot?.__messages) {
 			messages = window.frappe?.boot?.__messages;
-			return;
+		} else {
+			const url = new URL("/api/method/frappe.translate.load_all_translations", location.origin);
+			url.searchParams.append("lang", window.frappe?.boot?.lang ?? navigator.language);
+			url.searchParams.append("hash", window.frappe?.boot?.translations_hash || window._version_number || Math.random()); // for cache busting
+
+			try {
+				const response = await fetch(url);
+				const contentType = response.headers.get("content-type") || ""
+				if (!response.ok || !contentType.includes("json")) {
+					messages = messages || {};
+				} else {
+					messages = await response.json() || {}
+				}
+			} catch (error) {
+				console.error("Failed to fetch translations:", error)
+			}
 		}
 
-		const url = new URL("/api/method/frappe.translate.load_all_translations", location.origin);
-		url.searchParams.append("lang", window.frappe?.boot?.lang ?? navigator.language);
-		url.searchParams.append("hash", window.frappe?.boot?.translations_hash || window._version_number || Math.random()); // for cache busting
-		// url.searchParams.append("app", "hrms");
-
-		try {
-			const response = await fetch(url);
-			messages = await response.json() || {}
-		} catch (error) {
-			console.error("Failed to fetch translations:", error)
+		messages = messages || {};
+		messages.Fortnightly = "2-weeks";
+		messages["2 Weeks"] = "2-weeks";
+		messages["Cost to Company (CTC)"] = "Agent Hourly";
+		messages["PAN Number"] = "Tax Number";
+		messages["Total Cost To Company (CTC)"] = "Agent Hourly";
+		messages.CTC = "Agent Hourly";
+		messages["Current CTC"] = "Current Agent Hourly";
+		messages["Revised CTC"] = "Revised Agent Hourly";
+		if (window.frappe?.boot) {
+			window.frappe.boot.__messages = messages;
 		}
 	}
 

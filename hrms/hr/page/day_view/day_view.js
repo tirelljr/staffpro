@@ -34,10 +34,11 @@ hrms.day_view = {
 	make(page) {
 		this.page = page;
 		const $existing = page.main.find(".sp-dayview");
-		if ($existing.length) {
+		if ($existing.length && $existing.find(".sp-dayview__btn-clock").length) {
 			this.$body = $existing;
 			return;
 		}
+		$existing.remove();
 		this.$body = $('<div class="sp-dayview"></div>').appendTo(page.main);
 		this.render_shell();
 		this.bind();
@@ -77,6 +78,7 @@ hrms.day_view = {
 				</select>
 				<button type="button" class="sp-dayview__btn-approve">${frappe.utils.escape_html(__("Approve"))}</button>
 				<button type="button" class="sp-dayview__btn-delete">${frappe.utils.escape_html(__("Delete Selected"))}</button>
+				<button type="button" class="sp-clock-btn sp-dayview__btn-clock">${frappe.utils.escape_html(__("CLOCK"))}</button>
 				<span class="sp-dayview__status" aria-live="polite"></span>
 				<label class="sp-dayview__group">
 					<input type="checkbox" class="sp-dayview__group-by" />
@@ -127,25 +129,33 @@ hrms.day_view = {
 		});
 		this.$body.on("click", ".sp-dayview__btn-approve", () => me.approve_selected());
 		this.$body.on("click", ".sp-dayview__btn-delete", () => me.delete_selected());
+		this.$body.on("click", ".sp-dayview__btn-clock", () => me.open_clock());
 		this.$body.on("click", ".sp-dayview__link", function () {
 			const $btn = $(this);
+			const $row = $btn.closest(".sp-dayview__row");
 			const act = $btn.data("act");
 			const date = $btn.data("date");
 			const employee = $btn.data("employee");
-			const name = $btn.data("name");
+			const name = $btn.attr("data-name") || $row.attr("data-name");
+			const in_log = $row.attr("data-in-log") || null;
+			const out_log = $row.attr("data-out-log") || null;
+			const kind = $row.attr("data-kind");
 			if (act === "add") {
 				me.add_entry(date, employee);
 				return;
 			}
+			if (kind === "lunch") {
+				return;
+			}
 			if (act === "edit" && name) {
-				hrms.time.show_edit_entry_dialog(me.listview_stub(), name);
+				hrms.time.show_edit_entry_dialog(me.listview_stub(), name, { in_log, out_log });
 				return;
 			}
 			if (act === "del" && name) {
 				frappe.confirm(__("Remove this hours entry?"), () => {
 					frappe.call({
 						method: "hrms.hr.doctype.attendance.attendance.cancel_hours_entry",
-						args: { name },
+						args: { name, in_log, out_log },
 						callback() {
 							me.refresh();
 						},
@@ -474,10 +484,10 @@ hrms.day_view = {
 							<th>${frappe.utils.escape_html(__("Paid"))}</th>
 							<th>${frappe.utils.escape_html(__("Unpaid"))}</th>
 							<th>${frappe.utils.escape_html(__("Total"))}</th>
-							<th>${frappe.utils.escape_html(__("Pay"))}</th>
+							<th>${frappe.utils.escape_html(__("Gross"))}</th>
+							<th>${frappe.utils.escape_html(__("Net"))}</th>
 							<th>${frappe.utils.escape_html(__("SS"))}</th>
 							<th>${frappe.utils.escape_html(__("Tax"))}</th>
-							<th>${frappe.utils.escape_html(__("Net"))}</th>
 							<th>${frappe.utils.escape_html(__("Job/Absence"))}</th>
 							<th>${frappe.utils.escape_html(__("Shift"))}</th>
 							<th></th>
@@ -497,16 +507,24 @@ hrms.day_view = {
 		const moment_date = moment(date);
 		const odd = day_index % 2 === 1;
 		const name = row?.name || "";
+		const kind = row?.kind || (row ? "attendance" : "");
+		const is_lunch = kind === "lunch";
+		const in_log = row?.in_log || "";
+		const out_log = row?.out_log || "";
 		const actions = name
 			? `<button type="button" class="sp-dayview__link" data-act="add" data-date="${frappe.utils.escape_html(
 					date,
 				)}" data-employee="${frappe.utils.escape_html(employee)}">${frappe.utils.escape_html(__("add"))}</button>
-				<button type="button" class="sp-dayview__link" data-act="edit" data-name="${frappe.utils.escape_html(
-					name,
-				)}">${frappe.utils.escape_html(__("edit"))}</button>
+				${
+					is_lunch
+						? ""
+						: `<button type="button" class="sp-dayview__link" data-act="edit" data-name="${frappe.utils.escape_html(
+								name,
+							)}">${frappe.utils.escape_html(__("edit"))}</button>
 				<button type="button" class="sp-dayview__link" data-act="del" data-name="${frappe.utils.escape_html(
 					name,
 				)}">${frappe.utils.escape_html(__("del"))}</button>`
+				}`
 			: `<button type="button" class="sp-dayview__link" data-act="add" data-date="${frappe.utils.escape_html(
 					date,
 				)}" data-employee="${frappe.utils.escape_html(employee)}">${frappe.utils.escape_html(__("add"))}</button>`;
@@ -517,12 +535,17 @@ hrms.day_view = {
 			)
 			.join("");
 		const label = show_employee ? row.employee_label || row.employee_name || "" : this.date_label(date);
+		const check_disabled = !name || is_lunch ? "disabled" : "";
 		return `
-			<tr class="sp-dayview__row${odd ? " is-alt" : ""}${row ? " has-entry" : ""}" data-name="${frappe.utils.escape_html(
-				name,
-			)}">
+			<tr class="sp-dayview__row${odd ? " is-alt" : ""}${row ? " has-entry" : ""}${
+				is_lunch ? " is-lunch" : ""
+			}" data-name="${frappe.utils.escape_html(name)}" data-kind="${frappe.utils.escape_html(
+				kind,
+			)}" data-in-log="${frappe.utils.escape_html(in_log)}" data-out-log="${frappe.utils.escape_html(out_log)}">
 				<td class="sp-dayview__check-col">
-					<input type="checkbox" class="sp-dayview__check" ${name ? `value="${frappe.utils.escape_html(name)}"` : "disabled"} />
+					<input type="checkbox" class="sp-dayview__check" ${
+						name && !is_lunch ? `value="${frappe.utils.escape_html(name)}"` : check_disabled
+					} />
 				</td>
 				<td class="sp-dayview__day-col">${show_day ? frappe.utils.escape_html(moment_date.format("ddd")) : ""}</td>
 				<td>
@@ -537,11 +560,11 @@ hrms.day_view = {
 				<td>${frappe.utils.escape_html(this.hours(row?.pto))}</td>
 				<td>${frappe.utils.escape_html(this.hours(row?.paid))}</td>
 				<td>${frappe.utils.escape_html(this.hours(row?.unpaid))}</td>
-				<td>${frappe.utils.escape_html(this.hours(row?.total))}</td>
+				<td>${frappe.utils.escape_html(this.hours(this.entry_hours(row)))}</td>
 				<td>${frappe.utils.escape_html(this.money(row?.daily_pay))}</td>
+				<td>${frappe.utils.escape_html(this.money(row?.net_daily_pay))}</td>
 				<td>${frappe.utils.escape_html(this.money(row?.ss_deduction))}</td>
 				<td>${frappe.utils.escape_html(this.money(row?.tax_deduction))}</td>
-				<td>${frappe.utils.escape_html(this.money(row?.net_daily_pay))}</td>
 				<td>${frappe.utils.escape_html(row?.job || "")}</td>
 				<td>${frappe.utils.escape_html(row?.shift || "")}</td>
 				<td class="sp-dayview__actions">${actions}</td>
@@ -559,9 +582,9 @@ hrms.day_view = {
 			<td>${frappe.utils.escape_html(this.hours(totals.unpaid, true))}</td>
 			<td>${frappe.utils.escape_html(this.hours(totals.total, true))}</td>
 			<td>${frappe.utils.escape_html(this.money(totals.daily_pay, true))}</td>
+			<td>${frappe.utils.escape_html(this.money(totals.net_daily_pay, true))}</td>
 			<td>${frappe.utils.escape_html(this.money(totals.ss_deduction, true))}</td>
 			<td>${frappe.utils.escape_html(this.money(totals.tax_deduction, true))}</td>
-			<td>${frappe.utils.escape_html(this.money(totals.net_daily_pay, true))}</td>
 			<td colspan="3"></td>`;
 	},
 
@@ -581,16 +604,22 @@ hrms.day_view = {
 		};
 		const seen_weeks = new Set();
 		(rows || []).forEach((row) => {
-			Object.keys(totals).forEach((key) => {
-				if (key === "ss_deduction") return;
-				totals[key] += Number(row?.[key] || 0);
-			});
+			totals.reg += Number(row?.reg || 0);
+			totals.ot += Number(row?.ot || 0);
+			totals.dt += Number(row?.dt || 0);
+			totals.pto += Number(row?.pto || 0);
+			totals.paid += Number(row?.paid || 0);
+			totals.unpaid += Number(row?.unpaid || 0);
+			totals.total += Number(row?.total || this.entry_hours(row) || 0);
+			totals.daily_pay += Number(row?.daily_pay || 0);
 			const week_key = `${row?.employee || ""}|${row?.week_start || ""}`;
 			if (row?.week_start && !seen_weeks.has(week_key)) {
 				seen_weeks.add(week_key);
 				totals.ss_deduction += Number(row.week_ss || 0);
+				totals.tax_deduction += Number(row.week_tax || 0);
 			}
 		});
+		totals.net_daily_pay = totals.daily_pay - totals.ss_deduction - totals.tax_deduction;
 		return totals;
 	},
 
@@ -662,10 +691,11 @@ hrms.day_view = {
 	},
 
 	totals_label(totals) {
-		return __("Total Hours: {0} | Paid: {1} | Pay: {2} | SS: {3} | Tax: {4}", [
+		return __("Total Hours: {0} | Paid: {1} | Gross: {2} | Net: {3} | SS: {4} | Tax: {5}", [
 			this.hours(totals.total, true),
 			this.hours(totals.paid, true),
 			this.money(totals.daily_pay, true),
+			this.money(totals.net_daily_pay, true),
 			this.money(totals.ss_deduction, true),
 			this.money(totals.tax_deduction, true),
 		]);
@@ -685,6 +715,14 @@ hrms.day_view = {
 		if (!keep_zero && !Number(value)) return "";
 		if (hrms.time?.format_hours) return hrms.time.format_hours(value || 0);
 		return value == null ? "" : String(value);
+	},
+
+	entry_hours(row) {
+		if (!row) return 0;
+		if (Number(row.total)) return row.total;
+		if (Number(row.working_hours)) return row.working_hours;
+		if (hrms.time?.hours_for_row) return hrms.time.hours_for_row(row);
+		return 0;
 	},
 
 	money(value, keep_zero) {
@@ -720,9 +758,16 @@ hrms.day_view = {
 	},
 
 	approve_selected() {
-		const names = this.selected_names().length
-			? this.selected_names()
-			: this.rows.filter((row) => row.name && !Number(row.hours_paid)).map((row) => row.name);
+		const selected = this.selected_names();
+		const names = [
+			...new Set(
+				selected.length
+					? selected
+					: this.rows
+							.filter((row) => row.name && row.kind !== "lunch" && !Number(row.hours_paid))
+							.map((row) => row.name),
+			),
+		];
 		if (!names.length) {
 			frappe.msgprint(__("There is nothing to approve."));
 			return;
@@ -745,7 +790,7 @@ hrms.day_view = {
 	},
 
 	delete_selected() {
-		const names = this.selected_names();
+		const names = [...new Set(this.selected_names())];
 		if (!names.length) {
 			frappe.msgprint(__("Select at least one entry."));
 			return;
@@ -762,6 +807,14 @@ hrms.day_view = {
 
 	add_entry(date, employee) {
 		hrms.time.show_add_entry_dialog(this.listview_stub({ date, employee }));
+	},
+
+	open_clock() {
+		if (hrms.time?.show_add_entry_dialog) {
+			hrms.time.show_add_entry_dialog(this.listview_stub());
+			return;
+		}
+		frappe.set_route("List", "Attendance");
 	},
 
 	listview_stub(extra = {}) {

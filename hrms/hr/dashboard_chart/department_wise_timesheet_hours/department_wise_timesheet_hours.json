@@ -1,7 +1,7 @@
 {
  "aggregate_function_based_on": "total_hours",
  "based_on": "",
- "chart_name": "Department wise Timesheet Hours",
+ "chart_name": "Hours by Team",
  "chart_type": "Group By",
  "creation": "2022-08-21 17:32:09.625319",
  "docstatus": 0,

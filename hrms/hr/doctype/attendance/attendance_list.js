@@ -34,8 +34,9 @@ frappe.listview_settings["Attendance"] = {
 		out_time(value) {
 			return hrms.time?.format_clock ? hrms.time.format_clock(value) : value;
 		},
-		working_hours(value) {
-			return hrms.time?.format_hours ? hrms.time.format_hours(value) : value;
+		working_hours(value, _df, doc) {
+			const hours = value || hrms.time?.hours_between?.(doc?.in_time, doc?.out_time) || 0;
+			return hrms.time?.format_hours ? hrms.time.format_hours(hours) : hours;
 		},
 	},
 

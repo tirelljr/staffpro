@@ -2,11 +2,24 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Client Invoice", {
+	onload(frm) {
+		if (frm.is_new() && frm.doc.currency !== "USD") {
+			frm.set_value("currency", "USD");
+		}
+	},
+
 	refresh(frm) {
 		frm.trigger("toggle_get_agents_button");
+		frm.set_query("employee", "agents", () => ({
+			filters: {
+				status: "Active",
+				company: frm.doc.company,
+				...(frm.doc.customer ? { bill_to_customer: frm.doc.customer } : {}),
+			},
+		}));
 		if (frm.doc.docstatus === 1 && frm.doc.sales_invoice) {
 			frm.add_custom_button(
-				__("Sales Invoice"),
+				__("Posted Invoice"),
 				() => {
 					frappe.set_route("Form", "Sales Invoice", frm.doc.sales_invoice);
 				},
@@ -21,19 +34,32 @@ frappe.ui.form.on("Client Invoice", {
 
 	company(frm) {
 		frm.trigger("toggle_get_agents_button");
+		if (frm.doc.currency !== "USD") {
+			frm.set_value("currency", "USD");
+		}
 	},
 
 	from_date(frm) {
 		frm.trigger("toggle_get_agents_button");
+		frm.trigger("refresh_agent_rows");
 	},
 
 	to_date(frm) {
 		frm.trigger("toggle_get_agents_button");
+		frm.trigger("refresh_agent_rows");
+	},
+
+	refresh_agent_rows(frm) {
+		(frm.doc.agents || []).forEach((row) => {
+			if (row.employee) {
+				fill_agent_row(frm, row.doctype, row.name);
+			}
+		});
 	},
 
 	toggle_get_agents_button(frm) {
 		frm.remove_custom_button(__("Get Agents"));
-		if (frm.doc.docstatus !== 0 || frm.is_new()) {
+		if (frm.doc.docstatus !== 0) {
 			return;
 		}
 		if (!(frm.doc.customer && frm.doc.company && frm.doc.from_date && frm.doc.to_date)) {
@@ -61,6 +87,9 @@ frappe.ui.form.on("Client Invoice", {
 });
 
 frappe.ui.form.on("Client Invoice Item", {
+	employee(frm, cdt, cdn) {
+		fill_agent_row(frm, cdt, cdn);
+	},
 	hours(frm, cdt, cdn) {
 		calculate_row_amount(frm, cdt, cdn);
 	},
@@ -71,6 +100,30 @@ frappe.ui.form.on("Client Invoice Item", {
 		calculate_totals(frm);
 	},
 });
+
+function fill_agent_row(frm, cdt, cdn) {
+	const row = locals[cdt][cdn];
+	if (!row?.employee) {
+		return;
+	}
+	if (!(frm.doc.from_date && frm.doc.to_date)) {
+		return;
+	}
+	return frm
+		.call({
+			method: "get_agent_billing_row",
+			args: { employee: row.employee },
+		})
+		.then((r) => {
+			const data = r.message || {};
+			if (data.employee_name) {
+				frappe.model.set_value(cdt, cdn, "employee_name", data.employee_name);
+			}
+			frappe.model.set_value(cdt, cdn, "hours", flt(data.hours));
+			frappe.model.set_value(cdt, cdn, "billing_rate", flt(data.billing_rate));
+			calculate_totals(frm);
+		});
+}
 
 function calculate_row_amount(frm, cdt, cdn) {
 	const row = locals[cdt][cdn];

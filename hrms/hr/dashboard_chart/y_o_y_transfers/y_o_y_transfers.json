@@ -1,6 +1,6 @@
 {
  "based_on": "transfer_date",
- "chart_name": "Y-O-Y Transfers",
+ "chart_name": "Transfers",
  "chart_type": "Count",
  "creation": "2022-08-21 13:28:05.162754",
  "docstatus": 0,

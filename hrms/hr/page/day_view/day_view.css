@@ -115,6 +115,29 @@
 	background: #d68f02;
 }
 
+.sp-dayview__btn-clock,
+.sp-clock-btn {
+	height: 32px;
+	padding: 0 16px;
+	border: 0;
+	border-radius: 4px;
+	background: #f2ae5d;
+	color: #fff;
+	font: inherit;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	line-height: 1;
+	text-transform: uppercase;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.sp-dayview__btn-clock:hover,
+.sp-clock-btn:hover {
+	background: #e9a04f;
+	color: #fff;
+}
+
 .sp-dayview__status {
 	margin-left: 4px;
 	color: #555;

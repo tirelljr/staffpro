@@ -1,5 +1,5 @@
 {
- "chart_name": "Attendance Count",
+ "chart_name": "Monthly Attendance",
  "chart_type": "Report",
  "creation": "2020-07-22 11:56:32.730068",
  "custom_options": "{\n\t\t\"type\": \"line\",\n\t\t\"axisOptions\": {\n\t\t\t\"shortenYAxisNumbers\": 1\n\t\t},\n\t\t\"tooltipOptions\": {}\n\t}",

@@ -1,6 +1,6 @@
 {
  "based_on": "end_date",
- "chart_name": "Outgoing Salary",
+ "chart_name": "Payroll Payouts",
  "chart_type": "Sum",
  "creation": "2020-07-22 11:56:34.478848",
  "custom_options": "",

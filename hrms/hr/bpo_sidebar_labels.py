@@ -77,14 +77,18 @@ LINK_LABELS: dict[str, str] = {
 	"Appraisal Template": "Review Templates",
 	"Employee Feedback Criteria": "QA Scorecard Criteria",
 	"Employee Lifecycle": "Agent Lifecycle",
-	"Employee CTC Break-up": "Agent CTC Breakdown",
-	"Provident Fund Deductions": "Provident Fund",
+	"Employee CTC Break-up": "Agent Hourly Breakdown",
 	"Employee Tax Exemption Sub Category": "Exemption Sub Category",
 	"Employee Tax Adjustment": "Tax Period Adjustments",
 	"Employee Tax Exemption Proof Submission": "Tax Exemption Proof",
 	"Employee Tax Exemption Declaration": "Tax Exemption Declaration",
 	"Employee Benefit Application": "Benefits Enrollment",
 	"Employee Benefit Claim": "Benefits Claims",
+	"Customer": "Clients",
+	"Client Invoice": "Client Invoices",
+	"Sales Invoice": "Posted Invoices",
+	"Accounts Receivable": "Outstanding Invoices",
+	"Payment Entry": "Record Payment",
 }
 
 # Section headers and items keyed by their current sidebar label.
@@ -109,7 +113,6 @@ LABEL_LABELS: dict[str, str] = {
 	"Unpaid Expense Claim": "Unpaid Reimbursements",
 	"Income Tax Computation": "Tax Computation",
 	"Income Tax Deductions": "Tax Deductions",
-	"Professional Tax Deductions": "Professional Tax",
 	"Social Security Deductions": "Social Security",
 	"Social Security Contribution Table": "SS Contribution Table",
 	"Vehicle Expenses": "Fleet Expenses",
@@ -118,7 +121,49 @@ LABEL_LABELS: dict[str, str] = {
 	"Vehicle Log": "Fleet Logs",
 	"Expense Claim Type": "Reimbursement Types",
 	"Accrued Earnings Report": "Accrued Earnings",
+	"Accounts Receivable": "Outstanding Invoices",
+	"Payment Entry": "Record Payment",
+	"Customer": "Clients",
+	"Sales Invoice": "Posted Invoices",
 }
+
+
+# ERPNext accounting leftovers — not used in the call-center BPO Finance sidebar.
+HIDDEN_SIDEBAR_LINKS = frozenset(
+	{
+		"Account",
+		"Accounts",
+		"Accounts Payable",
+		"Accounts Settings",
+		"General Ledger",
+		"Journal Entry",
+		"Profit and Loss Statement",
+		"Purchase Invoice",
+		"Supplier",
+		"Trial Balance",
+		"bank-reconciliation-tool",
+	}
+)
+
+HIDDEN_SIDEBAR_LABELS = frozenset(
+	{
+		"Home",
+		"Chart of Accounts",
+		"Receivables",
+		"Payables",
+		"Credit Note",
+		"Debit Note",
+		"Supplier",
+		"Purchase Invoice",
+		"Accounts Payable",
+		"Journal Entry",
+		"Bank Reconciliation Tool",
+		"General Ledger",
+		"Profit and Loss Statement",
+		"Trial Balance",
+		"Accounts Settings",
+	}
+)
 
 
 def apply_bpo_label(row: dict) -> dict:
@@ -135,13 +180,50 @@ def apply_bpo_label(row: dict) -> dict:
 	return data
 
 
+def _is_hidden_row(row: dict) -> bool:
+	link_to = (row.get("link_to") or "").strip()
+	label = (row.get("label") or "").strip()
+	return link_to in HIDDEN_SIDEBAR_LINKS or label in HIDDEN_SIDEBAR_LABELS
+
+
 def apply_bpo_labels(rows: list[dict]) -> list[dict]:
-	return [apply_bpo_label(row) for row in rows]
+	out = []
+	for row in rows:
+		if _is_hidden_row(row):
+			continue
+		out.append(apply_bpo_label(row))
+	return _drop_empty_sections(out)
 
 
-def get_sidebar_label_maps() -> dict[str, dict[str, str]]:
+def _drop_empty_sections(rows: list[dict]) -> list[dict]:
+	kept: list[dict] = []
+	i = 0
+	while i < len(rows):
+		row = rows[i]
+		if row.get("type") == "Section Break":
+			children = []
+			j = i + 1
+			while j < len(rows) and rows[j].get("child"):
+				children.append(rows[j])
+				j += 1
+			if children:
+				kept.append(row)
+				kept.extend(children)
+			i = j
+			continue
+		kept.append(row)
+		i += 1
+	return kept
+
+
+def get_sidebar_label_maps() -> dict:
 	"""Maps consumed by desk JS to rewrite sidebar labels at runtime."""
 	by_label = dict(LABEL_LABELS)
 	for link_to, new_label in LINK_LABELS.items():
 		by_label.setdefault(link_to, new_label)
-	return {"by_link": LINK_LABELS, "by_label": by_label}
+	return {
+		"by_link": LINK_LABELS,
+		"by_label": by_label,
+		"hidden_links": sorted(HIDDEN_SIDEBAR_LINKS),
+		"hidden_labels": sorted(HIDDEN_SIDEBAR_LABELS),
+	}
