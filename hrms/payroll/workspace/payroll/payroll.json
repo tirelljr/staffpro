@@ -219,7 +219,7 @@
    "type": "Link"
   },
   {
-   "hidden": 0,
+   "hidden": 1,
    "is_query_report": 0,
    "label": "Chart of Cost Centers",
    "link_count": 0,

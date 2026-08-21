@@ -70,13 +70,13 @@ function hide_payroll_settings_menu(frm) {
 function show_automatic_payroll_intro(frm) {
 	const parts = [];
 	if (cint(frm.doc.automatic_payroll_weekly_days)) {
-		parts.push(__("Weekly every {0} days", [frm.doc.automatic_payroll_weekly_days]));
+		parts.push(__("Weekly every {0} working days", [frm.doc.automatic_payroll_weekly_days]));
 	}
 	if (cint(frm.doc.automatic_payroll_fortnightly_days)) {
-		parts.push(__("2-weeks every {0} days", [frm.doc.automatic_payroll_fortnightly_days]));
+		parts.push(__("2-weeks every {0} working days", [frm.doc.automatic_payroll_fortnightly_days]));
 	}
 	if (cint(frm.doc.automatic_payroll_monthly_days)) {
-		parts.push(__("Monthly every {0} days", [frm.doc.automatic_payroll_monthly_days]));
+		parts.push(__("Monthly every {0} working days", [frm.doc.automatic_payroll_monthly_days]));
 	}
 	const schedule = parts.length ? parts.join(", ") : __("set days on each pay template");
 	frm.set_intro(

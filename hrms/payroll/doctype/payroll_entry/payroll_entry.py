@@ -93,10 +93,23 @@ class PayrollEntry(Document):
 		if cint(entries) == len(self.employees):
 			self.set_onload("submitted_ss", True)
 
+	def before_validate(self):
+		self.set_cost_center()
+
 	def validate(self):
 		self.number_of_employees = len(self.employees)
 		self.deduct_social_security = 1
 		self.set_status()
+
+	def set_cost_center(self):
+		if self.cost_center or not self.company:
+			return
+
+		self.cost_center = frappe.get_cached_value("Company", self.company, "cost_center")
+		if not self.cost_center:
+			self.cost_center = frappe.db.get_value(
+				"Cost Center", {"company": self.company, "is_group": 0}, "name", order_by="creation"
+			)
 
 	def set_status(self, status=None, update=False):
 		if not status:
@@ -1604,19 +1617,19 @@ def get_start_end_dates(
 	payroll_frequency: str, start_date: str | datetime.date | None = None, company: str | None = None
 ) -> frappe._dict:
 	"""Returns dict of start and end dates for given payroll frequency based on start_date"""
-	from hrms.payroll.auto_payroll import canonical_frequency, days_for_frequency
+	from hrms.payroll.auto_payroll import add_working_days, canonical_frequency, days_for_frequency
 
 	payroll_frequency = canonical_frequency(payroll_frequency)
 
 	if payroll_frequency in ("Weekly", "Fortnightly"):
 		interval = days_for_frequency(payroll_frequency)
-		end_date = add_days(getdate(start_date), interval - 1)
+		end_date = add_working_days(getdate(start_date), interval)
 		return frappe._dict({"start_date": start_date, "end_date": end_date})
 
 	if payroll_frequency == "Monthly":
 		interval = days_for_frequency(payroll_frequency)
 		if interval not in (28, 29, 30, 31):
-			end_date = add_days(getdate(start_date), interval - 1)
+			end_date = add_working_days(getdate(start_date), interval)
 			return frappe._dict({"start_date": start_date, "end_date": end_date})
 
 	if payroll_frequency == "Monthly" or payroll_frequency == "Bimonthly" or payroll_frequency == "":
@@ -1635,10 +1648,10 @@ def get_start_end_dates(
 			end_date = m["month_end_date"]
 
 	if payroll_frequency == "Weekly":
-		end_date = add_days(start_date, days_for_frequency("Weekly") - 1)
+		end_date = add_working_days(start_date, days_for_frequency("Weekly"))
 
 	if payroll_frequency == "Fortnightly":
-		end_date = add_days(start_date, days_for_frequency("Fortnightly") - 1)
+		end_date = add_working_days(start_date, days_for_frequency("Fortnightly"))
 
 	if payroll_frequency == "Daily":
 		end_date = start_date
@@ -1658,14 +1671,14 @@ def get_frequency_kwargs(frequency_name):
 
 @frappe.whitelist()
 def get_end_date(start_date: str | datetime.date, frequency: str) -> dict:
-	from hrms.payroll.auto_payroll import canonical_frequency, days_for_frequency
+	from hrms.payroll.auto_payroll import add_working_days, canonical_frequency, days_for_frequency
 
 	start_date = getdate(start_date)
 	frequency = canonical_frequency(frequency) or "Monthly"
 	if frequency in ("Weekly", "Fortnightly") or (
 		frequency == "Monthly" and days_for_frequency(frequency) not in (28, 29, 30, 31)
 	):
-		end_date = add_days(start_date, days_for_frequency(frequency) - 1)
+		end_date = add_working_days(start_date, days_for_frequency(frequency))
 		return dict(end_date=end_date.strftime(DATE_FORMAT))
 
 	frequency_key = frequency.lower() if frequency else "monthly"

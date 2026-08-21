@@ -184,12 +184,14 @@
    "depends_on": "employee",
    "fieldname": "section_break_17",
    "fieldtype": "Section Break",
+   "hidden": 1,
    "label": "Payroll Cost Centers"
   },
   {
    "allow_on_submit": 1,
    "fieldname": "payroll_cost_centers",
    "fieldtype": "Table",
+   "hidden": 1,
    "label": "Cost Centers",
    "options": "Employee Cost Center"
   },
@@ -197,7 +199,7 @@
    "fetch_from": "employee.grade",
    "fieldname": "grade",
    "fieldtype": "Link",
-   "label": "Grade",
+   "label": "Campaign",
    "options": "Employee Grade",
    "read_only": 1
   },

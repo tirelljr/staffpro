@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Atlantic Bank">
+  <rect width="64" height="64" rx="12" fill="#F7F4EE"/>
+  <path fill="#1E4F91" d="M8 50 L28 14 L36 14 L16 50 Z"/>
+  <path fill="#D32B2F" d="M16 50 L34 18 L42 18 L24 50 Z"/>
+  <path fill="#2E8A3A" d="M24 50 L40 24 L48 24 L32 50 Z"/>
+  <path fill="#D4A017" d="M32 50 L46 30 L54 30 L40 50 Z"/>
+</svg>

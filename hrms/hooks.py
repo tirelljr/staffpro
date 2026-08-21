@@ -74,10 +74,12 @@ doctype_js = {
 	"Holiday List": "public/js/erpnext/holiday_list.js",
 	"System Settings": "public/js/erpnext/system_settings.js",
 	"Sales Invoice": "public/js/erpnext/sales_invoice.js",
+	"Customer": "public/js/erpnext/customer.js",
 }
 doctype_list_js = {
 	"Employee": "public/js/erpnext/employee_list.js",
 	"Sales Invoice": "public/js/erpnext/sales_invoice_list.js",
+	"Customer": "public/js/erpnext/customer_list.js",
 	"Dashboard Chart": "public/js/bpo_dashboard_list.js",
 	"Number Card": "public/js/bpo_dashboard_list.js",
 	"Dashboard": "public/js/bpo_dashboard_list.js",
@@ -128,6 +130,10 @@ after_migrate = [
 	"hrms.setup.update_select_perm_after_install",
 	"hrms.branding.apply_branding",
 	"hrms.hr.bpo_employee_labels.apply_bpo_employee_labels",
+	"hrms.payroll.bpo_customer.apply_bpo_customer_layout",
+	"hrms.payroll.bpo_sales_invoice.apply_bpo_sales_invoice_layout",
+	"hrms.payroll.bpo_client_accounts.setup_usd_client_billing",
+	"hrms.patches.v16_0.hide_cost_center.hide_cost_center_fields",
 	"hrms.patches.v16_0.remove_workspace_sidebar_home_links.execute",
 	"hrms.patches.v16_0.disable_app_onboarding.execute",
 	"hrms.patches.v16_0.split_finance_and_admin.execute",
@@ -218,6 +224,10 @@ doc_events = {
 		"validate": "hrms.utils.holiday_list.validate_holiday_list_pay_toggles",
 		"on_update": "hrms.utils.holiday_list.invalidate_cache",
 		"on_trash": "hrms.utils.holiday_list.invalidate_cache",
+	},
+	"Customer": {
+		"validate": "hrms.payroll.bpo_client_accounts.set_client_billing_defaults",
+		"after_insert": "hrms.payroll.bpo_client_accounts.after_insert_customer",
 	},
 	"Timesheet": {"validate": "hrms.hr.utils.validate_active_employee"},
 	"Payment Entry": {

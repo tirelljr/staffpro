@@ -72,6 +72,10 @@ frappe.ui.form.on("Payroll Entry", {
 
 	refresh: (frm) => {
 		frm.set_df_property("deduct_social_security", "read_only", 1);
+		frm.set_df_property("grade", "label", __("Campaign"));
+		frm.set_df_property("cost_center", "hidden", 1);
+		frm.set_df_property("project", "hidden", 1);
+		frm.set_df_property("accounting_dimensions_section", "hidden", 1);
 		frm.toggle_reqd(["payroll_frequency"], 1);
 		if (hrms.relabel_payroll_frequency) {
 			hrms.relabel_payroll_frequency(frm);
@@ -291,6 +295,9 @@ frappe.ui.form.on("Payroll Entry", {
 	company: function (frm) {
 		frm.events.clear_employee_table(frm);
 		erpnext.accounts.dimensions.update_dimension(frm, frm.doctype);
+		frm.set_df_property("cost_center", "hidden", 1);
+		frm.set_df_property("project", "hidden", 1);
+		frm.set_df_property("accounting_dimensions_section", "hidden", 1);
 		frm.trigger("set_payable_account_and_currency");
 	},
 

@@ -11,9 +11,6 @@
   },
   {
    "card": "Daily Pay (This Week)"
-  },
-  {
-   "card": "Total Outgoing Salary(Last month)"
   }
  ],
  "charts": [
@@ -23,10 +20,6 @@
   },
   {
    "chart": "Floor Attendance",
-   "width": "Half"
-  },
-  {
-   "chart": "Shift Assignment Breakup",
    "width": "Half"
   },
   {
@@ -48,10 +41,6 @@
   {
    "chart": "Designation Wise Employee Count",
    "width": "Half"
-  },
-  {
-   "chart": "Hiring vs Attrition Count",
-   "width": "Half"
   }
  ],
  "creation": "2023-11-17 14:10:56.741833",
@@ -61,7 +50,7 @@
  "idx": 0,
  "is_default": 1,
  "is_standard": 1,
- "modified": "2026-08-20 12:30:00.000000",
+ "modified": "2026-08-21 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "HR",
  "name": "Human Resource",

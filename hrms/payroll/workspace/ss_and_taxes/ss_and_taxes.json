@@ -13,7 +13,7 @@
  "is_hidden": 0,
  "label": "SS and Taxes",
  "links": [],
- "modified": "2026-08-20 12:18:00",
+ "modified": "2026-08-21 08:00:00",
  "modified_by": "Administrator",
  "module": "Payroll",
  "name": "SS and Taxes",
@@ -221,5 +221,7 @@
    "type": "Link"
   }
  ],
- "title": "SS and Taxes"
+ "standard": 1,
+ "title": "SS and Taxes",
+ "type": "Workspace"
 }

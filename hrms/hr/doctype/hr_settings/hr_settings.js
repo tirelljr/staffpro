@@ -17,57 +17,8 @@ frappe.ui.form.on("HR Settings", {
 				},
 			};
 		});
-		setup_hr_settings_audit_logs(frm);
-		setTimeout(() => setup_hr_settings_audit_logs(frm), 200);
-		setTimeout(() => setup_hr_settings_audit_logs(frm), 800);
-	},
-	timeline_refresh: function (frm) {
-		setup_hr_settings_audit_logs(frm);
 	},
 });
-
-function setup_hr_settings_audit_logs(frm) {
-	const $page = frm.page?.wrapper || frm.$wrapper;
-	if (!$page?.length) {
-		return;
-	}
-
-	const $after = $page.find(".after-save");
-	if (!$after.length) {
-		return;
-	}
-
-	const audit_label = __("Audit Logs");
-	replace_own_text($after, [__("Comments"), "Comments"], audit_label);
-	$after.find(".timeline-item.activity-title h4, .activity-title h4").text(audit_label);
-	replace_own_text($after, [__("Activity"), "Activity"], audit_label);
-
-	$after.find("button.action-btn, .action-btn").each(function () {
-		const label = ($(this).text() || "").replace(/\s+/g, " ").trim();
-		if (label.includes(__("New Email")) || label.includes("New Email")) {
-			$(this).closest(".timeline-actions").length ? $(this).closest(".timeline-actions").hide() : $(this).hide();
-		}
-	});
-}
-
-function replace_own_text($root, from_labels, to_label) {
-	const labels = new Set(from_labels.filter(Boolean));
-	$root.find("h4, h5, span, div, label").each(function () {
-		const own = Array.from(this.childNodes)
-			.filter((node) => node.nodeType === Node.TEXT_NODE)
-			.map((node) => (node.textContent || "").trim())
-			.filter(Boolean)
-			.join(" ");
-		if (!labels.has(own)) {
-			return;
-		}
-		Array.from(this.childNodes).forEach((node) => {
-			if (node.nodeType === Node.TEXT_NODE && labels.has((node.textContent || "").trim())) {
-				node.textContent = to_label;
-			}
-		});
-	});
-}
 
 frappe.tour["HR Settings"] = [
 	{

@@ -48,6 +48,21 @@ class TestDailyPay(HRMSTestSuite):
 		self.assertEqual(rows["rows"][0]["unpaid"], 0)
 		self.assertEqual(rows["approval"], "Approved")
 
+	def test_hour_rate_from_agent_hourly(self):
+		employee = make_employee("test_agent_hourly_ctc@example.com", company="_Test Company")
+		make_salary_structure(
+			"Agent Hourly Override Structure",
+			"Weekly",
+			employee=employee,
+			company="_Test Company",
+			from_date=nowdate(),
+			base=500,
+			other_details={"hour_rate": 12.5},
+		)
+		frappe.db.set_value("Employee", employee, "ctc", 18)
+		frappe.flags.hour_rate_cache = {}
+		self.assertEqual(flt(get_hour_rate(employee, nowdate()), 2), 18)
+
 	def test_hour_rate_from_weekly_base(self):
 		employee = make_employee("test_daily_pay_base@example.com", company="_Test Company")
 		make_salary_structure(

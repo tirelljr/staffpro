@@ -40,13 +40,32 @@ frappe.ui.form.on("Client Invoice", {
 	},
 
 	from_date(frm) {
+		frm.trigger("set_working_period_dates");
 		frm.trigger("toggle_get_agents_button");
-		frm.trigger("refresh_agent_rows");
 	},
 
 	to_date(frm) {
 		frm.trigger("toggle_get_agents_button");
 		frm.trigger("refresh_agent_rows");
+	},
+
+	set_working_period_dates(frm) {
+		if (!frm.doc.from_date || frm.doc.docstatus !== 0) {
+			return;
+		}
+		return frappe.call({
+			method: "hrms.payroll.auto_payroll.get_working_period_end",
+			args: {
+				start_date: frm.doc.from_date,
+				working_days: 10,
+			},
+			callback(r) {
+				if (r.message?.end_date) {
+					frm.set_value("to_date", r.message.end_date);
+					frm.set_value("posting_date", r.message.end_date);
+				}
+			},
+		});
 	},
 
 	refresh_agent_rows(frm) {

@@ -7,12 +7,15 @@ import frappe
 from frappe.utils import getdate
 
 from hrms.payroll.auto_payroll import (
+	add_working_days,
 	canonical_frequency,
 	days_for_frequency,
 	frequency_label,
 	get_pay_period,
+	get_working_period_end,
 	process_automatic_payroll,
 	set_automatic_payroll_interval,
+	subtract_working_days,
 )
 from hrms.tests.utils import HRMSTestSuite
 
@@ -43,6 +46,14 @@ class TestAutoPayroll(HRMSTestSuite):
 	def tearDown(self):
 		frappe.db.set_single_value("Payroll Settings", self._previous, update_modified=False)
 
+	def test_working_days_skip_weekends(self):
+		# Monday 3 Aug 2026 + 10 weekdays = Friday 14 Aug 2026
+		self.assertEqual(add_working_days(date(2026, 8, 3), 10), date(2026, 8, 14))
+		# Saturday start still lands on the same Friday
+		self.assertEqual(add_working_days(date(2026, 8, 1), 10), date(2026, 8, 14))
+		self.assertEqual(subtract_working_days(date(2026, 8, 14), 10), date(2026, 8, 3))
+		self.assertEqual(get_working_period_end("2026-08-03", 10)["end_date"], "2026-08-14")
+
 	def test_pay_period_from_last_end(self):
 		start, end = get_pay_period(
 			interval=10,
@@ -51,7 +62,7 @@ class TestAutoPayroll(HRMSTestSuite):
 			last_end=date(2026, 8, 10),
 		)
 		self.assertEqual(getdate(start), date(2026, 8, 11))
-		self.assertEqual(getdate(end), date(2026, 8, 20))
+		self.assertEqual(getdate(end), date(2026, 8, 24))
 
 	def test_first_period_ends_yesterday(self):
 		start, end = get_pay_period(
@@ -62,7 +73,7 @@ class TestAutoPayroll(HRMSTestSuite):
 			cycle_start=None,
 		)
 		self.assertEqual(getdate(end), date(2026, 8, 20))
-		self.assertEqual(getdate(start), date(2026, 8, 11))
+		self.assertEqual(getdate(start), date(2026, 8, 7))
 
 	def test_cycle_start_anchor(self):
 		start, end = get_pay_period(
@@ -73,7 +84,7 @@ class TestAutoPayroll(HRMSTestSuite):
 			cycle_start=date(2026, 8, 1),
 		)
 		self.assertEqual(getdate(start), date(2026, 8, 1))
-		self.assertEqual(getdate(end), date(2026, 8, 10))
+		self.assertEqual(getdate(end), date(2026, 8, 14))
 
 	def test_open_period_is_not_due(self):
 		_start, end = get_pay_period(
@@ -82,7 +93,7 @@ class TestAutoPayroll(HRMSTestSuite):
 			company="_Test Company",
 			last_end=date(2026, 8, 15),
 		)
-		self.assertEqual(getdate(end), date(2026, 8, 25))
+		self.assertEqual(getdate(end), date(2026, 8, 28))
 		self.assertGreaterEqual(getdate(end), date(2026, 8, 20))
 
 	def test_skips_when_disabled(self):

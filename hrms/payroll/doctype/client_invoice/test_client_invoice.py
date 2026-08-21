@@ -131,6 +131,11 @@ class TestClientInvoice(HRMSTestSuite):
 		self.assertEqual(si.currency, CLIENT_BILLING_CURRENCY)
 		self.assertEqual(len(si.items), 2)
 		self.assertAlmostEqual(flt(si.grand_total), 525.0)
+		if si.debit_to:
+			self.assertEqual(
+				frappe.db.get_value("Account", si.debit_to, "account_currency"),
+				CLIENT_BILLING_CURRENCY,
+			)
 
 		# Cancel rolls back the Sales Invoice
 		invoice.cancel()

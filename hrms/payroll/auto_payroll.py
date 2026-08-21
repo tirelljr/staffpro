@@ -14,10 +14,11 @@ from frappe.utils import add_days, cint, date_diff, getdate, nowdate
 MAX_PERIODS_PER_RUN = 3
 
 PAYROLL_TEMPLATES = (
-	("Weekly", "automatic_payroll_weekly_days", 7),
-	("Fortnightly", "automatic_payroll_fortnightly_days", 14),
-	("Monthly", "automatic_payroll_monthly_days", 30),
+	("Weekly", "automatic_payroll_weekly_days", 5),
+	("Fortnightly", "automatic_payroll_fortnightly_days", 10),
+	("Monthly", "automatic_payroll_monthly_days", 22),
 )
+WEEKEND_WEEKDAYS = {5, 6}  # Saturday, Sunday
 FREQUENCY_ALIASES = {
 	"weekly": "Weekly",
 	"fortnightly": "Fortnightly",
@@ -37,6 +38,45 @@ FREQUENCY_LABELS = {
 	"Bimonthly": "Twice a Month",
 	"Daily": "Daily",
 }
+
+
+def is_working_day(on_date) -> bool:
+	return getdate(on_date).weekday() not in WEEKEND_WEEKDAYS
+
+
+def add_working_days(start_date, working_days: int):
+	"""Nth Monday–Friday on or after start_date. Start counts when it is a weekday."""
+	current = getdate(start_date)
+	remaining = max(cint(working_days), 1)
+	while True:
+		if is_working_day(current):
+			remaining -= 1
+			if remaining == 0:
+				return current
+		current = add_days(current, 1)
+
+
+def subtract_working_days(end_date, working_days: int):
+	"""Start date of an N-weekday period that ends on end_date (inclusive)."""
+	current = getdate(end_date)
+	remaining = max(cint(working_days), 1)
+	while True:
+		if is_working_day(current):
+			remaining -= 1
+			if remaining == 0:
+				return current
+		current = add_days(current, -1)
+
+
+@frappe.whitelist()
+def get_working_period_end(start_date, working_days: int | None = None):
+	"""Form helper: end date N working days from start. Default is a 2-week (10-day) period."""
+	if not start_date:
+		return {"end_date": None}
+	days = cint(working_days) if working_days not in (None, "") else 10
+	if days < 1:
+		days = 10
+	return {"end_date": add_working_days(getdate(start_date), days).strftime("%Y-%m-%d")}
 
 
 def canonical_frequency(name: str | None) -> str:
@@ -377,18 +417,18 @@ def get_pay_period(
 
 	if last_end:
 		start_date = add_days(getdate(last_end), 1)
-		end_date = add_days(start_date, interval - 1)
+		end_date = add_working_days(start_date, interval)
 		return getdate(start_date), getdate(end_date)
 
 	anchor = getdate(cycle_start) if cycle_start else None
 	if not anchor:
-		# First run: the most recently completed N-day window, ending yesterday.
+		# First run: the most recently completed N-working-day window, ending yesterday.
 		end_date = add_days(as_of, -1)
-		start_date = add_days(end_date, -(interval - 1))
+		start_date = subtract_working_days(end_date, interval)
 		return getdate(start_date), getdate(end_date)
 
 	start_date = anchor
-	end_date = add_days(start_date, interval - 1)
+	end_date = add_working_days(start_date, interval)
 	return getdate(start_date), getdate(end_date)
 
 

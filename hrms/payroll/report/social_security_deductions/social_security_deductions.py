@@ -1,11 +1,16 @@
 # Copyright (c) 2026, Staff Pro BPO and Contributors
 # License: GNU General Public License v3. See license.txt
 
+import io
+import zipfile
+
 import frappe
 from frappe import _
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Coalesce
 from frappe.utils import getdate
+from frappe.utils.csvutils import to_csv
+from frappe.utils.xlsxutils import make_xlsx
 
 
 def execute(filters=None):
@@ -164,3 +169,44 @@ def _employee_ssn_map(employees: list[str]) -> dict[str, str]:
 		fields=["name", "social_security_number"],
 	)
 	return {row.name: row.social_security_number for row in rows if row.social_security_number}
+
+
+def _export_rows(filters=None):
+	columns, data = execute(filters)
+	headers = [col.get("label") for col in columns]
+	fieldnames = [col.get("fieldname") for col in columns]
+	rows = [headers]
+	for row in data:
+		rows.append(["" if row.get(fieldname) is None else row.get(fieldname) for fieldname in fieldnames])
+	return rows
+
+
+def _period_label(filters) -> str:
+	filters = frappe._dict(filters or {})
+	if filters.get("from_date") and filters.get("to_date"):
+		return f"{getdate(filters.from_date)}_{getdate(filters.to_date)}"
+	return "all"
+
+
+@frappe.whitelist()
+def download_zip(filters=None):
+	"""Download Social Security deductions as a ZIP of CSV and Excel."""
+	if not frappe.permissions.can_export("Salary Slip"):
+		frappe.throw(_("Not permitted to export"), frappe.PermissionError)
+
+	if isinstance(filters, str):
+		filters = frappe.parse_json(filters)
+
+	rows = _export_rows(filters)
+	period = _period_label(filters)
+	buffer = io.BytesIO()
+	with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+		archive.writestr(f"Social_Security_Deductions_{period}.csv", to_csv(rows))
+		archive.writestr(
+			f"Social_Security_Deductions_{period}.xlsx",
+			make_xlsx(rows, "Social Security Deductions").getvalue(),
+		)
+
+	frappe.response["filename"] = f"Social_Security_Deductions_{period}.zip"
+	frappe.response["filecontent"] = buffer.getvalue()
+	frappe.response["type"] = "binary"

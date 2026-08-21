@@ -16,9 +16,11 @@ HIDDEN_EMPLOYEE_FIELDS = (
 	"attendance_device_id",
 	"provident_fund_account",
 	"employee_advance_account",
+	"payroll_cost_center",
 	"health_insurance_section",
 	"health_insurance_provider",
 	"health_insurance_no",
+	"iban",
 )
 
 
@@ -73,7 +75,12 @@ def get_regional_custom_fields():
 
 
 def get_customizations():
-	from hrms.hr.bpo_employee_labels import EMPLOYEE_FIELD_LABELS, OTHER_DOCTYPE_FIELD_LABELS
+	from hrms.hr.bpo_employee_labels import (
+		EMPLOYEE_FIELD_DEFAULTS,
+		EMPLOYEE_FIELD_LABELS,
+		OTHER_DOCTYPE_FIELD_LABELS,
+	)
+	from hrms.payroll.bpo_customer import CUSTOMER_LABELS, HIDDEN_CUSTOMER_FIELDS
 	from hrms.payroll.bpo_sales_invoice import (
 		HIDDEN_SALES_INVOICE_FIELDS,
 		HIDDEN_SALES_INVOICE_ITEM_FIELDS,
@@ -114,6 +121,8 @@ def get_customizations():
 				{"doc_type": "Employee", "field_name": fieldname, "property": "hidden"}
 				for fieldname in HIDDEN_EMPLOYEE_FIELDS
 			],
+			{"doc_type": "Employee", "field_name": "bank_name", "property": "fieldtype"},
+			{"doc_type": "Employee", "field_name": "bank_name", "property": "options"},
 			*[
 				{"doc_type": "Sales Invoice", "field_name": fieldname, "property": "hidden"}
 				for fieldname in HIDDEN_SALES_INVOICE_FIELDS
@@ -131,14 +140,28 @@ def get_customizations():
 				for fieldname in SALES_INVOICE_ITEM_LABELS
 			],
 			*[
+				{"doc_type": "Customer", "field_name": fieldname, "property": "hidden"}
+				for fieldname in HIDDEN_CUSTOMER_FIELDS
+			],
+			*[
+				{"doc_type": "Customer", "field_name": fieldname, "property": "label"}
+				for fieldname in CUSTOMER_LABELS
+			],
+			*[
 				{"doc_type": "Employee", "field_name": fieldname, "property": "label"}
 				for fieldname in EMPLOYEE_FIELD_LABELS
 			],
+			*[
+				{"doc_type": "Employee", "field_name": fieldname, "property": "default"}
+				for fieldname in EMPLOYEE_FIELD_DEFAULTS
+			],
+			{"doc_type": "Employee", "field_name": "ctc", "property": "description"},
 			*[
 				{"doc_type": doctype, "field_name": fieldname, "property": "label"}
 				for doctype, labels in OTHER_DOCTYPE_FIELD_LABELS.items()
 				for fieldname in labels
 			],
+			{"doc_type": "Department", "field_name": "payroll_cost_center", "property": "hidden"},
 		],
 		"Custom DocPerm": [
 			{"parent": doctype, "role": role}
@@ -228,6 +251,7 @@ def get_custom_fields():
 			{
 				"fieldname": "payroll_cost_center",
 				"fieldtype": "Link",
+				"hidden": 1,
 				"label": _("Payroll Cost Center"),
 				"options": "Cost Center",
 				"insert_after": "section_break_4",
@@ -318,9 +342,10 @@ def get_custom_fields():
 			{
 				"fieldname": "grade",
 				"fieldtype": "Link",
-				"label": _("Grade"),
+				"label": _("Campaign"),
 				"options": "Employee Grade",
 				"insert_after": "branch",
+				"description": _("BPO campaign this agent is assigned to."),
 			},
 			{
 				"fieldname": "default_shift",
@@ -406,6 +431,7 @@ def get_custom_fields():
 				"fetch_if_empty": 1,
 				"fieldname": "payroll_cost_center",
 				"fieldtype": "Link",
+				"hidden": 1,
 				"label": _("Payroll Cost Center"),
 				"options": "Cost Center",
 				"insert_after": "salary_cb",
@@ -456,12 +482,103 @@ def get_custom_fields():
 				"read_only": 1,
 			},
 			{
-				"description": _("Default hourly rate billed to this client in USD."),
+				"description": _("Hourly rate billed to this client in USD."),
 				"fieldname": "default_billing_rate",
 				"fieldtype": "Currency",
-				"label": _("Default Billing Rate"),
+				"in_list_view": 1,
+				"label": _("Hourly Billing Rate"),
 				"options": "billing_currency",
 				"insert_after": "billing_currency",
+			},
+			{
+				"fieldname": "campaign_section",
+				"fieldtype": "Section Break",
+				"label": _("Campaign"),
+				"insert_after": "default_billing_rate",
+			},
+			{
+				"description": _("Client program or campaign this account is billed under."),
+				"fieldname": "campaign_name",
+				"fieldtype": "Data",
+				"label": _("Campaign / Program"),
+				"insert_after": "campaign_section",
+			},
+			{
+				"fieldname": "service_type",
+				"fieldtype": "Select",
+				"label": _("Service Type"),
+				"options": "\nInbound\nOutbound\nBlended\nChat\nEmail\nBack Office\nCollections\nTechnical Support",
+				"insert_after": "campaign_name",
+			},
+			{
+				"fieldname": "contracted_seats",
+				"fieldtype": "Int",
+				"label": _("Contracted Seats"),
+				"non_negative": 1,
+				"insert_after": "service_type",
+			},
+			{
+				"fieldname": "column_break_campaign",
+				"fieldtype": "Column Break",
+				"insert_after": "contracted_seats",
+			},
+			{
+				"fieldname": "client_timezone",
+				"fieldtype": "Select",
+				"label": _("Timezone"),
+				"options": "\nAmerica/Belize\nAmerica/New_York\nAmerica/Chicago\nAmerica/Denver\nAmerica/Los_Angeles\nUTC",
+				"insert_after": "column_break_campaign",
+			},
+			{
+				"description": _("e.g. 24/7 or 8:00–20:00 ET"),
+				"fieldname": "hours_of_operation",
+				"fieldtype": "Data",
+				"label": _("Hours of Operation"),
+				"insert_after": "client_timezone",
+			},
+			{
+				"fieldname": "billing_frequency",
+				"fieldtype": "Select",
+				"label": _("Billing Frequency"),
+				"options": "Weekly\nFortnightly\nMonthly",
+				"insert_after": "hours_of_operation",
+			},
+			{
+				"fieldname": "contract_section",
+				"fieldtype": "Section Break",
+				"label": _("Contract"),
+				"insert_after": "billing_frequency",
+			},
+			{
+				"fieldname": "contract_start_date",
+				"fieldtype": "Date",
+				"label": _("Contract Start"),
+				"insert_after": "contract_section",
+			},
+			{
+				"fieldname": "column_break_contract",
+				"fieldtype": "Column Break",
+				"insert_after": "contract_start_date",
+			},
+			{
+				"fieldname": "contract_end_date",
+				"fieldtype": "Date",
+				"label": _("Contract End"),
+				"insert_after": "column_break_contract",
+			},
+		],
+		"Sales Invoice": [
+			{
+				"fieldname": "billing_from",
+				"fieldtype": "Date",
+				"label": _("Billing From"),
+				"insert_after": "due_date",
+			},
+			{
+				"fieldname": "billing_to",
+				"fieldtype": "Date",
+				"label": _("Billing To"),
+				"insert_after": "billing_from",
 			},
 		],
 		"Project": [

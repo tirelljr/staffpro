@@ -814,7 +814,7 @@ hrms.day_view = {
 			hrms.time.show_add_entry_dialog(this.listview_stub());
 			return;
 		}
-		frappe.set_route("List", "Attendance");
+		hrms.time?.go_attendance_portal?.();
 	},
 
 	listview_stub(extra = {}) {

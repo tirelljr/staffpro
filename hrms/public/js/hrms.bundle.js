@@ -9,5 +9,6 @@ import "./utils/telemetry.js";
 import "./salary_slip_deductions_report_filters.js";
 import "./desk_topbar.js";
 import "./desk_sidebar.js";
+import "./desk_form_footer.js";
 import "./desk_dashboard.js";
 import "./time_hours.js";

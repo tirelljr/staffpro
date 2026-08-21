@@ -224,10 +224,10 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Attendance",
+   "label": "Day View",
    "link_count": 0,
-   "link_to": "Attendance",
-   "link_type": "DocType",
+   "link_to": "day-view",
+   "link_type": "Page",
    "onboard": 0,
    "type": "Link"
   },
@@ -386,7 +386,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-14 12:41:17.370296",
+ "modified": "2026-08-21 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "HR",
  "name": "HR Setup",

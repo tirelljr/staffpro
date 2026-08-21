@@ -144,7 +144,7 @@ frappe.in_out_today = {
 
 	open_clock() {
 		if (!hrms.time?.show_add_entry_dialog) {
-			frappe.set_route("List", "Attendance");
+			hrms.time?.go_attendance_portal?.();
 			return;
 		}
 		const me = this;

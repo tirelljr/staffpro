@@ -3,6 +3,7 @@
 
 frappe.ui.form.on("Department", {
 	refresh: function (frm) {
+		frm.set_df_property("payroll_cost_center", "hidden", 1);
 		frm.set_query("payroll_cost_center", function () {
 			return {
 				filters: {

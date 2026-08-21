@@ -55,11 +55,17 @@ class LeaveEncashment(AccountsController):
 		set_employee_name(self)
 		validate_active_employee(self.employee)
 		self.encashment_date = self.encashment_date or getdate()
+		self.set_cost_center()
 		self.get_leave_details_for_encashment()
 		self.set_status()
 
 		if not self.pay_via_payment_entry:
 			self.set_salary_structure()
+
+	def set_cost_center(self):
+		if self.cost_center or not self.company:
+			return
+		self.cost_center = frappe.get_cached_value("Company", self.company, "cost_center")
 
 	def set_salary_structure(self):
 		self._salary_structure = get_assigned_salary_structure(self.employee, self.encashment_date)

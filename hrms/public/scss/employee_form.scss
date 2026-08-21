@@ -1,0 +1,114 @@
+.frappe-control[data-fieldname="bank_name"] .control-input {
+	position: relative;
+}
+
+.frappe-control[data-fieldname="bank_name"] .control-input > input,
+.frappe-control[data-fieldname="bank_name"] .control-input > select {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+	height: 0;
+	width: 0;
+}
+
+.sp-bank-picker {
+	position: relative;
+	width: 100%;
+}
+
+.sp-bank-picker__toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	min-height: 28px;
+	padding: 2px 8px;
+	text-align: left;
+	cursor: pointer;
+}
+
+.sp-bank-picker__toggle:disabled {
+	cursor: default;
+	opacity: 0.85;
+}
+
+.sp-bank-picker__logo,
+.sp-bank-value__logo {
+	width: auto;
+	height: 22px;
+	max-width: 96px;
+	object-fit: contain;
+	flex: 0 0 auto;
+	border-radius: 4px;
+	background: #fff;
+}
+
+.sp-bank-picker__option .sp-bank-picker__logo {
+	height: 28px;
+	max-width: 140px;
+}
+
+.sp-bank-picker__label {
+	flex: 1 1 auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text-color);
+}
+
+.sp-bank-picker__label.is-placeholder {
+	color: var(--text-muted);
+}
+
+.sp-bank-picker__caret {
+	flex: 0 0 auto;
+	width: 0;
+	height: 0;
+	border-left: 4px solid transparent;
+	border-right: 4px solid transparent;
+	border-top: 5px solid var(--text-muted);
+}
+
+.sp-bank-picker__menu {
+	display: none;
+	position: absolute;
+	z-index: 32;
+	top: calc(100% + 4px);
+	left: 0;
+	right: 0;
+	padding: 4px;
+	background: var(--fg-color, #fff);
+	border: 1px solid var(--border-color);
+	border-radius: 8px;
+	box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
+}
+
+.sp-bank-picker.is-open .sp-bank-picker__menu {
+	display: block;
+}
+
+.sp-bank-picker__option {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	padding: 8px 10px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-color);
+	text-align: left;
+	cursor: pointer;
+}
+
+.sp-bank-picker__option:hover,
+.sp-bank-picker__option.is-selected {
+	background: var(--control-bg, var(--bg-light-gray, #f3f3f3));
+}
+
+.sp-bank-value {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 22px;
+}

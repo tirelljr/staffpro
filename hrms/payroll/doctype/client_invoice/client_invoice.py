@@ -6,6 +6,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt, getdate
 
+from hrms.payroll.bpo_client_accounts import get_invoice_receivable_account
+
 # Clients are billed in USD. Agent payroll stays in the company salary currency (BZD).
 CLIENT_BILLING_CURRENCY = "USD"
 BILLABLE_ATTENDANCE_STATUSES = ("Present", "Half Day", "Work From Home")
@@ -199,10 +201,24 @@ class ClientInvoice(Document):
 		si.company = self.company
 		si.posting_date = self.posting_date
 		si.due_date = self.posting_date
+		if si.meta.has_field("from_date"):
+			si.from_date = self.from_date
+		if si.meta.has_field("to_date"):
+			si.to_date = self.to_date
+		if si.meta.has_field("billing_from"):
+			si.billing_from = self.from_date
+		if si.meta.has_field("billing_to"):
+			si.billing_to = self.to_date
 		si.currency = currency
 		si.conversion_rate = conversion_rate
 		si.plc_conversion_rate = conversion_rate
 		si.set_posting_time = 1
+		if si.meta.has_field("ignore_pricing_rule"):
+			si.ignore_pricing_rule = 1
+		receivable = get_invoice_receivable_account(self.company, self.customer, currency)
+		if receivable:
+			si.debit_to = receivable
+		si.remarks = _("BPO agent hours from {0} to {1}").format(self.from_date, self.to_date)
 
 		for row in self.agents:
 			item_row = {

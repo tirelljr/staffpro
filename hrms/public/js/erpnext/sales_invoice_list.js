@@ -2,12 +2,29 @@ const existing_sales_invoice_listview = frappe.listview_settings["Sales Invoice"
 const existing_onload = existing_sales_invoice_listview.onload;
 const existing_refresh = existing_sales_invoice_listview.refresh;
 
+(function applyPostedInvoiceListLabels() {
+	const messages = frappe._messages || frappe.boot?.__messages || {};
+	Object.assign(messages, {
+		"Sales Invoice": "Posted Invoice",
+		"Sales Invoices": "Posted Invoices",
+		"New Sales Invoice": "New Posted Invoice",
+	});
+	frappe._messages = messages;
+	if (frappe.boot) {
+		frappe.boot.__messages = messages;
+	}
+})();
+
 function open_client_invoice() {
 	frappe.new_doc("Client Invoice");
 }
 
 function set_client_invoice_primary_action(list_view) {
 	if (!list_view?.page) return;
+
+	const title = __("Posted Invoices");
+	list_view.page_title = title;
+	list_view.page.set_title(title);
 
 	const can_add =
 		!frappe.boot?.read_only &&

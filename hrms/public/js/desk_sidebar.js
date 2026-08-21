@@ -202,32 +202,6 @@ const SIDEBAR_CSS = `
 	color: #2c2e30 !important;
 	line-height: 1.3 !important;
 }
-.body-sidebar .staff-pro-sidebar-search {
-	display: flex !important;
-	align-items: center !important;
-	gap: 8px !important;
-	height: 34px !important;
-	margin: 4px 4px 10px !important;
-	padding: 0 10px !important;
-	border: 1px solid #ececec !important;
-	border-radius: 8px !important;
-	background: #f7f7f8 !important;
-	color: #9ca3af !important;
-	cursor: pointer !important;
-}
-.body-sidebar .staff-pro-sidebar-search svg,
-.body-sidebar .staff-pro-sidebar-search .icon {
-	width: 14px !important;
-	height: 14px !important;
-	stroke: #9ca3af !important;
-}
-.body-sidebar .staff-pro-sidebar-search span {
-	font-size: 13px !important;
-	font-weight: 400 !important;
-	color: #9ca3af !important;
-	text-transform: none !important;
-	letter-spacing: 0 !important;
-}
 .body-sidebar .sidebar-items {
 	padding: 0 2px 8px !important;
 }
@@ -469,16 +443,16 @@ body.staff-pro-hide-form-sidebar .layout-main-section-wrapper {
 	width: 100% !important;
 	max-width: 100% !important;
 }
-[id="page-HR Settings"] .timeline-actions,
-[id="page-HR Settings"] .document-email-link-container {
+.form-footer .staff-pro-hide-new-email,
+.form-footer .timeline-actions,
+.form-footer .timeline-item.timeline-action,
+.form-footer .document-email-link-container {
 	display: none !important;
 }
 [id="page-Employee"] .form-sidebar .modified-by,
 [id="page-Employee"] .form-sidebar .created-by,
 [id="page-Employee"] .form-sidebar .sidebar-section:has(.modified-by),
-[id="page-Employee"] .form-sidebar .sidebar-section.text-muted.pt-3,
-[id="page-Employee"] .timeline-actions,
-[id="page-Employee"] .document-email-link-container {
+[id="page-Employee"] .form-sidebar .sidebar-section.text-muted.pt-3 {
 	display: none !important;
 }
 
@@ -1000,7 +974,10 @@ const HR_SIDEBARS = [
 ];
 
 function staff_pro_is_hr_sidebar(name) {
-	return HR_SIDEBARS.includes(String(name || "").toLowerCase());
+	const key = String(name || "")
+		.toLowerCase()
+		.replace(/[-_]/g, " ");
+	return HR_SIDEBARS.includes(key);
 }
 
 function staff_pro_hr_home_sidebar() {
@@ -1343,7 +1320,12 @@ function patch_sidebar_header_branding() {
 
 function staff_pro_sidebar_payload(name) {
 	if (!name) return null;
-	return frappe.boot?.workspace_sidebar_item?.[(name || "").toLowerCase()] || null;
+	const items = frappe.boot?.workspace_sidebar_item;
+	if (!items) return null;
+	const lower = String(name).toLowerCase();
+	const spaced = lower.replace(/[-_]/g, " ");
+	const dashed = lower.replace(/\s+/g, "-");
+	return items[lower] || items[spaced] || items[dashed] || null;
 }
 
 function patch_sidebar_workspace_switch() {
@@ -1551,24 +1533,8 @@ function label_workspace_dock() {
 	});
 }
 
-function add_sidebar_search() {
-	const $header = $(".body-sidebar .sidebar-header").first();
-	if (!$header.length || $header.next(".staff-pro-sidebar-search").length) return;
-
-	const $search = $(`
-		<div class="staff-pro-sidebar-search" role="button" tabindex="0">
-			${frappe.utils.icon("search", "sm")}
-			<span>${__("Search")}</span>
-		</div>
-	`);
-	$search.on("click", () => {
-		if (frappe.search?.open_awesomebar_from_global_search_shortcut) {
-			frappe.search.open_awesomebar_from_global_search_shortcut({ preventDefault() {} });
-		} else if (frappe.searchdialog?.search?.toggle_global_search_dialog) {
-			frappe.searchdialog.search.toggle_global_search_dialog();
-		}
-	});
-	$header.after($search);
+function remove_sidebar_search() {
+	$(".body-sidebar .staff-pro-sidebar-search").remove();
 }
 
 function patch_workspace_dock() {
@@ -1640,7 +1606,7 @@ function watch_workspace_dock() {
 	refresh_staff_pro_dock_shortcuts();
 	label_workspace_dock();
 	render_staff_pro_dock_integrations();
-	add_sidebar_search();
+	remove_sidebar_search();
 	enhance_sidebar_menus();
 
 	const dock = document.querySelector(".workspace-dock");
@@ -1656,7 +1622,7 @@ function watch_workspace_dock() {
 		refresh_staff_pro_dock_shortcuts();
 		label_workspace_dock();
 		render_staff_pro_dock_integrations();
-		add_sidebar_search();
+		remove_sidebar_search();
 		enhance_sidebar_menus();
 		disable_app_onboarding();
 	});
@@ -1793,6 +1759,7 @@ const LIST_PAGES_HIDE_MENU = new Set([
 	"Client Invoice",
 ]);
 const LIST_PAGES_HIDE_VIEW_SWITCHER = new Set([
+	"Attendance",
 	"Payroll Entry",
 	"Salary Structure Assignment",
 	"Client Invoice",

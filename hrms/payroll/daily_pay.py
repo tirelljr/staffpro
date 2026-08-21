@@ -73,6 +73,11 @@ def get_hour_rate(employee: str, on_date) -> float:
 	if key in cache:
 		return cache[key]
 
+	agent_hourly = flt(frappe.db.get_value("Employee", employee, "ctc"))
+	if agent_hourly:
+		cache[key] = flt(agent_hourly, 6)
+		return cache[key]
+
 	assignment = get_assignment(employee, on_date)
 	hour_rate = 0.0
 	frequency = "Weekly"

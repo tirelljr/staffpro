@@ -6,6 +6,10 @@ BPO_DOCTYPE_UI_MESSAGES = {
 	"Designations": "Roles",
 	"Add Designation": "Add Role",
 	"New Designation": "New Role",
+	"Employee Grade": "Campaign",
+	"Employee Grades": "Campaigns",
+	"Add Employee Grade": "Add Campaign",
+	"New Employee Grade": "New Campaign",
 }
 
 STAFF_PRO_DESK_HOME_DASHBOARD = "Human Resource"
@@ -181,10 +185,14 @@ def apply_payroll_frequency_translations(bootinfo):
 	messages.update(BPO_DOCTYPE_UI_MESSAGES)
 
 
-def _is_bpo_workspace_name(name) -> bool:
+def _normalize_workspace_key(name) -> str:
 	if isinstance(name, dict):
 		name = name.get("name") or name.get("title") or name.get("label")
-	return str(name or "").lower() in BPO_WORKSPACE_SIDEBARS
+	return str(name or "").lower().replace("-", " ").replace("_", " ")
+
+
+def _is_bpo_workspace_name(name) -> bool:
+	return _normalize_workspace_key(name) in BPO_WORKSPACE_SIDEBARS
 
 
 def _filter_bpo_workspace_sidebars(bootinfo):
@@ -195,7 +203,7 @@ def _filter_bpo_workspace_sidebars(bootinfo):
 	bootinfo["workspace_sidebar_item"] = {
 		key: value
 		for key, value in sidebars.items()
-		if str(key).lower() in BPO_WORKSPACE_SIDEBARS
+		if _normalize_workspace_key(key) in BPO_WORKSPACE_SIDEBARS
 	}
 
 

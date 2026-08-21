@@ -651,22 +651,22 @@ body.staff-pro-hide-form-sidebar {
 	}
 }
 
-/* HR Settings: drop email composer from the audit trail */
-[id="page-HR Settings"] {
+/* Form footers: hide New Email / email composer on every doctype */
+.form-footer {
+	.staff-pro-hide-new-email,
 	.timeline-actions,
+	.timeline-item.timeline-action,
 	.document-email-link-container {
 		display: none !important;
 	}
 }
 
-/* Employee: hide last-edited/created stats and New Email */
+/* Employee: hide last-edited/created stats */
 [id="page-Employee"] {
 	.form-sidebar .modified-by,
 	.form-sidebar .created-by,
 	.form-sidebar .sidebar-section:has(.modified-by),
-	.form-sidebar .sidebar-section.text-muted.pt-3,
-	.timeline-actions,
-	.document-email-link-container {
+	.form-sidebar .sidebar-section.text-muted.pt-3 {
 		display: none !important;
 	}
 }

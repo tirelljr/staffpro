@@ -238,7 +238,7 @@
   {
    "default": "0",
    "depends_on": "enable_automatic_payroll",
-   "description": "Pay period length for Weekly payroll. Set 0 to skip this template.",
+   "description": "Working days (Mon–Fri) for Weekly payroll. Set 0 to skip this template.",
    "fieldname": "automatic_payroll_weekly_days",
    "fieldtype": "Int",
    "label": "Weekly Days",
@@ -247,7 +247,7 @@
   {
    "default": "0",
    "depends_on": "enable_automatic_payroll",
-   "description": "Pay period length for 2-week payroll. Set 0 to skip this template.",
+   "description": "Working days (Mon–Fri) for 2-week payroll. Set 0 to skip this template.",
    "fieldname": "automatic_payroll_fortnightly_days",
    "fieldtype": "Int",
    "label": "2-weeks Days",
@@ -256,7 +256,7 @@
   {
    "default": "0",
    "depends_on": "enable_automatic_payroll",
-   "description": "Pay period length for Monthly payroll. Set 0 to skip this template.",
+   "description": "Working days (Mon–Fri) for Monthly payroll. Set 0 to skip this template.",
    "fieldname": "automatic_payroll_monthly_days",
    "fieldtype": "Int",
    "label": "Monthly Days",
@@ -347,7 +347,7 @@
   {
    "default": "0",
    "depends_on": "enable_automatic_client_invoice",
-   "description": "Billing period length for weekly client invoices. Set 0 to skip.",
+   "description": "Working days (Mon–Fri) for weekly client invoices. Set 0 to skip.",
    "fieldname": "automatic_invoice_weekly_days",
    "fieldtype": "Int",
    "label": "Weekly Days",
@@ -356,7 +356,7 @@
   {
    "default": "0",
    "depends_on": "enable_automatic_client_invoice",
-   "description": "Billing period length for 2-week client invoices. Set 0 to skip.",
+   "description": "Working days (Mon–Fri) for 2-week client invoices. Set 0 to skip.",
    "fieldname": "automatic_invoice_fortnightly_days",
    "fieldtype": "Int",
    "label": "2-weeks Days",
@@ -365,7 +365,7 @@
   {
    "default": "0",
    "depends_on": "enable_automatic_client_invoice",
-   "description": "Billing period length for monthly client invoices. Set 0 to skip.",
+   "description": "Working days (Mon–Fri) for monthly client invoices. Set 0 to skip.",
    "fieldname": "automatic_invoice_monthly_days",
    "fieldtype": "Int",
    "label": "Monthly Days",

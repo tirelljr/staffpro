@@ -89,6 +89,24 @@ HIDDEN_SALES_INVOICE_FIELDS = (
 	"more_info",
 	"more_info_tab",
 	"address_and_contact_tab",
+	"terms_tab",
+	"tc_name",
+	"terms",
+	"selling_price_list",
+	"price_list_currency",
+	"plc_conversion_rate",
+	"debit_to",
+	"against_income_account",
+	"letter_head",
+	"sales_partner",
+	"commission_rate",
+	"total_commission",
+	"amount_eligible_for_commission",
+	"cash_bank_account",
+	"pay_to_recd_from",
+	"is_discounted",
+	"in_words",
+	"base_in_words",
 )
 
 HIDDEN_SALES_INVOICE_ITEM_FIELDS = (
@@ -157,6 +175,15 @@ SALES_INVOICE_LABELS = {
 	"customer_name": "Client Name",
 	"items": "Agent Hours",
 	"items_section": "Agent Hours",
+	"posting_date": "Invoice Date",
+	"due_date": "Payment Due",
+	"billing_from": "Billing From",
+	"billing_to": "Billing To",
+	"remarks": "Notes",
+	"payment_terms_template": "Payment Terms",
+	"outstanding_amount": "Outstanding",
+	"grand_total": "Total",
+	"total_qty": "Total Hours",
 }
 
 SALES_INVOICE_ITEM_LABELS = {
@@ -174,6 +201,7 @@ def apply_bpo_sales_invoice_layout():
 
 	_hide_fields("Sales Invoice", HIDDEN_SALES_INVOICE_FIELDS)
 	_relabel_fields("Sales Invoice", SALES_INVOICE_LABELS)
+	_sync_custom_field_labels("Sales Invoice", SALES_INVOICE_LABELS)
 
 	if frappe.db.exists("DocType", "Sales Invoice Item"):
 		_hide_fields("Sales Invoice Item", HIDDEN_SALES_INVOICE_ITEM_FIELDS)
@@ -212,3 +240,11 @@ def _relabel_fields(doctype: str, labels: dict[str, str]):
 			"Data",
 			validate_fields_for_doctype=False,
 		)
+
+
+def _sync_custom_field_labels(doctype: str, labels: dict[str, str]):
+	for fieldname, label in labels.items():
+		name = frappe.db.get_value("Custom Field", {"dt": doctype, "fieldname": fieldname}, "name")
+		if not name:
+			continue
+		frappe.db.set_value("Custom Field", name, "label", label, update_modified=False)

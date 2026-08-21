@@ -85,8 +85,34 @@ def _rows_from_fixture(data: dict, fieldname: str) -> list[dict]:
 	return apply_bpo_labels([dict(row) for row in (data.get(fieldname) or [])])
 
 
+def _import_fixture_doc(doctype: str, fixture_path: str, rows_field: str):
+	try:
+		data = _load_fixture(fixture_path)
+	except FileNotFoundError:
+		return None
+	for key in ("creation", "modified", "modified_by", "owner", "docstatus"):
+		data.pop(key, None)
+	if doctype == "Workspace":
+		data["standard"] = 1
+		data["type"] = "Workspace"
+		data["is_hidden"] = 0
+		data["public"] = 1
+	data[rows_field] = apply_bpo_labels([dict(row) for row in (data.get(rows_field) or [])])
+	if frappe.db.exists(doctype, data["name"]):
+		doc = frappe.get_doc(doctype, data["name"])
+		doc.update(data)
+	else:
+		doc = frappe.new_doc(doctype)
+		doc.update(data)
+	doc.flags.ignore_links = True
+	doc.flags.ignore_validate = True
+	doc.save(ignore_permissions=True)
+	return doc
+
+
 def _sync_workspace(name: str, fixture_path: str):
 	if not frappe.db.exists("Workspace", name):
+		_import_fixture_doc("Workspace", fixture_path, "sidebar_items")
 		return
 	try:
 		rows = _rows_from_fixture(_load_fixture(fixture_path), "sidebar_items")
@@ -98,7 +124,10 @@ def _sync_workspace(name: str, fixture_path: str):
 
 
 def _sync_sidebar(name: str, fixture_path: str):
-	if not frappe.db.table_exists("Workspace Sidebar") or not frappe.db.exists("Workspace Sidebar", name):
+	if not frappe.db.table_exists("Workspace Sidebar"):
+		return
+	if not frappe.db.exists("Workspace Sidebar", name):
+		_import_fixture_doc("Workspace Sidebar", fixture_path, "items")
 		return
 	try:
 		rows = _rows_from_fixture(_load_fixture(fixture_path), "items")
@@ -110,7 +139,7 @@ def _sync_sidebar(name: str, fixture_path: str):
 
 
 def _remove_broken_ss_and_taxes_workspace():
-	"""Drop a half-imported SS and Taxes workspace so other patches can save workspaces."""
+	"""Drop a half-imported SS and Taxes workspace so it can be re-imported from fixture."""
 	if not frappe.db.exists("Workspace", "SS and Taxes"):
 		return
 	try:

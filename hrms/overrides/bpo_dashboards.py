@@ -67,7 +67,7 @@ CHART_LABELS = {
 	"Employee Advance Status": "Cash Advance Status",
 	"Employees by Age": "Agents by Age",
 	"Employees by Branch": "Agents by Site",
-	"Employees by Grade": "Agents by Level",
+	"Employees by Grade": "Agents by Campaign",
 	"Employees by Type": "Agents by Type",
 	"Expense Claims": "Reimbursements",
 	"Gender Diversity Ratio": "Gender Mix",

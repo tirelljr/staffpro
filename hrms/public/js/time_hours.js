@@ -301,6 +301,80 @@ hrms.time.default_entry_date = function (listview) {
 	return frappe.datetime.get_today();
 };
 
+hrms.time.ATTENDANCE_PORTAL_ROUTE = ["day-view"];
+
+hrms.time.route_parts_from_value = function (value) {
+	if (Array.isArray(value)) {
+		return value.map((part) => String(part || ""));
+	}
+	if (value == null) {
+		return [];
+	}
+	let path = String(value);
+	if (path.startsWith("/desk/") || path.startsWith("/app/")) {
+		path = path.replace(/^\/(desk|app)\//, "");
+	} else if (path.startsWith("/")) {
+		path = path.replace(/^\//, "");
+	}
+	return path.split("/").filter(Boolean).map((part) => {
+		try {
+			return decodeURIComponent(part);
+		} catch (error) {
+			return part;
+		}
+	});
+};
+
+hrms.time.normalize_route_args = function (args) {
+	const parts = Array.prototype.slice.call(args);
+	if (parts.length === 1) {
+		return hrms.time.route_parts_from_value(parts[0]);
+	}
+	return parts.map((part) => String(part || ""));
+};
+
+hrms.time.is_blocked_attendance_list_route = function (parts) {
+	if (!parts?.length) {
+		return false;
+	}
+	const tokens = parts.map((part) => String(part || ""));
+	const lower = tokens.map((part) => part.toLowerCase());
+	if (lower[0] === "list" && lower[1] === "attendance") {
+		return (lower[2] || "list") !== "calendar";
+	}
+	if (lower[0] === "attendance") {
+		if (tokens.length === 1) {
+			return true;
+		}
+		if (lower[1] === "view") {
+			return (lower[2] || "list") !== "calendar";
+		}
+		if (lower[1] === "new") {
+			return true;
+		}
+		return false;
+	}
+	return false;
+};
+
+hrms.time.rewrite_nav_item = function (item) {
+	if (!item?.route) {
+		return item;
+	}
+	const parts = hrms.time.route_parts_from_value(item.route);
+	if (!hrms.time.is_blocked_attendance_list_route(parts)) {
+		return item;
+	}
+	return Object.assign({}, item, {
+		route: hrms.time.ATTENDANCE_PORTAL_ROUTE.slice(),
+		route_options: null,
+	});
+};
+
+hrms.time.go_attendance_portal = function () {
+	return frappe.set_route(...hrms.time.ATTENDANCE_PORTAL_ROUTE);
+};
+
 hrms.time.attendance_listview = function () {
 	return cur_list?.doctype === "Attendance" ? cur_list : null;
 };
@@ -334,10 +408,14 @@ hrms.time.redirect_new_attendance_form = function (frm) {
 	};
 	frappe.model.clear_doc(frm.doctype, frm.docname || frm.doc.name);
 	const prev = frappe.get_prev_route?.() || [];
-	if (prev.length && !(prev[0] === "Form" && prev[1] === "Attendance")) {
+	if (
+		prev.length &&
+		!(prev[0] === "Form" && prev[1] === "Attendance") &&
+		!hrms.time.is_blocked_attendance_list_route(prev)
+	) {
 		frappe.set_route(prev);
 	} else {
-		frappe.set_route("List", "Attendance");
+		hrms.time.go_attendance_portal();
 	}
 	hrms.time.open_add_attendance(opts);
 	return true;
@@ -1203,3 +1281,41 @@ hrms.time.show_add_hours_comment_dialog = function (listview, name) {
 	};
 	frappe.new_doc.__sp_attendance_patched = true;
 })();
+
+function patch_attendance_list_routes() {
+	if (!frappe.set_route || frappe.set_route.__sp_hide_attendance_list) {
+		return;
+	}
+	const original = frappe.set_route;
+	frappe.set_route = function () {
+		if (hrms.time.is_blocked_attendance_list_route(hrms.time.normalize_route_args(arguments))) {
+			return original.apply(this, hrms.time.ATTENDANCE_PORTAL_ROUTE);
+		}
+		return original.apply(this, arguments);
+	};
+	frappe.set_route.__sp_hide_attendance_list = true;
+}
+
+function redirect_attendance_list_if_needed() {
+	if (window._staff_pro_attendance_list_redirecting) {
+		return;
+	}
+	const route = frappe.get_route?.() || [];
+	const parts = route.length
+		? route
+		: hrms.time.route_parts_from_value(window.location.pathname || "");
+	if (!hrms.time.is_blocked_attendance_list_route(parts)) {
+		return;
+	}
+	window._staff_pro_attendance_list_redirecting = true;
+	Promise.resolve(hrms.time.go_attendance_portal()).finally(() => {
+		window._staff_pro_attendance_list_redirecting = false;
+	});
+}
+
+patch_attendance_list_routes();
+$(document).on("app_ready", () => {
+	patch_attendance_list_routes();
+	redirect_attendance_list_if_needed();
+});
+$(document).on("page-change", redirect_attendance_list_if_needed);

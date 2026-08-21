@@ -1,3 +1,16 @@
+(function applyPostedInvoiceUiLabels() {
+	const messages = frappe._messages || frappe.boot?.__messages || {};
+	Object.assign(messages, {
+		"Sales Invoice": "Posted Invoice",
+		"Sales Invoices": "Posted Invoices",
+		"New Sales Invoice": "New Posted Invoice",
+	});
+	frappe._messages = messages;
+	if (frappe.boot) {
+		frappe.boot.__messages = messages;
+	}
+})();
+
 frappe.ui.form.on("Sales Invoice", {
 	onload(frm) {
 		if (frm.is_new() && frappe.model.can_create("Client Invoice")) {
@@ -13,6 +26,7 @@ frappe.ui.form.on("Sales Invoice", {
 		}
 		apply_bpo_invoice_layout(frm);
 		strip_erpnext_invoice_actions(frm);
+		setTimeout(() => apply_bpo_invoice_layout(frm), 150);
 		setTimeout(() => strip_erpnext_invoice_actions(frm), 150);
 	},
 });
@@ -60,6 +74,19 @@ const HIDDEN_INVOICE_FIELDS = [
 	"address_and_contact_tab",
 	"more_info",
 	"more_info_tab",
+	"terms_tab",
+	"tc_name",
+	"terms",
+	"selling_price_list",
+	"price_list_currency",
+	"plc_conversion_rate",
+	"debit_to",
+	"against_income_account",
+	"letter_head",
+	"sales_partner",
+	"commission_rate",
+	"total_commission",
+	"in_words",
 ];
 
 const HIDDEN_ITEM_FIELDS = [
@@ -83,7 +110,7 @@ const HIDDEN_ITEM_FIELDS = [
 	"discount_amount",
 ];
 
-const HIDDEN_TABS = ["Address & Contact", "More Info"];
+const HIDDEN_TABS = ["Address & Contact", "More Info", "Terms"];
 
 function apply_bpo_invoice_layout(frm) {
 	HIDDEN_INVOICE_FIELDS.forEach((fieldname) => {
@@ -92,18 +119,27 @@ function apply_bpo_invoice_layout(frm) {
 		}
 	});
 
-	if (frm.fields_dict.customer) {
-		frm.set_df_property("customer", "label", __("Client"));
-	}
-	if (frm.fields_dict.customer_name) {
-		frm.set_df_property("customer_name", "label", __("Client Name"));
-	}
-	if (frm.fields_dict.items) {
-		frm.set_df_property("items", "label", __("Agent Hours"));
-	}
-	if (frm.fields_dict.items_section) {
-		frm.set_df_property("items_section", "label", __("Agent Hours"));
-	}
+	const labels = {
+		customer: __("Client"),
+		customer_name: __("Client Name"),
+		items: __("Agent Hours"),
+		items_section: __("Agent Hours"),
+		posting_date: __("Invoice Date"),
+		due_date: __("Payment Due"),
+		billing_from: __("Billing From"),
+		billing_to: __("Billing To"),
+		remarks: __("Notes"),
+		payment_terms_template: __("Payment Terms"),
+		outstanding_amount: __("Outstanding"),
+		grand_total: __("Total"),
+		total_qty: __("Total Hours"),
+	};
+	Object.entries(labels).forEach(([fieldname, label]) => {
+		if (frm.fields_dict[fieldname]) {
+			frm.set_df_property(fieldname, "hidden", 0);
+			frm.set_df_property(fieldname, "label", label);
+		}
+	});
 
 	const items = frm.get_field("items");
 	if (items?.grid) {
@@ -133,15 +169,20 @@ function hide_invoice_tabs(frm) {
 }
 
 function relabel_invoice_page(frm) {
-	const title = frm.is_new() ? __("New Client Invoice") : frm.doc.name || __("Client Invoice");
+	const title = frm.is_new()
+		? __("New Posted Invoice")
+		: frm.doc.customer_name || frm.doc.name || __("Posted Invoice");
 	frm.page.set_title(title);
 
 	const $head = frm.page.wrapper.find(".page-head");
-	$head.find(".title-text, h3, .ellipsis").each(function () {
+	$head.find(".title-text, h3, .ellipsis, .breadcrumb-item, .page-title").each(function () {
 		const $el = $(this);
 		const text = ($el.text() || "").trim();
-		if (text.includes("Sales Invoice")) {
-			$el.text(text.replace(/Sales Invoice/g, __("Client Invoice")));
+		if (!text) return;
+		if (text === "Sales Invoice" || text === __("Sales Invoice")) {
+			$el.text(__("Posted Invoice"));
+		} else if (text.includes("Sales Invoice")) {
+			$el.text(text.replace(/Sales Invoice/g, __("Posted Invoice")));
 		}
 	});
 }

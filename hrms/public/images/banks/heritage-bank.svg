@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Heritage Bank">
+  <rect width="64" height="64" rx="12" fill="#8E1B32"/>
+  <path fill="#F4E6D8" d="M10 26 L32 12 L54 26 V30 H10 Z"/>
+  <rect x="14" y="30" width="6" height="18" fill="#F4E6D8"/>
+  <rect x="29" y="30" width="6" height="18" fill="#F4E6D8"/>
+  <rect x="44" y="30" width="6" height="18" fill="#F4E6D8"/>
+  <rect x="10" y="48" width="44" height="5" fill="#F4E6D8"/>
+</svg>

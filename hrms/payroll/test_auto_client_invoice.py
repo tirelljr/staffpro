@@ -13,6 +13,7 @@ from hrms.payroll.auto_client_invoice import (
 	process_automatic_invoices,
 	set_automatic_invoice_interval,
 )
+from hrms.payroll.auto_payroll import get_pay_period
 from hrms.setup import get_custom_fields
 from hrms.tests.utils import HRMSTestSuite
 
@@ -136,10 +137,18 @@ class TestAutoClientInvoice(HRMSTestSuite):
 
 	def test_force_creates_invoice_from_attendance(self):
 		agent = self._make_agent("test_auto_client_invoice@example.com", 20)
-		end_date = add_days(getdate(), -1)
-		start_date = add_days(end_date, -9)
-		for offset in range(10):
-			self._mark_attendance(agent, add_days(start_date, offset), "Present", 8)
+		start_date, end_date = get_pay_period(
+			interval=10,
+			as_of=getdate(),
+			company="_Test Company",
+			last_end="",
+			cycle_start=None,
+		)
+		day = getdate(start_date)
+		while day <= getdate(end_date):
+			if day.weekday() < 5:
+				self._mark_attendance(agent, day, "Present", 8)
+			day = add_days(day, 1)
 
 		frappe.db.set_single_value(
 			"Payroll Settings",
@@ -160,4 +169,5 @@ class TestAutoClientInvoice(HRMSTestSuite):
 		self.assertEqual(invoice.docstatus, 1)
 		self.assertEqual(invoice.customer, self.customer)
 		self.assertTrue(invoice.sales_invoice)
-		self.assertEqual((getdate(invoice.to_date) - getdate(invoice.from_date)).days, 9)
+		self.assertEqual(getdate(invoice.from_date), getdate(start_date))
+		self.assertEqual(getdate(invoice.to_date), getdate(end_date))

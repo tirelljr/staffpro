@@ -320,15 +320,15 @@ function open_import_employee() {
 function open_hours_add_entry() {
 	if (hrms.time?.show_add_entry_dialog) {
 		const $panel = $(".sp-dash-hours").first();
-		hrms.time.show_add_entry_dialog($panel.length ? hours_listview_stub($panel) : hrms.time.attendance_listview?.());
+		hrms.time.show_add_entry_dialog($panel.length ? hours_listview_stub($panel) : null);
 		return;
 	}
-	frappe.set_route("List", "Attendance");
+	hrms.time?.go_attendance_portal?.();
 }
 
 function open_inout_clock_entry($widget) {
 	if (!hrms.time?.show_add_entry_dialog) {
-		frappe.set_route("List", "Attendance");
+		hrms.time?.go_attendance_portal?.();
 		return;
 	}
 	const department = inout_department_value($widget);
@@ -921,6 +921,146 @@ function load_celebrations($widget, period, eventType = "all") {
 			`);
 		},
 	});
+}
+
+function hr_kpi_widget_group($root) {
+	return $root
+		.find(".dashboard-graph .widget-group")
+		.filter(function () {
+			return $(this).find(kpi_card_selector()).length;
+		})
+		.first();
+}
+
+const KPI_HOURS_CARDS = new Set(["Hours Worked (This Week)"]);
+const HIDDEN_HR_KPI_CARDS = new Set([
+	"Total Outgoing Salary(Last month)",
+	"Payroll Payouts (Last Month)",
+]);
+const HIDDEN_HR_CHARTS = new Set([
+	"Shift Assignment Breakup",
+	"Shift Coverage",
+	"Hiring vs Attrition Count",
+	"Hiring vs Attrition",
+]);
+const PERCENT_LEGEND_CHARTS = new Set(["Floor Attendance"]);
+
+function format_kpi_hours(value) {
+	const hours = Number(value || 0);
+	if (!hours) return "0h";
+	const text = hours.toFixed(1);
+	return `${text.endsWith(".0") ? text.slice(0, -2) : text}h`;
+}
+
+function apply_kpi_value_format($card) {
+	const name = kpi_card_name($card);
+	if (!KPI_HOURS_CARDS.has(name)) return;
+
+	const $number = $card.find(".widget-content .number, .widget-body .number").first();
+	if (!$number.length) return;
+
+	const value = kpi_parse_number($number.text());
+	if (value == null) return;
+
+	const formatted = format_kpi_hours(value);
+	if ($number.text().trim() !== formatted) {
+		$number.text(formatted);
+	}
+}
+
+function filter_hr_kpi_cards($root) {
+	if (dashboard_name() !== "Human Resource") return;
+
+	$root.find(".sp-dash-kpi-group").find(kpi_card_selector()).each(function () {
+		const $card = $(this);
+		if (HIDDEN_HR_KPI_CARDS.has(kpi_card_name($card))) {
+			$card.remove();
+		}
+	});
+}
+
+function chart_widget_label($widget) {
+	const $title = $widget.find(".widget-title").first();
+	return (
+		$title.find("[title]").attr("title") ||
+		$title.attr("title") ||
+		$title.text() ||
+		""
+	)
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+function filter_hr_charts($root) {
+	if (dashboard_name() !== "Human Resource") return;
+
+	$root.find(".dashboard-graph .widget.dashboard-widget-box, .dashboard-graph .chart-widget").each(function () {
+		const $widget = $(this).closest(".widget");
+		if (HIDDEN_HR_CHARTS.has(chart_widget_label($widget))) {
+			$widget.remove();
+		}
+	});
+}
+
+function format_legend_percentages(values) {
+	const total = values.reduce((sum, value) => sum + value, 0);
+	if (!total) return values.map(() => "0%");
+
+	const raw = values.map((value) => (value / total) * 100);
+	const rounded = raw.map((value) => Math.round(value));
+	let diff = 100 - rounded.reduce((sum, value) => sum + value, 0);
+	const order = raw
+		.map((value, index) => ({ index, frac: value - Math.floor(value) }))
+		.sort((a, b) => (diff > 0 ? b.frac - a.frac : a.frac - b.frac));
+	for (let i = 0; diff !== 0 && i < order.length; i++) {
+		rounded[order[i].index] += diff > 0 ? 1 : -1;
+		diff += diff > 0 ? -1 : 1;
+	}
+	return rounded.map((value) => `${Math.max(0, value)}%`);
+}
+
+function format_pie_legend_percentages($root) {
+	$root.find(".dashboard-graph .widget.dashboard-widget-box, .dashboard-graph .chart-widget").each(function () {
+		const $widget = $(this).closest(".widget");
+		if (!PERCENT_LEGEND_CHARTS.has(chart_widget_label($widget))) return;
+
+		const $values = $widget.find(".legend-dataset-value");
+		if (!$values.length) return;
+
+		const texts = $values
+			.map(function () {
+				return $(this).text().replace(/\s+/g, " ").trim();
+			})
+			.get();
+		if (!texts.length || texts.some((text) => !text)) return;
+		if (texts.every((text) => /%$/.test(text))) return;
+
+		const numbers = texts.map((text) => kpi_parse_number(text) || 0);
+		const labels = format_legend_percentages(numbers);
+		$values.each(function (index) {
+			if (labels[index] != null && $(this).text().trim() !== labels[index]) {
+				$(this).text(labels[index]);
+			}
+		});
+	});
+}
+
+function reorder_hr_dashboard_layout($root) {
+	if (dashboard_name() !== "Human Resource") {
+		$root.find(".sp-dash-kpi-group").removeClass("sp-dash-kpi-group");
+		return;
+	}
+
+	const $kpiGroup = hr_kpi_widget_group($root);
+	const $home = $root.find(".sp-dash-home").first();
+	if (!$kpiGroup.length || !$home.length) return;
+
+	$kpiGroup.addClass("sp-dash-kpi-group");
+	if (!$home.prev().is($kpiGroup)) {
+		$home.before($kpiGroup);
+	}
+
+	filter_hr_kpi_cards($root);
 }
 
 function inject_celebrations($root) {
@@ -2335,6 +2475,7 @@ function ensure_kpi_chrome($card, index) {
 
 	render_kpi_viz($card);
 	sync_kpi_footer($card);
+	apply_kpi_value_format($card);
 }
 
 function theme_number_cards($root) {
@@ -2349,6 +2490,7 @@ function theme_number_cards($root) {
 		if (name) names.push(name);
 		if ($card.data("sp-themed")) {
 			sync_kpi_footer($card);
+			apply_kpi_value_format($card);
 			return;
 		}
 		$card.data("sp-themed", 1);
@@ -2368,8 +2510,13 @@ function theme_number_cards($root) {
 			if ($card.data("sp-spark") === fingerprint) return;
 			$card.data("sp-spark", fingerprint);
 			render_kpi_viz($card);
+			apply_kpi_value_format($card);
 		});
 	});
+
+	if (dashboard_name() === "Human Resource") {
+		filter_hr_kpi_cards($root);
+	}
 }
 
 function clean_number_cards($root) {
@@ -2673,6 +2820,9 @@ function enhance() {
 		$root.find(".sp-dash-celebrations:not(.sp-dash-panel)").remove();
 		inject_quick_actions($root);
 		inject_celebrations($root);
+		reorder_hr_dashboard_layout($root);
+		filter_hr_charts($root);
+		format_pie_legend_percentages($root);
 		inject_hours_board($root);
 		upgrade_native_selects($root);
 		$root.find(".sp-dash-start").remove();

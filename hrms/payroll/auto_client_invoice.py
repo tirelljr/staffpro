@@ -17,9 +17,9 @@ from hrms.payroll.doctype.client_invoice.client_invoice import CLIENT_BILLING_CU
 MAX_PERIODS_PER_RUN = 3
 
 INVOICE_TEMPLATES = (
-	("Weekly", "automatic_invoice_weekly_days", 7),
-	("Fortnightly", "automatic_invoice_fortnightly_days", 14),
-	("Monthly", "automatic_invoice_monthly_days", 30),
+	("Weekly", "automatic_invoice_weekly_days", 5),
+	("Fortnightly", "automatic_invoice_fortnightly_days", 10),
+	("Monthly", "automatic_invoice_monthly_days", 22),
 )
 
 

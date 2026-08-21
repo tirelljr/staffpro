@@ -44,7 +44,13 @@ class Gratuity(AccountsController):
 		data = self.calculate_work_experience_and_amount()
 		self.current_work_experience = data["current_work_experience"]
 		self.amount = data["amount"]
+		self.set_cost_center()
 		self.set_status()
+
+	def set_cost_center(self):
+		if self.cost_center or not self.company:
+			return
+		self.cost_center = frappe.get_cached_value("Company", self.company, "cost_center")
 
 	@property
 	def gratuity_settings(self):

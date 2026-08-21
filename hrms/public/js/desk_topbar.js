@@ -1268,6 +1268,9 @@ hrms.ui.TopBar = class {
 		}
 
 		options = this.deduplicate_search_options(options);
+		if (hrms.time?.rewrite_nav_item) {
+			options = options.map((item) => hrms.time.rewrite_nav_item(item));
+		}
 		options.sort((a, b) => (b.index || 0) - (a.index || 0));
 		return options.slice(0, 20);
 	}
@@ -1288,7 +1291,10 @@ hrms.ui.TopBar = class {
 				args: { txt },
 				callback: (r) => {
 					if (seq !== this.search_seq || !r.message?.length) return;
-					const merged = this.deduplicate_search_options(this.search_items.concat(r.message));
+					const incoming = hrms.time?.rewrite_nav_item
+						? r.message.map((item) => hrms.time.rewrite_nav_item(item))
+						: r.message;
+					const merged = this.deduplicate_search_options(this.search_items.concat(incoming));
 					merged.sort((a, b) => (b.index || 0) - (a.index || 0));
 					this.render_search_results(merged.slice(0, 20));
 				},

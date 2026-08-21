@@ -217,6 +217,10 @@ function notify_assignment_created(action, doc) {
 }
 
 frappe.ui.form.on("Employee", {
+	onload: function (frm) {
+		set_employee_salary_defaults(frm);
+	},
+
 	refresh: function (frm) {
 		frm.set_query("payroll_cost_center", function () {
 			return {
@@ -248,13 +252,17 @@ frappe.ui.form.on("Employee", {
 			"attendance_device_id",
 			"provident_fund_account",
 			"employee_advance_account",
+			"payroll_cost_center",
 			"health_insurance_section",
 			"health_insurance_provider",
 			"health_insurance_no",
 			"holiday_list",
+			"iban",
 		]) {
 			frm.set_df_property(fieldname, "hidden", 1);
 		}
+		frm.set_df_property("grade", "label", __("Campaign"));
+		setup_belize_bank_picker(frm);
 
 		// hide naming series field based on hr settings
 		frappe.db.get_single_value("HR Settings", "emp_created_by").then((value) => {
@@ -262,12 +270,22 @@ frappe.ui.form.on("Employee", {
 		});
 
 		frm.trigger("add_assignment_actions");
+		frm.trigger("add_hourly_rate_action");
 		setup_employee_form_chrome(frm);
-		setTimeout(() => setup_employee_form_chrome(frm), 200);
-		setTimeout(() => setup_employee_form_chrome(frm), 800);
+		set_employee_salary_defaults(frm);
 	},
-	timeline_refresh: function (frm) {
-		setup_employee_form_chrome(frm);
+
+	add_hourly_rate_action: function (frm) {
+		if (!flt(frm.doc.ctc)) return;
+		frm.add_custom_button(__("Apply Hourly Rate"), () => open_apply_hourly_rate_dialog(frm));
+	},
+
+	ctc: function (frm) {
+		if (!flt(frm.doc.ctc)) return;
+		frappe.confirm(
+			__("Apply this hourly rate to other agents, a branch, campaign, or team?"),
+			() => open_apply_hourly_rate_dialog(frm),
+		);
 	},
 
 	add_assignment_actions: async function (frm) {
@@ -297,7 +315,175 @@ frappe.ui.form.on("Employee", {
 			if (r && r.message) frm.set_value("date_of_retirement", r.message);
 		});
 	},
+
+	salary_mode(frm) {
+		setup_belize_bank_picker(frm);
+	},
+
+	bank_name(frm) {
+		setup_belize_bank_picker(frm);
+	},
 });
+
+function set_employee_salary_defaults(frm) {
+	if (!frm.is_new()) return;
+	if (!frm.doc.salary_currency) {
+		frm.set_value("salary_currency", "BZD");
+	}
+	if (!frm.doc.salary_mode) {
+		frm.set_value("salary_mode", "Bank");
+	}
+}
+
+function hourly_rate_dialog_values(d) {
+	const employees = (d.get_value("employees") || [])
+		.map((row) => row.employee)
+		.filter(Boolean);
+	const branches = d.get_value("branch") ? [d.get_value("branch")] : [];
+	const campaigns = d.get_value("campaign") ? [d.get_value("campaign")] : [];
+	const teams = d.get_value("team") ? [d.get_value("team")] : [];
+	return { employees, branches, campaigns, teams };
+}
+
+function open_apply_hourly_rate_dialog(frm) {
+	const rate = flt(frm.doc.ctc);
+	if (!rate) {
+		frappe.msgprint(__("Set Agent Hourly first."));
+		frm.scroll_to_field("ctc");
+		return;
+	}
+
+	const currency = frm.doc.salary_currency || "BZD";
+	const dialog = new frappe.ui.Dialog({
+		title: __("Apply Hourly Rate"),
+		fields: [
+			{
+				fieldtype: "HTML",
+				fieldname: "rate_html",
+				options: `<p>${__("Apply {0}/hr to other agents, a branch, campaign, or team.", [
+					format_currency(rate, currency),
+				])}</p>`,
+			},
+			{
+				fieldtype: "Table",
+				fieldname: "employees",
+				label: __("Other Agents"),
+				cannot_add_rows: false,
+				in_place_edit: true,
+				data: [],
+				fields: [
+					{
+						fieldtype: "Link",
+						fieldname: "employee",
+						options: "Employee",
+						in_list_view: 1,
+						reqd: 1,
+						label: __("Agent"),
+						get_query: () => ({
+							filters: {
+								status: "Active",
+								company: frm.doc.company,
+								name: ["!=", frm.doc.name],
+							},
+						}),
+					},
+				],
+			},
+			{
+				fieldtype: "Section Break",
+				label: __("Or by group"),
+			},
+			{
+				fieldtype: "Link",
+				fieldname: "branch",
+				label: __("Branch"),
+				options: "Branch",
+			},
+			{
+				fieldtype: "Column Break",
+			},
+			{
+				fieldtype: "Link",
+				fieldname: "campaign",
+				label: __("Campaign"),
+				options: "Employee Grade",
+			},
+			{
+				fieldtype: "Column Break",
+			},
+			{
+				fieldtype: "Link",
+				fieldname: "team",
+				label: __("Team"),
+				options: "Department",
+				get_query: () => ({
+					filters: { company: frm.doc.company },
+				}),
+			},
+		],
+		primary_action_label: __("Apply"),
+		primary_action: () => {
+			const args = hourly_rate_dialog_values(dialog);
+			if (
+				!args.employees.length &&
+				!args.branches.length &&
+				!args.campaigns.length &&
+				!args.teams.length
+			) {
+				frappe.msgprint(__("Select other agents, a branch, campaign, or team."));
+				return;
+			}
+
+			frappe.call({
+				method: "hrms.hr.bpo_hourly_rate.preview_hourly_rate_targets",
+				args: { source_employee: frm.doc.name, company: frm.doc.company, ...args },
+			}).then((preview) => {
+				const count = preview.message?.count || 0;
+				if (!count) {
+					frappe.msgprint(__("No other active agents match that selection."));
+					return;
+				}
+				frappe.confirm(
+					__("Update Agent Hourly to {0}/hr for {1} agent(s)?", [
+						format_currency(rate, currency),
+						count,
+					]),
+					() => {
+						frappe.call({
+							method: "hrms.hr.bpo_hourly_rate.apply_hourly_rate",
+							args: {
+								source_employee: frm.doc.name,
+								hourly_rate: rate,
+								company: frm.doc.company,
+								...args,
+							},
+							freeze: true,
+							freeze_message: __("Updating hourly rates..."),
+						}).then((r) => {
+							const updated = r.message?.updated || 0;
+							frappe.show_alert({
+								message: __("Updated Agent Hourly for {0} agent(s).", [updated]),
+								indicator: "green",
+							});
+							dialog.hide();
+						});
+					},
+				);
+			});
+		},
+	});
+	dialog.show();
+	const employee_field = dialog.fields_dict.employees?.grid?.get_field("employee");
+	if (employee_field) {
+		employee_field.get_query = () => ({
+			filters: {
+				status: "Active",
+				company: frm.doc.company,
+				name: ["!=", frm.doc.name || ""],
+			},
+		});
+	}
+}
 
 function setup_employee_form_chrome(frm) {
 	const $page = frm.page?.wrapper || frm.$wrapper;
@@ -308,41 +494,150 @@ function setup_employee_form_chrome(frm) {
 	$page.find(".form-sidebar .modified-by, .form-sidebar .created-by").each(function () {
 		$(this).closest(".sidebar-section").hide();
 	});
+}
 
-	const $after = $page.find(".after-save");
-	if (!$after.length) {
-		return;
+const BELIZE_BANKS = [
+	{
+		name: "Heritage Bank",
+		logo: "/assets/hrms/images/banks/heritage-bank.svg",
+		remote: "https://www.google.com/s2/favicons?sz=128&domain=www.heritageibt.com",
+	},
+	{
+		name: "Belize Bank",
+		logo: "/assets/hrms/images/banks/belize-bank.svg",
+		remote: "https://upload.wikimedia.org/wikipedia/commons/d/dd/The_Belize_Bank_Limited.png",
+	},
+	{
+		name: "Atlantic Bank",
+		logo: "/assets/hrms/images/banks/atlantic-bank.svg",
+		remote: "https://www.atlabank.com/images/logo.jpg",
+	},
+	{
+		name: "National Bank of Belize",
+		logo: "/assets/hrms/images/banks/national-bank-of-belize.svg",
+		remote: "https://www.nbbl.bz/wp-content/uploads/2022/07/National-Bank-of-Belize-Logo.png",
+	},
+];
+
+function belize_bank_choices(current) {
+	const choices = BELIZE_BANKS.map((bank) => ({ ...bank }));
+	if (current && !choices.some((bank) => bank.name === current)) {
+		choices.unshift({ name: current, logo: "", remote: "" });
+	}
+	return choices;
+}
+
+function belize_bank_by_name(name) {
+	return BELIZE_BANKS.find((bank) => bank.name === name) || null;
+}
+
+function bank_logo_html(bank, extra_class) {
+	if (!bank?.name) return "";
+	const cls = extra_class || "sp-bank-picker__logo";
+	const local = frappe.utils.escape_html(bank.logo || "");
+	const remote = frappe.utils.escape_html(bank.remote || "");
+	const alt = frappe.utils.escape_html(bank.name);
+	const src = remote || local;
+	if (!src) return "";
+	const fallback = local && remote ? ` onerror="this.onerror=null;this.src='${local}'"` : "";
+	return `<img class="${cls}" src="${src}" alt="${alt}" referrerpolicy="no-referrer"${fallback}>`;
+}
+
+function setup_belize_bank_picker(frm) {
+	frm.set_df_property("iban", "hidden", 1);
+	frm.set_df_property("bank_name", "options", ["", ...BELIZE_BANKS.map((bank) => bank.name)].join("\n"));
+
+	const field = frm.get_field("bank_name");
+	if (!field?.$wrapper?.length) return;
+
+	const $input_area = field.$wrapper.find(".control-input").first();
+	const $disp = field.$wrapper.find(".control-value").first();
+	if ($input_area.length) {
+		render_bank_picker(frm, field, $input_area);
+	}
+	if ($disp.length) {
+		render_bank_display($disp, frm.doc.bank_name);
+	}
+}
+
+function render_bank_picker(frm, field, $input_area) {
+	let $picker = $input_area.find(".sp-bank-picker");
+	if (!$picker.length) {
+		$picker = $(`
+			<div class="sp-bank-picker">
+				<button type="button" class="sp-bank-picker__toggle input-with-feedback form-control">
+					<span class="sp-bank-picker__mark"></span>
+					<span class="sp-bank-picker__label is-placeholder">${__("Select bank")}</span>
+					<span class="sp-bank-picker__caret"></span>
+				</button>
+				<div class="sp-bank-picker__menu" role="listbox"></div>
+			</div>
+		`).appendTo($input_area);
+
+		const $toggle = $picker.find(".sp-bank-picker__toggle");
+		$toggle.on("click", (event) => {
+			event.preventDefault();
+			event.stopPropagation();
+			if ($toggle.prop("disabled")) return;
+			$picker.toggleClass("is-open");
+		});
+
+		$picker.on("click", (event) => {
+			event.stopPropagation();
+		});
+
+		$picker.on("click", ".sp-bank-picker__option", (event) => {
+			event.preventDefault();
+			const name = $(event.currentTarget).attr("data-bank") || "";
+			$picker.removeClass("is-open");
+			frm.set_value("bank_name", name);
+		});
+
+		$(document).off("click.spBankPicker").on("click.spBankPicker", () => {
+			$(".sp-bank-picker").removeClass("is-open");
+		});
 	}
 
-	replace_employee_own_text($after, [__("Comments"), "Comments"], __("Collab"));
-	$after.find(".timeline-item.activity-title h4, .activity-title h4").text(__("Audit Logs"));
-	replace_employee_own_text($after, [__("Activity"), "Activity"], __("Audit Logs"));
+	const current = frm.doc.bank_name || "";
+	const $toggle = $picker.find(".sp-bank-picker__toggle");
+	const $label = $picker.find(".sp-bank-picker__label");
+	const $mark = $picker.find(".sp-bank-picker__mark");
+	const selected = belize_bank_by_name(current) || (current ? { name: current, logo: "", remote: "" } : null);
 
-	$after.find("button.action-btn, .action-btn").each(function () {
-		const label = ($(this).text() || "").replace(/\s+/g, " ").trim();
-		if (label.includes(__("New Email")) || label.includes("New Email")) {
-			$(this).closest(".timeline-actions").length
-				? $(this).closest(".timeline-actions").hide()
-				: $(this).hide();
-		}
+	$toggle.prop("disabled", Boolean(field.df.read_only));
+	$mark.html(selected ? bank_logo_html(selected) : "");
+	$label.text(selected ? selected.name : __("Select bank"));
+	$label.toggleClass("is-placeholder", !selected);
+
+	const $menu = $picker.find(".sp-bank-picker__menu");
+	$menu.empty();
+	belize_bank_choices(current).forEach((bank) => {
+		const selected_cls = bank.name === current ? " is-selected" : "";
+		$menu.append(`
+			<button type="button" class="sp-bank-picker__option${selected_cls}" data-bank="${frappe.utils.escape_html(
+				bank.name,
+			)}" role="option">
+				${bank_logo_html(bank)}
+				<span>${frappe.utils.escape_html(bank.name)}</span>
+			</button>
+		`);
 	});
 }
 
-function replace_employee_own_text($root, from_labels, to_label) {
-	const labels = new Set(from_labels.filter(Boolean));
-	$root.find("h4, h5, span, div, label").each(function () {
-		const own = Array.from(this.childNodes)
-			.filter((node) => node.nodeType === Node.TEXT_NODE)
-			.map((node) => (node.textContent || "").trim())
-			.filter(Boolean)
-			.join(" ");
-		if (!labels.has(own)) {
-			return;
-		}
-		Array.from(this.childNodes).forEach((node) => {
-			if (node.nodeType === Node.TEXT_NODE && labels.has((node.textContent || "").trim())) {
-				node.textContent = to_label;
-			}
-		});
-	});
+function render_bank_display($disp, bank_name) {
+	if (!$disp.length) return;
+	$disp.find(".sp-bank-value").remove();
+	if (!bank_name) return;
+
+	const bank = belize_bank_by_name(bank_name) || { name: bank_name, logo: "", remote: "" };
+	const $value = $(`
+		<span class="sp-bank-value">
+			${bank_logo_html(bank, "sp-bank-value__logo")}
+			<span>${frappe.utils.escape_html(bank.name)}</span>
+		</span>
+	`);
+	$disp.append($value);
+	$disp.contents().filter(function () {
+		return this.nodeType === 3 && String(this.nodeValue || "").trim() === bank_name;
+	}).remove();
 }
