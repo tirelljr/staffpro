@@ -50,6 +50,7 @@ class PayrollEntry(Document):
 		company: DF.Link
 		cost_center: DF.Link
 		currency: DF.Link
+		customer: DF.Link | None
 		deduct_social_security: DF.Check
 		deduct_tax_for_unsubmitted_tax_exemption_proof: DF.Check
 		department: DF.Link | None
@@ -94,12 +95,24 @@ class PayrollEntry(Document):
 			self.set_onload("submitted_ss", True)
 
 	def before_validate(self):
+		if not self.company:
+			self.company = frappe.defaults.get_user_default("Company") or frappe.defaults.get_global_default(
+				"company"
+			)
 		self.set_cost_center()
 
 	def validate(self):
 		self.number_of_employees = len(self.employees)
 		self.deduct_social_security = 1
+		self.sync_payment_account_from_bank()
 		self.set_status()
+
+	def sync_payment_account_from_bank(self):
+		if not self.bank_account:
+			return
+		gl_account = frappe.db.get_value("Bank Account", self.bank_account, "account")
+		if gl_account:
+			self.payment_account = gl_account
 
 	def set_cost_center(self):
 		if self.cost_center or not self.company:
@@ -249,6 +262,7 @@ class PayrollEntry(Document):
 	def make_filters(self):
 		filters = frappe._dict(
 			company=self.company,
+			customer=self.customer,
 			branch=self.branch,
 			department=self.department,
 			designation=self.designation,
@@ -263,29 +277,25 @@ class PayrollEntry(Document):
 		return filters
 
 	@frappe.whitelist()
-	def fill_employee_details(self) -> list[dict] | None:
+	def fill_employee_details(self, raise_if_empty: int | bool = True) -> list[dict] | None:
 		filters = self.make_filters()
 		employees = get_employee_list(filters=filters, as_dict=True, ignore_match_conditions=True)
 		self.set("employees", [])
 
 		if not employees:
-			error_msg = _(
-				"No employees found for the mentioned criteria:<br>Company: {0}<br> Currency: {1}"
-			).format(
-				frappe.bold(self.company),
-				frappe.bold(self.currency),
-			)
+			error_msg = _("No agents found for the mentioned criteria:")
+			if self.customer:
+				error_msg += "<br>" + _("Client: {0}").format(frappe.bold(self.customer))
 			if self.branch:
 				error_msg += "<br>" + _("Branch: {0}").format(frappe.bold(self.branch))
 			if self.department:
 				error_msg += "<br>" + _("Department: {0}").format(frappe.bold(self.department))
 			if self.designation:
 				error_msg += "<br>" + _("Designation: {0}").format(frappe.bold(self.designation))
-			if self.start_date:
-				error_msg += "<br>" + _("Start date: {0}").format(frappe.bold(self.start_date))
-			if self.end_date:
-				error_msg += "<br>" + _("End date: {0}").format(frappe.bold(self.end_date))
-			frappe.throw(error_msg, title=_("No employees found"))
+			if cint(raise_if_empty):
+				frappe.throw(error_msg, title=_("No agents found"))
+			self.number_of_employees = 0
+			return None
 
 		self.set("employees", employees)
 		self.number_of_employees = len(self.employees)
@@ -686,19 +696,38 @@ class PayrollEntry(Document):
 				employee_wise_accounting_enabled=employee_wise_accounting_enabled,
 			)
 
+	def get_selected_bank_gl_account(self) -> str | None:
+		"""GL account for the BPO bank selected on this payroll run."""
+		if self.bank_account:
+			gl_account = frappe.db.get_value("Bank Account", self.bank_account, "account")
+			if gl_account:
+				return gl_account
+		if self.payment_account:
+			account_type = frappe.db.get_value("Account", self.payment_account, "account_type")
+			if account_type == "Bank":
+				return self.payment_account
+		return None
+
 	def get_direct_payment_account(self, salary_mode: str | None) -> str:
-		"""Resolve Bank or Cash ledger from Company defaults (Bank Transfer / Cash)."""
+		"""Credit the selected BPO bank for Bank Transfer agents, or Company cash for Cash agents."""
 		mode = (salary_mode or "Bank").strip()
 		if mode == "Cash":
 			account = frappe.db.get_value("Company", self.company, "default_cash_account")
 			label = _("Default Cash Account")
+			if not account:
+				account_type = (
+					frappe.db.get_value("Account", self.payment_account, "account_type")
+					if self.payment_account
+					else None
+				)
+				if account_type == "Cash":
+					account = self.payment_account
 		else:
-			# Bank, Cheque, or blank -> bank transfer
-			account = frappe.db.get_value("Company", self.company, "default_bank_account")
-			label = _("Default Bank Account")
-
-		if not account and self.payment_account:
-			account = self.payment_account
+			account = self.get_selected_bank_gl_account()
+			label = _("Pay From Bank Account")
+			if not account:
+				account = frappe.db.get_value("Company", self.company, "default_bank_account")
+				label = _("Default Bank Account")
 
 		if not account:
 			frappe.throw(
@@ -764,6 +793,7 @@ class PayrollEntry(Document):
 			payment_account = self.get_direct_payment_account("Bank")
 			amounts_by_account[payment_account] = payable_amount
 
+		selected_bank_gl = self.get_selected_bank_gl_account()
 		for payment_account, amount in amounts_by_account.items():
 			payment_accounts_used.add(payment_account)
 			# When tagging is enabled, still credit Bank/Cash without Employee party
@@ -779,6 +809,7 @@ class PayrollEntry(Document):
 				precision,
 				entry_type="payable",
 				accounts=accounts,
+				bank_account=self.bank_account if payment_account == selected_bank_gl else None,
 			)
 
 		return payment_accounts_used
@@ -953,6 +984,7 @@ class PayrollEntry(Document):
 		reference_type=None,
 		reference_name=None,
 		is_advance=None,
+		bank_account=None,
 	):
 		exchange_rate, amt = self.get_amount_and_exchange_rate_for_journal_entry(
 			account, amount, company_currency, currencies
@@ -964,6 +996,8 @@ class PayrollEntry(Document):
 			"cost_center": cost_center,
 			"project": self.project,
 		}
+		if bank_account:
+			row["bank_account"] = bank_account
 
 		if entry_type == "debit":
 			payable_amount += flt(amount, precision)
@@ -1268,12 +1302,39 @@ class PayrollEntry(Document):
 		)
 
 	def set_journal_entry_in_salary_slips(self, submitted_salary_slips, jv_name=None):
+		from hrms.hr.belize_banks import bank_label_for_account
+
 		SalarySlip = frappe.qb.DocType("Salary Slip")
-		(
-			frappe.qb.update(SalarySlip)
-			.set(SalarySlip.journal_entry, jv_name)
-			.where(SalarySlip.name.isin([salary_slip.name for salary_slip in submitted_salary_slips]))
-		).run()
+		paid = [slip.name for slip in submitted_salary_slips if not slip.salary_withholding]
+		withheld = [slip.name for slip in submitted_salary_slips if slip.salary_withholding]
+		paid_from_bank = bank_label_for_account(self.bank_account) if self.bank_account else None
+
+		def _update(names, payment_status):
+			if not names:
+				return
+			query = frappe.qb.update(SalarySlip).set(SalarySlip.journal_entry, jv_name)
+			if frappe.get_meta("Salary Slip").has_field("payment_status"):
+				query = query.set(SalarySlip.payment_status, payment_status)
+			if self.bank_account and frappe.get_meta("Salary Slip").has_field("paid_from_bank_account"):
+				query = query.set(SalarySlip.paid_from_bank_account, self.bank_account)
+			if paid_from_bank and frappe.get_meta("Salary Slip").has_field("paid_from_bank"):
+				query = query.set(SalarySlip.paid_from_bank, paid_from_bank)
+			if payment_status == "Paid":
+				from frappe.utils import nowdate, nowtime
+
+				if frappe.get_meta("Salary Slip").has_field("payment_date"):
+					query = query.set(SalarySlip.payment_date, nowdate())
+				if frappe.get_meta("Salary Slip").has_field("payment_time"):
+					query = query.set(SalarySlip.payment_time, nowtime())
+			else:
+				if frappe.get_meta("Salary Slip").has_field("payment_date"):
+					query = query.set(SalarySlip.payment_date, None)
+				if frappe.get_meta("Salary Slip").has_field("payment_time"):
+					query = query.set(SalarySlip.payment_time, None)
+			query.where(SalarySlip.name.isin(names)).run()
+
+		_update(paid, "Paid")
+		_update(withheld, "Not Paid")
 
 	def set_start_end_dates(self):
 		self.update(
@@ -1475,6 +1536,38 @@ class PayrollEntry(Document):
 		return [len(employee_eligible_for_overtime) > 0, len(unsubmitted_overtime_slips) > 0]
 
 
+def _payroll_entry_from_request(docs=None, name: str | None = None) -> "PayrollEntry":
+	if not docs:
+		docs = frappe.form_dict.get("docs")
+	if docs:
+		docs = frappe.parse_json(docs)
+		if isinstance(docs, list):
+			docs = docs[0] if docs else None
+		if docs:
+			return frappe.get_doc(docs)
+
+	name = name or frappe.form_dict.get("name")
+	if name and frappe.db.exists("Payroll Entry", name):
+		return frappe.get_doc("Payroll Entry", name)
+
+	frappe.throw(_("Could not load Payroll Entry to fetch agents."))
+
+
+@frappe.whitelist()
+def fill_employee_details(
+	raise_if_empty: int | bool = True,
+	docs: dict | list | str | None = None,
+	name: str | None = None,
+):
+	"""Module-level wrapper so Desk can call this as a form command, not only as a doc method."""
+	doc = _payroll_entry_from_request(docs=docs, name=name)
+	result = doc.fill_employee_details(raise_if_empty=cint(raise_if_empty))
+	if not frappe.response.get("docs"):
+		frappe.response.docs = []
+	frappe.response.docs.append(doc)
+	return result
+
+
 def get_salary_structure(
 	company: str, currency: str, salary_slip_based_on_timesheet: int, payroll_frequency: str
 ) -> list[str]:
@@ -1497,6 +1590,40 @@ def get_salary_structure(
 		query = query.where(SalaryStructure.salary_slip_based_on_timesheet == 1)
 
 	return query.run(pluck=True)
+
+
+def get_employees_for_client(
+	filters,
+	searchfield=None,
+	search_string=None,
+	fields=None,
+	as_dict=False,
+	limit=None,
+	offset=None,
+	ignore_match_conditions=False,
+) -> list:
+	"""Agents billed to the selected client. Currency and pay period are not used."""
+	Employee = frappe.qb.DocType("Employee")
+
+	query = (
+		frappe.qb.from_(Employee)
+		.where((Employee.status != "Inactive") & (Employee.company == filters.company))
+	)
+
+	query = set_fields_to_select(query, fields)
+	query = set_searchfield(query, searchfield, search_string, qb_object=Employee)
+	query = set_filter_conditions(query, filters, qb_object=Employee)
+
+	if not ignore_match_conditions:
+		query = set_match_conditions(query=query, qb_object=Employee)
+
+	if limit:
+		query = query.limit(limit)
+
+	if offset:
+		query = query.offset(offset)
+
+	return query.run(as_dict=as_dict)
 
 
 def get_filtered_employees(
@@ -1551,6 +1678,10 @@ def get_filtered_employees(
 
 def set_fields_to_select(query, fields: list[str] | None = None):
 	default_fields = ["employee", "employee_name", "department", "designation"]
+	meta = frappe.get_meta("Employee")
+	for extra in ("bank_name", "bank_ac_no"):
+		if meta.has_field(extra):
+			default_fields.append(extra)
 
 	if fields:
 		query = query.select(*fields).distinct()
@@ -1578,6 +1709,9 @@ def set_filter_conditions(query, filters, qb_object):
 	for fltr_key in ["branch", "department", "designation", "grade"]:
 		if filters.get(fltr_key):
 			query = query.where(qb_object[fltr_key] == filters[fltr_key])
+
+	if filters.get("customer") and frappe.get_meta("Employee").has_field("bill_to_customer"):
+		query = query.where(qb_object["bill_to_customer"] == filters.customer)
 
 	return query
 
@@ -1610,6 +1744,14 @@ def remove_payrolled_employees(emp_list, start_date, end_date):
 	).run(pluck=True)
 
 	return [emp_list[emp] for emp in emp_list if emp not in employees_with_payroll]
+
+
+@frappe.whitelist()
+def get_payroll_source_banks(company: str | None = None) -> list[dict]:
+	"""Belize company bank accounts the BPO can wire agent payroll from."""
+	from hrms.hr.belize_banks import get_company_payment_banks
+
+	return get_company_payment_banks(company)
 
 
 @frappe.whitelist()
@@ -1921,6 +2063,18 @@ def get_employee_list(
 	offset=None,
 	ignore_match_conditions=False,
 ) -> list:
+	if filters.get("customer") and frappe.get_meta("Employee").has_field("bill_to_customer"):
+		return get_employees_for_client(
+			filters,
+			searchfield=searchfield,
+			search_string=search_string,
+			fields=fields,
+			as_dict=as_dict,
+			limit=limit,
+			offset=offset,
+			ignore_match_conditions=ignore_match_conditions,
+		)
+
 	sal_struct = get_salary_structure(
 		filters.company,
 		filters.currency,
@@ -1958,8 +2112,9 @@ def employee_query(
 ) -> list:
 	filters = frappe._dict(filters)
 
-	if not filters.payroll_frequency:
-		frappe.throw(_("Select Payroll Frequency."))
+	if not (filters.get("customer") and frappe.get_meta("Employee").has_field("bill_to_customer")):
+		if not filters.payroll_frequency:
+			frappe.throw(_("Select Payroll Frequency."))
 
 	employee_list = get_employee_list(
 		filters,

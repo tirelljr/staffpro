@@ -45,9 +45,21 @@ frappe.listview_settings["Sales Invoice"] = Object.assign({}, existing_sales_inv
 	onload(list_view) {
 		existing_onload?.(list_view);
 		set_client_invoice_primary_action(list_view);
+		place_posted_invoice_export(list_view);
 	},
 	refresh(list_view) {
 		existing_refresh?.(list_view);
 		list_view.set_primary_action?.();
+		place_posted_invoice_export(list_view);
 	},
 });
+
+function place_posted_invoice_export(listview) {
+	hrms.mount_invoice_list_export?.(listview, {
+		doctype: "Sales Invoice",
+		label: __("Posted Invoice"),
+		file_stem: "Posted_Invoices",
+		storage_key: "staff-pro-posted-invoice-export-format",
+		min_selected: 1,
+	});
+}

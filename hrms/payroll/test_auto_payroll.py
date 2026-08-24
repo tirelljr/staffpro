@@ -125,3 +125,19 @@ class TestAutoPayroll(HRMSTestSuite):
 		self.assertEqual(days_for_frequency("2 Weeks"), 12)
 		self.assertEqual(days_for_frequency("2-weeks"), 12)
 		self.assertEqual(days_for_frequency("Monthly"), 28)
+
+	def test_payroll_entry_uses_attendance_not_timesheets(self):
+		from frappe.utils import cint
+
+		from hrms.payroll.auto_payroll import build_payroll_entry
+
+		if not frappe.db.get_value("Cost Center", {"company": "_Test Company", "is_group": 0}):
+			self.skipTest("No cost center for _Test Company")
+
+		settings = frappe.get_single("Payroll Settings")
+		entry = build_payroll_entry(
+			settings, "_Test Company", "2026-08-10", "2026-08-14", "Weekly"
+		)
+		self.assertEqual(cint(entry.salary_slip_based_on_timesheet), 0)
+		self.assertEqual(entry.payroll_frequency, "Weekly")
+		self.assertEqual(cint(entry.deduct_social_security), 1)

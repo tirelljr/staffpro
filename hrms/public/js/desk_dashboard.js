@@ -180,7 +180,7 @@ const DASHBOARDS = {
 		pills: [
 			{ label: __("Pay Structure"), icon: "briefcase", hue: "#90BA93", route: ["List", "Salary Structure"] },
 			{ label: __("Run Payroll"), icon: "wallet", hue: "#90BA93", route: ["List", "Payroll Entry"] },
-			{ label: __("Pay Stubs"), icon: "file", hue: "#90BA93", route: ["List", "Salary Slip"] },
+			{ label: __("Current Pay Stubs"), icon: "file", hue: "#90BA93", route: ["List", "Salary Slip"] },
 			{ label: __("Incentives"), icon: "spark", hue: "#11A5DD", route: ["List", "Employee Incentive"] },
 		],
 	},
@@ -192,7 +192,7 @@ const DASHBOARDS = {
 		create_doctype: "Salary Slip",
 		pills: [
 			{ label: __("Social Security"), icon: "file", hue: "#0f766e", route: ["query-report", "Social Security Deductions"] },
-			{ label: __("Pay Stubs"), icon: "wallet", hue: "#90BA93", route: ["List", "Salary Slip"] },
+			{ label: __("Current Pay Stubs"), icon: "wallet", hue: "#90BA93", route: ["List", "Salary Slip"] },
 			{ label: __("SS Contribution Table"), icon: "briefcase", hue: "#11A5DD", route: ["List", "Social Security Contribution Table"] },
 			{ label: __("Run Payroll"), icon: "spark", hue: "#16678C", route: ["List", "Payroll Entry"] },
 		],

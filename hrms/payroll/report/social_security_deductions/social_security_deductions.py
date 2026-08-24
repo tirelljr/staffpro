@@ -8,9 +8,9 @@ import frappe
 from frappe import _
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Coalesce
-from frappe.utils import getdate
+from frappe.utils import flt, formatdate, fmt_money, getdate, sbool
 from frappe.utils.csvutils import to_csv
-from frappe.utils.xlsxutils import make_xlsx
+from frappe.utils.pdf import get_pdf
 
 
 def execute(filters=None):
@@ -133,8 +133,15 @@ def get_data(filters):
 		query = query.where(SalarySlip.end_date >= getdate(filters.from_date))
 	if filters.get("to_date"):
 		query = query.where(SalarySlip.start_date <= getdate(filters.to_date))
-	if filters.get("employee"):
-		query = query.where(SalarySlip.employee == filters.employee)
+
+	employees = as_list(filters.get("selected_employees")) or as_list(filters.get("employee"))
+	if employees:
+		query = query.where(SalarySlip.employee.isin(employees))
+
+	salary_slips = as_list(filters.get("selected_salary_slips"))
+	if salary_slips:
+		query = query.where(SalarySlip.name.isin(salary_slips))
+
 	if filters.get("ss_number"):
 		query = query.where(SalarySlip.ss_number == filters.ss_number)
 
@@ -171,6 +178,31 @@ def _employee_ssn_map(employees: list[str]) -> dict[str, str]:
 	return {row.name: row.social_security_number for row in rows if row.social_security_number}
 
 
+def as_list(value) -> list:
+	if value in (None, "", []):
+		return []
+	if isinstance(value, str):
+		stripped = value.strip()
+		if stripped.startswith("["):
+			value = frappe.parse_json(stripped)
+		else:
+			return [stripped] if stripped else []
+	if isinstance(value, (list, tuple, set)):
+		return [item for item in value if item not in (None, "")]
+	return [value]
+
+
+def _parse_filters(filters) -> frappe._dict:
+	if isinstance(filters, str):
+		filters = frappe.parse_json(filters)
+	return frappe._dict(filters or {})
+
+
+def _assert_can_export():
+	if not frappe.permissions.can_export("Salary Slip"):
+		frappe.throw(_("Not permitted to export"), frappe.PermissionError)
+
+
 def _export_rows(filters=None):
 	columns, data = execute(filters)
 	headers = [col.get("label") for col in columns]
@@ -178,7 +210,7 @@ def _export_rows(filters=None):
 	rows = [headers]
 	for row in data:
 		rows.append(["" if row.get(fieldname) is None else row.get(fieldname) for fieldname in fieldnames])
-	return rows
+	return columns, data, rows
 
 
 def _period_label(filters) -> str:
@@ -188,25 +220,132 @@ def _period_label(filters) -> str:
 	return "all"
 
 
+def _period_display(filters) -> str:
+	filters = frappe._dict(filters or {})
+	if filters.get("from_date") and filters.get("to_date"):
+		return _("{0} to {1}").format(formatdate(filters.from_date), formatdate(filters.to_date))
+	return _("All Periods")
+
+
+def _safe_filename(value: str) -> str:
+	cleaned = "".join(ch if ch.isalnum() or ch in "._- " else "_" for ch in str(value or ""))
+	return cleaned.strip().replace(" ", "_") or "agent"
+
+
+def _respond_file(filename: str, content, file_type: str = "binary"):
+	frappe.response["filename"] = filename
+	frappe.response["filecontent"] = content
+	frappe.response["type"] = file_type
+
+
+def _csv_bytes(rows: list) -> str:
+	return to_csv(rows)
+
+
 @frappe.whitelist()
-def download_zip(filters=None):
-	"""Download Social Security deductions as a ZIP of CSV and Excel."""
-	if not frappe.permissions.can_export("Salary Slip"):
-		frappe.throw(_("Not permitted to export"), frappe.PermissionError)
+def download_csv(filters: dict | str | None = None) -> None:
+	"""Download Social Security deductions as CSV."""
+	_assert_can_export()
+	filters = _parse_filters(filters)
+	_columns, data, rows = _export_rows(filters)
+	if not data:
+		frappe.throw(_("No data to export"))
+	period = _period_label(filters)
+	_respond_file(f"Social_Security_Deductions_{period}.csv", _csv_bytes(rows))
 
-	if isinstance(filters, str):
-		filters = frappe.parse_json(filters)
 
-	rows = _export_rows(filters)
+@frappe.whitelist()
+def download_pdf(filters: dict | str | None = None) -> None:
+	"""Download Social Security deductions as PDF."""
+	_assert_can_export()
+	filters = _parse_filters(filters)
+	columns, data, _rows = _export_rows(filters)
+	if not data:
+		frappe.throw(_("No data to export"))
+
+	html = frappe.render_template(
+		"hrms/payroll/report/social_security_deductions/social_security_deductions.html",
+		{
+			"columns": columns,
+			"data": [_pdf_row(columns, row) for row in data],
+			"period_label": _period_display(filters),
+			"generated_on": formatdate(getdate()),
+			"totals": _pdf_totals(data),
+		},
+	)
+	period = _period_label(filters)
+	_respond_file(
+		f"Social_Security_Deductions_{period}.pdf",
+		get_pdf(html, {"orientation": "Landscape"}),
+	)
+
+
+def _pdf_row(columns, row) -> dict:
+	formatted = {}
+	for column in columns:
+		fieldname = column.get("fieldname")
+		value = row.get(fieldname)
+		fieldtype = column.get("fieldtype")
+		if value in (None, ""):
+			formatted[fieldname] = ""
+		elif fieldtype == "Date":
+			formatted[fieldname] = formatdate(value)
+		elif fieldtype == "Currency":
+			formatted[fieldname] = fmt_money(flt(value))
+		else:
+			formatted[fieldname] = value
+	return formatted
+
+
+def _pdf_totals(data) -> dict:
+	return {
+		"ss_weekly_earnings": fmt_money(sum(flt(row.get("ss_weekly_earnings")) for row in data)),
+		"ss_insurable_earnings": fmt_money(sum(flt(row.get("ss_insurable_earnings")) for row in data)),
+		"ss_employee_amount": fmt_money(sum(flt(row.get("ss_employee_amount")) for row in data)),
+		"ss_employer_amount": fmt_money(sum(flt(row.get("ss_employer_amount")) for row in data)),
+		"total": fmt_money(sum(flt(row.get("total")) for row in data)),
+	}
+
+
+@frappe.whitelist()
+def download_zip(filters: dict | str | None = None) -> None:
+	"""Download one CSV per selected agent, packed as a ZIP."""
+	_assert_can_export()
+	filters = _parse_filters(filters)
+	require_multiple = sbool(filters.get("require_multiple", True))
+	selected_employees = as_list(filters.get("selected_employees"))
+
+	if require_multiple and len(set(selected_employees)) < 2:
+		frappe.throw(_("Select more than one agent to export a ZIP of CSV files."))
+
+	columns, data, _rows = _export_rows(filters)
+	grouped = {}
+	for row in data:
+		employee = row.get("employee")
+		if not employee:
+			continue
+		grouped.setdefault(employee, []).append(row)
+
+	if require_multiple and len(grouped) < 2:
+		frappe.throw(_("Select more than one agent to export a ZIP of CSV files."))
+	if not grouped:
+		frappe.throw(_("No data to export"))
+
+	headers = [col.get("label") for col in columns]
+	fieldnames = [col.get("fieldname") for col in columns]
 	period = _period_label(filters)
 	buffer = io.BytesIO()
 	with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-		archive.writestr(f"Social_Security_Deductions_{period}.csv", to_csv(rows))
-		archive.writestr(
-			f"Social_Security_Deductions_{period}.xlsx",
-			make_xlsx(rows, "Social Security Deductions").getvalue(),
-		)
+		for employee, employee_rows in grouped.items():
+			csv_rows = [headers]
+			for row in employee_rows:
+				csv_rows.append(
+					["" if row.get(fieldname) is None else row.get(fieldname) for fieldname in fieldnames]
+				)
+			agent_name = _safe_filename(employee_rows[0].get("employee_name") or employee)
+			archive.writestr(
+				f"{agent_name}_{_safe_filename(employee)}_{period}.csv",
+				_csv_bytes(csv_rows),
+			)
 
-	frappe.response["filename"] = f"Social_Security_Deductions_{period}.zip"
-	frappe.response["filecontent"] = buffer.getvalue()
-	frappe.response["type"] = "binary"
+	_respond_file(f"Social_Security_Deductions_{period}.zip", buffer.getvalue())

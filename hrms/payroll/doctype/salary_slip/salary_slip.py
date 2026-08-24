@@ -22,6 +22,8 @@ from frappe.utils import (
 	get_link_to_form,
 	getdate,
 	money_in_words,
+	nowdate,
+	nowtime,
 	rounded,
 )
 from frappe.utils.background_jobs import enqueue
@@ -234,6 +236,7 @@ class SalarySlip(TransactionBase):
 	def validate(self):
 		self.check_salary_withholding()
 		self.status = self.get_status()
+		self.set_payment_trace()
 		validate_active_employee(self.employee)
 		self.validate_dates()
 		self.check_existing()
@@ -294,6 +297,7 @@ class SalarySlip(TransactionBase):
 			frappe.throw(_("Net Pay cannot be less than 0"))
 		else:
 			self.set_status()
+			self.set_payment_trace(update=True)
 			self.update_status(self.name)
 
 			make_loan_repayment_entry(self)
@@ -344,6 +348,7 @@ class SalarySlip(TransactionBase):
 
 	def on_cancel(self):
 		self.set_status()
+		self.set_payment_trace(update=True)
 		self.update_status()
 		self.update_payment_status_for_gratuity_and_leave_encashment()
 		delete_employee_benefit_ledger_entry("salary_slip", self.name)
@@ -378,6 +383,59 @@ class SalarySlip(TransactionBase):
 				return "Draft"
 			elif self.docstatus == 1:
 				return "Submitted"
+
+	def set_payment_trace(self, update: bool = False):
+		"""Stamp agent destination bank, BPO source bank, and Paid / Not Paid."""
+		self.pull_emp_details()
+		if not frappe.get_meta("Salary Slip").has_field("payment_status"):
+			return
+		self.set_paid_from_bank()
+		self.payment_status = self.get_payment_status()
+		stamp = get_payment_stamp(
+			self.payment_status == "Paid",
+			keep_date=self.get("payment_date"),
+			keep_time=self.get("payment_time"),
+		)
+		if "payment_date" in stamp:
+			self.payment_date = stamp["payment_date"]
+		if "payment_time" in stamp:
+			self.payment_time = stamp["payment_time"]
+		if update:
+			values = {
+				"payment_status": self.payment_status,
+				"bank_name": self.bank_name,
+				"bank_account_no": self.bank_account_no,
+				"paid_from_bank": self.paid_from_bank,
+				"paid_from_bank_account": self.paid_from_bank_account,
+			}
+			values.update(stamp)
+			meta = frappe.get_meta("Salary Slip")
+			values = {key: value for key, value in values.items() if meta.has_field(key)}
+			self.db_set(values, update_modified=False)
+
+	def get_payment_status(self) -> str:
+		if self.docstatus == 2:
+			return "Not Paid"
+		if self.salary_withholding:
+			return "Not Paid"
+		if self.docstatus == 1 and (self.journal_entry or self.payment_status == "Paid"):
+			return "Paid"
+		return "Not Paid"
+
+	def set_paid_from_bank(self):
+		bank_account = None
+		if self.payroll_entry:
+			bank_account = frappe.db.get_value("Payroll Entry", self.payroll_entry, "bank_account")
+		if not bank_account and self.company:
+			from hrms.hr.belize_banks import get_default_payroll_bank_account
+
+			bank_account = get_default_payroll_bank_account(self.company)
+		if not bank_account:
+			return
+		from hrms.hr.belize_banks import bank_label_for_account
+
+		self.paid_from_bank_account = bank_account
+		self.paid_from_bank = bank_label_for_account(bank_account)
 
 	def validate_dates(self):
 		self.validate_from_to_dates("start_date", "end_date")
@@ -2603,8 +2661,11 @@ def unlink_ref_doc_from_salary_slip(doc, method=None):
 
 	if linked_ss:
 		for ss in linked_ss:
-			ss_doc = frappe.get_doc("Salary Slip", ss)
-			frappe.db.set_value("Salary Slip", ss_doc.name, "journal_entry", "")
+			values = {"journal_entry": ""}
+			if frappe.get_meta("Salary Slip").has_field("payment_status"):
+				values["payment_status"] = "Not Paid"
+			values.update(get_payment_stamp(False))
+			frappe.db.set_value("Salary Slip", ss, values)
 
 
 def generate_password_for_pdf(policy_template, employee):
@@ -2768,3 +2829,201 @@ def email_salary_slips(names) -> None:
 	for name in names:
 		salary_slip = frappe.get_doc("Salary Slip", name)
 		salary_slip.email_salary_slip()
+
+
+def get_payment_stamp(paid: bool, keep_date=None, keep_time=None) -> dict:
+	"""Date and time the agent was paid. Kept if already stamped."""
+	meta = frappe.get_meta("Salary Slip")
+	values = {}
+	if paid:
+		if meta.has_field("payment_date"):
+			values["payment_date"] = keep_date or nowdate()
+		if meta.has_field("payment_time"):
+			values["payment_time"] = keep_time or nowtime()
+	else:
+		if meta.has_field("payment_date"):
+			values["payment_date"] = None
+		if meta.has_field("payment_time"):
+			values["payment_time"] = None
+	return values
+
+
+def _as_name_list(names: list | str | None) -> list[str]:
+	import json
+
+	if isinstance(names, str):
+		try:
+			names = json.loads(names)
+		except json.JSONDecodeError:
+			names = [names]
+	if not names:
+		return []
+	if isinstance(names, (list, tuple)):
+		return [cstr(name) for name in names if name]
+	return [cstr(names)]
+
+
+def _can_pay_salary_slip(doc) -> bool:
+	if cint(doc.docstatus) != 1:
+		return False
+	if doc.get("salary_withholding"):
+		return False
+	return doc.payment_status != "Paid"
+
+
+def _salary_slip_query_fields() -> list[str]:
+	wanted = [
+		"name",
+		"employee",
+		"employee_name",
+		"company",
+		"net_pay",
+		"gross_pay",
+		"ss_employee_amount",
+		"currency",
+		"start_date",
+		"end_date",
+		"bank_name",
+		"bank_account_no",
+		"paid_from_bank",
+		"paid_from_bank_account",
+		"payment_status",
+		"docstatus",
+		"salary_withholding",
+		"payroll_entry",
+	]
+	columns = set(frappe.db.get_table_columns("Salary Slip") or [])
+	return [field for field in wanted if field in columns]
+
+
+def _fetch_salary_slips(names: list[str]) -> dict:
+	# Raw SQL so names with slashes (Sal Slip/EMP-00001/00001) still resolve.
+	fields = _salary_slip_query_fields()
+	if not names or not fields:
+		return {}
+	placeholders = ", ".join(["%s"] * len(names))
+	select_sql = ", ".join(f"`{field}`" for field in fields)
+	rows = frappe.db.sql(
+		f"SELECT {select_sql} FROM `tabSalary Slip` WHERE `name` IN ({placeholders})",
+		tuple(names),
+		as_dict=True,
+	)
+	return {row.name: row for row in rows}
+
+
+def _paid_from_account(row, defaults: dict | None = None) -> str | None:
+	account = row.get("paid_from_bank_account")
+	if account:
+		return account
+	if row.get("payroll_entry"):
+		account = frappe.db.get_value("Payroll Entry", row.payroll_entry, "bank_account")
+		if account:
+			return account
+	company = row.get("company")
+	if not company:
+		return None
+	if defaults is not None and company in defaults:
+		return defaults[company]
+	from hrms.hr.belize_banks import get_default_payroll_bank_account
+
+	account = get_default_payroll_bank_account(company)
+	if defaults is not None:
+		defaults[company] = account
+	return account
+
+
+def _paid_from_label(row, defaults: dict | None = None) -> str:
+	label = row.get("paid_from_bank") or ""
+	if label:
+		return label
+	account = _paid_from_account(row, defaults)
+	if not account:
+		return ""
+	from hrms.hr.belize_banks import bank_label_for_account
+
+	return bank_label_for_account(account) or account
+
+
+@frappe.whitelist()
+def pay_agents(names: list | str | None = None) -> dict:
+	"""Mark selected unpaid salary slips as Paid from Current Pay Stubs."""
+	names = _as_name_list(names)
+	if not names:
+		frappe.throw(_("Please select the pay stubs to pay"))
+
+	frappe.has_permission("Salary Slip", "write", throw=True)
+
+	by_name = _fetch_salary_slips(names)
+	paid: list[str] = []
+	skipped: list[str] = []
+	defaults: dict = {}
+	meta = frappe.get_meta("Salary Slip")
+	for name in names:
+		row = by_name.get(name)
+		if not row or not _can_pay_salary_slip(row):
+			skipped.append(name)
+			continue
+		values = {"payment_status": "Paid"}
+		from_bank = _paid_from_label(row, defaults)
+		bank_account = _paid_from_account(row, defaults)
+		if meta.has_field("paid_from_bank") and from_bank:
+			values["paid_from_bank"] = from_bank
+		if meta.has_field("paid_from_bank_account") and bank_account:
+			values["paid_from_bank_account"] = bank_account
+		values.update(get_payment_stamp(True))
+		frappe.db.set_value("Salary Slip", name, values)
+		paid.append(name)
+
+	return {"paid": paid, "skipped": skipped}
+
+
+@frappe.whitelist()
+def get_pay_preview(names: list | str | None = None) -> dict:
+	"""Return payment details for the confirm-pay dialog."""
+	names = _as_name_list(names)
+	if not names:
+		frappe.throw(_("Please select the pay stubs to pay"))
+
+	frappe.has_permission("Salary Slip", "read", throw=True)
+
+	by_name = _fetch_salary_slips(names)
+	agents = []
+	skipped = []
+	defaults: dict = {}
+	total_net = 0.0
+	currency = None
+	for name in names:
+		row = by_name.get(name)
+		if not row:
+			skipped.append(name)
+			continue
+		if not _can_pay_salary_slip(row):
+			skipped.append(name)
+			continue
+		to_bank = " ".join(part for part in [row.get("bank_name"), row.get("bank_account_no")] if part)
+		from_bank = _paid_from_label(row, defaults)
+		amount = flt(row.net_pay)
+		total_net += amount
+		currency = currency or row.currency
+		agents.append(
+			{
+				"name": row.name,
+				"employee": row.employee,
+				"employee_name": row.employee_name,
+				"net_pay": amount,
+				"gross_pay": flt(row.get("gross_pay")),
+				"ss_employee_amount": flt(row.get("ss_employee_amount")),
+				"currency": row.currency,
+				"start_date": row.start_date,
+				"end_date": row.end_date,
+				"pay_from": from_bank,
+				"pay_to": to_bank,
+			}
+		)
+
+	return {
+		"agents": agents,
+		"skipped": skipped,
+		"total_net": total_net,
+		"currency": currency,
+	}

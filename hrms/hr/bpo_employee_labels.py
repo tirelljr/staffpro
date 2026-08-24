@@ -29,8 +29,12 @@ BELIZE_EMPLOYEE_BANKS = (
 
 OTHER_DOCTYPE_FIELD_LABELS = {
 	"Salary Structure Assignment": {"ctc": "Agent Hourly", "grade": "Campaign"},
-	"Salary Slip": {"ctc": "Agent Hourly"},
-	"Payroll Entry": {"grade": "Campaign"},
+	"Salary Slip": {
+		"ctc": "Agent Hourly",
+		"bank_name": "Paid To Bank",
+		"bank_account_no": "Paid To Account No",
+	},
+	"Payroll Entry": {"grade": "Campaign", "bank_account": "Pay From Bank Account"},
 	"Employee Promotion": {
 		"current_ctc": "Current Agent Hourly",
 		"revised_ctc": "Revised Agent Hourly",
@@ -44,6 +48,7 @@ def apply_bpo_employee_labels():
 	_sync_custom_field_labels("Employee", EMPLOYEE_FIELD_LABELS)
 	apply_belize_employee_bank_fields()
 	apply_employee_salary_defaults()
+	apply_payroll_payment_layout()
 
 	for doctype, labels in OTHER_DOCTYPE_FIELD_LABELS.items():
 		_relabel_fields(doctype, labels)
@@ -76,6 +81,40 @@ def apply_employee_salary_defaults():
 			"ctc",
 			"description",
 			"Hourly pay in salary currency. After setting it, you can apply the same rate to other agents, a branch, campaign, or team.",
+			"Small Text",
+			validate_fields_for_doctype=False,
+		)
+
+
+def apply_payroll_payment_layout():
+	if not frappe.db.exists("DocType", "Payroll Entry"):
+		return
+
+	meta = frappe.get_meta("Payroll Entry")
+	hidden_fields = {
+		"payment_account": "Check",
+		"overtime_step": "Check",
+		"accounting_dimensions_tab": "Check",
+		"accounting_dimensions_section": "Check",
+	}
+	for fieldname, fieldtype in hidden_fields.items():
+		if not meta.has_field(fieldname):
+			continue
+		make_property_setter(
+			"Payroll Entry",
+			fieldname,
+			"hidden",
+			1,
+			fieldtype,
+			validate_fields_for_doctype=False,
+		)
+
+	if meta.has_field("bank_account"):
+		make_property_setter(
+			"Payroll Entry",
+			"bank_account",
+			"description",
+			"Company bank account to send agent payments from.",
 			"Small Text",
 			validate_fields_for_doctype=False,
 		)

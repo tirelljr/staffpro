@@ -104,5 +104,13 @@ hrms.patches.v16_0.client_invoice_usd_billing #2026-08-20
 hrms.patches.v16_0.hide_attendance_list_from_nav #2026-08-21
 hrms.patches.v16_0.hide_cost_center #2026-08-21
 hrms.patches.v16_0.belize_employee_bank_fields #2026-08-21
+hrms.patches.v16_0.seed_belize_company_bank_accounts #2026-08-21
 hrms.patches.v16_0.usd_client_receivable_account #2026-08-21
 hrms.patches.v16_0.restore_ss_and_taxes_nav #2026-08-21
+hrms.patches.v16_0.seed_connected_bpo_demo #2026-08-21
+hrms.patches.v16_0.bpo_bank_account_form #2026-08-21
+hrms.patches.v16_0.show_bank_account_number_and_branch #2026-08-21
+hrms.patches.v16_0.hide_bank_account_iban_and_company_account #2026-08-21
+hrms.patches.v16_0.seed_demo_employee_banks #2026-08-21
+hrms.patches.v16_0.split_current_and_past_pay_stubs #2026-08-21
+hrms.patches.v16_0.backfill_salary_slip_payment_datetime #2026-08-21

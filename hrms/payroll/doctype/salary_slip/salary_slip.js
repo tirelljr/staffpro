@@ -218,6 +218,43 @@ frappe.ui.form.on("Salary Slip", {
 		frm.fields_dict["earnings"].grid.set_column_disp(salary_detail_fields, false);
 		frm.fields_dict["deductions"].grid.set_column_disp(salary_detail_fields, false);
 		frm.trigger("set_dynamic_labels");
+		frm.trigger("show_payment_status");
+		hrms.mount_invoice_form_export?.(frm, {
+			doctype: "Salary Slip",
+			label: __("Salary Slip"),
+			file_stem: "Salary_Slips",
+			storage_key: "staff-pro-salary-slip-export-format",
+			method_prefix: "hrms.payroll.salary_slip_export",
+			default_format: "PDF",
+		});
+	},
+
+	show_payment_status: function (frm) {
+		if (!frm.doc.payment_status) {
+			return;
+		}
+		const paid = frm.doc.payment_status === "Paid";
+		const from_bank = frm.doc.paid_from_bank || frm.doc.paid_from_bank_account || "";
+		const to_bank = [frm.doc.bank_name, frm.doc.bank_account_no].filter(Boolean).join(" ");
+		let message = paid ? __("Paid") : __("Not Paid");
+		if (paid && frm.doc.payment_date) {
+			const paid_at = [frm.doc.payment_date, frm.doc.payment_time]
+				.filter(Boolean)
+				.join(" ");
+			message = __("Paid on {0}", [paid_at]);
+		}
+		if (from_bank && to_bank) {
+			message = paid
+				? frm.doc.payment_date
+					? __("Paid on {0} from {1} to {2}", [
+							[frm.doc.payment_date, frm.doc.payment_time].filter(Boolean).join(" "),
+							from_bank,
+							to_bank,
+						])
+					: __("Paid from {0} to {1}", [from_bank, to_bank])
+				: __("Not Paid. Will pay from {0} to {1}", [from_bank, to_bank]);
+		}
+		frm.dashboard.set_headline_alert(message, paid ? "green" : "orange");
 	},
 
 	salary_slip_based_on_timesheet: function (frm) {

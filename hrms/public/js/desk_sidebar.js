@@ -655,6 +655,8 @@ const SUBMENU_ICONS = {
 	"qa feedback": "trending-up",
 	"run payroll": "banknote-arrow-up",
 	"pay stubs": "wallet",
+	"current pay stubs": "wallet",
+	"past pay stubs": "archive",
 	reimbursements: "arrow-down-from-line",
 	"cash advances": "upload",
 	"client invoices": "receipt",
@@ -745,6 +747,7 @@ function apply_bpo_sidebar_label($item) {
 
 	const current = ($label.text() || "").trim();
 	if (!current) return;
+	if (current.toLowerCase() === "past pay stubs") return;
 
 	const href = ($item.find(".item-anchor").attr("href") || "").trim();
 	const next = bpo_sidebar_label(current, href);
@@ -905,6 +908,7 @@ function enhance_sidebar_menus() {
 		}
 
 		prefer_employee_image_sidebar_link($anchor);
+		bind_pay_stubs_sidebar_item($item, $anchor, label);
 
 		const $wrapper = $item.parent();
 		const $nested = $wrapper.children(".nested-container");
@@ -916,6 +920,80 @@ function enhance_sidebar_menus() {
 				$drop.attr("data-state", next);
 			}
 		}
+	});
+	sync_pay_stubs_sidebar_state();
+}
+
+const PAY_STUBS_MODE_KEY = "staff_pro_pay_stubs_view";
+
+function pay_stubs_sidebar_mode(label) {
+	const key = (label || "").trim().toLowerCase();
+	if (key === "past pay stubs") return "past";
+	if (key === "current pay stubs" || key === "pay stubs") return "current";
+	return "";
+}
+
+function bind_pay_stubs_sidebar_item($item, $anchor, label) {
+	const mode = pay_stubs_sidebar_mode(label);
+	if (!mode || !$anchor?.length) return;
+
+	$anchor.attr("data-sp-pay-stubs", mode);
+	$anchor.off("click.paystubs").on("click.paystubs", function (e) {
+		e.preventDefault();
+		e.stopPropagation();
+		open_pay_stubs_list(mode);
+	});
+}
+
+function open_pay_stubs_list(mode) {
+	try {
+		sessionStorage.setItem(PAY_STUBS_MODE_KEY, mode);
+	} catch (err) {
+		/* ignore */
+	}
+	frappe.route_options = {
+		payment_status: mode === "past" ? "Paid" : "Not Paid",
+	};
+
+	const route = frappe.get_route() || [];
+	const on_list = route[0] === "List" && route[1] === "Salary Slip";
+	if (on_list && window.cur_list?.doctype === "Salary Slip") {
+		if (typeof window.cur_list._staff_pro_pay_status !== "undefined") {
+			window.cur_list._staff_pro_pay_status = null;
+		}
+		if (window.cur_list.filter_area) {
+			window.cur_list.filter_area.remove("payment_status");
+			window.cur_list.filter_area.add([
+				[window.cur_list.doctype, "payment_status", "=", mode === "past" ? "Paid" : "Not Paid"],
+			]);
+		}
+		if (typeof frappe.listview_settings["Salary Slip"]?.refresh === "function") {
+			frappe.listview_settings["Salary Slip"].refresh(window.cur_list);
+		}
+		sync_pay_stubs_sidebar_state();
+		return;
+	}
+
+	frappe.set_route("List", "Salary Slip");
+}
+
+function sync_pay_stubs_sidebar_state() {
+	const route = frappe.get_route() || [];
+	const on_list = route[0] === "List" && route[1] === "Salary Slip";
+	if (!on_list) return;
+
+	let mode = "current";
+	try {
+		mode = sessionStorage.getItem(PAY_STUBS_MODE_KEY) || "current";
+	} catch (err) {
+		mode = "current";
+	}
+
+	$(".body-sidebar .standard-sidebar-item").each(function () {
+		const $item = $(this);
+		const item_mode = pay_stubs_sidebar_mode(sidebar_item_label($item));
+		if (!item_mode) return;
+		$item.toggleClass("active-sidebar", item_mode === mode);
 	});
 }
 

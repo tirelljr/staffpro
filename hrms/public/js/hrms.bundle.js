@@ -12,3 +12,4 @@ import "./desk_sidebar.js";
 import "./desk_form_footer.js";
 import "./desk_dashboard.js";
 import "./time_hours.js";
+import "./invoice_export.js";

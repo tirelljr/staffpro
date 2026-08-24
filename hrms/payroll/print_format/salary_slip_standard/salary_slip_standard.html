@@ -66,6 +66,29 @@
 </table>
 
 <table class="table table-bordered" style="margin-bottom:16px;">
+	<tbody>
+		<tr>
+			<td style="width:25%;"><b>{{ _("Payment Status") }}</b></td>
+			<td style="width:25%;">{{ _(doc.payment_status or "Not Paid") }}</td>
+			<td style="width:25%;"><b>{{ _("Net Pay") }}</b></td>
+			<td style="width:25%;">{{ doc.get_formatted("net_pay") }}</td>
+		</tr>
+		<tr>
+			<td><b>{{ _("Paid From Bank") }}</b></td>
+			<td>{{ doc.paid_from_bank or "" }}</td>
+			<td><b>{{ _("Paid To Bank") }}</b></td>
+			<td>{{ doc.bank_name or "" }}</td>
+		</tr>
+		<tr>
+			<td><b>{{ _("Paid From Account") }}</b></td>
+			<td>{{ doc.paid_from_bank_account or "" }}</td>
+			<td><b>{{ _("Paid To Account No") }}</b></td>
+			<td>{{ doc.bank_account_no or "" }}</td>
+		</tr>
+	</tbody>
+</table>
+
+<table class="table table-bordered" style="margin-bottom:16px;">
 	<thead>
 		<tr>
 			<th style="width:30%;">{{ _("Earnings") }}</th>

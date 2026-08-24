@@ -2246,6 +2246,7 @@ body.staff-pro-alive .sp-hours__field .awesomplete mark {
 
 .sp-adj-modal .modal-body {
 	padding: 12px 16px 16px;
+	overflow: visible;
 }
 
 .sp-adj-modal .form-section,
@@ -2305,7 +2306,13 @@ body.staff-pro-alive .sp-hours__field .awesomplete mark {
 }
 
 .sp-adj__dept {
+	flex: 0 0 28px;
+	min-height: 28px !important;
+	max-height: 28px;
+	height: 28px !important;
 	margin-bottom: 8px;
+	appearance: auto;
+	-webkit-appearance: menulist;
 }
 
 .sp-adj__users {
@@ -2517,16 +2524,32 @@ body.staff-pro-alive .sp-hours__field .awesomplete mark {
 	max-width: 860px;
 }
 
+.sp-entry-dialog .modal-body {
+	padding: 12px 16px 16px;
+	overflow: visible;
+}
+
 .sp-entry-dialog .modal-footer {
 	display: none !important;
 }
 
+.sp-entry-dialog .form-layout,
+.sp-entry-dialog .form-page,
 .sp-entry-dialog .form-section,
 .sp-entry-dialog .form-column,
+.sp-entry-dialog .form-section .form-column,
+.sp-entry-dialog form,
 .sp-entry-dialog .frappe-control[data-fieldname="entry_body"],
-.sp-entry-dialog .frappe-control[data-fieldname="entry_body"] .form-group {
+.sp-entry-dialog .frappe-control[data-fieldname="entry_body"] .form-group,
+.sp-entry-dialog .frappe-control[data-fieldname="entry_body"] .control-input-wrapper,
+.sp-entry-dialog .frappe-control[data-fieldname="entry_body"] .control-input {
+	display: block !important;
+	float: none;
+	width: 100%;
+	max-width: 100%;
 	margin: 0;
 	padding: 0;
+	overflow: visible;
 }
 
 .sp-entry-dialog .frappe-control[data-fieldname="entry_body"] .clearfix,
@@ -2535,12 +2558,8 @@ body.staff-pro-alive .sp-hours__field .awesomplete mark {
 	display: none;
 }
 
-.sp-entry-dialog .frappe-control[data-fieldname="entry_body"] .control-input-wrapper {
-	margin: 0;
-}
-
 .sp-entry {
-	display: grid;
+	display: grid !important;
 	grid-template-columns: minmax(180px, 1fr) minmax(160px, 0.95fr) minmax(240px, 1.25fr);
 	gap: 10px;
 	align-items: stretch;
@@ -2551,6 +2570,7 @@ body.staff-pro-alive .sp-hours__field .awesomplete mark {
 
 .sp-entry__col {
 	min-width: 0;
+	min-height: 0;
 	display: flex;
 	flex-direction: column;
 }
@@ -2576,6 +2596,16 @@ body.staff-pro-alive .sp-hours__field .awesomplete mark {
 .sp-entry__end {
 	height: 28px;
 	padding: 0 8px;
+}
+
+.sp-entry__department,
+.sp-entry__job {
+	flex: 0 0 28px;
+	min-height: 28px !important;
+	max-height: 28px;
+	height: 28px !important;
+	appearance: auto;
+	-webkit-appearance: menulist;
 }
 
 .sp-entry__department {
@@ -2949,4 +2979,21 @@ body.staff-pro-alive .sp-hours__field .awesomplete mark {
 
 .sp-report-export__item.is-selected .sp-report-export__check {
 	display: inline-flex;
+}
+
+.page-head:has(.sp-invoice-export),
+.page-head-content:has(.sp-invoice-export),
+.custom-actions:has(.sp-invoice-export) {
+	overflow: visible;
+}
+
+.sp-invoice-export {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	margin-right: 8px;
+}
+
+.sp-invoice-export[hidden] {
+	display: none !important;
 }

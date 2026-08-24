@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<style>
+		body { font-family: Helvetica, Arial, sans-serif; font-size: 11px; color: #222; }
+		.invoice { page-break-inside: avoid; }
+		.invoice + .invoice { page-break-before: always; }
+		.banner { background: #000; margin-bottom: 16px; }
+		.banner table { width: 100%; border: none; }
+		.banner td { border: none; color: #fff; vertical-align: middle; padding: 14px; }
+		.banner img { max-height: 52px; max-width: 200px; }
+		.banner .doctype { font-size: 18px; font-weight: 600; }
+		.banner .name { font-size: 12px; margin-top: 4px; opacity: 0.9; }
+		.meta { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+		.meta td { border: 1px solid #ccc; padding: 6px 8px; width: 25%; }
+		table.lines { width: 100%; border-collapse: collapse; margin-top: 8px; }
+		.lines th, .lines td { border: 1px solid #ccc; padding: 5px 6px; text-align: left; }
+		.lines th { background: #e8f5ef; font-weight: bold; }
+		.num { text-align: right; }
+		.totals td { font-weight: bold; background: #f7f7f7; }
+		.footer { margin-top: 16px; font-size: 9px; color: #666; }
+	</style>
+</head>
+<body>
+	{% for invoice in invoices %}
+	<div class="invoice">
+		<div class="banner">
+			<table cellpadding="0" cellspacing="0">
+				<tr>
+					<td style="width:58%;">
+						<img src="{{ logo }}" alt="Staff Pro BPO">
+					</td>
+					<td style="width:42%; text-align:right;">
+						<div class="doctype">
+							{% if invoice.is_posted %}
+								{{ _("Posted Invoice") }}
+							{% else %}
+								{{ _("Client Invoice") }}
+							{% endif %}
+						</div>
+						<div class="name">{{ invoice.name }}</div>
+					</td>
+				</tr>
+			</table>
+		</div>
+		<table class="meta">
+			<tr>
+				<td><b>{{ _("Client") }}</b></td>
+				<td>{{ invoice.client }}</td>
+				<td><b>{{ _("Company") }}</b></td>
+				<td>{{ invoice.company }}</td>
+			</tr>
+			<tr>
+				<td><b>{{ _("Period") }}</b></td>
+				<td>{{ invoice.period_label }}</td>
+				<td><b>{{ _("Status") }}</b></td>
+				<td>{{ invoice.status_label }}</td>
+			</tr>
+			{% if invoice.is_posted %}
+			<tr>
+				<td><b>{{ _("Invoice Date") }}</b></td>
+				<td>{{ invoice.posting_date_label }}</td>
+				<td><b>{{ _("Payment Due") }}</b></td>
+				<td>{{ invoice.due_date_label }}</td>
+			</tr>
+			<tr>
+				<td><b>{{ _("Outstanding") }}</b></td>
+				<td colspan="3">{{ invoice.outstanding_label }}</td>
+			</tr>
+			{% else %}
+			<tr>
+				<td><b>{{ _("Posting Date") }}</b></td>
+				<td colspan="3">{{ invoice.posting_date_label }}</td>
+			</tr>
+			{% endif %}
+		</table>
+		<table class="lines">
+			<thead>
+				<tr>
+					<th>{{ _("Description") }}</th>
+					<th class="num">{{ _("Hours") }}</th>
+					<th class="num">{{ _("Billing Rate") }}</th>
+					<th class="num">{{ _("Amount") }}</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for row in invoice.rows %}
+				<tr>
+					<td>{{ row.description }}</td>
+					<td class="num">{{ row.hours_label }}</td>
+					<td class="num">{{ row.rate_label }}</td>
+					<td class="num">{{ row.amount_label }}</td>
+				</tr>
+				{% endfor %}
+				<tr class="totals">
+					<td>{{ _("Total") }}</td>
+					<td class="num">{{ invoice.total_hours_label }}</td>
+					<td></td>
+					<td class="num">{{ invoice.total_amount_label }}</td>
+				</tr>
+			</tbody>
+		</table>
+		<div class="footer">{{ _("Staff Pro BPO") }} · {{ generated_on }}</div>
+	</div>
+	{% endfor %}
+</body>
+</html>

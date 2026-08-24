@@ -33,6 +33,7 @@ class ClientInvoice(Document):
 		customer_name: DF.Data | None
 		from_date: DF.Date
 		naming_series: DF.Literal["CI-.YYYY.-"]
+		payroll_entry: DF.Link | None
 		posting_date: DF.Date
 		sales_invoice: DF.Link | None
 		status: DF.Literal["Draft", "Submitted", "Cancelled"]

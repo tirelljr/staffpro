@@ -692,7 +692,7 @@ def add_hours_entry(
 
 @frappe.whitelist()
 def add_hours_entries(
-	employees,
+	employees: str | list,
 	attendance_date: str | date,
 	in_time: str,
 	out_time: str | None = None,
@@ -1515,7 +1515,20 @@ def get_hours_filter_options() -> dict:
 		order_by="employee_name asc",
 		limit=500,
 	)
-	departments = frappe.get_list("Department", fields=["name"], order_by="name asc", limit=200)
+	departments = frappe.get_list(
+		"Department",
+		fields=["name"],
+		filters={"is_group": 0},
+		order_by="name asc",
+		limit=200,
+	)
+	departments = [
+		row
+		for row in departments
+		if row.name
+		and str(row.name) != "All Departments"
+		and not str(row.name).startswith("All Departments - ")
+	]
 	shifts = []
 	if frappe.has_permission("Shift Type", "read"):
 		shifts = frappe.get_list(
@@ -1757,7 +1770,7 @@ def _as_name_list(names) -> list[str]:
 
 
 @frappe.whitelist()
-def approve_hours_entries(names) -> dict:
+def approve_hours_entries(names: str | list) -> dict:
 	frappe.has_permission("Attendance", "submit", throw=True)
 	approved = []
 	for name in _as_name_list(names):
@@ -1781,7 +1794,7 @@ def approve_hours_entries(names) -> dict:
 
 
 @frappe.whitelist()
-def cancel_hours_entries(names) -> dict:
+def cancel_hours_entries(names: str | list) -> dict:
 	removed = []
 	for name in _as_name_list(names):
 		cancel_hours_entry(name)

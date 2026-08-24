@@ -57,7 +57,7 @@ LINK_LABELS: dict[str, str] = {
 	"Appraisal Overview": "Review Overview",
 	"Payroll Entry": "Run Payroll",
 	"Salary Structure Assignment": "Pay Rate Setup",
-	"Salary Slip": "Pay Stubs",
+	"Salary Slip": "Current Pay Stubs",
 	"Additional Salary": "Bonuses & Adjustments",
 	"Salary Withholding": "Pay Holds",
 	"Expense Claim": "Reimbursements",
@@ -125,6 +125,7 @@ LABEL_LABELS: dict[str, str] = {
 	"Payment Entry": "Record Payment",
 	"Customer": "Clients",
 	"Sales Invoice": "Posted Invoices",
+	"Pay Stubs": "Current Pay Stubs",
 }
 
 

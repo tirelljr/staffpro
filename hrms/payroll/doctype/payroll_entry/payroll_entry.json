@@ -9,6 +9,7 @@
  "field_order": [
   "select_payroll_period",
   "posting_date",
+  "customer",
   "company",
   "column_break_5",
   "currency",
@@ -24,6 +25,8 @@
   "column_break_13",
   "deduct_tax_for_unsubmitted_tax_exemption_proof",
   "employees_tab",
+  "account",
+  "bank_account",
   "section_break_17",
   "branch",
   "department",
@@ -41,10 +44,8 @@
   "cost_center",
   "dimension_col_break",
   "project",
-  "account",
-  "payment_account",
   "column_break_35",
-  "bank_account",
+  "payment_account",
   "salary_slips_created",
   "salary_slips_submitted",
   "overtime_step",
@@ -71,9 +72,19 @@
    "reqd": 1
   },
   {
-   "fieldname": "company",
+   "description": "Payroll includes agents billed to this client.",
+   "fieldname": "customer",
    "fieldtype": "Link",
    "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Client",
+   "options": "Customer",
+   "remember_last_selected_value": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "hidden": 1,
    "label": "Company",
    "options": "Company",
    "remember_last_selected_value": 1,
@@ -101,12 +112,13 @@
   {
    "fieldname": "number_of_employees",
    "fieldtype": "Int",
-   "label": "Number Of Employees",
+   "label": "Number Of Agents",
    "read_only": 1
   },
   {
    "fieldname": "employees",
    "fieldtype": "Table",
+   "label": "Agents",
    "options": "Payroll Employee Detail"
   },
   {
@@ -175,7 +187,7 @@
   {
    "fieldname": "account",
    "fieldtype": "Section Break",
-   "label": "Payment Entry"
+   "label": "Agent Payments"
   },
   {
    "allow_on_submit": 1,
@@ -183,8 +195,10 @@
    "fetch_from": "bank_account.account",
    "fieldname": "payment_account",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Payment Account",
-   "options": "Account"
+   "options": "Account",
+   "print_hide": 1
   },
   {
    "fieldname": "amended_from",
@@ -224,9 +238,11 @@
    "fieldtype": "Column Break"
   },
   {
+   "allow_on_submit": 1,
+   "description": "Company bank account to send agent payments from.",
    "fieldname": "bank_account",
    "fieldtype": "Link",
-   "label": "Bank Account",
+   "label": "Pay From Bank Account",
    "options": "Bank Account"
   },
   {
@@ -294,7 +310,7 @@
   {
    "fieldname": "section_break_24",
    "fieldtype": "Section Break",
-   "label": "Employee Details"
+   "label": "Agents"
   },
   {
    "fieldname": "section_break_26",
@@ -311,17 +327,18 @@
   {
    "fieldname": "accounting_dimensions_tab",
    "fieldtype": "Tab Break",
+   "hidden": 1,
    "label": "Accounting & Payment"
   },
   {
    "fieldname": "section_break_17",
    "fieldtype": "Section Break",
-   "label": "Filter Employees"
+   "label": "Filter Agents"
   },
   {
    "fieldname": "employees_tab",
    "fieldtype": "Tab Break",
-   "label": "Employees"
+   "label": "Agents"
   },
   {
    "fieldname": "section_break_cypo",
@@ -342,6 +359,7 @@
   {
    "fieldname": "overtime_step",
    "fieldtype": "Select",
+   "hidden": 1,
    "label": "Overtime Slip Step",
    "options": "\nCreate\nSubmit"
   }
@@ -352,9 +370,13 @@
   {
    "link_doctype": "Overtime Slip",
    "link_fieldname": "payroll_entry"
+  },
+  {
+   "link_doctype": "Client Invoice",
+   "link_fieldname": "payroll_entry"
   }
  ],
- "modified": "2026-08-20 19:10:00.000000",
+ "modified": "2026-08-21 14:30:00.000000",
  "modified_by": "Administrator",
  "module": "Payroll",
  "name": "Payroll Entry",

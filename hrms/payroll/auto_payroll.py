@@ -296,6 +296,7 @@ def _process_template(settings, company: str, template: dict, as_of: date, force
 	frequency = template["frequency"]
 	interval = template["interval"]
 	last_end = get_last_payroll_end(company, settings.get("automatic_payroll_branch"), frequency=frequency)
+	customers = get_payroll_customers(company) or [None]
 
 	for _ in range(MAX_PERIODS_PER_RUN):
 		start_date, end_date = get_pay_period(
@@ -320,37 +321,49 @@ def _process_template(settings, company: str, template: dict, as_of: date, force
 			)
 			break
 
-		existing = find_existing_entry(
-			company,
-			start_date,
-			end_date,
-			branch=settings.get("automatic_payroll_branch"),
-			frequency=frequency,
-		)
-		if existing and existing.docstatus == 1:
-			last_end = getdate(end_date)
-			continue
-
-		try:
-			entry = create_or_submit_payroll_entry(
-				settings, company, start_date, end_date, existing, frequency=frequency
+		period_created = False
+		for customer in customers:
+			existing = find_existing_entry(
+				company,
+				start_date,
+				end_date,
+				branch=settings.get("automatic_payroll_branch"),
+				frequency=frequency,
+				customer=customer,
 			)
-		except Exception:
-			frappe.log_error(title=_("Automatic payroll failed"))
-			return {
-				"created": created,
-				"skipped": skipped,
-				"blocked": _("Automatic payroll failed. Check Error Log."),
-			}
+			if existing and existing.docstatus == 1:
+				continue
 
-		if not entry:
-			skipped.append(_("No employees found for the {0} pay period.").format(template["label"]))
+			try:
+				entry = create_or_submit_payroll_entry(
+					settings,
+					company,
+					start_date,
+					end_date,
+					existing,
+					frequency=frequency,
+					customer=customer,
+				)
+			except Exception:
+				frappe.log_error(title=_("Automatic payroll failed"))
+				return {
+					"created": created,
+					"skipped": skipped,
+					"blocked": _("Automatic payroll failed. Check Error Log."),
+				}
+
+			if not entry:
+				continue
+
+			created.append(entry.name)
+			period_created = True
+			mark_last_run(as_of, entry.name)
+
+		if not period_created:
+			skipped.append(_("No agents found for the {0} pay period.").format(template["label"]))
 			break
 
-		created.append(entry.name)
-		mark_last_run(as_of, entry.name)
 		last_end = getdate(end_date)
-
 		if getdate(end_date) >= add_days(as_of, -1):
 			break
 
@@ -379,7 +392,13 @@ def submit_due_drafts(settings, company: str, as_of: date, force: bool = False) 
 		existing = frappe.get_doc("Payroll Entry", draft.name)
 		try:
 			entry = create_or_submit_payroll_entry(
-				settings, company, existing.start_date, existing.end_date, existing
+				settings,
+				company,
+				existing.start_date,
+				existing.end_date,
+				existing,
+				frequency=existing.payroll_frequency,
+				customer=existing.get("customer"),
 			)
 		except Exception:
 			frappe.log_error(title=_("Automatic payroll failed"))
@@ -390,7 +409,7 @@ def submit_due_drafts(settings, company: str, as_of: date, force: bool = False) 
 			}
 
 		if not entry:
-			skipped.append(_("No employees found for Payroll Entry {0}.").format(draft.name))
+			skipped.append(_("No agents found for Payroll Entry {0}.").format(draft.name))
 			continue
 
 		created.append(entry.name)
@@ -456,7 +475,12 @@ def get_open_entries(company: str, branch: str | None = None) -> list:
 
 
 def find_existing_entry(
-	company: str, start_date, end_date, branch: str | None = None, frequency: str | None = None
+	company: str,
+	start_date,
+	end_date,
+	branch: str | None = None,
+	frequency: str | None = None,
+	customer: str | None = None,
 ):
 	filters = {
 		"company": company,
@@ -468,6 +492,8 @@ def find_existing_entry(
 		filters["branch"] = branch
 	if frequency:
 		filters["payroll_frequency"] = canonical_frequency(frequency)
+	if customer:
+		filters["customer"] = customer
 
 	name = frappe.db.get_value("Payroll Entry", filters, "name", order_by="docstatus desc, creation desc")
 	if not name:
@@ -475,14 +501,40 @@ def find_existing_entry(
 	return frappe.get_doc("Payroll Entry", name)
 
 
+def get_payroll_customers(company: str) -> list[str]:
+	"""Clients that have active agents assigned via Employee.bill_to_customer."""
+	if not frappe.get_meta("Employee").has_field("bill_to_customer"):
+		return []
+	if not frappe.get_meta("Payroll Entry").has_field("customer"):
+		return []
+	rows = frappe.get_all(
+		"Employee",
+		filters={
+			"company": company,
+			"status": "Active",
+			"bill_to_customer": ("is", "set"),
+		},
+		pluck="bill_to_customer",
+	)
+	return list(dict.fromkeys(customer for customer in rows if customer))
+
+
 def create_or_submit_payroll_entry(
-	settings, company, start_date, end_date, existing=None, frequency: str | None = None
+	settings,
+	company,
+	start_date,
+	end_date,
+	existing=None,
+	frequency: str | None = None,
+	customer: str | None = None,
 ):
 	frappe.flags.skip_payroll_enqueue = True
 
 	to_submit = []
 	if existing and existing.docstatus == 0:
 		entry = existing
+		if customer and not entry.get("customer"):
+			entry.customer = customer
 		if not entry.employees:
 			try:
 				entry.fill_employee_details()
@@ -493,7 +545,7 @@ def create_or_submit_payroll_entry(
 	else:
 		frequencies = [frequency] if frequency else get_payroll_frequencies(company, settings)
 		for freq in frequencies:
-			entry = build_payroll_entry(settings, company, start_date, end_date, freq)
+			entry = build_payroll_entry(settings, company, start_date, end_date, freq, customer=customer)
 			try:
 				entry.fill_employee_details()
 			except frappe.ValidationError:
@@ -553,7 +605,9 @@ def get_payroll_frequencies(company: str, settings=None) -> list[str]:
 	return [configured or "Fortnightly"]
 
 
-def build_payroll_entry(settings, company, start_date, end_date, frequency: str | None = None):
+def build_payroll_entry(
+	settings, company, start_date, end_date, frequency: str | None = None, customer: str | None = None
+):
 	company_doc = frappe.get_cached_doc("Company", company)
 	currency = company_doc.default_currency
 	cost_center = company_doc.cost_center
@@ -567,17 +621,22 @@ def build_payroll_entry(settings, company, start_date, end_date, frequency: str 
 
 	entry = frappe.new_doc("Payroll Entry")
 	entry.company = company
+	entry.customer = customer
 	entry.posting_date = nowdate()
 	entry.start_date = getdate(start_date)
 	entry.end_date = getdate(end_date)
 	entry.payroll_frequency = canonical_frequency(frequency) or "Fortnightly"
-	entry.salary_slip_based_on_timesheet = 1
+	# Floor time lives on Attendance / check-ins, not Timesheets.
+	entry.salary_slip_based_on_timesheet = 0
 	entry.deduct_social_security = 1
 	entry.currency = currency
 	entry.exchange_rate = 1
 	entry.cost_center = cost_center
 	entry.branch = settings.get("automatic_payroll_branch") or None
 	entry.validate_attendance = 0
+	from hrms.hr.belize_banks import get_default_payroll_bank_account
+
+	entry.bank_account = get_default_payroll_bank_account(company)
 	return entry
 
 

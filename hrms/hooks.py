@@ -130,6 +130,8 @@ after_migrate = [
 	"hrms.setup.update_select_perm_after_install",
 	"hrms.branding.apply_branding",
 	"hrms.hr.bpo_employee_labels.apply_bpo_employee_labels",
+	"hrms.hr.belize_banks.ensure_belize_company_bank_accounts",
+	"hrms.hr.bpo_bank_account.apply_bank_account_layout",
 	"hrms.payroll.bpo_customer.apply_bpo_customer_layout",
 	"hrms.payroll.bpo_sales_invoice.apply_bpo_sales_invoice_layout",
 	"hrms.payroll.bpo_client_accounts.setup_usd_client_billing",
@@ -281,7 +283,12 @@ doc_events = {
 		],
 		"on_update": "hrms.payroll.daily_pay.on_employee_checkin",
 	},
-	"Payroll Entry": {"on_submit": "hrms.telemetry.on_payroll_entry_submit"},
+	"Payroll Entry": {
+		"on_submit": [
+			"hrms.telemetry.on_payroll_entry_submit",
+			"hrms.payroll.auto_client_invoice.create_invoices_for_payroll_entry",
+		]
+	},
 	"Job Offer": {"on_submit": "hrms.telemetry.on_job_offer_submit"},
 	"Appraisal": {"on_submit": "hrms.telemetry.on_appraisal_submit"},
 	"Interview": {"on_submit": "hrms.telemetry.on_interview_submit"},

@@ -261,6 +261,39 @@ hrms.time.employee_label = function (employee) {
 	return employee?.employee_name || employee?.name || "";
 };
 
+hrms.time.employee_in_department = function (employee, department) {
+	if (!department) {
+		return true;
+	}
+	const value = String(employee?.department || "");
+	const selected = String(department);
+	if (value === selected) {
+		return true;
+	}
+	return value.startsWith(`${selected} - `) || selected.startsWith(`${value} - `);
+};
+
+hrms.time.mount_dialog_html = function (dialog, fieldname, $content) {
+	const $host = dialog?.fields_dict?.[fieldname]?.$wrapper;
+	if ($host?.length) {
+		$host.empty().append($content);
+	} else {
+		dialog.$body.empty().append($content);
+	}
+	dialog.$wrapper.find(".modal-footer").hide();
+};
+
+hrms.time.refresh_hours_views = function (listview) {
+	if (listview?.refresh) {
+		listview.refresh();
+	} else if (cur_list?.doctype === "Attendance") {
+		cur_list.refresh();
+	}
+	if (hrms.day_view?.$body?.length && listview?.refresh !== hrms.day_view.refresh) {
+		hrms.day_view.refresh();
+	}
+};
+
 hrms.time.to_hhmm = function (value) {
 	if (!value) {
 		return "";
@@ -442,7 +475,6 @@ hrms.time.show_add_entry_dialog = function (listview, opts) {
 		fields: [{ fieldtype: "HTML", fieldname: "entry_body" }],
 	});
 	dialog.$wrapper.addClass("sp-entry-dialog");
-	dialog.$wrapper.find(".modal-footer").hide();
 
 	const $root = $(`
 		<div class="sp-entry-shell">
@@ -496,7 +528,6 @@ hrms.time.show_add_entry_dialog = function (listview, opts) {
 		</div>
 	`);
 
-	dialog.fields_dict.entry_body.$wrapper.empty().append($root);
 	$root.find(".sp-entry__users").html(
 		`<div class="sp-entry__user">${hrms.time.escape_html(__("Loading..."))}</div>`,
 	);
@@ -513,8 +544,8 @@ hrms.time.show_add_entry_dialog = function (listview, opts) {
 	}
 
 	const visible_employees = () => {
-		const rows = state.employees.filter(
-			(row) => !state.department || row.department === state.department,
+		const rows = state.employees.filter((row) =>
+			hrms.time.employee_in_department(row, state.department),
 		);
 		rows.sort((a, b) =>
 			hrms.time.employee_label(a).localeCompare(hrms.time.employee_label(b), undefined, {
@@ -620,11 +651,7 @@ hrms.time.show_add_entry_dialog = function (listview, opts) {
 					message: count === 1 ? __("Entry added") : __("{0} entries added", [count]),
 					indicator: "green",
 				});
-				if (listview?.refresh) {
-					listview.refresh();
-				} else if (cur_list?.doctype === "Attendance") {
-					cur_list.refresh();
-				}
+				hrms.time.refresh_hours_views(listview);
 				if (add_next) {
 					$root.find(".sp-entry__comment").val("");
 					return;
@@ -698,6 +725,7 @@ hrms.time.show_add_entry_dialog = function (listview, opts) {
 	$root.on("click", "[data-act=cancel]", () => dialog.hide());
 
 	dialog.show();
+	hrms.time.mount_dialog_html(dialog, "entry_body", $root);
 
 	frappe.call({
 		method: "hrms.hr.doctype.attendance.attendance.get_hours_filter_options",
@@ -1060,7 +1088,7 @@ hrms.time.show_add_adjustment_dialog = function (listview) {
 	const render_users = () => {
 		const department = $dept.val() || "";
 		const visible = employees
-			.filter((row) => !department || row.department === department)
+			.filter((row) => hrms.time.employee_in_department(row, department))
 			.slice()
 			.sort((a, b) =>
 				hrms.time.employee_label(a).localeCompare(hrms.time.employee_label(b), undefined, {
@@ -1214,7 +1242,7 @@ hrms.time.show_add_adjustment_dialog = function (listview) {
 
 	render_types();
 	dialog.show();
-	dialog.$wrapper.find(".modal-footer").hide();
+	hrms.time.mount_dialog_html(dialog, "layout", $root);
 
 	frappe.call({
 		method: "hrms.hr.doctype.attendance.attendance.get_hours_filter_options",

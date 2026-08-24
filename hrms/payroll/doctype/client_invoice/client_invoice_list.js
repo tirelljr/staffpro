@@ -16,6 +16,7 @@ frappe.listview_settings["Client Invoice"] = {
 		hide_client_invoice_list_chrome(listview);
 		set_add_client_invoice_action(listview);
 		place_invoice_days_button(listview);
+		place_client_invoice_export(listview);
 		refresh_automatic_invoice_ui(listview);
 	},
 
@@ -23,6 +24,7 @@ frappe.listview_settings["Client Invoice"] = {
 		hide_client_invoice_list_chrome(listview);
 		set_add_client_invoice_action(listview);
 		place_invoice_days_button(listview);
+		place_client_invoice_export(listview);
 		refresh_automatic_invoice_ui(listview);
 	},
 };
@@ -60,6 +62,16 @@ function set_add_client_invoice_action(listview) {
 	};
 	listview.make_new_doc = open_client_invoice;
 	listview.set_primary_action();
+}
+
+function place_client_invoice_export(listview) {
+	hrms.mount_invoice_list_export?.(listview, {
+		doctype: "Client Invoice",
+		label: __("Client Invoice"),
+		file_stem: "Client_Invoices",
+		storage_key: "staff-pro-client-invoice-export-format",
+		min_selected: 2,
+	});
 }
 
 function place_invoice_days_button(listview) {

@@ -83,7 +83,7 @@ const tabs = [
 	{ name: "Earnings & Deductions", lastField: "base_total_deduction" },
 	{ name: "Net Pay Info", lastField: "base_month_to_date" },
 	{ name: "Income Tax Breakup", lastField: "total_income_tax" },
-	{ name: "Bank Details", lastField: "bank_account_no" },
+	{ name: "Payment", lastField: "bank_account_no" },
 ]
 
 watch(

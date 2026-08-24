@@ -304,3 +304,17 @@ class TestSocialSecuritySalarySlip(HRMSTestSuite):
 		self.assertIn("ss_employee_amount", fieldnames)
 		self.assertIn("employee_name", fieldnames)
 		self.assertIn("ss_number", fieldnames)
+
+	def test_as_list_parses_employee_filters(self):
+		from hrms.payroll.report.social_security_deductions.social_security_deductions import as_list
+
+		self.assertEqual(as_list(None), [])
+		self.assertEqual(as_list("EMP-00003"), ["EMP-00003"])
+		self.assertEqual(as_list(["EMP-00003", "EMP-00005"]), ["EMP-00003", "EMP-00005"])
+		self.assertEqual(as_list('["EMP-00003", "EMP-00005"]'), ["EMP-00003", "EMP-00005"])
+
+	def test_zip_export_requires_more_than_one_agent(self):
+		from hrms.payroll.report.social_security_deductions.social_security_deductions import download_zip
+
+		with self.assertRaises(frappe.ValidationError):
+			download_zip({"selected_employees": ["EMP-00003"], "require_multiple": 1})

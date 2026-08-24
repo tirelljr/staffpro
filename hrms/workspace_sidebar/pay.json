@@ -55,13 +55,27 @@
                       "default_workspace":  0,
                       "indent":  0,
                       "keep_closed":  0,
-                      "label":  "Pay Stubs",
+                      "label":  "Current Pay Stubs",
                       "open_in_new_tab":  0,
                       "show_arrow":  0,
                       "type":  "Link",
                       "icon":  "wallet",
                       "link_to":  "Salary Slip",
                       "link_type":  "DocType"
+                  },
+                  {
+                      "child":  0,
+                      "collapsible":  1,
+                      "default_workspace":  0,
+                      "indent":  0,
+                      "keep_closed":  0,
+                      "label":  "Past Pay Stubs",
+                      "open_in_new_tab":  0,
+                      "show_arrow":  0,
+                      "type":  "Link",
+                      "icon":  "archive",
+                      "link_type":  "URL",
+                      "url":  "/desk/salary-slip/view/list?pay_stubs=past"
                   },
                   {
                       "child":  0,

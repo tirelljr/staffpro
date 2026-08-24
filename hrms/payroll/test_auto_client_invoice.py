@@ -9,6 +9,7 @@ from erpnext.setup.doctype.employee.test_employee import make_employee
 
 from hrms.patches.v16_0.add_invoicing_workspace import ensure_bpo_agent_hours_item
 from hrms.payroll.auto_client_invoice import (
+	create_invoices_for_payroll_entry,
 	get_automatic_invoice_status,
 	process_automatic_invoices,
 	set_automatic_invoice_interval,
@@ -171,3 +172,71 @@ class TestAutoClientInvoice(HRMSTestSuite):
 		self.assertTrue(invoice.sales_invoice)
 		self.assertEqual(getdate(invoice.from_date), getdate(start_date))
 		self.assertEqual(getdate(invoice.to_date), getdate(end_date))
+
+	def _insert_payroll_entry(self, start_date, end_date, frequency="Fortnightly"):
+		company = frappe.get_cached_doc("Company", "_Test Company")
+		cost_center = company.cost_center or frappe.db.get_value(
+			"Cost Center", {"company": company.name, "is_group": 0}, "name", order_by="creation"
+		)
+		entry = frappe.get_doc(
+			{
+				"doctype": "Payroll Entry",
+				"company": company.name,
+				"customer": self.customer,
+				"posting_date": getdate(),
+				"start_date": start_date,
+				"end_date": end_date,
+				"payroll_frequency": frequency,
+				"salary_slip_based_on_timesheet": 0,
+				"currency": company.default_currency,
+				"exchange_rate": 1,
+				"cost_center": cost_center,
+				"validate_attendance": 0,
+			}
+		)
+		entry.flags.ignore_permissions = True
+		entry.insert()
+		return entry
+
+	def test_payroll_entry_creates_client_invoice(self):
+		agent = self._make_agent("test_payroll_creates_invoice@example.com", 22)
+		start_date = getdate()
+		end_date = add_days(start_date, 4)
+		self._mark_attendance(agent, start_date, "Present", 8)
+
+		entry = self._insert_payroll_entry(start_date, end_date)
+		created = create_invoices_for_payroll_entry(entry)
+
+		self.assertTrue(created)
+		invoice = frappe.get_doc("Client Invoice", created[0])
+		self.assertEqual(invoice.docstatus, 1)
+		self.assertEqual(invoice.customer, self.customer)
+		self.assertEqual(getdate(invoice.from_date), start_date)
+		self.assertEqual(getdate(invoice.to_date), end_date)
+		self.assertEqual(invoice.payroll_entry, entry.name)
+		self.assertTrue(invoice.sales_invoice)
+
+	def test_payroll_entry_does_not_duplicate_client_invoice(self):
+		agent = self._make_agent("test_payroll_invoice_dedupe@example.com", 18)
+		start_date = getdate()
+		end_date = add_days(start_date, 4)
+		self._mark_attendance(agent, start_date, "Present", 8)
+
+		entry = self._insert_payroll_entry(start_date, end_date)
+		first = create_invoices_for_payroll_entry(entry)
+		second = create_invoices_for_payroll_entry(entry)
+
+		self.assertEqual(len(first), 1)
+		self.assertEqual(second, [])
+		self.assertEqual(
+			frappe.db.count(
+				"Client Invoice",
+				{
+					"customer": self.customer,
+					"from_date": start_date,
+					"to_date": end_date,
+					"docstatus": 1,
+				},
+			),
+			1,
+		)

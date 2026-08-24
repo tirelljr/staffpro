@@ -1,7 +1,7 @@
 # Copyright (c) 2026, Staff Pro BPO and Contributors
 # License: GNU General Public License v3. See license.txt
 
-"""Create and submit Client Invoice on an admin-configured day interval."""
+"""Create and submit Client Invoice from payroll, or on an admin-configured day interval."""
 
 from __future__ import annotations
 
@@ -9,9 +9,9 @@ from datetime import date
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, cint, date_diff, getdate, nowdate
+from frappe.utils import add_days, cint, comma_and, date_diff, get_link_to_form, getdate, nowdate
 
-from hrms.payroll.auto_payroll import frequency_label, get_pay_period
+from hrms.payroll.auto_payroll import canonical_frequency, frequency_label, get_pay_period
 from hrms.payroll.doctype.client_invoice.client_invoice import CLIENT_BILLING_CURRENCY
 
 MAX_PERIODS_PER_RUN = 3
@@ -42,6 +42,82 @@ def get_enabled_invoice_templates(settings=None) -> list[dict]:
 def run_scheduled_invoices():
 	"""Daily scheduler entry: invoice clients after each completed billing period."""
 	return process_automatic_invoices(force=False)
+
+
+def create_invoices_for_payroll_entry(doc, method=None):
+	"""Payroll Entry on_submit: create the Client Invoice for the same client and period."""
+	if getattr(frappe.flags, "skip_client_invoice_on_payroll", False):
+		return []
+	if not doc or getattr(doc, "doctype", None) != "Payroll Entry":
+		return []
+	if cint(getattr(doc, "docstatus", 0)) == 2:
+		return []
+	if not frappe.db.exists("DocType", "Client Invoice"):
+		return []
+	if not doc.get("start_date") or not doc.get("end_date"):
+		return []
+
+	customers = _customers_for_payroll(doc)
+	if not customers:
+		return []
+
+	created = []
+	failed = False
+	frequency = canonical_frequency(doc.get("payroll_frequency")) or None
+	for customer in customers:
+		existing = find_existing_invoice(
+			doc.company, customer, doc.start_date, doc.end_date, frequency=frequency
+		)
+		if existing and existing.docstatus == 1:
+			continue
+		try:
+			invoice = create_or_submit_client_invoice(
+				doc.company,
+				customer,
+				doc.start_date,
+				doc.end_date,
+				existing,
+				frequency=frequency,
+				payroll_entry=doc.name,
+			)
+		except Exception:
+			frappe.log_error(title=_("Client invoice from payroll failed"))
+			failed = True
+			continue
+		if invoice:
+			created.append(invoice.name)
+
+	if created and not frappe.flags.in_test:
+		frappe.msgprint(
+			_("Created Client Invoice {0} for this payroll period.").format(
+				comma_and([get_link_to_form("Client Invoice", name) for name in created])
+			),
+			alert=True,
+			indicator="green",
+		)
+	elif failed and not frappe.flags.in_test:
+		frappe.msgprint(
+			_("Payroll was submitted, but the Client Invoice could not be created. Check Error Log."),
+			alert=True,
+			indicator="orange",
+		)
+	return created
+
+
+def _customers_for_payroll(doc) -> list[str]:
+	if doc.get("customer"):
+		return [doc.customer]
+
+	employees = [row.employee for row in doc.get("employees") or [] if row.employee]
+	if not employees or not frappe.get_meta("Employee").has_field("bill_to_customer"):
+		return []
+
+	rows = frappe.get_all(
+		"Employee",
+		filters={"name": ("in", employees), "bill_to_customer": ("is", "set")},
+		pluck="bill_to_customer",
+	)
+	return list(dict.fromkeys(customer for customer in rows if customer))
 
 
 @frappe.whitelist()
@@ -366,7 +442,13 @@ def find_existing_invoice(
 
 
 def create_or_submit_client_invoice(
-	company, customer, start_date, end_date, existing=None, frequency: str | None = None
+	company,
+	customer,
+	start_date,
+	end_date,
+	existing=None,
+	frequency: str | None = None,
+	payroll_entry: str | None = None,
 ):
 	if existing and existing.docstatus == 1:
 		return existing
@@ -382,6 +464,8 @@ def create_or_submit_client_invoice(
 		invoice.currency = CLIENT_BILLING_CURRENCY
 		if frequency and invoice.meta.has_field("billing_frequency"):
 			invoice.billing_frequency = frequency
+	if payroll_entry and invoice.meta.has_field("payroll_entry") and not invoice.get("payroll_entry"):
+		invoice.payroll_entry = payroll_entry
 
 	try:
 		invoice.get_agents()

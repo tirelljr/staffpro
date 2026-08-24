@@ -36,11 +36,11 @@ frappe.query_reports["Social Security Deductions"] = {
 		{
 			fieldname: "employee",
 			label: __("Agent"),
-			fieldtype: "Link",
+			fieldtype: "MultiSelectList",
 			options: "Employee",
-			get_query: function () {
+			get_data: function (txt) {
 				const company = frappe.query_report.get_filter_value("company");
-				return company ? { filters: { company } } : {};
+				return frappe.db.get_link_options("Employee", txt, company ? { company } : {});
 			},
 		},
 		{
@@ -52,6 +52,12 @@ frappe.query_reports["Social Security Deductions"] = {
 	onload: function (report) {
 		set_period_dates();
 		mount_ss_report_actions(report);
+	},
+	get_datatable_options(options) {
+		return Object.assign(options, {
+			checkboxColumn: true,
+			checkedRowStatus: true,
+		});
 	},
 };
 
@@ -115,6 +121,9 @@ function inject_ss_report_chrome_css() {
 		#page-query-report:has(.sp-ss-actions) .page-icon-group {
 			display: inline-flex !important;
 		}
+		#page-query-report:has(.sp-ss-actions) .dt-cell--col-0 .dt-checkbox {
+			cursor: pointer;
+		}
 	`;
 	document.head.appendChild(style);
 }
@@ -150,9 +159,15 @@ function ss_report_actions_html(selected) {
 function export_dropdown_html(selected) {
 	const items = SS_EXPORT_FORMATS.map((format) => {
 		const is_selected = format === selected;
+		const title =
+			format === "ZIP"
+				? __("Select more than one agent, then export one CSV per agent")
+				: __("Export the report as {0}", [format]);
 		return `<button type="button" class="sp-report-export__item${
 			is_selected ? " is-selected" : ""
-		}" role="menuitem" data-format="${format}" aria-checked="${is_selected}">
+		}" role="menuitem" data-format="${format}" aria-checked="${is_selected}" title="${frappe.utils.escape_html(
+			title,
+		)}">
 			${file_format_icon(format)}
 			<span class="sp-report-export__label">${frappe.utils.escape_html(__(format))}</span>
 			<span class="sp-report-export__check" aria-hidden="true">${check_icon()}</span>
@@ -245,64 +260,161 @@ function export_ss_deductions(format) {
 	if (!report) return;
 
 	if (format === "PDF") {
-		export_ss_pdf(report);
+		export_ss_file(report, "download_pdf", "PDF");
 		return;
 	}
 	if (format === "ZIP") {
 		export_ss_zip(report);
 		return;
 	}
-	export_ss_query(report, "CSV");
+	export_ss_file(report, "download_csv", "CSV");
+}
+
+function report_rows(report) {
+	return (report.data || []).filter((row) => row && !row.is_total_row);
 }
 
 function ensure_report_has_data(report) {
-	if (typeof report.get_validated_visible_indexes === "function") {
-		report.get_validated_visible_indexes();
-		return;
-	}
-	if (!report.data?.length) {
-		frappe.throw({
-			title: __("No data to perform this action"),
-			message: __("Please adjust filters to include some data"),
-		});
+	if (report_rows(report).length) return;
+	frappe.throw({
+		title: __("No data to perform this action"),
+		message: __("Please adjust filters to include some data"),
+	});
+}
+
+function get_selected_rows(report) {
+	const indexes = report.datatable?.rowmanager?.getCheckedRows?.() || [];
+	return indexes
+		.map((index) => report.data?.[Number(index)])
+		.filter((row) => row && !row.is_total_row && row.employee);
+}
+
+function get_selected_employees(report) {
+	return [...new Set(get_selected_rows(report).map((row) => row.employee))];
+}
+
+function export_filters(report, extra) {
+	return Object.assign({}, report.get_filter_values(true) || {}, extra || {});
+}
+
+function post_ss_download(method, filters) {
+	const filename_fallback = default_ss_filename(method);
+	frappe.dom.freeze(__("Downloading {0}...", [filename_fallback]));
+
+	fetch(
+		`/api/method/hrms.payroll.report.social_security_deductions.social_security_deductions.${method}`,
+		{
+			method: "POST",
+			credentials: "same-origin",
+			headers: {
+				"X-Frappe-CSRF-Token": frappe.csrf_token,
+				"Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+			},
+			body: new URLSearchParams({ filters: JSON.stringify(filters) }),
+		},
+	)
+		.then(async (response) => {
+			const content_type = response.headers.get("Content-Type") || "";
+			const blob = await response.blob();
+			if (!response.ok || is_ss_error_response(content_type, blob.type)) {
+				throw new Error(await error_message_from_blob(blob));
+			}
+			trigger_blob_download(blob, filename_from_response(response, filename_fallback));
+		})
+		.catch((error) => {
+			frappe.msgprint({
+				title: __("Export failed"),
+				indicator: "red",
+				message: error.message || __("Could not download the file."),
+			});
+		})
+		.finally(() => frappe.dom.unfreeze());
+}
+
+function default_ss_filename(method) {
+	if (method === "download_pdf") return "Social_Security_Deductions.pdf";
+	if (method === "download_zip") return "Social_Security_Deductions.zip";
+	return "Social_Security_Deductions.csv";
+}
+
+function is_ss_error_response(content_type, blob_type) {
+	const type = `${content_type} ${blob_type}`.toLowerCase();
+	return type.includes("text/html") || type.includes("application/json");
+}
+
+async function error_message_from_blob(blob) {
+	const fallback = __("Could not download the file.");
+	try {
+		const text = await blob.text();
+		const json = JSON.parse(text);
+		if (json._server_messages) {
+			const messages = JSON.parse(json._server_messages).map((row) => {
+				try {
+					return JSON.parse(row).message || row;
+				} catch (e) {
+					return row;
+				}
+			});
+			return messages.filter(Boolean).join("<br>") || fallback;
+		}
+		return json.exception || json.message || fallback;
+	} catch (e) {
+		return fallback;
 	}
 }
 
-function export_ss_query(report, file_format) {
+function filename_from_response(response, fallback) {
+	const disposition = response.headers.get("Content-Disposition") || "";
+	const match = disposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);
+	if (!match) return fallback;
+	return decodeURIComponent(match[1] || match[2]);
+}
+
+function trigger_blob_download(blob, filename) {
+	const url = URL.createObjectURL(blob);
+	const link = document.createElement("a");
+	link.href = url;
+	link.download = filename;
+	document.body.appendChild(link);
+	link.click();
+	link.remove();
+	setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function selected_export_filters(report) {
+	const selected_rows = get_selected_rows(report);
+	const filters = export_filters(report);
+	if (selected_rows.length) {
+		filters.selected_employees = get_selected_employees(report);
+		filters.selected_salary_slips = selected_rows
+			.map((row) => row.salary_slip)
+			.filter(Boolean);
+	}
+	return filters;
+}
+
+function export_ss_file(report, method, file_format) {
 	ensure_report_has_data(report);
 	report.make_access_log?.("Export", file_format);
-
-	const filters = report.get_filter_values(true);
-	const args = {
-		cmd: "frappe.desk.query_report.export_query",
-		report_name: report.report_name,
-		custom_columns: report.custom_columns?.length ? report.custom_columns : [],
-		file_format_type: file_format,
-		filters,
-		applied_filters: report.get_applied_filters?.(filters) || {},
-		include_filters: 1,
-	};
-	open_url_post(frappe.request.url, args);
+	post_ss_download(method, selected_export_filters(report));
 }
 
-function export_ss_pdf(report) {
+function export_ss_zip(report, opts = {}) {
 	ensure_report_has_data(report);
-	const print_settings = {
-		with_letter_head: 1,
-		orientation: "Landscape",
-		letter_head: report.report_doc?.letter_head || report.report_doc?.default_letter_head,
-		include_filters: 1,
-	};
-	report.pdf_report(print_settings);
-}
+	const selected_employees = get_selected_employees(report);
+	if (!opts.all_agents && selected_employees.length < 2) {
+		frappe.throw({
+			title: __("Select agents"),
+			message: __("Select more than one agent in the report to export a ZIP of CSV files."),
+		});
+	}
 
-function export_ss_zip(report) {
-	ensure_report_has_data(report);
-	const filters = report.get_filter_values(true);
-	open_url_post(
-		"/api/method/hrms.payroll.report.social_security_deductions.social_security_deductions.download_zip",
-		{ filters: JSON.stringify(filters) },
-	);
+	const filters = opts.all_agents
+		? export_filters(report, { require_multiple: 0 })
+		: Object.assign(selected_export_filters(report), { require_multiple: 1 });
+
+	report.make_access_log?.("Export", "ZIP");
+	post_ss_download("download_zip", filters);
 }
 
 function push_to_social_security() {
@@ -322,7 +434,7 @@ function push_to_social_security() {
 			[summary.count, total, from_date, to_date],
 		),
 		() => {
-			export_ss_zip(report);
+			export_ss_zip(report, { all_agents: true });
 			frappe.show_alert({
 				message: __("Social Security filing package downloaded."),
 				indicator: "green",

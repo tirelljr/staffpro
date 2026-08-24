@@ -26,8 +26,10 @@ frappe.ui.form.on("Sales Invoice", {
 		}
 		apply_bpo_invoice_layout(frm);
 		strip_erpnext_invoice_actions(frm);
+		place_posted_invoice_form_export(frm);
 		setTimeout(() => apply_bpo_invoice_layout(frm), 150);
 		setTimeout(() => strip_erpnext_invoice_actions(frm), 150);
+		setTimeout(() => place_posted_invoice_form_export(frm), 150);
 	},
 });
 
@@ -184,6 +186,15 @@ function relabel_invoice_page(frm) {
 		} else if (text.includes("Sales Invoice")) {
 			$el.text(text.replace(/Sales Invoice/g, __("Posted Invoice")));
 		}
+	});
+}
+
+function place_posted_invoice_form_export(frm) {
+	hrms.mount_invoice_form_export?.(frm, {
+		doctype: "Sales Invoice",
+		label: __("Posted Invoice"),
+		file_stem: "Posted_Invoices",
+		storage_key: "staff-pro-posted-invoice-export-format",
 	});
 }
 

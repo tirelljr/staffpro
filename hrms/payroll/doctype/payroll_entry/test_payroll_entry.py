@@ -782,6 +782,112 @@ class TestPayrollEntry(HRMSTestSuite):
 		self.assertIn(cash_account, credited)
 		self.assertNotIn("_Test Payroll Payable - _TC", credited)
 
+	@HRMSTestSuite.change_settings(
+		"Payroll Settings", {"process_payroll_accounting_entry_based_on_employee": 0}
+	)
+	def test_direct_payment_uses_selected_bpo_bank(self):
+		"""Selecting Heritage Bank wires agent pay from that BPO source account."""
+		company = frappe.get_doc("Company", "_Test Company")
+		department = create_department("Heritage Wire")
+		default_bank = frappe.db.get_value("Company", company.name, "default_bank_account")
+		heritage_gl = _ensure_bank_gl(company.name, "_Test Heritage Wire")
+		self.assertNotEqual(heritage_gl, default_bank)
+
+		source = _ensure_company_bank_account(company.name, "Heritage Bank", heritage_gl)
+		employee = make_employee(
+			"test_heritage_wire@example.com",
+			department=department,
+			company=company.name,
+			salary_mode="Bank",
+		)
+		if frappe.get_meta("Employee").has_field("bank_name"):
+			frappe.db.set_value(
+				"Employee",
+				employee,
+				{"bank_name": "Belize Bank", "bank_ac_no": "123456789"},
+			)
+		setup_salary_structure(employee, company)
+
+		dates = get_start_end_dates("Monthly", nowdate())
+		payroll_entry = make_payroll_entry(
+			start_date=dates.start_date,
+			end_date=dates.end_date,
+			currency=company.default_currency,
+			department=department,
+			company=company.name,
+			cost_center="Main - _TC",
+			bank_account=source,
+		)
+		self.assertEqual(payroll_entry.payment_account, heritage_gl)
+
+		je_name = frappe.db.get_value("Salary Slip", {"payroll_entry": payroll_entry.name}, "journal_entry")
+		credited = frappe.get_all(
+			"Journal Entry Account",
+			filters={"parent": je_name, "credit": (">", 0)},
+			fields=["account", "bank_account"],
+		)
+		self.assertIn(heritage_gl, {row.account for row in credited})
+		self.assertIn(source, {row.bank_account for row in credited})
+		if default_bank:
+			self.assertNotIn(default_bank, {row.account for row in credited})
+
+		slip = frappe.get_doc("Salary Slip", {"payroll_entry": payroll_entry.name, "employee": employee})
+		if frappe.get_meta("Salary Slip").has_field("payment_status"):
+			self.assertEqual(slip.payment_status, "Paid")
+			self.assertEqual(slip.paid_from_bank_account, source)
+			self.assertEqual(slip.paid_from_bank, "Heritage Bank")
+			self.assertEqual(slip.bank_name, "Belize Bank")
+			self.assertEqual(slip.bank_account_no, "123456789")
+
+	def test_payroll_source_banks_include_belize_banks(self):
+		from hrms.hr.belize_banks import BELIZE_BANKS, get_company_payment_banks
+
+		banks = get_company_payment_banks("_Test Company")
+		names = {row["bank"] for row in banks}
+		for bank in BELIZE_BANKS:
+			self.assertIn(bank, names)
+
+	def test_default_payroll_bank_account_prefills_a_company_bank(self):
+		from hrms.hr.belize_banks import get_company_payment_banks, get_default_payroll_bank_account
+
+		banks = get_company_payment_banks("_Test Company")
+		self.assertTrue(banks)
+		default = get_default_payroll_bank_account("_Test Company")
+		self.assertIn(default, {row["name"] for row in banks})
+
+	def test_payroll_source_banks_include_connected_accounts_without_company_flag(self):
+		from hrms.hr.belize_banks import get_company_payment_banks, payroll_bank_account_query
+
+		company = "_Test Company"
+		if not frappe.db.exists("Bank", "Heritage Bank"):
+			frappe.get_doc({"doctype": "Bank", "bank_name": "Heritage Bank"}).insert(ignore_permissions=True)
+
+		account_name = "Heritage Payroll Test"
+		existing = frappe.db.get_value("Bank Account", {"account_name": account_name}, "name")
+		if existing:
+			frappe.delete_doc("Bank Account", existing, force=True, ignore_permissions=True)
+
+		doc = {
+			"doctype": "Bank Account",
+			"account_name": account_name,
+			"bank": "Heritage Bank",
+			"company": company,
+			"is_company_account": 0,
+			"bank_account_no": "23344432223",
+		}
+		meta = frappe.get_meta("Bank Account")
+		if meta.has_field("account_type"):
+			doc["account_type"] = "Bank"
+		bank_account = frappe.get_doc(doc).insert(ignore_permissions=True)
+
+		banks = get_company_payment_banks(company)
+		self.assertIn(bank_account.name, {row["name"] for row in banks})
+
+		results = payroll_bank_account_query(
+			"Bank Account", "Heritage Payroll", "name", 0, 20, {"company": company}
+		)
+		self.assertTrue(any(row[0] == bank_account.name for row in results))
+
 	def test_validate_attendance(self):
 		company = frappe.get_doc("Company", "_Test Company")
 		employee = frappe.db.get_value("Employee", {"company": "_Test Company"})
@@ -1227,12 +1333,122 @@ class TestPayrollEntry(HRMSTestSuite):
 		payroll_entry.reload()
 		self.assertEqual(payroll_entry.status, "Cancelled")
 
+	def test_fill_employees_by_customer_without_filters(self):
+		"""Selecting a client pulls billed agents; branch/department filters are optional."""
+		from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+
+		from hrms.setup import get_custom_fields
+
+		create_custom_fields(get_custom_fields(), ignore_validate=True)
+		if not frappe.get_meta("Employee").has_field("bill_to_customer"):
+			return
+		if not frappe.get_meta("Payroll Entry").has_field("customer"):
+			return
+
+		company = frappe.get_doc("Company", "_Test Company")
+		customer_a = _ensure_customer("_Test Payroll Client A")
+		customer_b = _ensure_customer("_Test Payroll Client B")
+
+		emp_a = make_employee("payroll.client.a@example.com", company=company.name)
+		emp_b = make_employee("payroll.client.b@example.com", company=company.name)
+		frappe.db.set_value("Employee", emp_a, "bill_to_customer", customer_a)
+		frappe.db.set_value("Employee", emp_b, "bill_to_customer", customer_b)
+		setup_salary_structure(emp_a, company)
+		setup_salary_structure(emp_b, company)
+
+		dates = get_start_end_dates("Monthly", nowdate())
+		payroll_entry = frappe.new_doc("Payroll Entry")
+		payroll_entry.company = company.name
+		payroll_entry.customer = customer_a
+		payroll_entry.start_date = dates.start_date
+		payroll_entry.end_date = dates.end_date
+		payroll_entry.payroll_frequency = "Monthly"
+		payroll_entry.currency = company.default_currency
+		payroll_entry.exchange_rate = 1
+		payroll_entry.fill_employee_details()
+
+		employees = {row.employee for row in payroll_entry.employees}
+		self.assertIn(emp_a, employees)
+		self.assertNotIn(emp_b, employees)
+
+		payroll_entry.fill_employee_details(raise_if_empty=0)
+		self.assertIn(emp_a, {row.employee for row in payroll_entry.employees})
+
+	def test_fill_employees_by_customer_ignores_currency_and_dates(self):
+		"""Client roster is independent of payroll currency, pay period, and salary structures."""
+		from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+
+		from hrms.setup import get_custom_fields
+
+		create_custom_fields(get_custom_fields(), ignore_validate=True)
+		if not frappe.get_meta("Employee").has_field("bill_to_customer"):
+			return
+		if not frappe.get_meta("Payroll Entry").has_field("customer"):
+			return
+
+		company = frappe.get_doc("Company", "_Test Company")
+		customer = _ensure_customer("_Test Payroll Client Currency")
+		employee = make_employee("payroll.client.currency@example.com", company=company.name)
+		frappe.db.set_value("Employee", employee, "bill_to_customer", customer)
+
+		payroll_entry = frappe.new_doc("Payroll Entry")
+		payroll_entry.company = company.name
+		payroll_entry.customer = customer
+		payroll_entry.start_date = "2010-01-01"
+		payroll_entry.end_date = "2010-01-14"
+		payroll_entry.payroll_frequency = "Fortnightly"
+		payroll_entry.currency = "USD" if company.default_currency != "USD" else "BZD"
+		payroll_entry.exchange_rate = 1
+		payroll_entry.fill_employee_details()
+
+		self.assertIn(employee, {row.employee for row in payroll_entry.employees})
+
+	def test_fill_employees_includes_agent_bank(self):
+		company = frappe.get_doc("Company", "_Test Company")
+		employee = make_employee("payroll.agent.bank@example.com", company=company.name)
+		if frappe.get_meta("Employee").has_field("bank_name"):
+			frappe.db.set_value("Employee", employee, {"bank_name": "Atlantic Bank", "bank_ac_no": "998877"})
+		setup_salary_structure(employee, company)
+
+		dates = get_start_end_dates("Monthly", nowdate())
+		payroll_entry = frappe.new_doc("Payroll Entry")
+		payroll_entry.company = company.name
+		payroll_entry.start_date = dates.start_date
+		payroll_entry.end_date = dates.end_date
+		payroll_entry.payroll_frequency = "Monthly"
+		payroll_entry.currency = company.default_currency
+		payroll_entry.exchange_rate = 1
+		payroll_entry.fill_employee_details()
+
+		row = next(r for r in payroll_entry.employees if r.employee == employee)
+		if frappe.get_meta("Payroll Employee Detail").has_field("bank_name"):
+			self.assertEqual(row.bank_name, "Atlantic Bank")
+			self.assertEqual(row.bank_ac_no, "998877")
+
+
+def _ensure_customer(name: str) -> str:
+	if frappe.db.exists("Customer", name):
+		return name
+	customer_group = frappe.db.get_value("Customer Group", {"is_group": 0}, "name") or "Commercial"
+	territory = frappe.db.get_value("Territory", {"is_group": 0}, "name") or "All Territories"
+	frappe.get_doc(
+		{
+			"doctype": "Customer",
+			"customer_name": name,
+			"customer_type": "Company",
+			"customer_group": customer_group,
+			"territory": territory,
+		}
+	).insert(ignore_permissions=True)
+	return name
+
 
 def get_payroll_entry(**args):
 	args = frappe._dict(args)
 
 	payroll_entry: PayrollEntry = frappe.new_doc("Payroll Entry")
 	payroll_entry.company = args.company or "_Test Company"
+	payroll_entry.customer = args.customer
 	payroll_entry.start_date = args.start_date or "2016-11-01"
 	payroll_entry.end_date = args.end_date or "2016-11-30"
 	payroll_entry.payment_account = get_payment_account()
@@ -1249,6 +1465,9 @@ def get_payroll_entry(**args):
 
 	if args.payment_account:
 		payroll_entry.payment_account = args.payment_account
+
+	if args.bank_account:
+		payroll_entry.bank_account = args.bank_account
 
 	payroll_entry.fill_employee_details()
 	payroll_entry.insert()
@@ -1426,3 +1645,58 @@ def get_linked_journal_entries(payroll_entry_id, docstatus=None):
 		"parent",
 		distinct=True,
 	)
+
+
+def _ensure_bank_gl(company: str, account_name: str) -> str:
+	existing = frappe.db.get_value(
+		"Account", {"account_name": account_name, "company": company, "is_group": 0}, "name"
+	)
+	if existing:
+		return existing
+
+	parent = frappe.db.get_value(
+		"Account",
+		{"is_group": 1, "company": company, "root_type": "Asset", "account_type": "Bank"},
+		"name",
+	) or frappe.db.get_value(
+		"Account", {"is_group": 1, "company": company, "root_type": "Asset"}, "name"
+	)
+	doc = frappe.get_doc(
+		{
+			"doctype": "Account",
+			"account_name": account_name,
+			"parent_account": parent,
+			"company": company,
+			"account_type": "Bank",
+			"is_group": 0,
+		}
+	).insert(ignore_permissions=True)
+	return doc.name
+
+
+def _ensure_company_bank_account(company: str, bank_name: str, gl_account: str) -> str:
+	if not frappe.db.exists("Bank", bank_name):
+		frappe.get_doc({"doctype": "Bank", "bank_name": bank_name}).insert(ignore_permissions=True)
+
+	existing = frappe.db.get_value(
+		"Bank Account",
+		{"company": company, "bank": bank_name, "is_company_account": 1},
+		"name",
+	)
+	if existing:
+		frappe.db.set_value("Bank Account", existing, "account", gl_account)
+		return existing
+
+	abbr = frappe.db.get_value("Company", company, "abbr") or company
+	doc = {
+		"doctype": "Bank Account",
+		"account_name": f"{bank_name} - {abbr}",
+		"bank": bank_name,
+		"is_company_account": 1,
+		"company": company,
+		"account": gl_account,
+	}
+	meta = frappe.get_meta("Bank Account")
+	if meta.has_field("account_type"):
+		doc["account_type"] = "Bank"
+	return frappe.get_doc(doc).insert(ignore_permissions=True).name

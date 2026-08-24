@@ -17,6 +17,12 @@ frappe.ui.form.on("Client Invoice", {
 				...(frm.doc.customer ? { bill_to_customer: frm.doc.customer } : {}),
 			},
 		}));
+		hrms.mount_invoice_form_export?.(frm, {
+			doctype: "Client Invoice",
+			label: __("Client Invoice"),
+			file_stem: "Client_Invoices",
+			storage_key: "staff-pro-client-invoice-export-format",
+		});
 		if (frm.doc.docstatus === 1 && frm.doc.sales_invoice) {
 			frm.add_custom_button(
 				__("Posted Invoice"),
