@@ -32,11 +32,19 @@ function hide_new_email_buttons($after) {
 	});
 }
 
+function apply_staff_pro_form_dashboard_links(frm) {
+	if (typeof hrms.relabel_form_dashboard_links === "function") {
+		hrms.relabel_form_dashboard_links(frm);
+	}
+}
+
 function apply_staff_pro_form_footer(frm) {
 	const $page = frm?.page?.wrapper || frm?.$wrapper;
 	if (!$page?.length) {
 		return;
 	}
+
+	apply_staff_pro_form_dashboard_links(frm);
 
 	const $after = $page.find(".form-footer .after-save, .after-save");
 	if (!$after.length) {

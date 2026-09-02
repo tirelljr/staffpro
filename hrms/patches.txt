@@ -114,3 +114,11 @@ hrms.patches.v16_0.hide_bank_account_iban_and_company_account #2026-08-21
 hrms.patches.v16_0.seed_demo_employee_banks #2026-08-21
 hrms.patches.v16_0.split_current_and_past_pay_stubs #2026-08-21
 hrms.patches.v16_0.backfill_salary_slip_payment_datetime #2026-08-21
+hrms.patches.v16_0.trim_admin_sidebar #2026-09-02
+hrms.patches.v16_0.delete_legacy_workspace_sidebars #2026-09-02
+hrms.patches.v16_0.remove_travel_fleet #2026-09-02
+hrms.patches.v16_0.remove_telemetry #2026-09-02
+hrms.patches.v16_0.ensure_default_holiday_list #2026-09-02
+hrms.patches.v16_0.ensure_default_shift_locations #2026-09-02
+hrms.patches.v16_0.remove_bulk_attendance_sidebar #2026-09-02
+hrms.patches.v16_0.remove_accrued_earnings_sidebar #2026-09-02

@@ -16,6 +16,9 @@ def after_install():
 		from hrms.payroll.bpo_customer import apply_bpo_customer_layout
 		from hrms.payroll.bpo_sales_invoice import apply_bpo_sales_invoice_layout
 
+		from hrms.hr.staff_pro_holiday_list import ensure_staff_pro_holiday_list
+		from hrms.hr.staff_pro_shift_locations import ensure_staff_pro_shift_locations
+
 		apply_branding()
 		apply_bpo_employee_labels()
 		apply_bank_account_layout()
@@ -24,6 +27,8 @@ def after_install():
 		setup_usd_client_billing()
 		hide_cost_center_fields()
 		disable_app_onboarding()
+		ensure_staff_pro_holiday_list()
+		ensure_staff_pro_shift_locations()
 
 		click.secho("Thank you for installing Staff Pro BPO!", fg="green")
 

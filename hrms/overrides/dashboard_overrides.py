@@ -14,7 +14,6 @@ def get_dashboard_for_employee(data):
 					"Leave Application",
 					"Leave Allocation",
 					"Leave Policy Assignment",
-					"Holiday List Assignment",
 				],
 			},
 			{
@@ -42,7 +41,6 @@ def get_dashboard_for_employee(data):
 					"Salary Structure Assignment",
 					"Salary Slip",
 					"Additional Salary",
-					"Timesheet",
 					"Employee Incentive",
 					"Retention Bonus",
 					"Bank Account",
@@ -64,13 +62,11 @@ def get_dashboard_for_employee(data):
 			"Bank Account": "party",
 			"Contract": "party_name",
 			"Employee Grievance": "raised_by",
-			"Holiday List Assignment": "assigned_to",
 		}
 	)
 
 	if not data.get("dynamic_links"):
 		data["dynamic_links"] = {}
-	data["dynamic_links"]["assigned_to"] = ["Employee", "applicable_for"]
 	data["dynamic_links"]["party_name"] = ["Employee", "party_type"]
 	data.update(
 		{

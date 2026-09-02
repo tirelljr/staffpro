@@ -330,22 +330,160 @@ class Attendance(Document):
 		hrms.refetch_resource("hrms:attendance_calendar_events", employee_user)
 
 
-@frappe.whitelist()
-def get_events(start: date | str, end: date | str, filters: str | list | None = None) -> list[dict]:
-	employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user})
-	if not employee:
-		return []
-
+def _normalize_calendar_filters(filters: str | list | dict | None) -> list | dict:
 	if isinstance(filters, str):
 		import json
 
 		filters = json.loads(filters)
 	if not filters:
-		filters = []
-	filters.append(["attendance_date", "between", [get_datetime(start).date(), get_datetime(end).date()]])
+		return []
+	if isinstance(filters, dict):
+		return filters
+
+	normalized = []
+	for item in filters:
+		if isinstance(item, (list, tuple)) and len(item) >= 4 and item[0] == "Attendance":
+			normalized.append(list(item[1:4]))
+		else:
+			normalized.append(item)
+	return normalized
+
+
+@frappe.whitelist()
+def get_events(start: date | str, end: date | str, filters: str | list | None = None) -> list[dict]:
+	employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user})
+	filters = _normalize_calendar_filters(filters)
+	if isinstance(filters, list):
+		filters.append(["attendance_date", "between", [get_datetime(start).date(), get_datetime(end).date()]])
+	else:
+		filters["attendance_date"] = ["between", [get_datetime(start).date(), get_datetime(end).date()]]
 	attendance_records = add_attendance(filters)
-	add_holidays(attendance_records, start, end, employee)
+	if employee:
+		add_holidays(attendance_records, start, end, employee)
 	return attendance_records
+
+
+@frappe.whitelist()
+def get_calendar_day_roster(attendance_date: str):
+	day = getdate(attendance_date)
+	hr_roles = {"HR Manager", "HR User", "System Manager", "Administrator"}
+	payload = None
+	if hr_roles.intersection(frappe.get_roles()):
+		from hrms.hr.page.in_out_today.in_out_today import get_in_out_today
+
+		try:
+			payload = get_in_out_today(attendance_date=str(day))
+		except frappe.PermissionError:
+			payload = None
+	if payload is None:
+		payload = roster_from_attendance(day)
+	return _trim_inactive_roster(payload, day)
+
+
+def _has_day_activity(row: dict) -> bool:
+	return bool(
+		row.get("in_time")
+		or row.get("out_time")
+		or row.get("time")
+		or row.get("attendance")
+		or row.get("pto_code")
+		or row.get("status") == "IN"
+		or row.get("late")
+	)
+
+
+def _trim_inactive_roster(payload: dict, day) -> dict:
+	if getdate(day) == getdate():
+		return payload
+	details = [row for row in payload.get("details") or [] if _has_day_activity(row)]
+	payload["details"] = details
+	payload["departments"] = sorted({row.get("department") for row in details if row.get("department")})
+	payload["totals"] = {
+		"total": len(details),
+		"in_count": sum(1 for row in details if row.get("status") == "IN"),
+		"out_count": sum(1 for row in details if row.get("status") == "OUT"),
+		"late": sum(1 for row in details if row.get("late")),
+	}
+	return payload
+
+
+def roster_from_attendance(attendance_date):
+	rows = frappe.get_list(
+		"Attendance",
+		fields=[
+			"name",
+			"employee",
+			"employee_name",
+			"department",
+			"status",
+			"in_time",
+			"out_time",
+			"late_entry",
+		],
+		filters={"attendance_date": getdate(attendance_date), "docstatus": ["<", 2]},
+		order_by="employee_name",
+	)
+	images = _employee_images([row.employee for row in rows])
+	as_of = now_datetime() if getdate(attendance_date) == getdate() else get_datetime(add_days(attendance_date, 1))
+	details = []
+	for row in rows:
+		in_dt = get_datetime(row.in_time) if row.in_time else None
+		out_dt = get_datetime(row.out_time) if row.out_time else None
+		if out_dt and out_dt <= as_of:
+			status = "OUT"
+		elif in_dt and in_dt <= as_of:
+			status = "IN"
+		else:
+			status = "OUT"
+
+		details.append(
+			{
+				"employee": row.employee,
+				"employee_name": row.employee_name or row.employee,
+				"image": images.get(row.employee) or "",
+				"department": row.department or "",
+				"status": status,
+				"late": bool(row.late_entry),
+				"attendance_status": row.status or "",
+				"attendance": row.name,
+				"date": str(getdate(attendance_date)),
+				"in_time": _format_clock(in_dt),
+				"out_time": _format_clock(out_dt),
+				"time": _format_clock(out_dt or in_dt),
+				"pto_code": row.status if row.status == "On Leave" else "",
+				"device_id": "",
+			}
+		)
+
+	departments = sorted({row["department"] for row in details if row["department"]})
+	return {
+		"date": str(getdate(attendance_date)),
+		"departments": departments,
+		"totals": {
+			"total": len(details),
+			"in_count": sum(1 for row in details if row["status"] == "IN"),
+			"out_count": sum(1 for row in details if row["status"] == "OUT"),
+			"late": sum(1 for row in details if row["late"]),
+		},
+		"summary": [],
+		"details": details,
+	}
+
+
+def _format_clock(value):
+	if not value:
+		return ""
+	return get_datetime(value).strftime("%I:%M %p").lstrip("0")
+
+
+def _employee_images(employee_ids: list[str]) -> dict[str, str]:
+	ids = [name for name in {cstr(employee_id) for employee_id in employee_ids} if name]
+	if not ids:
+		return {}
+	return {
+		row.name: row.image or ""
+		for row in frappe.get_all("Employee", filters={"name": ["in", ids]}, fields=["name", "image"])
+	}
 
 
 def add_attendance(filters):
@@ -355,14 +493,25 @@ def add_attendance(filters):
 			"name",
 			ValueWrapper("Attendance").as_("doctype"),
 			"attendance_date",
+			"employee",
 			"employee_name",
+			"department",
 			"status",
+			"in_time",
+			"out_time",
+			"late_entry",
 			"docstatus",
 		],
 		filters=filters,
 	)
+	images = _employee_images([record.employee for record in attendance])
 	for record in attendance:
+		record["image"] = images.get(record.employee) or ""
 		record["title"] = f"{record['employee_name']} : {record['status']}"
+		record["allDay"] = 1
+		record["color"] = "transparent"
+		record["in_time"] = cstr(record.get("in_time") or "")
+		record["out_time"] = cstr(record.get("out_time") or "")
 	return attendance
 
 

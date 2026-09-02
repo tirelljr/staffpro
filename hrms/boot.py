@@ -55,12 +55,9 @@ BPO_WORKSPACE_SIDEBARS = frozenset(
 		"people",
 		"time",
 		"pay",
-		"payroll",
 		"ss and taxes",
 		"talent",
 		"finance",
-		"finance & admin",
-		"finance and admin",
 		"admin",
 	}
 )
@@ -165,6 +162,7 @@ def extend_bootinfo(bootinfo):
 	bootinfo["staff_pro_bpo_sidebar_labels"] = get_sidebar_label_maps()
 	apply_payroll_frequency_translations(bootinfo)
 	_filter_bpo_workspace_sidebars(bootinfo)
+	_filter_bpo_module_sidebars(bootinfo)
 	_filter_bpo_app_workspaces(bootinfo)
 
 
@@ -205,6 +203,47 @@ def _filter_bpo_workspace_sidebars(bootinfo):
 		for key, value in sidebars.items()
 		if _normalize_workspace_key(key) in BPO_WORKSPACE_SIDEBARS
 	}
+
+
+def _is_bpo_dock_entry(entry) -> bool:
+	if not isinstance(entry, dict):
+		return _is_bpo_workspace_name(entry)
+	return _is_bpo_workspace_name(
+		entry.get("link_to") or entry.get("title") or entry.get("name") or entry.get("label")
+	)
+
+
+def _filter_bpo_module_sidebars(bootinfo):
+	"""Keep Frappe v17 shells and the hrms dock on Staff Pro portals only."""
+	sidebars = bootinfo.get("module_sidebars")
+	if isinstance(sidebars, dict):
+		bootinfo["module_sidebars"] = {
+			key: value
+			for key, value in sidebars.items()
+			if _is_bpo_workspace_name(key)
+			or (isinstance(value, dict) and _is_bpo_workspace_name(value.get("title")))
+		}
+
+	dock = bootinfo.get("dock")
+	if isinstance(dock, dict):
+		hrms_dock = dock.get("hrms")
+		bootinfo["dock"] = {"hrms": hrms_dock} if isinstance(hrms_dock, list) else {}
+		if isinstance(hrms_dock, list):
+			bootinfo["dock"]["hrms"] = [entry for entry in hrms_dock if _is_bpo_dock_entry(entry)]
+
+	app_data = bootinfo.get("app_data")
+	if not isinstance(app_data, list):
+		return
+	for app in app_data:
+		if not isinstance(app, dict):
+			continue
+		if app.get("app_name") == "hrms":
+			entries = app.get("dock")
+			if isinstance(entries, list):
+				app["dock"] = [entry for entry in entries if _is_bpo_dock_entry(entry)]
+		else:
+			app["dock"] = []
+			app["on_apps_screen"] = False
 
 
 def _filter_bpo_app_workspaces(bootinfo):

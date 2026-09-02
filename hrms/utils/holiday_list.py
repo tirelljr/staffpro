@@ -96,21 +96,25 @@ def get_holiday_dates_between_range(
 def get_holiday_list_for_employee(
 	employee: str, raise_exception: bool = True, as_on: date | str | None = None, as_dict: bool = False
 ) -> str:
+	from hrms.hr.staff_pro_holiday_list import get_fallback_holiday_list
+
 	as_on = frappe.utils.getdate(as_on)
+	company = frappe.db.get_value("Employee", employee, "company")
 	holiday_list = get_assigned_holiday_list(employee, as_on, as_dict)
 	if not holiday_list:
-		company = frappe.db.get_value("Employee", employee, "company")
 		holiday_list = get_assigned_holiday_list(company, as_on, as_dict)
+	if not holiday_list:
+		holiday_list = get_fallback_holiday_list(company, as_on, as_dict)
 
 	if not holiday_list and raise_exception:
 		frappe.throw(
 			_(
-				"No Holiday List was found for Employee {0} or their company {1} for date {2}. Please assign through {3}"
+				"No Holiday List was found for Employee {0} or their company {1} for date {2}. Edit {3}."
 			).format(
 				frappe.bold(employee),
 				frappe.bold(company),
 				frappe.bold(formatdate(as_on)),
-				get_link_to_form("Holiday List Assignment", label="Holiday List Assignment"),
+				get_link_to_form("Holiday List", label="Holiday List"),
 			)
 		)
 	return holiday_list

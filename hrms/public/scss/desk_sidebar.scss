@@ -494,27 +494,30 @@
 	color: var(--sp-sidebar-muted);
 }
 
-/* Employee / Agents roster, Payroll Entry, and Client Invoice: hide extra page-head menu / view switcher */
-[id="page-List/Employee/List"] .menu-btn-group,
-[id="page-List/Employee/Image"] .menu-btn-group,
-[id^="page-List/Employee/"] .menu-btn-group,
-[id="page-List/Payroll Entry/List"] .menu-btn-group,
-[id^="page-List/Payroll Entry/"] .menu-btn-group,
-[id="page-List/Salary Structure Assignment/List"] .menu-btn-group,
-[id^="page-List/Salary Structure Assignment/"] .menu-btn-group,
-[id="page-List/Client Invoice/List"] .menu-btn-group,
-[id^="page-List/Client Invoice/"] .menu-btn-group,
-[id="page-List/Payroll Entry/List"] .view-switcher,
-[id="page-List/Payroll Entry/List"] .views-switcher,
-[id^="page-List/Payroll Entry/"] .view-switcher,
-[id^="page-List/Payroll Entry/"] .views-switcher,
-[id="page-List/Salary Structure Assignment/List"] .view-switcher,
-[id^="page-List/Salary Structure Assignment/"] .view-switcher,
-[id="page-List/Client Invoice/List"] .view-switcher,
-[id="page-List/Client Invoice/List"] .views-switcher,
-[id^="page-List/Client Invoice/"] .view-switcher,
-[id^="page-List/Client Invoice/"] .views-switcher {
+/* List pages: hide view switcher + overflow menu on every doctype */
+[id^="page-List/"] .view-switcher,
+[id^="page-List/"] .views-switcher,
+[id^="page-List/"] .menu-btn-group,
+[id^="page-List/"] .menu-more-button,
+[id^="page-List/"] .page-actions .custom-actions:not(:has(> :not(.view-switcher, .views-switcher))) {
 	display: none !important;
+}
+
+/* Standard filters: drop the icon-only match-type control */
+.match-type-dropdown-btn,
+.standard-filter-section .input-group-btn:has(.match-type-dropdown-btn),
+.filter-box .input-group-btn:has(.match-type-dropdown-btn),
+.filter-field .input-group-btn:has(.match-type-dropdown-btn) {
+	display: none !important;
+}
+
+.standard-filter-section .input-group .form-control,
+.standard-filter-section .input-group input,
+.standard-filter-section .input-group select,
+.filter-box .input-group .form-control,
+.filter-field .input-group .form-control {
+	border-top-left-radius: var(--border-radius, 6px) !important;
+	border-bottom-left-radius: var(--border-radius, 6px) !important;
 }
 
 [id^="page-Payroll Entry"] [data-fieldname="deduct_social_security"] {
@@ -661,12 +664,33 @@ body.staff-pro-hide-form-sidebar {
 	}
 }
 
+/* Employee and User profiles: hide overflow menu */
+[id="page-Employee"],
+[id="page-User"] {
+	.menu-btn-group,
+	.menu-more-button {
+		display: none !important;
+	}
+}
+
 /* Employee: hide last-edited/created stats */
 [id="page-Employee"] {
 	.form-sidebar .modified-by,
 	.form-sidebar .created-by,
 	.form-sidebar .sidebar-section:has(.modified-by),
 	.form-sidebar .sidebar-section.text-muted.pt-3 {
+		display: none !important;
+	}
+}
+
+/* Hide Attachments / Tags / Share on every form sidebar */
+.form-sidebar {
+	.form-attachments,
+	.form-tags,
+	.form-shared,
+	.sidebar-section.form-attachments,
+	.sidebar-section.form-tags,
+	.sidebar-section.form-shared {
 		display: none !important;
 	}
 }

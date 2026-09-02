@@ -1,6 +1,7 @@
 {
  "app": "hrms",
- "creation": "2026-08-18 23:40:00",
+ "bg_color": "gray",
+ "creation": "2026-09-02 23:48:03.165754",
  "docstatus": 0,
  "doctype": "Desktop Icon",
  "hidden": 0,
@@ -10,7 +11,7 @@
  "label": "Admin",
  "link_to": "Admin",
  "link_type": "Workspace Sidebar",
- "modified": "2026-08-21 15:04:07.148855",
+ "modified": "2026-09-02 15:25:42.970327",
  "modified_by": "Administrator",
  "name": "Admin",
  "owner": "Administrator",

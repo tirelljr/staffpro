@@ -3,7 +3,7 @@
 		<div class="flex items-center space-x-1.5">
 			<a href="/desk/time" class="text-gray-600 hover:text-gray-700 flex items-center">
 				<img
-					src="/assets/hrms/images/staff-pro-bpo-logo.png"
+					:src="logoUrl"
 					alt="Staff Pro BPO"
 					class="h-10 w-auto mr-2.5"
 				/>
@@ -43,6 +43,9 @@ import { FeatherIcon, Dropdown, Avatar, createResource } from "frappe-ui";
 
 import { User } from "../views/Home.vue";
 import { goTo, raiseToast } from "../utils";
+import { STAFF_PRO_LOGO_URL } from "../utils/branding";
+
+const logoUrl = STAFF_PRO_LOGO_URL;
 
 const props = defineProps<{
 	user: User;

@@ -1,0 +1,71 @@
+{
+ "app": "hrms",
+ "creation": "2026-09-02 12:59:40.734529",
+ "docstatus": 0,
+ "doctype": "Dock",
+ "idx": 0,
+ "items": [
+  {
+   "added": 0,
+   "hidden": 0,
+   "icon": "user",
+   "link_to": "People",
+   "link_type": "Sidebar",
+   "title": "People"
+  },
+  {
+   "added": 0,
+   "hidden": 0,
+   "icon": "clock",
+   "link_to": "Time",
+   "link_type": "Sidebar",
+   "title": "Time"
+  },
+  {
+   "added": 0,
+   "hidden": 0,
+   "icon": "coins",
+   "link_to": "Pay",
+   "link_type": "Sidebar",
+   "title": "Payroll"
+  },
+  {
+   "added": 0,
+   "hidden": 0,
+   "icon": "user-plus",
+   "link_to": "Talent",
+   "link_type": "Sidebar",
+   "title": "Talent"
+  },
+  {
+   "added": 0,
+   "hidden": 0,
+   "icon": "shield",
+   "link_to": "SS and Taxes",
+   "link_type": "Sidebar",
+   "title": "SS and Taxes"
+  },
+  {
+   "added": 0,
+   "hidden": 0,
+   "icon": "receipt",
+   "link_to": "Finance",
+   "link_type": "Sidebar",
+   "title": "Finance"
+  },
+  {
+   "added": 0,
+   "hidden": 0,
+   "icon": "settings",
+   "link_to": "Admin",
+   "link_type": "Sidebar",
+   "title": "Admin"
+  }
+ ],
+ "modified": "2026-09-02 15:25:43.206199",
+ "modified_by": "Administrator",
+ "name": "hrms",
+ "owner": "Administrator",
+ "standard": 1,
+ "user": ""
+}

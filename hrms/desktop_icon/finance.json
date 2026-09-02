@@ -1,7 +1,7 @@
 {
  "app": "hrms",
  "bg_color": "gray",
- "creation": "2026-08-18 23:47:37.926885",
+ "creation": "2026-09-02 23:48:03.153558",
  "docstatus": 0,
  "doctype": "Desktop Icon",
  "hidden": 0,
@@ -12,7 +12,7 @@
  "link_to": "Finance",
  "link_type": "Workspace Sidebar",
  "logo_url": "/assets/hrms/images/integrations/quickbooks.svg",
- "modified": "2026-08-21 15:04:07.058947",
+ "modified": "2026-09-02 15:25:42.950409",
  "modified_by": "Administrator",
  "name": "Finance",
  "owner": "Administrator",

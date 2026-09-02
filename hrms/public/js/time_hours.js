@@ -315,6 +315,31 @@ hrms.time.to_clock = function (value) {
 	return value.length === 5 ? `${value}:00` : value;
 };
 
+hrms.time.compare_hhmm = function (a, b) {
+	if (!a || !b) {
+		return 0;
+	}
+	return String(a).localeCompare(String(b));
+};
+
+hrms.time.sync_entry_end_after_start = function ($root) {
+	const $start = $root.find(".sp-entry__start");
+	const $end = $root.find(".sp-entry__end");
+	if ($end.prop("disabled")) {
+		return;
+	}
+	const start = $start.val();
+	if (start) {
+		$end.attr("min", start);
+	} else {
+		$end.removeAttr("min");
+	}
+	const end = $end.val();
+	if (start && end && hrms.time.compare_hhmm(end, start) < 0) {
+		$end.val(start);
+	}
+};
+
 hrms.time.to_date_string = function (value) {
 	if (!value) {
 		return "";
@@ -599,6 +624,9 @@ hrms.time.show_add_entry_dialog = function (listview, opts) {
 		$root.find(".sp-entry__end").prop("disabled", on);
 		$root.find('.sp-entry__icon-btn[data-time="end"]').prop("disabled", on);
 		$root.find(".sp-entry__time-field").eq(1).toggleClass("is-disabled", on);
+		if (!on) {
+			hrms.time.sync_entry_end_after_start($root);
+		}
 	};
 
 	const collect = () => {
@@ -699,6 +727,9 @@ hrms.time.show_add_entry_dialog = function (listview, opts) {
 			$root.find(".sp-entry__end").val(end);
 		}
 	});
+	$root.on("change input", ".sp-entry__start", function () {
+		hrms.time.sync_entry_end_after_start($root);
+	});
 	$root.on("change", ".sp-entry__working-now", toggle_working_now);
 	$root.on("click", ".sp-entry__date-btn", () => {
 		const input = $root.find(".sp-entry__date").get(0);
@@ -726,6 +757,7 @@ hrms.time.show_add_entry_dialog = function (listview, opts) {
 
 	dialog.show();
 	hrms.time.mount_dialog_html(dialog, "entry_body", $root);
+	hrms.time.sync_entry_end_after_start($root);
 
 	frappe.call({
 		method: "hrms.hr.doctype.attendance.attendance.get_hours_filter_options",

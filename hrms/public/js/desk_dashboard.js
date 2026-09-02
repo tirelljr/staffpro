@@ -24,6 +24,103 @@ const ICONS = {
 	sortAsc: `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4.2 13.8c-.4 0-.7-.3-.7-.7V6l-1.3 1.3-.9-.9 2.4-2.4c.3-.3.7-.3 1 0l2.4 2.4-.9.9-1.3-1.3v7.1c0 .4-.3.7-.7.7z"/><rect x="8.2" y="2.8" width="6.4" height="1.45" rx=".45"/><rect x="8.2" y="5.7" width="4.9" height="1.45" rx=".45"/><rect x="8.2" y="8.6" width="3.4" height="1.45" rx=".45"/><rect x="8.2" y="11.5" width="1.9" height="1.45" rx=".45"/></svg>`,
 };
 
+function empty_face({ bg, skin, hair, path, extra = "" }) {
+	return `<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="20" cy="20" r="20" fill="${bg}"/><path d="M6.5 40c2.2-11.5 7.2-15.5 13.5-15.5S31.3 28.5 33.5 40" fill="${bg}"/><ellipse cx="20" cy="17.2" rx="7.1" ry="8" fill="${skin}"/><path d="${path}" fill="${hair}"/>${extra}</svg>`;
+}
+
+const EMPTY_FACES = [
+	{
+		slot: "tl",
+		svg: empty_face({
+			bg: "#e8a598",
+			skin: "#e8b896",
+			hair: "#2c1a12",
+			path: "M10.2 19c.5-9.2 19.1-9.2 19.6 0-.6-6.8-4.6-11.8-9.8-11.8S10.8 12.2 10.2 19z",
+		}),
+	},
+	{
+		slot: "tr",
+		svg: empty_face({
+			bg: "#1f3a5f",
+			skin: "#c68642",
+			hair: "#1a120c",
+			path: "M12 17.8c.2-7.4 15.8-7.4 16 0-.4-5.2-15.6-5.2-16 0z",
+		}),
+	},
+	{
+		slot: "l",
+		fade: true,
+		svg: empty_face({
+			bg: "#90ba93",
+			skin: "#f1c27d",
+			hair: "#4a2c14",
+			path: "M11.4 18.4c.4-8 16.8-8 17.2 0-.6-5.6-16.6-5.6-17.2 0z",
+			extra: '<circle cx="20" cy="6.4" r="3.1" fill="#4a2c14"/>',
+		}),
+	},
+	{
+		slot: "r",
+		svg: empty_face({
+			bg: "#11a5dd",
+			skin: "#ffdbac",
+			hair: "#3b2314",
+			path: "M12.4 17.2c0-7.2 15.2-7.2 15.2 0C27 12.2 13 12.2 12.4 17.2z",
+		}),
+	},
+	{
+		slot: "bl",
+		fade: true,
+		svg: empty_face({
+			bg: "#d9a5b3",
+			skin: "#8d5524",
+			hair: "#1b0f0a",
+			path: "M9.6 20c.2-10.4 20.6-10.4 20.8 0-1.2-8-19.6-8-20.8 0z",
+		}),
+	},
+	{
+		slot: "br",
+		svg: empty_face({
+			bg: "#a7c8cc",
+			skin: "#e0ac69",
+			hair: "#2a1b10",
+			path: "M12.2 17.6c.3-7 15.3-7 15.6 0-.5-4.8-15.1-4.8-15.6 0z",
+			extra: '<g fill="none" stroke="#2a2a2a" stroke-width="1.1"><circle cx="16.6" cy="18.2" r="2.3"/><circle cx="23.4" cy="18.2" r="2.3"/><path d="M18.9 18.2h2.2"/></g>',
+		}),
+	},
+	{
+		slot: "tc",
+		fade: true,
+		svg: empty_face({
+			bg: "#c4b5a5",
+			skin: "#f3d1b3",
+			hair: "#5c4033",
+			path: "M11.8 18c.5-8.2 15.9-8.2 16.4 0-.6-6-15.8-6-16.4 0z",
+		}),
+	},
+];
+
+function empty_state_art(size = "") {
+	const size_class = size ? ` sp-empty-illus--${size}` : "";
+	const faces = EMPTY_FACES.map(
+		(face) =>
+			`<span class="sp-empty-illus__face sp-empty-illus__face--${face.slot}${
+				face.fade ? " is-fade" : ""
+			}">${face.svg}</span>`
+	).join("");
+	return `<div class="sp-empty-illus${size_class}" aria-hidden="true"><div class="sp-empty-illus__rings"><i></i><i></i><i></i></div>${faces}<div class="sp-empty-illus__stack"><div class="sp-empty-illus__card"><i></i><span><b></b><b></b></span></div><div class="sp-empty-illus__card is-accent"><i></i><span><b></b><b></b></span></div><div class="sp-empty-illus__card"><i></i><span><b></b><b></b></span></div></div></div>`;
+}
+
+function empty_state_card({ title, text, button, size = "" }) {
+	const action = button
+		? `<button type="button" class="sp-empty-list__btn">${escape_html(button)}</button>`
+		: "";
+	return `<div class="sp-empty-list${size ? ` sp-empty-list--${size}` : ""}">${empty_state_art(
+		size
+	)}<h2 class="sp-empty-list__title">${escape_html(title)}</h2><p class="sp-empty-list__text">${escape_html(
+		text
+	)}</p>${action}</div>`;
+}
+
 const DASH_PILL_CSS = `
 .sp-dash-pills{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:16px 32px;margin:8px 0 40px;padding:0;width:100%;max-width:100%;overflow:hidden}
 .sp-dash-pill{display:inline-flex;align-items:center;gap:8px;max-width:100%;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;color:#111;font:inherit;font-size:13px;font-weight:500;line-height:1;cursor:pointer}
@@ -1170,17 +1267,7 @@ function inject_celebrations($root) {
 						</div>
 						<button type="button" class="sp-clock-btn">${escape_html(__("CLOCK"))}</button>
 						<div class="sp-dash-panel__filter">
-							${dash_select_html({
-								className: "sp-inout-dash__status",
-								variant: "solid",
-								label: __("Status"),
-								value: "all",
-								options: [
-									{ value: "all", label: __("All") },
-									{ value: "IN", label: __("IN") },
-									{ value: "OUT", label: __("OUT") },
-								],
-							})}
+							${hrms.ui.inout_toggle_html({ value: "IN" })}
 						</div>
 						<button type="button" class="sp-inout-dash__open">${escape_html(__("View all"))}</button>
 					</div>
@@ -1222,7 +1309,7 @@ function inject_celebrations($root) {
 	$inout.find(".sp-inout-dash__department").on("change", function () {
 		render_inout_panel($inout);
 	});
-	$inout.find(".sp-inout-dash__status").on("change", function () {
+	hrms.ui.bind_inout_toggle($inout.find(".sp-inout-toggle"), () => {
 		render_inout_rows($inout);
 	});
 	load_inout($inout);
@@ -1384,9 +1471,8 @@ function scoped_inout_rows($widget) {
 }
 
 function filtered_inout_rows($widget) {
-	const status = $widget.find(".sp-inout-dash__status").val() || "all";
+	const status = hrms.ui.inout_toggle_value($widget.find(".sp-inout-toggle"));
 	const rows = scoped_inout_rows($widget);
-	if (status === "all") return rows;
 	return rows.filter((row) => row.status === status);
 }
 
@@ -2546,21 +2632,21 @@ function enhance_empty_charts($root) {
 		$body.find(".chart-container, .widget-chart-box, .flex.justify-center").hide();
 		$body.append(`
 			<div class="sp-empty-chart">
-				<div class="sp-empty-chart__art">${ICONS.chart}</div>
-				<p class="sp-empty-chart__title">${__("Nothing to plot yet")}</p>
-				<p class="sp-empty-chart__text">${escape_html(cfg.empty_text)}</p>
-				<button type="button" class="sp-empty-chart__btn">${escape_html(cfg.create_label)}</button>
+				${empty_state_card({
+					title: __("Nothing to plot yet"),
+					text: cfg.empty_text,
+					button: cfg.create_label,
+					size: "embed",
+				})}
 			</div>
 		`);
-		$body.find(".sp-empty-chart__btn").on("click", () => start_action(cfg));
+		$body.find(".sp-empty-list__btn").on("click", () => start_action(cfg));
 	});
 }
 
-function enhance_list_empty() {
+function enhance_page_empty() {
 	const route = frappe.get_route?.() || [];
-	if (route[0] !== "List") return;
-
-	const doctype = route[1];
+	const doctype = route[0] === "List" ? route[1] : "";
 	const copy = LIST_EMPTY[doctype] || {
 		title: __("Nothing here yet"),
 		text: __("Create the first record and this list starts working for you."),
@@ -2568,10 +2654,23 @@ function enhance_list_empty() {
 		doctype,
 	};
 
-	$(".no-result, .list-empty-state").each(function () {
+	const selector = [
+		".no-result",
+		".list-empty-state",
+		".empty-state",
+		".empty-apps-state",
+		".kanban-empty-state",
+		"#hierarchy-empty-root",
+	].join(", ");
+
+	$(selector).each(function () {
 		const $box = $(this);
+		if ($box.closest(".sp-empty-chart, .sp-empty-list").length) return;
 		if ($box.find(".sp-empty-list").length) return;
+		if ($box.siblings(".sp-empty-list").length) return;
+		if ($box.hasClass("sp-empty-list")) return;
 		if (!$box.text().trim()) return;
+		if ($box.closest(".modal, .grid-empty, .form-grid").length) return;
 
 		const filtered = /filter/i.test($box.text());
 		const current = filtered
@@ -2583,15 +2682,13 @@ function enhance_list_empty() {
 				}
 			: copy;
 
-		$box.find("svg, img, .icon").first().hide();
-		const $card = $(`
-			<div class="sp-empty-list">
-				<div class="sp-empty-list__art">${ICONS.users}</div>
-				<h2 class="sp-empty-list__title">${escape_html(current.title)}</h2>
-				<p class="sp-empty-list__text">${escape_html(current.text)}</p>
-				<button type="button" class="sp-empty-list__btn">${escape_html(current.button)}</button>
-			</div>
-		`);
+		const $card = $(
+			empty_state_card({
+				title: current.title,
+				text: current.text,
+				button: current.button,
+			})
+		);
 		$card.find(".sp-empty-list__btn").on("click", () => {
 			if (current.action === "clear-filters") {
 				cur_list?.filter_area?.clear?.();
@@ -2601,7 +2698,9 @@ function enhance_list_empty() {
 				new_doc(copy.doctype);
 				return;
 			}
-			go(copy.route);
+			if (copy.route) {
+				go(copy.route);
+			}
 		});
 		$box.prepend($card);
 		$box.children().not(".sp-empty-list").hide();
@@ -2832,10 +2931,7 @@ function enhance() {
 	}
 
 	theme_number_cards($(document.body));
-
-	if (route[0] === "List") {
-		enhance_list_empty();
-	}
+	enhance_page_empty();
 }
 
 function watch() {

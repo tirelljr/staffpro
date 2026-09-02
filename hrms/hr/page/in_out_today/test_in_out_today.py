@@ -4,7 +4,7 @@
 from datetime import datetime, timedelta
 
 import frappe
-from frappe.utils import getdate, now_datetime
+from frappe.utils import add_days, getdate, now_datetime
 
 from erpnext.setup.doctype.employee.test_employee import make_employee
 
@@ -174,3 +174,26 @@ class TestInOutToday(HRMSTestSuite):
 		row = next(item for item in payload["details"] if item["employee"] == employee)
 		self.assertEqual(row["status"], "IN")
 		self.assertTrue(row["time"])
+		self.assertTrue(row["in_time"])
+
+	def test_in_out_for_past_date(self):
+		yesterday = add_days(getdate(), -1)
+		employee = make_employee(
+			"inout.today.yesterday@example.com",
+			company=self.company,
+			department=self.dept_a,
+			first_name="Yesterday",
+			last_name="Agent",
+			date_of_joining=add_days(yesterday, -10),
+		)
+		in_time = datetime.combine(yesterday, datetime.min.time()).replace(hour=8, minute=0)
+		out_time = datetime.combine(yesterday, datetime.min.time()).replace(hour=17, minute=0)
+		make_checkin(employee, time=in_time, log_type="IN")
+		make_checkin(employee, time=out_time, log_type="OUT")
+
+		payload = get_in_out_today(department=self.dept_a, attendance_date=str(yesterday))
+		self.assertEqual(payload["date"], str(yesterday))
+		row = next(item for item in payload["details"] if item["employee"] == employee)
+		self.assertEqual(row["status"], "OUT")
+		self.assertTrue(row["in_time"])
+		self.assertTrue(row["out_time"])

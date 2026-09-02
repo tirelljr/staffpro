@@ -105,20 +105,6 @@
    "link_type": "Report"
   },
   {
-   "child": 1,
-   "collapsible": 1,
-   "default_workspace": 0,
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Accrued Earnings",
-   "open_in_new_tab": 0,
-   "show_arrow": 0,
-   "type": "Link",
-   "icon": "bar-chart-2",
-   "link_to": "Accrued Earnings Report",
-   "link_type": "Report"
-  },
-  {
    "child": 0,
    "collapsible": 1,
    "default_workspace": 0,

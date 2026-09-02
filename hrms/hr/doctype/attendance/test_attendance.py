@@ -30,6 +30,7 @@ from hrms.hr.doctype.attendance.attendance import (
 	approve_hours_entries,
 	cancel_hours_entries,
 	cancel_hours_entry,
+	get_calendar_day_roster,
 	get_events,
 	get_hours_entry,
 	get_hours_rows,
@@ -307,6 +308,41 @@ class TestAttendance(HRMSTestSuite):
 			frappe.db.get_value("Employee", employee.name, "employee_name"),
 		)
 		self.assertEqual(attendance_events[0].get("attendance_date"), getdate())
+		self.assertEqual(attendance_events[0].get("employee"), employee.name)
+		self.assertIn("image", attendance_events[0])
+
+	def test_get_events_for_system_manager_without_employee(self):
+		employee = make_employee("test_calendar_admin_events@example.com", company="_Test Company")
+		mark_attendance(employee, getdate(), status="Present")
+
+		events = get_events(start=getdate(), end=getdate())
+		attendance_events = [e for e in events if e.get("doctype") == "Attendance" and e.get("employee") == employee]
+		self.assertTrue(attendance_events)
+		self.assertEqual(attendance_events[0].get("status"), "Present")
+
+	def test_calendar_day_roster_includes_in_out(self):
+		employee = make_employee(
+			"test_calendar_day_roster@example.com",
+			company="_Test Company",
+			first_name="Roster",
+			last_name="Agent",
+		)
+		attendance_name = mark_attendance(employee, getdate(), status="Present")
+		frappe.db.set_value(
+			"Attendance",
+			attendance_name,
+			{
+				"in_time": datetime.now().replace(hour=8, minute=5, second=0, microsecond=0),
+				"late_entry": 1,
+			},
+			update_modified=False,
+		)
+
+		payload = get_calendar_day_roster(str(getdate()))
+		row = next(item for item in payload["details"] if item["employee"] == employee)
+		self.assertEqual(row["status"], "IN")
+		self.assertTrue(row["in_time"])
+		self.assertEqual(row["attendance_status"], "Present")
 
 	def test_bulk_attendance_marking_through_bg(self):
 		user1 = "test_bg1@example.com"

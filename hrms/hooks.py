@@ -69,8 +69,6 @@ doctype_js = {
 	"Timesheet": "public/js/erpnext/timesheet.js",
 	"Payment Entry": "public/js/erpnext/payment_entry.js",
 	"Journal Entry": "public/js/erpnext/journal_entry.js",
-	"Delivery Trip": "public/js/erpnext/delivery_trip.js",
-	"Bank Transaction": "public/js/erpnext/bank_transaction.js",
 	"Holiday List": "public/js/erpnext/holiday_list.js",
 	"System Settings": "public/js/erpnext/system_settings.js",
 	"Sales Invoice": "public/js/erpnext/sales_invoice.js",
@@ -139,12 +137,15 @@ after_migrate = [
 	"hrms.patches.v16_0.remove_workspace_sidebar_home_links.execute",
 	"hrms.patches.v16_0.disable_app_onboarding.execute",
 	"hrms.patches.v16_0.split_finance_and_admin.execute",
+	"hrms.hr.staff_pro_sidebars.sync_staff_pro_sidebars",
+	"hrms.hr.staff_pro_holiday_list.ensure_staff_pro_holiday_list",
+	"hrms.hr.staff_pro_shift_locations.ensure_staff_pro_shift_locations",
 	"hrms.boot.hide_unused_erpnext_workspaces",
 	"hrms.overrides.bpo_dashboards.hide_non_bpo_dashboard_records",
 ]
 
 setup_wizard_requires = "assets/hrms/js/setup_wizard.js"
-setup_wizard_complete = "hrms.subscription_utils.update_erpnext_access"
+setup_wizard_complete = "hrms.hr.staff_pro_sidebars.after_setup_wizard"
 
 # Uninstallation
 # ------------
@@ -216,16 +217,21 @@ doc_events = {
 	},
 	"Company": {
 		"validate": "hrms.overrides.company.validate_default_accounts",
+		"after_insert": "hrms.hr.staff_pro_holiday_list.assign_default_holiday_list_to_company",
 		"on_update": [
 			"hrms.overrides.company.make_company_fixtures",
 			"hrms.overrides.company.set_default_hr_accounts",
+			"hrms.hr.staff_pro_holiday_list.assign_default_holiday_list_to_company",
 		],
 		"on_trash": "hrms.overrides.company.handle_linked_docs",
 	},
 	"Holiday List": {
 		"validate": "hrms.utils.holiday_list.validate_holiday_list_pay_toggles",
 		"on_update": "hrms.utils.holiday_list.invalidate_cache",
-		"on_trash": "hrms.utils.holiday_list.invalidate_cache",
+		"on_trash": [
+			"hrms.hr.staff_pro_holiday_list.prevent_default_holiday_list_delete",
+			"hrms.utils.holiday_list.invalidate_cache",
+		],
 	},
 	"Customer": {
 		"validate": "hrms.payroll.bpo_client_accounts.set_client_billing_defaults",
@@ -262,44 +268,19 @@ doc_events = {
 			"hrms.overrides.employee_master.update_approver_role",
 			"hrms.overrides.employee_master.publish_update",
 		],
-		"after_insert": [
-			"hrms.overrides.employee_master.update_job_applicant_and_offer",
-			"hrms.telemetry.on_milestone_insert",
-		],
+		"after_insert": "hrms.overrides.employee_master.update_job_applicant_and_offer",
 		"on_trash": "hrms.overrides.employee_master.update_employee_transfer",
 		"after_delete": "hrms.overrides.employee_master.publish_update",
 	},
 	"Project": {"validate": "hrms.controllers.employee_boarding_controller.update_employee_boarding_status"},
 	"Task": {"on_update": "hrms.controllers.employee_boarding_controller.update_task"},
-	# ---- Usage telemetry: recurring feature usage (see hrms/telemetry.py) ----
-	"Leave Application": {"on_submit": "hrms.telemetry.on_leave_application_submit"},
-	"Expense Claim": {"on_submit": "hrms.telemetry.on_expense_claim_submit"},
-	"Attendance Request": {"on_submit": "hrms.telemetry.on_attendance_request_submit"},
-	"Shift Request": {"on_submit": "hrms.telemetry.on_shift_request_submit"},
 	"Employee Checkin": {
-		"after_insert": [
-			"hrms.telemetry.on_employee_checkin",
-			"hrms.payroll.daily_pay.on_employee_checkin",
-		],
+		"after_insert": "hrms.payroll.daily_pay.on_employee_checkin",
 		"on_update": "hrms.payroll.daily_pay.on_employee_checkin",
 	},
 	"Payroll Entry": {
-		"on_submit": [
-			"hrms.telemetry.on_payroll_entry_submit",
-			"hrms.payroll.auto_client_invoice.create_invoices_for_payroll_entry",
-		]
+		"on_submit": "hrms.payroll.auto_client_invoice.create_invoices_for_payroll_entry",
 	},
-	"Job Offer": {"on_submit": "hrms.telemetry.on_job_offer_submit"},
-	"Appraisal": {"on_submit": "hrms.telemetry.on_appraisal_submit"},
-	"Interview": {"on_submit": "hrms.telemetry.on_interview_submit"},
-	# ---- Activation telemetry: post-install setup funnel (first-time milestones) ----
-	"Shift Type": {"after_insert": "hrms.telemetry.on_milestone_insert"},
-	"Leave Type": {"after_insert": "hrms.telemetry.on_milestone_insert"},
-	"Salary Structure": {"after_insert": "hrms.telemetry.on_milestone_insert"},
-	"Job Opening": {"after_insert": "hrms.telemetry.on_milestone_insert"},
-	"Appraisal Cycle": {"after_insert": "hrms.telemetry.on_milestone_insert"},
-	"Employee Onboarding": {"after_insert": "hrms.telemetry.on_milestone_insert"},
-	"Salary Slip": {"on_submit": "hrms.telemetry.on_milestone_submit"},
 }
 
 # Scheduled Tasks
@@ -324,7 +305,6 @@ scheduler_events = {
 		"hrms.hr.doctype.interview.interview.send_daily_feedback_reminder",
 		"hrms.hr.doctype.shift_assignment.shift_assignment.mark_expired_shift_assignments_as_inactive",
 		"hrms.hr.doctype.job_opening.job_opening.close_expired_job_openings",
-		"hrms.telemetry.capture_daily_attendance_pulse",
 		"hrms.payroll.auto_payroll.run_scheduled_payroll",
 		"hrms.payroll.auto_client_invoice.run_scheduled_invoices",
 	],
@@ -365,11 +345,6 @@ before_tests = "hrms.tests.test_utils.before_tests"
 get_matching_queries = "hrms.hr.utils.get_matching_queries"
 
 regional_overrides = {
-	"India": {
-		"hrms.hr.utils.calculate_annual_eligible_hra_exemption": "hrms.regional.india.utils.calculate_annual_eligible_hra_exemption",
-		"hrms.hr.utils.calculate_hra_exemption_for_period": "hrms.regional.india.utils.calculate_hra_exemption_for_period",
-		"hrms.hr.utils.calculate_tax_with_marginal_relief": "hrms.regional.india.utils.calculate_tax_with_marginal_relief",
-	},
 	"Belize": {
 		"hrms.payroll.doctype.income_tax_slab.income_tax_slab.calculate_tax_by_tax_slab": "hrms.regional.belize.utils.calculate_tax_by_tax_slab",
 		"hrms.payroll.doctype.salary_slip.salary_slip.apply_regional_deductions": "hrms.regional.belize.utils.apply_regional_deductions",

@@ -1,48 +1,60 @@
 const SIDEBAR_CSS = `
 .workspace-dock,
+.dock,
 .body-sidebar,
 .body-sidebar-container {
 	font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif !important;
 	-webkit-font-smoothing: antialiased !important;
 }
 
-/* Dock */
-.workspace-dock {
+/* Dock — Frappe v17 uses .dock; older builds used .workspace-dock */
+.workspace-dock,
+.dock {
 	flex: 0 0 72px !important;
 	width: 72px !important;
 	display: flex !important;
 	flex-direction: column !important;
+	align-items: center !important;
 	background: #ffffff !important;
 	border-right: 1px solid #ececec !important;
 	padding: 10px 0 12px !important;
 }
-.workspace-dock .workspace-dock-logo {
+.workspace-dock .workspace-dock-logo,
+.dock .dock-logo {
 	height: auto !important;
 	padding: 4px 0 8px !important;
 }
-.workspace-dock .workspace-dock-logo a {
+.workspace-dock .workspace-dock-logo a,
+.dock .dock-logo a {
 	width: 32px !important;
 	height: 32px !important;
 	border-radius: 8px !important;
+	overflow: hidden !important;
 }
 .workspace-dock .workspace-dock-items,
 .workspace-dock .workspace-dock-shortcuts,
-.workspace-dock .staff-pro-dock-integrations {
+.workspace-dock .staff-pro-dock-integrations,
+.dock .dock-items,
+.dock .dock-shortcuts,
+.dock .staff-pro-dock-integrations {
 	width: 100% !important;
 	padding: 0 4px !important;
 	gap: 4px !important;
 	align-items: center !important;
 }
-.workspace-dock .workspace-dock-items {
+.workspace-dock .workspace-dock-items,
+.dock .dock-items {
 	flex: 1 1 auto !important;
 	min-height: 0 !important;
 	overflow-y: auto !important;
 	scrollbar-width: none !important;
 }
-.workspace-dock .workspace-dock-items::-webkit-scrollbar {
+.workspace-dock .workspace-dock-items::-webkit-scrollbar,
+.dock .dock-items::-webkit-scrollbar {
 	display: none !important;
 }
-.workspace-dock .staff-pro-dock-integrations {
+.workspace-dock .staff-pro-dock-integrations,
+.dock .staff-pro-dock-integrations {
 	flex: 0 0 auto !important;
 	display: flex !important;
 	flex-direction: column !important;
@@ -51,7 +63,12 @@ const SIDEBAR_CSS = `
 .workspace-dock > .workspace-dock-item,
 .workspace-dock .workspace-dock-items > .workspace-dock-item,
 .workspace-dock .workspace-dock-shortcuts > .workspace-dock-item,
-.workspace-dock .staff-pro-dock-integrations > .workspace-dock-item {
+.workspace-dock .staff-pro-dock-integrations > .workspace-dock-item,
+.dock > .dock-item,
+.dock .dock-items > .dock-item,
+.dock .dock-shortcuts > .dock-item,
+.dock .staff-pro-dock-integrations > .dock-item,
+.dock .staff-pro-dock-integrations > .workspace-dock-item {
 	display: flex !important;
 	flex-direction: column !important;
 	align-items: center !important;
@@ -63,7 +80,9 @@ const SIDEBAR_CSS = `
 	box-shadow: none !important;
 	overflow: visible !important;
 }
-.workspace-dock button.workspace-dock-item {
+.workspace-dock button.workspace-dock-item,
+.dock button.dock-item,
+.dock button.workspace-dock-item {
 	display: flex !important;
 	flex-direction: column !important;
 	align-items: center !important;
@@ -84,7 +103,9 @@ const SIDEBAR_CSS = `
 	text-indent: 0 !important;
 	text-transform: none !important;
 }
-.workspace-dock button.workspace-dock-item::after {
+.workspace-dock button.workspace-dock-item::after,
+.dock button.dock-item::after,
+.dock button.workspace-dock-item::after {
 	content: attr(aria-label) !important;
 	display: block !important;
 	width: 100% !important;
@@ -100,12 +121,17 @@ const SIDEBAR_CSS = `
 	word-break: break-word !important;
 	text-transform: none !important;
 }
-.workspace-dock button.workspace-dock-item:has(.workspace-dock-label)::after {
+.workspace-dock button.workspace-dock-item:has(.workspace-dock-label)::after,
+.dock button.dock-item:has(.workspace-dock-label)::after,
+.dock button.dock-item:has(.dock-label)::after,
+.dock button.workspace-dock-item:has(.workspace-dock-label)::after {
 	content: none !important;
 	display: none !important;
 }
 .workspace-dock .workspace-dock-icon,
-.workspace-dock button.workspace-dock-item .sidebar-item-icon {
+.workspace-dock button.workspace-dock-item .sidebar-item-icon,
+.dock .dock-icon,
+.dock button.dock-item .sidebar-item-icon {
 	display: inline-flex !important;
 	align-items: center !important;
 	justify-content: center !important;
@@ -113,7 +139,10 @@ const SIDEBAR_CSS = `
 }
 .workspace-dock .workspace-dock-item svg,
 .workspace-dock .workspace-dock-item .icon,
-.workspace-dock .workspace-dock-item img {
+.workspace-dock .workspace-dock-item img,
+.dock .dock-item svg,
+.dock .dock-item .icon,
+.dock .dock-item img {
 	display: block !important;
 	width: 22px !important;
 	height: 22px !important;
@@ -123,7 +152,10 @@ const SIDEBAR_CSS = `
 }
 .workspace-dock .staff-pro-dock-integrations .workspace-dock-item img,
 .workspace-dock .staff-pro-dock-integrations .workspace-dock-item svg,
-.workspace-dock button.workspace-dock-item.staff-pro-dock-brand-icon img {
+.workspace-dock button.workspace-dock-item.staff-pro-dock-brand-icon img,
+.dock .staff-pro-dock-integrations .dock-item img,
+.dock .staff-pro-dock-integrations .workspace-dock-item img,
+.dock button.dock-item.staff-pro-dock-brand-icon img {
 	width: 22px !important;
 	height: 22px !important;
 	min-width: 22px !important;
@@ -132,18 +164,24 @@ const SIDEBAR_CSS = `
 	object-fit: contain !important;
 	border-radius: 5px !important;
 }
-.workspace-dock button.workspace-dock-item:hover {
+.workspace-dock button.workspace-dock-item:hover,
+.dock button.dock-item:hover {
 	background: #ececee !important;
 }
-.workspace-dock button.workspace-dock-item.active {
+.workspace-dock button.workspace-dock-item.active,
+.dock button.dock-item.active {
 	background: #e8e8ea !important;
 	color: #000000 !important;
 }
-.workspace-dock button.workspace-dock-item.active::before {
+.workspace-dock button.workspace-dock-item.active::before,
+.dock button.dock-item.active::before {
 	display: none !important;
 }
 .workspace-dock .workspace-dock-label,
-.workspace-dock button.workspace-dock-item .workspace-dock-label {
+.workspace-dock button.workspace-dock-item .workspace-dock-label,
+.dock .dock-label,
+.dock button.dock-item .workspace-dock-label,
+.dock button.dock-item .dock-label {
 	display: block !important;
 	width: 100% !important;
 	max-width: 56px !important;
@@ -159,18 +197,35 @@ const SIDEBAR_CSS = `
 	word-break: break-word !important;
 }
 .workspace-dock .workspace-dock-shortcuts .workspace-dock-item,
-.workspace-dock .staff-pro-dock-integrations .workspace-dock-item {
+.workspace-dock .staff-pro-dock-integrations .workspace-dock-item,
+.dock .dock-shortcuts .dock-item,
+.dock .staff-pro-dock-integrations .dock-item,
+.dock .staff-pro-dock-integrations .workspace-dock-item {
 	min-height: 56px !important;
 	padding: 4px 2px 4px !important;
 }
-.workspace-dock .workspace-dock-divider {
+.workspace-dock .workspace-dock-divider,
+.dock .dock-divider {
 	width: 28px !important;
 	height: 1px !important;
 	margin: 8px auto !important;
 	background: #e5e7eb !important;
 }
-.workspace-dock .staff-pro-integrations-divider {
+.workspace-dock .staff-pro-integrations-divider,
+.dock .staff-pro-integrations-divider {
 	flex: 0 0 auto !important;
+}
+.dock .dock-shortcuts:empty,
+.dock .dock-shortcuts:empty + .dock-divider {
+	display: none !important;
+}
+.dock .dock-user {
+	width: 32px !important;
+	height: 32px !important;
+	margin-top: 4px !important;
+	padding: 0 !important;
+	border: 0 !important;
+	background: transparent !important;
 }
 
 :root {
@@ -449,10 +504,45 @@ body.staff-pro-hide-form-sidebar .layout-main-section-wrapper {
 .form-footer .document-email-link-container {
 	display: none !important;
 }
+[id="page-Employee"] .menu-btn-group,
+[id="page-Employee"] .menu-more-button,
+[id="page-User"] .menu-btn-group,
+[id="page-User"] .menu-more-button {
+	display: none !important;
+}
+[id^="page-List/"] .view-switcher,
+[id^="page-List/"] .views-switcher,
+[id^="page-List/"] .menu-btn-group,
+[id^="page-List/"] .menu-more-button,
+[id^="page-List/"] .page-actions .custom-actions:not(:has(> :not(.view-switcher, .views-switcher))) {
+	display: none !important;
+}
+.match-type-dropdown-btn,
+.standard-filter-section .input-group-btn:has(.match-type-dropdown-btn),
+.filter-box .input-group-btn:has(.match-type-dropdown-btn),
+.filter-field .input-group-btn:has(.match-type-dropdown-btn) {
+	display: none !important;
+}
+.standard-filter-section .input-group .form-control,
+.standard-filter-section .input-group input,
+.standard-filter-section .input-group select,
+.filter-box .input-group .form-control,
+.filter-field .input-group .form-control {
+	border-top-left-radius: 6px !important;
+	border-bottom-left-radius: 6px !important;
+}
 [id="page-Employee"] .form-sidebar .modified-by,
 [id="page-Employee"] .form-sidebar .created-by,
 [id="page-Employee"] .form-sidebar .sidebar-section:has(.modified-by),
 [id="page-Employee"] .form-sidebar .sidebar-section.text-muted.pt-3 {
+	display: none !important;
+}
+.form-sidebar .form-attachments,
+.form-sidebar .form-tags,
+.form-sidebar .form-shared,
+.form-sidebar .sidebar-section.form-attachments,
+.form-sidebar .sidebar-section.form-tags,
+.form-sidebar .sidebar-section.form-shared {
 	display: none !important;
 }
 
@@ -491,7 +581,6 @@ const PARENT_STYLES = [
 	{ test: /onboarding|recruit|talent|hiring|job opening|job applicant|interview|job offer|appointment/i, glyph: "person", hue: "#11A5DD" },
 	{ test: /separation|grievance/i, glyph: "person", hue: "#16678C" },
 	{ test: /expense|bill|claim|advance/i, glyph: "chevron", hue: "#90BA93" },
-	{ test: /travel/i, glyph: "plane", hue: "#90BA93" },
 	{ test: /payroll|pay$|salary|wallet/i, glyph: "wallet", hue: "#90BA93" },
 	{ test: /tax|benefit|exemption/i, glyph: "leaf", hue: "#205B76" },
 	{ test: /leave|holiday/i, glyph: "leaf", hue: "#90BA93" },
@@ -539,14 +628,8 @@ const SUBMENU_ICONS = {
 	"employee birthday": "cake",
 	"employee information": "file-text",
 	"employee analytics": "bar-chart-2",
-	"purpose of travel": "map-pin",
-	"travel request": "plane",
-	"vehicle log": "truck",
 	"unpaid expense claim": "alert-circle",
-	"vehicle expenses": "car",
 	"expense claim type": "tag",
-	driver: "user",
-	vehicle: "car",
 	"leave balance": "calendar-check",
 	"leave balance summary": "calendar-range",
 	"employees working on a holiday": "sun",
@@ -678,7 +761,6 @@ const SECTION_ICONS = {
 	"tax & benefits": "badge-alert",
 	"social security": "shield",
 	"other statutory": "landmark",
-	travel: "plane",
 	"time off admin": "sliders-horizontal",
 	"extra hours": "calendar-clock",
 	"workforce planning": "align-start-horizontal",
@@ -692,8 +774,6 @@ const SUBMENU_KEYWORD_ICONS = [
 	{ test: /setting|setup/i, icon: "settings" },
 	{ test: /template|letter|policy/i, icon: "file-text" },
 	{ test: /calendar|holiday|leave|shift|roster/i, icon: "calendar" },
-	{ test: /travel|plane/i, icon: "plane" },
-	{ test: /vehicle|car/i, icon: "car" },
 	{ test: /tax|benefit/i, icon: "tag" },
 	{ test: /goal|appraisal|kra/i, icon: "target" },
 	{ test: /job|interview|recruit/i, icon: "briefcase" },
@@ -1059,9 +1139,9 @@ function staff_pro_is_hr_sidebar(name) {
 }
 
 function staff_pro_hr_home_sidebar() {
-	if (staff_pro_sidebar_payload("Workforce")) return "Workforce";
 	if (staff_pro_sidebar_payload("People")) return "People";
-	return "Workforce";
+	if (staff_pro_sidebar_payload("Workforce")) return "Workforce";
+	return "People";
 }
 
 function staff_pro_accounting_home_sidebar() {
@@ -1096,7 +1176,7 @@ function staff_pro_current_portal() {
 		return "hr";
 	}
 
-	if (staff_pro_is_hr_sidebar(frappe.app?.sidebar?.sidebar_title)) {
+	if (staff_pro_is_hr_sidebar(frappe.app?.sidebar?.current_module || frappe.app?.sidebar?.sidebar_title)) {
 		return "hr";
 	}
 
@@ -1161,6 +1241,7 @@ function staff_pro_remember_sidebar(name) {
 	if (!name) return;
 	try {
 		localStorage.setItem("selected_sidebar", name);
+		localStorage.setItem("selected_module", name);
 	} catch (e) {
 		/* ignore */
 	}
@@ -1171,8 +1252,10 @@ function staff_pro_activate_sidebar(name) {
 	staff_pro_remember_sidebar(name);
 	if (!sidebar || !name) return;
 	sidebar._staff_pro_pinned_sidebar = name;
-	sidebar.open();
-	if (staff_pro_sidebar_payload(name)) {
+	sidebar.open?.();
+	if (typeof sidebar.select_module === "function") {
+		sidebar.select_module(name);
+	} else if (staff_pro_sidebar_payload(name) && typeof sidebar.select_sidebar === "function") {
 		sidebar.select_sidebar(name);
 	}
 	sidebar.refresh_header?.();
@@ -1253,19 +1336,32 @@ function staff_pro_integrations() {
 		});
 }
 
+function staff_pro_dock_class() {
+	return frappe.ui?.Dock || frappe.ui?.WorkspaceDock;
+}
+
+function staff_pro_dock_instance() {
+	return frappe.app?.sidebar?.dock || frappe.app?.sidebar?.workspace_dock;
+}
+
+function staff_pro_dock_root() {
+	return $(".dock, .workspace-dock");
+}
+
 function render_staff_pro_dock_integrations() {
 	if (!should_use_staff_pro_desk_home()) return;
 
-	const $dock = $(".workspace-dock");
+	const $dock = staff_pro_dock_root();
 	if (!$dock.length) return;
+	$dock.addClass("staff-pro-dock");
 
 	let $wrap = $dock.children(".staff-pro-dock-integrations");
 	if (!$wrap.length) {
 		const $divider = $(
-			'<div class="workspace-dock-divider staff-pro-integrations-divider" role="separator"></div>'
+			'<div class="workspace-dock-divider dock-divider staff-pro-integrations-divider" role="separator"></div>'
 		);
 		$wrap = $('<div class="staff-pro-dock-integrations"></div>');
-		const $user = $dock.children(".workspace-dock-user");
+		const $user = $dock.children(".workspace-dock-user, .dock-user");
 		if ($user.length) {
 			$user.before($divider, $wrap);
 		} else {
@@ -1284,14 +1380,14 @@ function render_staff_pro_dock_integrations() {
 		const label = frappe.utils.escape_html(item.label);
 		const icon = frappe.utils.escape_html(item.icon);
 		const $item = $(`
-			<button type="button" class="workspace-dock-item staff-pro-dock-integration staff-pro-dock-brand-icon"
+			<button type="button" class="workspace-dock-item dock-item staff-pro-dock-integration staff-pro-dock-brand-icon"
 				data-sp-integration="${frappe.utils.escape_html(item.name)}"
 				aria-label="${label}"
 				title="${label}">
-				<span class="workspace-dock-icon" aria-hidden="true">
+				<span class="workspace-dock-icon dock-icon" aria-hidden="true">
 					<img src="${icon}" alt="" />
 				</span>
-				<span class="workspace-dock-label">${label}</span>
+				<span class="workspace-dock-label dock-label">${label}</span>
 			</button>
 		`);
 		$item.on("click", () => {
@@ -1303,7 +1399,7 @@ function render_staff_pro_dock_integrations() {
 }
 
 function patch_workspace_dock_shortcuts() {
-	const Dock = frappe.ui && frappe.ui.WorkspaceDock;
+	const Dock = staff_pro_dock_class();
 	if (!Dock || Dock.prototype._staff_pro_shortcuts) return;
 	Dock.prototype._staff_pro_shortcuts = true;
 
@@ -1339,7 +1435,7 @@ function patch_workspace_dock_shortcuts() {
 }
 
 function patch_workspace_dock_logo() {
-	const Dock = frappe.ui && frappe.ui.WorkspaceDock;
+	const Dock = staff_pro_dock_class();
 	if (!Dock || Dock.prototype._staff_pro_logo) return;
 	Dock.prototype._staff_pro_logo = true;
 
@@ -1367,7 +1463,7 @@ function patch_workspace_dock_logo() {
 }
 
 function staff_pro_sidebar_workspace_title(sidebar) {
-	const name = sidebar?.sidebar_title;
+	const name = sidebar?.current_module || sidebar?.sidebar_title;
 	if (!name) return staff_pro_brand().title;
 
 	const workspace = frappe.workspaces?.[frappe.router.slug(name)];
@@ -1398,12 +1494,30 @@ function patch_sidebar_header_branding() {
 
 function staff_pro_sidebar_payload(name) {
 	if (!name) return null;
-	const items = frappe.boot?.workspace_sidebar_item;
-	if (!items) return null;
 	const lower = String(name).toLowerCase();
 	const spaced = lower.replace(/[-_]/g, " ");
 	const dashed = lower.replace(/\s+/g, "-");
-	return items[lower] || items[spaced] || items[dashed] || null;
+
+	const items = frappe.boot?.workspace_sidebar_item;
+	if (items) {
+		const found = items[name] || items[lower] || items[spaced] || items[dashed];
+		if (found) return found;
+	}
+
+	const modules = frappe.boot?.module_sidebars;
+	if (!modules) return null;
+	if (modules[name]) return modules[name];
+	for (const [key, value] of Object.entries(modules)) {
+		const keyLower = String(key).toLowerCase();
+		if (keyLower === lower || keyLower === spaced || keyLower === dashed) {
+			return value;
+		}
+		const title = String(value?.title || "").toLowerCase();
+		if (title && (title === lower || title === spaced)) {
+			return value;
+		}
+	}
+	return null;
 }
 
 function patch_sidebar_workspace_switch() {
@@ -1418,9 +1532,16 @@ function patch_sidebar_workspace_switch() {
 		}
 
 		this._staff_pro_pinned_sidebar = name;
-		this.open();
-		if (staff_pro_sidebar_payload(name)) {
+		this.open?.();
+		if (typeof this.select_module === "function" && staff_pro_sidebar_payload(name)) {
+			this.select_module(name);
+		} else if (staff_pro_sidebar_payload(name) && typeof this.select_sidebar === "function") {
 			this.select_sidebar(name);
+		}
+
+		if (typeof this.open_module === "function" && staff_pro_sidebar_payload(name)) {
+			this.open_module(name);
+			return;
 		}
 
 		const route = this.get_first_sidebar_route?.(name);
@@ -1437,6 +1558,7 @@ function patch_sidebar_workspace_switch() {
 		if (should_use_staff_pro_desk_home()) {
 			const portal = staff_pro_current_portal();
 			let pinned = this._staff_pro_pinned_sidebar;
+			const current = this.current_module || this.sidebar_title;
 
 			if (portal === "hr" && pinned && !staff_pro_is_hr_sidebar(pinned)) {
 				this._staff_pro_pinned_sidebar = null;
@@ -1448,19 +1570,27 @@ function patch_sidebar_workspace_switch() {
 				staff_pro_sidebar_payload(pinned) &&
 				(portal !== "hr" || staff_pro_is_hr_sidebar(pinned))
 			) {
-				this.select_sidebar(pinned);
-				this.set_active_workspace_item();
-				this.refresh_dock();
+				if (typeof this.select_module === "function") {
+					this.select_module(pinned);
+				} else {
+					this.select_sidebar?.(pinned);
+				}
+				this.set_active_workspace_item?.();
+				this.refresh_dock?.();
 				return;
 			}
 
-			if (portal === "hr" && !staff_pro_is_hr_sidebar(this.sidebar_title)) {
+			if (portal === "hr" && !staff_pro_is_hr_sidebar(current)) {
 				const home = staff_pro_hr_home_sidebar();
 				staff_pro_remember_sidebar(home);
-				this.select_sidebar(home);
-				this.set_active_workspace_item();
+				if (typeof this.select_module === "function") {
+					this.select_module(home);
+				} else {
+					this.select_sidebar?.(home);
+				}
+				this.set_active_workspace_item?.();
 				this.refresh_header?.();
-				this.refresh_dock();
+				this.refresh_dock?.();
 				return;
 			}
 		}
@@ -1474,7 +1604,7 @@ function refresh_staff_pro_dock_shortcuts() {
 	patch_workspace_dock_shortcuts();
 	patch_workspace_dock_logo();
 
-	const dock = frappe.app?.sidebar?.workspace_dock;
+	const dock = staff_pro_dock_instance();
 	if (!dock?.$shortcuts) return;
 
 	const portal = staff_pro_current_portal();
@@ -1497,6 +1627,7 @@ function refresh_staff_pro_dock_shortcuts() {
 	}
 
 	dock._staff_pro_portal = portal;
+	dock.rendered = null;
 	dock.$shortcuts.find('[data-toggle="tooltip"]').tooltip("dispose");
 	dock.$shortcuts.empty();
 	dock.render_shortcuts();
@@ -1567,9 +1698,9 @@ function apply_dock_icon($item, label) {
 		if (!html || !String(html).includes("svg")) return;
 	}
 
-	let $wrap = $item.children(".workspace-dock-icon, .sidebar-item-icon").first();
+	let $wrap = $item.children(".workspace-dock-icon, .dock-icon, .sidebar-item-icon").first();
 	if (!$wrap.length) {
-		$wrap = $('<span class="workspace-dock-icon" aria-hidden="true"></span>');
+		$wrap = $('<span class="workspace-dock-icon dock-icon" aria-hidden="true"></span>');
 		$item.prepend($wrap);
 	}
 	$wrap.html(html);
@@ -1589,7 +1720,7 @@ function dock_item_label($item) {
 }
 
 function label_workspace_dock() {
-	$(".workspace-dock button.workspace-dock-item").each(function () {
+	$(".workspace-dock button.workspace-dock-item, .dock button.dock-item").each(function () {
 		const $item = $(this);
 		const rawLabel = dock_item_label($item);
 		if (!rawLabel) return;
@@ -1600,13 +1731,13 @@ function label_workspace_dock() {
 
 		apply_dock_icon($item, label);
 
-		let $label = $item.children(".workspace-dock-label");
+		let $label = $item.children(".workspace-dock-label, .dock-label");
 		if ($label.length) {
 			if ($label.text() !== label) $label.text(label);
 			return;
 		}
 		$item.append(
-			`<span class="workspace-dock-label">${frappe.utils.escape_html(String(label))}</span>`
+			`<span class="workspace-dock-label dock-label">${frappe.utils.escape_html(String(label))}</span>`
 		);
 	});
 }
@@ -1621,29 +1752,41 @@ function patch_workspace_dock() {
 	patch_sidebar_header_branding();
 	patch_sidebar_workspace_switch();
 
-	const Dock = frappe.ui && frappe.ui.WorkspaceDock;
+	const Dock = staff_pro_dock_class();
 	if (!Dock || Dock.prototype._staff_pro_labeled) return;
 	Dock.prototype._staff_pro_labeled = true;
 
-	const orig = Dock.prototype.make_workspace_item;
-	Dock.prototype.make_workspace_item = function (workspace) {
-		const rawLabel = workspace.title || workspace.label || workspace.name || "";
+	const origItem = Dock.prototype.make_dock_item || Dock.prototype.make_workspace_item;
+	if (!origItem) return;
+
+	const patched = function (entry) {
+		const rawLabel = entry.label || entry.title || entry.name || "";
 		const label = display_dock_label(rawLabel);
-		const mappedIcon = DOCK_ICONS[String(label).toLowerCase()] || DOCK_ICONS[String(rawLabel).toLowerCase()];
+		const mappedIcon =
+			DOCK_ICONS[String(label).toLowerCase()] || DOCK_ICONS[String(rawLabel).toLowerCase()];
 		if (mappedIcon && !is_dock_image_icon(mappedIcon)) {
-			workspace = Object.assign({}, workspace, { icon: mappedIcon });
+			entry = Object.assign({}, entry, { icon: mappedIcon, label });
+		} else if (label !== rawLabel) {
+			entry = Object.assign({}, entry, { label });
 		}
-		const $item = orig.call(this, workspace);
+		const $item = origItem.call(this, entry);
 		if ($item && $item.length) {
-			if (label && !$item.children(".workspace-dock-label").length) {
+			if (label && !$item.children(".workspace-dock-label, .dock-label").length) {
 				$item.append(
-					`<span class="workspace-dock-label">${frappe.utils.escape_html(String(label))}</span>`
+					`<span class="workspace-dock-label dock-label">${frappe.utils.escape_html(String(label))}</span>`
 				);
 			}
 			apply_dock_icon($item, label);
 		}
 		return $item;
 	};
+
+	if (Dock.prototype.make_dock_item) {
+		Dock.prototype.make_dock_item = patched;
+	}
+	if (Dock.prototype.make_workspace_item) {
+		Dock.prototype.make_workspace_item = patched;
+	}
 }
 
 function disable_app_onboarding() {
@@ -1687,7 +1830,7 @@ function watch_workspace_dock() {
 	remove_sidebar_search();
 	enhance_sidebar_menus();
 
-	const dock = document.querySelector(".workspace-dock");
+	const dock = document.querySelector(".dock, .workspace-dock");
 	const sidebar = document.querySelector(".body-sidebar");
 	const container = document.querySelector(".body-sidebar-container");
 	if (!dock && !sidebar && !container) {
@@ -1715,7 +1858,7 @@ $(document).on("page-change", disable_app_onboarding);
 
 if (typeof frappe !== "undefined") {
 	disable_app_onboarding();
-	if ($(".workspace-dock, .body-sidebar").length) {
+	if ($(".dock, .workspace-dock, .body-sidebar").length) {
 		watch_workspace_dock();
 	}
 }
@@ -1830,38 +1973,22 @@ function prefer_employee_image_view() {
 	});
 }
 
-const LIST_PAGES_HIDE_MENU = new Set([
-	"Employee",
-	"Payroll Entry",
-	"Salary Structure Assignment",
-	"Client Invoice",
-]);
-const LIST_PAGES_HIDE_VIEW_SWITCHER = new Set([
-	"Attendance",
-	"Payroll Entry",
-	"Salary Structure Assignment",
-	"Client Invoice",
-]);
-
-function hide_employee_list_menu() {
+function hide_list_page_chrome() {
 	const route = frappe.get_route?.() || [];
 	if (route[0] !== "List") return;
-	const doctype = route[1];
-	if (LIST_PAGES_HIDE_MENU.has(doctype)) {
-		document.querySelectorAll(`[id^="page-List/${doctype}"] .menu-btn-group`).forEach((el) => {
+
+	document
+		.querySelectorAll(
+			'[id^="page-List/"] .menu-btn-group, [id^="page-List/"] .menu-more-button, [id^="page-List/"] .view-switcher, [id^="page-List/"] .views-switcher, [id^="page-List/"] .match-type-dropdown-btn',
+		)
+		.forEach((el) => {
 			el.classList.add("hidden", "hide");
 			el.style.display = "none";
 		});
-	}
-	if (LIST_PAGES_HIDE_VIEW_SWITCHER.has(doctype)) {
-		document
-			.querySelectorAll(
-				`[id^="page-List/${doctype}"] .view-switcher, [id^="page-List/${doctype}"] .views-switcher`,
-			)
-			.forEach((el) => {
-				el.classList.add("hidden", "hide");
-				el.style.display = "none";
-			});
+
+	const page = window.cur_list?.page;
+	if (typeof page?.hide_menu === "function") {
+		page.hide_menu();
 	}
 }
 
@@ -1878,10 +2005,22 @@ function staff_pro_current_form_doctype() {
 	return null;
 }
 
+function hide_form_sidebar_attachments_tags_share() {
+	document
+		.querySelectorAll(
+			".form-sidebar .form-attachments, .form-sidebar .form-tags, .form-sidebar .form-shared",
+		)
+		.forEach((el) => {
+			el.classList.add("hidden", "hide");
+			el.style.display = "none";
+		});
+}
+
 function apply_form_sidebar_policy() {
 	const doctype = staff_pro_current_form_doctype();
 	const hide = Boolean(doctype) && !PROFILE_FORM_DOCTYPES.has(doctype);
 	document.body.classList.toggle("staff-pro-hide-form-sidebar", hide);
+	hide_form_sidebar_attachments_tags_share();
 }
 
 function patch_form_sidebar_policy() {
@@ -1897,14 +2036,29 @@ function patch_form_sidebar_policy() {
 	};
 }
 
+function patch_list_page_chrome() {
+	const ListView = frappe.views?.ListView;
+	if (!ListView || ListView.prototype._staff_pro_list_chrome) return;
+	ListView.prototype._staff_pro_list_chrome = true;
+
+	const original = ListView.prototype.refresh;
+	ListView.prototype.refresh = function (...args) {
+		const result = original.apply(this, args);
+		hide_list_page_chrome();
+		return result;
+	};
+}
+
 $(document).on("app_ready", patch_staff_pro_desktop_redirect);
 $(document).on("app_ready", () => redirect_staff_pro_desk_home({ includeWorkforceBootstrap: true }));
 $(document).on("app_ready", prefer_employee_image_view);
 $(document).on("app_ready", patch_form_sidebar_policy);
+$(document).on("app_ready", patch_list_page_chrome);
 $(document).on("app_ready", apply_form_sidebar_policy);
+$(document).on("app_ready", hide_list_page_chrome);
 $(document).on("page-change", () => redirect_staff_pro_desk_home());
 $(document).on("page-change", refresh_staff_pro_dock_shortcuts);
 $(document).on("page-change", enhance_sidebar_menus);
 $(document).on("page-change", prefer_employee_image_view);
-$(document).on("page-change", hide_employee_list_menu);
+$(document).on("page-change", hide_list_page_chrome);
 $(document).on("page-change", apply_form_sidebar_policy);

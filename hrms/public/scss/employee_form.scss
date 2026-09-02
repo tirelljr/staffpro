@@ -11,6 +11,123 @@
 	width: 0;
 }
 
+/* Employee form: hide overflow menu */
+[id="page-Employee"] {
+	.menu-btn-group,
+	.menu-more-button {
+		display: none !important;
+	}
+}
+
+.sp-emp-password {
+	margin-top: 4px;
+	padding: 12px;
+	border: 1px solid var(--border-color, #e5e7eb);
+	border-radius: 10px;
+	background: var(--fg-color, #fff);
+	display: block !important;
+	visibility: visible !important;
+	position: relative;
+	z-index: 1;
+}
+
+.form-column[data-fieldname="column_break_xwnm"] {
+	min-height: 120px;
+}
+
+.sp-emp-password__title {
+	margin-bottom: 4px;
+	font-size: 13px;
+	font-weight: 700;
+	color: var(--text-color);
+}
+
+.sp-emp-password__help {
+	margin: 0 0 10px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.sp-emp-password__label {
+	display: block;
+	margin-bottom: 8px;
+}
+
+.sp-emp-password__label span {
+	display: block;
+	margin-bottom: 4px;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.sp-emp-password__check {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 4px 0 12px;
+	font-size: 12px;
+	color: var(--text-color);
+}
+
+.sp-emp-password__save {
+	width: 100%;
+}
+
+.sp-emp-password__user {
+	margin-top: 8px;
+	font-size: 11px;
+}
+
+.sp-emp-stats {
+	padding: 12px 0 4px !important;
+	border-top: 1px solid var(--border-color, #eef1f4);
+}
+
+.sp-emp-stats__title {
+	margin-bottom: 10px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--text-muted, #6b7280);
+}
+
+.sp-emp-stats__list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.sp-emp-stats__list.is-loading {
+	opacity: 0.65;
+}
+
+.sp-emp-stats__row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.sp-emp-stats__label {
+	font-size: 12px;
+	color: var(--text-muted, #6b7280);
+}
+
+.sp-emp-stats__value {
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--text-color, #111);
+	text-align: right;
+	white-space: nowrap;
+}
+
+.sp-emp-stats__empty {
+	font-size: 12px;
+	color: var(--text-muted, #6b7280);
+}
+
 .sp-bank-picker {
 	position: relative;
 	width: 100%;

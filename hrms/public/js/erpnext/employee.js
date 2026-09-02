@@ -6,22 +6,6 @@ const assignable_masters = {};
 function get_assignment_actions() {
 	return [
 		{
-			label: __("Holiday List"),
-			doctype: "Holiday List Assignment",
-			master_field: "holiday_list",
-			prefill: (frm) => ({
-				applicable_for: "Employee",
-				assigned_to: frm.doc.name,
-				employee_name: frm.doc.employee_name,
-				employee_company: frm.doc.company,
-			}),
-			hide: ["naming_series"],
-			on_change: {
-				holiday_list: sync_holiday_list_range,
-				from_date: flag_start_date_outside_range,
-			},
-		},
-		{
 			label: __("Leave Policy"),
 			doctype: "Leave Policy Assignment",
 			master: "Leave Policy",
@@ -123,34 +107,6 @@ function keep_dialog_open_for_submit(dialog) {
 	});
 }
 
-function set_field_hint(dialog, fieldname, title) {
-	dialog.modal_body.find(".assignment-hint").remove();
-	if (!title) return;
-
-	frappe.ui
-		.alert({ title, theme: "blue", css_class: "assignment-hint" })
-		.insertAfter(dialog.fields_dict[fieldname].$wrapper);
-}
-
-async function sync_holiday_list_range(dialog) {
-	const holiday_list = dialog.get_value("holiday_list");
-	dialog.holiday_list_range = null;
-
-	if (holiday_list) {
-		const response = await frappe.db.get_value("Holiday List", holiday_list, [
-			"from_date",
-			"to_date",
-		]);
-		dialog.holiday_list_range = response.message?.from_date ? response.message : null;
-	}
-
-	const range_start = dialog.holiday_list_range?.from_date;
-	if (range_start && !dialog.get_value("from_date"))
-		await dialog.set_value("from_date", range_start);
-
-	flag_start_date_outside_range(dialog);
-}
-
 async function set_leave_effective_dates(dialog, frm) {
 	const assignment_based_on = dialog.get_value("assignment_based_on");
 
@@ -180,26 +136,6 @@ async function set_leave_effective_dates(dialog, frm) {
 
 	await dialog.set_value("effective_from", response.message.from_date);
 	await dialog.set_value("effective_to", response.message.to_date);
-}
-
-function flag_start_date_outside_range(dialog) {
-	const range = dialog.holiday_list_range;
-	const from_date = dialog.get_value("from_date");
-	if (!range || !from_date) return set_field_hint(dialog, "from_date", null);
-
-	const outside =
-		frappe.datetime.get_diff(from_date, range.from_date) < 0 ||
-		frappe.datetime.get_diff(from_date, range.to_date) > 0;
-
-	set_field_hint(
-		dialog,
-		"from_date",
-		outside &&
-			__("Assignment must start between {0} and {1}", [
-				frappe.datetime.str_to_user(range.from_date),
-				frappe.datetime.str_to_user(range.to_date),
-			]),
-	);
 }
 
 function notify_assignment_created(action, doc) {
@@ -272,6 +208,8 @@ frappe.ui.form.on("Employee", {
 		frm.trigger("add_assignment_actions");
 		frm.trigger("add_hourly_rate_action");
 		setup_employee_form_chrome(frm);
+		setup_employee_password_panel(frm);
+		setup_employee_profile_stats(frm);
 		set_employee_salary_defaults(frm);
 	},
 
@@ -491,8 +429,233 @@ function setup_employee_form_chrome(frm) {
 		return;
 	}
 
+	$page.addClass("sp-employee-form");
+	$page.find(".menu-btn-group, .menu-more-button").addClass("hide").hide();
+	$page.find(".form-sidebar .form-attachments, .form-sidebar .form-tags, .form-sidebar .form-shared").hide();
 	$page.find(".form-sidebar .modified-by, .form-sidebar .created-by").each(function () {
 		$(this).closest(".sidebar-section").hide();
+	});
+}
+
+function password_panel_host(frm) {
+	const $page = frm.page?.wrapper || frm.$wrapper;
+	if (!$page?.length) return $();
+
+	let $host = $page.find('.form-column[data-fieldname="column_break_xwnm"]').first();
+	if ($host.length) return $host;
+
+	const field = frm.get_field("column_break_xwnm");
+	if (field?.$wrapper?.length) {
+		const $column = field.$wrapper.closest(".form-column");
+		if ($column.length) return $column;
+		return field.$wrapper;
+	}
+
+	const section = frm.fields_dict?.erpnext_user?.section
+		|| frm.layout?.sections?.find?.((s) => s.df?.fieldname === "erpnext_user");
+	const $section = section?.$wrapper || $page.find('[data-fieldname="erpnext_user"]').closest(".form-section");
+	if ($section?.length) {
+		$host = $section.find(".form-column").eq(1);
+		if ($host.length) return $host;
+	}
+
+	return $();
+}
+
+function expand_user_details_section(frm) {
+	const section = frm.fields_dict?.erpnext_user?.section
+		|| frm.layout?.sections?.find?.((s) => s.df?.fieldname === "erpnext_user");
+	if (section?.collapse && section.collapsed) {
+		section.collapse(false);
+	}
+	const $page = frm.page?.wrapper || frm.$wrapper;
+	const $section = $page?.find('[data-fieldname="erpnext_user"]').closest(".form-section");
+	if ($section?.hasClass("hide") || $section?.find(".section-body").is(":hidden")) {
+		$section.find(".section-head").trigger("click");
+	}
+}
+
+function setup_employee_password_panel(frm) {
+	const $page = frm.page?.wrapper || frm.$wrapper;
+	if (!$page?.length) return;
+
+	if (frm.is_new()) {
+		$page.find(".sp-emp-password").remove();
+		return;
+	}
+
+	expand_user_details_section(frm);
+
+	const mount = () => {
+		const $host = password_panel_host(frm);
+		if (!$host.length) return false;
+
+		$page.find(".sp-emp-password").not($host.find(".sp-emp-password")).remove();
+
+		let $panel = $host.children(".sp-emp-password");
+		if (!$panel.length) {
+			$panel = $(`
+				<div class="sp-emp-password">
+					<div class="sp-emp-password__title">${frappe.utils.escape_html(__("HRMS Password"))}</div>
+					<p class="sp-emp-password__help">${frappe.utils.escape_html(
+						__("Set or change this agent's login password for Staff Pro."),
+					)}</p>
+					<label class="sp-emp-password__label">
+						<span>${frappe.utils.escape_html(__("New password"))}</span>
+						<input type="password" class="form-control sp-emp-password__input" autocomplete="new-password" />
+					</label>
+					<label class="sp-emp-password__label">
+						<span>${frappe.utils.escape_html(__("Confirm password"))}</span>
+						<input type="password" class="form-control sp-emp-password__confirm" autocomplete="new-password" />
+					</label>
+					<label class="sp-emp-password__check">
+						<input type="checkbox" class="sp-emp-password__logout" />
+						<span>${frappe.utils.escape_html(__("Log out of all sessions"))}</span>
+					</label>
+					<button type="button" class="btn btn-primary btn-sm sp-emp-password__save">${frappe.utils.escape_html(
+						__("Update Password"),
+					)}</button>
+					<div class="sp-emp-password__user text-muted"></div>
+				</div>
+			`).appendTo($host);
+
+			$panel.on("click", ".sp-emp-password__save", () => {
+				const password = String($panel.find(".sp-emp-password__input").val() || "");
+				const confirm = String($panel.find(".sp-emp-password__confirm").val() || "");
+				if (!frm.doc.user_id) {
+					frappe.msgprint(__("Link a User ID first, or create a user for this employee."));
+					return;
+				}
+				if (password.length < 8) {
+					frappe.msgprint(__("Password must be at least 8 characters."));
+					return;
+				}
+				if (password !== confirm) {
+					frappe.msgprint(__("Passwords do not match."));
+					return;
+				}
+				frappe.call({
+					method: "hrms.overrides.employee_profile.update_employee_user_password",
+					args: {
+						employee: frm.doc.name,
+						new_password: password,
+						logout_all_sessions: $panel.find(".sp-emp-password__logout").is(":checked") ? 1 : 0,
+					},
+					freeze: true,
+					freeze_message: __("Updating password..."),
+				}).then(() => {
+					$panel.find(".sp-emp-password__input, .sp-emp-password__confirm").val("");
+					$panel.find(".sp-emp-password__logout").prop("checked", false);
+					frappe.show_alert({
+						message: __("Password updated for {0}", [frm.doc.user_id]),
+						indicator: "green",
+					});
+				});
+			});
+		}
+
+		const user = frm.doc.user_id || "";
+		$panel
+			.find(".sp-emp-password__user")
+			.text(user ? __("User: {0}", [user]) : __("No User ID linked yet."));
+		$panel.find(".sp-emp-password__save").prop("disabled", !user);
+		return true;
+	};
+
+	if (mount()) return;
+
+	let tries = 0;
+	const timer = setInterval(() => {
+		tries += 1;
+		expand_user_details_section(frm);
+		if (mount() || tries > 20) {
+			clearInterval(timer);
+		}
+	}, 150);
+
+	$page.off("click.spEmpPassword").on("click.spEmpPassword", ".section-head", () => {
+		setTimeout(mount, 50);
+	});
+}
+
+function setup_employee_profile_stats(frm) {
+	const $sidebar = (frm.page?.wrapper || frm.$wrapper)?.find(".form-sidebar");
+	if (!$sidebar?.length || frm.is_new()) {
+		$sidebar?.find(".sp-emp-stats").remove();
+		return;
+	}
+
+	let $stats = $sidebar.find(".sp-emp-stats");
+	if (!$stats.length) {
+		$stats = $(`
+			<div class="sidebar-section sp-emp-stats">
+				<div class="sp-emp-stats__title">${frappe.utils.escape_html(__("Totals"))}</div>
+				<div class="sp-emp-stats__list is-loading">
+					<div class="sp-emp-stats__empty">${frappe.utils.escape_html(__("Loading..."))}</div>
+				</div>
+			</div>
+		`);
+		const $assign = $sidebar.find(".form-assignments").closest(".sidebar-section");
+		if ($assign.length) {
+			$stats.insertAfter($assign);
+		} else {
+			$sidebar.prepend($stats);
+		}
+	}
+
+	const request_id = `${frm.doc.name}:${Date.now()}`;
+	$stats.data("request-id", request_id);
+	$stats.find(".sp-emp-stats__list").addClass("is-loading").html(
+		`<div class="sp-emp-stats__empty">${frappe.utils.escape_html(__("Loading..."))}</div>`,
+	);
+
+	frappe.call({
+		method: "hrms.overrides.employee_profile.get_employee_profile_stats",
+		args: { employee: frm.doc.name },
+	}).then((r) => {
+		if ($stats.data("request-id") !== request_id) return;
+		const stats = r.message || {};
+		const company_currency = stats.company_currency || "BZD";
+		const billing_currency = stats.billing_currency || "USD";
+		const money = (value, currency) => {
+			if (value == null || value === "") return "—";
+			if (typeof format_currency === "function") {
+				return format_currency(value, currency);
+			}
+			return `${Number(value).toLocaleString(undefined, {
+				minimumFractionDigits: 2,
+				maximumFractionDigits: 2,
+			})} ${currency}`;
+		};
+		const hours = Number(stats.total_hours || 0);
+		const rows = [
+			{ label: __("Total SS contributions"), value: money(stats.total_ss, company_currency) },
+			{ label: __("Total income"), value: money(stats.total_income, company_currency) },
+			{ label: __("Total Billed to Client"), value: money(stats.total_billed, billing_currency) },
+			{ label: __("Agent Profit"), value: money(stats.agent_profit, company_currency) },
+			{ label: __("Tax total"), value: money(stats.total_tax, company_currency) },
+			{
+				label: __("Total hours worked"),
+				value: hours ? `${hours.toLocaleString(undefined, { maximumFractionDigits: 1 })}h` : "—",
+			},
+		];
+		$stats.find(".sp-emp-stats__list").removeClass("is-loading").html(
+			rows
+				.map(
+					(row) => `
+				<div class="sp-emp-stats__row">
+					<span class="sp-emp-stats__label">${frappe.utils.escape_html(row.label)}</span>
+					<span class="sp-emp-stats__value">${frappe.utils.escape_html(row.value)}</span>
+				</div>`,
+				)
+				.join(""),
+		);
+	}).catch(() => {
+		if ($stats.data("request-id") !== request_id) return;
+		$stats
+			.find(".sp-emp-stats__list")
+			.removeClass("is-loading")
+			.html(`<div class="sp-emp-stats__empty">${frappe.utils.escape_html(__("Could not load totals."))}</div>`);
 	});
 }
 

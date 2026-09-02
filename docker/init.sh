@@ -7,6 +7,13 @@ git config --global --add safe.directory /workspace/hrms
 
 APP_PATH="/workspace/hrms"
 
+# Bench requires a git repo for mounted apps
+if [ ! -d "$APP_PATH/.git" ]; then
+    git -C "$APP_PATH" init
+    git -C "$APP_PATH" -c user.email="dev@local" -c user.name="Staff Pro Dev" add -A
+    git -C "$APP_PATH" -c user.email="dev@local" -c user.name="Staff Pro Dev" commit -m "Initial commit for Docker development" || true
+fi
+
 finish_site_setup() {
     cd /home/frappe/frappe-bench
 
@@ -28,14 +35,30 @@ finish_site_setup() {
         bench --site hrms.localhost install-app hrms
         bench --site hrms.localhost set-config developer_mode 1
         bench --site hrms.localhost enable-scheduler
-        bench --site hrms.localhost clear-cache
+        finish_customization_setup
         bench use hrms.localhost
     fi
+}
+
+finish_customization_setup() {
+    cd /home/frappe/frappe-bench
+
+    echo "Building Staff Pro BPO desk assets..."
+    # Desk bundles only; PWA/roster need separate yarn install in frontend/ and roster/
+    node apps/frappe/esbuild --production --apps hrms
+
+    echo "Applying migrations and branding..."
+    bench --site hrms.localhost migrate || true
+    bench --site hrms.localhost execute hrms.branding.apply_branding
+    bench --site hrms.localhost clear-cache
 }
 
 if [ -d "/home/frappe/frappe-bench/apps/frappe" ]; then
     echo "Bench already exists, finishing setup if needed"
     finish_site_setup
+    if [ ! -d "$APP_PATH/hrms/public/dist" ] || [ -z "$(ls -A "$APP_PATH/hrms/public/dist" 2>/dev/null)" ]; then
+        finish_customization_setup
+    fi
     cd /home/frappe/frappe-bench
     bench start
     exit 0

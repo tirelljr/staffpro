@@ -20,7 +20,7 @@ frappe.in_out_today = {
 	$body: null,
 	payload: null,
 	department: "",
-	status: "all",
+	status: "IN",
 
 	make(page) {
 		this.page = page;
@@ -88,17 +88,7 @@ frappe.in_out_today = {
 						</div>
 						<button type="button" class="sp-clock-btn">${this.escape(__("CLOCK"))}</button>
 						<div class="sp-dash-panel__filter">
-							${this.select_html(
-								"sp-inout-dash__status",
-								"solid",
-								__("Status"),
-								[
-									{ value: "all", label: __("All") },
-									{ value: "IN", label: __("IN") },
-									{ value: "OUT", label: __("OUT") },
-								],
-								"all",
-							)}
+							${hrms.ui.inout_toggle_html({ value: "IN" })}
 						</div>
 						<button type="button" class="sp-inout-dash__open sp-inout-refresh">${this.escape(__("Refresh"))}</button>
 					</div>
@@ -130,8 +120,8 @@ frappe.in_out_today = {
 			me.department = $(this).val() || "";
 			me.render_panel();
 		});
-		this.$body.on("change", ".sp-inout-dash__status", function () {
-			me.status = $(this).val() || "all";
+		hrms.ui.bind_inout_toggle(this.$body.find(".sp-inout-toggle"), (value) => {
+			me.status = value;
 			me.render_rows();
 		});
 		this.$body.on("click", ".sp-inout-dash__row", function () {
@@ -238,9 +228,6 @@ frappe.in_out_today = {
 
 	filtered_rows() {
 		const rows = this.scoped_rows();
-		if (this.status === "all") {
-			return rows;
-		}
 		return rows.filter((row) => row.status === this.status);
 	},
 

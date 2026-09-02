@@ -324,48 +324,9 @@ def _create_designations():
 
 
 def _ensure_holiday_list(company):
-	list_name = "Staff Pro Holiday List"
-	today = getdate()
-	from_date = get_first_day(today.replace(month=1, day=1))
-	to_date = get_last_day(today.replace(month=12, day=31))
+	from hrms.hr.staff_pro_holiday_list import DEFAULT_HOLIDAY_LIST, ensure_staff_pro_holiday_list
 
-	if not frappe.db.exists("Holiday List", list_name):
-		holiday_list = frappe.get_doc(
-			{
-				"doctype": "Holiday List",
-				"holiday_list_name": list_name,
-				"from_date": from_date,
-				"to_date": to_date,
-				"weekly_off": "Sunday",
-			}
-		).insert(ignore_permissions=True)
-		holiday_list.get_weekly_off_dates()
-		holiday_list.save(ignore_permissions=True)
-
-	from hrms.hr.belize_holidays import add_belize_holidays_to_list
-
-	add_belize_holidays_to_list(list_name, year=from_date.year)
-
-	if not frappe.db.get_value("Company", company, "default_holiday_list"):
-		frappe.db.set_value("Company", company, "default_holiday_list", list_name)
-
-	if not frappe.db.exists(
-		"Holiday List Assignment",
-		{"applicable_for": "Company", "assigned_to": company, "holiday_list": list_name},
-	):
-		assignment = frappe.get_doc(
-			{
-				"doctype": "Holiday List Assignment",
-				"applicable_for": "Company",
-				"assigned_to": company,
-				"holiday_list": list_name,
-				"from_date": from_date,
-			}
-		)
-		assignment.insert(ignore_permissions=True)
-		assignment.submit()
-
-	return list_name
+	return ensure_staff_pro_holiday_list(company) or DEFAULT_HOLIDAY_LIST
 
 
 def _create_leave_period(company):
@@ -542,21 +503,21 @@ def _backfill_demo_payroll_banks(employee_map):
 def _create_employees(company, departments, designations, holiday_list):
 	employee_map = {}
 
-	for emp in EMPLOYEES:
+	for idx, emp in enumerate(EMPLOYEES, start=1):
 		if frappe.db.exists("Employee", {"company_email": emp["email"]}):
 			employee_map[emp["email"]] = frappe.db.get_value("Employee", {"company_email": emp["email"]})
 			continue
 
-		user_id = _ensure_user(emp["email"], emp["first_name"], emp["last_name"], _demo_avatar_url(emp))
+		user_id = _ensure_user(emp["email"], emp["first_name"], emp["last_name"])
 		employee = frappe.get_doc(
 			{
 				"doctype": "Employee",
 				"naming_series": "EMP-",
+				"employee_number": emp.get("employee_number") or f"EMP-{idx:05d}",
 				"first_name": emp["first_name"],
 				"last_name": emp["last_name"],
 				"company": company,
 				"user_id": user_id,
-				"image": _demo_avatar_url(emp),
 				"date_of_birth": emp["date_of_birth"],
 				"date_of_joining": emp["date_of_joining"],
 				"department": departments[emp["department"]],

@@ -91,11 +91,16 @@ def _update_child_table(doc, fieldname: str, rows: list[dict]):
 
 def execute():
 	"""Remove Home sidebar links. Desk reads Workspace.sidebar_items (source of truth)."""
+	workspace_meta = frappe.get_meta("Workspace")
+	has_sidebar_items = workspace_meta.has_field("sidebar_items")
+
 	# Primary: Workspace.sidebar_items (used by bootinfo / body sidebar)
 	for workspace_name in HRMS_WORKSPACES:
 		if not frappe.db.exists("Workspace", workspace_name):
 			continue
 		workspace = frappe.get_doc("Workspace", workspace_name)
+		if not has_sidebar_items:
+			continue
 		rows = _reorder_sidebar_rows([_clean_row(row) for row in (workspace.sidebar_items or [])], workspace_name)
 		_update_child_table(workspace, "sidebar_items", rows)
 

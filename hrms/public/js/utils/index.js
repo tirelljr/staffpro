@@ -485,3 +485,114 @@ $.extend(hrms, {
 		installListFormatters();
 	}
 })();
+
+hrms.relabel_form_dashboard_links = function (frm) {
+	const $page = frm?.page?.wrapper || frm?.$wrapper;
+	if (!$page?.length) {
+		return;
+	}
+
+	const doctype_labels = {
+		"Employee Grade": __("Campaign"),
+		Designation: __("Role"),
+	};
+
+	$page.find(".document-link").each(function () {
+		const doctype = $(this).attr("data-doctype");
+		const label = doctype_labels[doctype];
+		if (label) {
+			$(this).text(label);
+		}
+	});
+};
+
+(function applyEmployeeGradeUiLabels() {
+	const messagesToApply = {
+		"Employee Grade": "Campaign",
+		"Employee Grades": "Campaigns",
+		"Add Employee Grade": "Add Campaign",
+		"New Employee Grade": "New Campaign",
+	};
+
+	const applyMessages = () => {
+		const messages = frappe._messages || frappe.boot?.__messages || {};
+		Object.assign(messages, messagesToApply);
+		frappe._messages = messages;
+		if (frappe.boot) {
+			frappe.boot.__messages = messages;
+		}
+	};
+
+	const setListTitle = (list_view) => {
+		if (!list_view?.page) return;
+		const title = __("Campaigns");
+		list_view.page_title = title;
+		list_view.page.set_title(title);
+	};
+
+	const setListPrimaryAction = (list_view) => {
+		if (!list_view?.page) return;
+		const make_new = list_view.make_new_doc?.bind(list_view);
+		list_view.set_primary_action = () => {
+			const can_add =
+				!frappe.boot?.read_only &&
+				(frappe.model.can_create?.("Employee Grade") || list_view.can_create);
+			if (can_add && make_new) {
+				list_view.page.set_primary_action(__("Add Campaign"), () => make_new());
+			} else {
+				list_view.page.clear_primary_action();
+			}
+		};
+		list_view.set_primary_action();
+	};
+
+	const relabelEmployeeGradeForm = (frm) => {
+		if (!frm?.page) return;
+		if (frm.is_new()) {
+			frm.page.set_title(__("New Campaign"));
+		}
+	};
+
+	applyMessages();
+
+	frappe.ui.form.on("Employee Grade", {
+		onload(frm) {
+			relabelEmployeeGradeForm(frm);
+		},
+		refresh(frm) {
+			relabelEmployeeGradeForm(frm);
+			hrms.relabel_form_dashboard_links(frm);
+		},
+	});
+
+	frappe.ui.form.on("Salary Structure", {
+		refresh(frm) {
+			hrms.relabel_form_dashboard_links(frm);
+		},
+	});
+
+	const installList = () => {
+		applyMessages();
+		const existing = frappe.listview_settings["Employee Grade"] || {};
+		const existing_onload = existing.onload;
+		const existing_refresh = existing.refresh;
+		frappe.listview_settings["Employee Grade"] = Object.assign({}, existing, {
+			onload(list_view) {
+				existing_onload?.(list_view);
+				setListTitle(list_view);
+				setListPrimaryAction(list_view);
+			},
+			refresh(list_view) {
+				existing_refresh?.(list_view);
+				setListTitle(list_view);
+				list_view.set_primary_action?.();
+			},
+		});
+	};
+
+	if (typeof frappe.ready === "function") {
+		frappe.ready(installList);
+	} else {
+		installList();
+	}
+})();
