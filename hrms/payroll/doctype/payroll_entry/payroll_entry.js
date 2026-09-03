@@ -148,6 +148,8 @@ frappe.ui.form.on("Payroll Entry", {
 			frm.events.add_context_buttons(frm);
 		}
 
+		setup_payroll_excel_views(frm);
+
 		if (frm.doc.status == "Failed" && frm.doc.error_message) {
 			const issue = `<a id="jump_to_error" style="text-decoration: underline;">issue</a>`;
 			let process = cint(frm.doc.salary_slips_created) ? "submission" : "creation";
@@ -227,7 +229,10 @@ frappe.ui.form.on("Payroll Entry", {
 					name: frm.doc.name,
 				},
 				freeze: true,
-				freeze_message: __("Fetching agents for this client"),
+				freeze_message:
+					frm.doc.customer === "All Clients"
+						? __("Fetching agents for all clients")
+						: __("Fetching agents for this client"),
 			}),
 		)
 			.then((r) => {
@@ -315,6 +320,22 @@ frappe.ui.form.on("Payroll Entry", {
 				},
 			};
 		});
+
+		frm.set_query("customer", function () {
+			return {
+				query: "hrms.payroll.doctype.payroll_entry.payroll_entry.payroll_client_query",
+			};
+		});
+		const customer_field = frm.get_field("customer");
+		if (customer_field) {
+			const original_validate = customer_field.validate?.bind(customer_field);
+			customer_field.validate = function (value) {
+				if (value === "All Clients") {
+					return;
+				}
+				return original_validate ? original_validate(value) : undefined;
+			};
+		}
 
 		frm.set_query("bank_account", function () {
 			return {
@@ -590,6 +611,245 @@ let make_bank_entry = function (frm, for_withheld_salaries = 0) {
 		frm.scroll_to_field("bank_account");
 	}
 };
+
+const PAYROLL_EXCEL_MONEY_FIELDS = [
+	"holiday_pay",
+	"hourly_rate",
+	"bonus",
+	"gross_pay",
+	"income_tax_wh",
+	"weekly_insurable_earnings",
+	"employee_social_security",
+	"employer_social_security",
+	"pay_period_ee_social",
+	"pay_period_er_social",
+	"net_pay",
+];
+
+function setup_payroll_excel_views(frm) {
+	render_agents_view_toggle(frm);
+	set_agents_view_mode(frm, frm._payroll_excel_view || "table");
+	if (frm._payroll_excel_view === "excel") load_payroll_excel_grid(frm);
+}
+
+function render_agents_view_toggle(frm) {
+	const grid_wrapper = frm.get_field("employees")?.grid?.wrapper;
+	if (!grid_wrapper?.length || grid_wrapper.find(".payroll-view-toggle").length) return;
+
+	const $toggle = $(`
+		<div class="payroll-view-toggle" style="margin-bottom: 12px;">
+			<div class="btn-group">
+				<button type="button" class="btn btn-xs btn-default payroll-view-table">${__("Table")}</button>
+				<button type="button" class="btn btn-xs btn-default payroll-view-excel">${__("Excel")}</button>
+			</div>
+		</div>
+	`);
+	grid_wrapper.prepend($toggle);
+	$toggle.find(".payroll-view-table").on("click", () => set_agents_view_mode(frm, "table"));
+	$toggle.find(".payroll-view-excel").on("click", () => {
+		set_agents_view_mode(frm, "excel");
+		load_payroll_excel_grid(frm);
+	});
+}
+
+function set_agents_view_mode(frm, mode) {
+	frm._payroll_excel_view = mode;
+	const grid_wrapper = frm.get_field("employees")?.grid?.wrapper;
+	if (!grid_wrapper?.length) return;
+
+	grid_wrapper.find(".payroll-view-table").toggleClass("btn-primary", mode === "table");
+	grid_wrapper.find(".payroll-view-excel").toggleClass("btn-primary", mode === "excel");
+	// Grid markup differs across Frappe versions, so cover both container variants.
+	grid_wrapper
+		.find(".form-grid-container, .form-grid, .grid-empty, .grid-footer")
+		.toggle(mode === "table");
+	frm.get_field("payroll_excel_html")?.$wrapper.toggle(mode === "excel");
+}
+
+function load_payroll_excel_grid(frm) {
+	const $wrapper = frm.get_field("payroll_excel_html")?.$wrapper;
+	if (!$wrapper?.length) return;
+
+	const notice = (text) => $wrapper.html(`<div class="text-muted">${text}</div>`);
+	if (frm.is_new()) {
+		notice(__("Save this payroll entry to see the spreadsheet."));
+		return;
+	}
+
+	notice(__("Loading payroll spreadsheet..."));
+	frappe
+		.call({
+			method: "hrms.payroll.doctype.payroll_entry.payroll_entry.get_payroll_excel_data",
+			args: { name: frm.doc.name },
+		})
+		.then((r) => {
+			if (frm._payroll_excel_view !== "excel") return;
+			mount_payroll_spreadsheet(frm, r.message || { columns: [], rows: [] });
+		});
+}
+
+function mount_payroll_spreadsheet(frm, payload) {
+	const $wrapper = frm.get_field("payroll_excel_html")?.$wrapper;
+	if (!$wrapper?.length) return;
+
+	const period = payload.meta?.pay_period || "";
+	const currency = payload.meta?.currency;
+	$wrapper.empty().append(
+		$(`
+		<div class="payroll-excel-wrap">
+			<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;overflow:visible;">
+				<div class="text-muted"></div>
+				<div class="payroll-excel-toolbar-actions" style="display:flex;gap:6px;align-items:center;">
+					<div class="sp-report-export payroll-excel-export">
+						<button type="button" class="sp-report-export__btn" aria-expanded="false" aria-haspopup="menu">
+							<span>${frappe.utils.escape_html(__("Export"))}</span>
+						</button>
+						<div class="sp-report-export__menu" role="menu" hidden>
+							<button type="button" class="sp-report-export__item" data-format="xlsx" role="menuitem">${frappe.utils.escape_html(
+								__("Excel"),
+							)}</button>
+							<button type="button" class="sp-report-export__item" data-format="pdf" role="menuitem">${frappe.utils.escape_html(
+								__("PDF"),
+							)}</button>
+						</div>
+					</div>
+					<button type="button" class="btn btn-xs btn-default payroll-excel-copy">${__("Copy")}</button>
+				</div>
+			</div>
+			<div class="payroll-excel-grid"></div>
+		</div>
+	`),
+	);
+	$wrapper.find(".text-muted").text([period, currency].filter(Boolean).join(" · "));
+	$wrapper.find(".payroll-excel-copy").on("click", () => copy_payroll_excel(payload));
+	bind_payroll_excel_export($wrapper.find(".payroll-excel-export"), frm);
+
+	const container = $wrapper.find(".payroll-excel-grid").get(0);
+	if (!frappe.DataTable) {
+		container.innerHTML = render_payroll_excel_fallback_table(payload);
+		return;
+	}
+
+	const columns = (payload.columns || []).map((col) => ({
+		id: col.id,
+		name: col.name,
+		editable: false,
+		align: col.align || "left",
+		width: ["last_name", "first_name", "pay_period"].includes(col.id) ? 160 : 140,
+		format: (value) => format_payroll_excel_cell(col.id, value, payload.meta),
+	}));
+
+	new frappe.DataTable(container, {
+		columns,
+		data: (payload.rows || []).map((row) => columns.map((col) => row[col.id] ?? "")),
+		layout: "fixed",
+		serialNoColumn: false,
+		checkboxColumn: false,
+		inlineFilters: true,
+		disableReorderColumn: true,
+		cellHeight: 32,
+		noDataMessage: __("No payroll rows yet. Create salary slips to populate this view."),
+	});
+}
+
+// Returns HTML: DataTable inserts custom formatter output without escaping it.
+function format_payroll_excel_cell(field, value, meta) {
+	if (value == null || value === "") return "";
+	if (PAYROLL_EXCEL_MONEY_FIELDS.includes(field)) {
+		return format_currency(value, meta?.currency);
+	}
+	if (field === "regular_hours" || field === "overtime_hours") {
+		return format_number(value, null, 2);
+	}
+	return frappe.utils.escape_html(String(value));
+}
+
+function render_payroll_excel_fallback_table(payload) {
+	const columns = payload.columns || [];
+	const rows = payload.rows || [];
+	const empty_message = __("No payroll rows yet. Create salary slips to populate this view.");
+
+	const cell = (col, row) => {
+		const value = format_payroll_excel_cell(col.id, row[col.id], payload.meta);
+		return `<td style="text-align:${col.align || "left"};">${value}</td>`;
+	};
+	const header = columns
+		.map((col) => `<th>${frappe.utils.escape_html(col.name)}</th>`)
+		.join("");
+	const body = rows.length
+		? rows.map((row) => `<tr>${columns.map((col) => cell(col, row)).join("")}</tr>`).join("")
+		: `<tr><td colspan="${columns.length || 1}" class="text-muted">${empty_message}</td></tr>`;
+
+	return `<div style="overflow:auto;max-height:480px;">
+		<table class="table table-bordered" style="margin:0;white-space:nowrap;">
+			<thead><tr>${header}</tr></thead><tbody>${body}</tbody>
+		</table>
+	</div>`;
+}
+
+function bind_payroll_excel_export($wrap, frm) {
+	if (!$wrap?.length) return;
+	const $btn = $wrap.find(".sp-report-export__btn");
+	const $menu = $wrap.find(".sp-report-export__menu");
+
+	const close = () => {
+		$wrap.removeClass("is-open");
+		$btn.attr("aria-expanded", "false");
+		$menu.attr("hidden", true);
+	};
+	const open = () => {
+		$wrap.addClass("is-open");
+		$btn.attr("aria-expanded", "true");
+		$menu.removeAttr("hidden");
+	};
+
+	$btn.on("click", (event) => {
+		event.preventDefault();
+		event.stopPropagation();
+		if ($wrap.hasClass("is-open")) close();
+		else open();
+	});
+	$wrap.on("click", ".sp-report-export__item", (event) => {
+		event.preventDefault();
+		event.stopPropagation();
+		const format = $(event.currentTarget).data("format");
+		close();
+		export_payroll_excel(frm, format);
+	});
+	$(document)
+		.off("click.payroll-excel-export")
+		.on("click.payroll-excel-export", (event) => {
+			if (!$wrap.hasClass("is-open")) return;
+			if (!$.contains($wrap.get(0), event.target)) close();
+		});
+}
+
+function export_payroll_excel(frm, format) {
+	if (!frm?.doc?.name || frm.is_new()) {
+		frappe.msgprint(__("Save this payroll entry before exporting."));
+		return;
+	}
+	const method =
+		format === "pdf"
+			? "hrms.payroll.doctype.payroll_entry.payroll_entry.download_payroll_excel_pdf"
+			: "hrms.payroll.doctype.payroll_entry.payroll_entry.download_payroll_excel";
+	open_url_post(`/api/method/${method}`, { name: frm.doc.name });
+}
+
+function copy_payroll_excel(payload) {
+	const columns = payload.columns || [];
+	const rows = payload.rows || [];
+	const header = columns.map((col) => col.name).join("\t");
+	const lines = rows.map((row) => columns.map((col) => row[col.id] ?? "").join("\t"));
+	const text = [header, ...lines].join("\n");
+	if (navigator.clipboard?.writeText) {
+		navigator.clipboard.writeText(text).then(() => {
+			frappe.show_alert({ message: __("Copied spreadsheet rows"), indicator: "green" });
+		});
+		return;
+	}
+	frappe.msgprint(text);
+}
 
 let render_employee_attendance = function (frm, data) {
 	frm.fields_dict.attendance_detail_html.html(

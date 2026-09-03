@@ -186,6 +186,31 @@ class TestAdditionalSalary(HRMSTestSuite):
 		with self.assertRaises(frappe.ValidationError):
 			additional_salary_doc.save()
 
+	def test_defaults_company_and_bonus_component(self):
+		emp_id = make_employee("test_additional_defaults@salary.com", company="_Test Company")
+		date = nowdate()
+		make_salary_structure(
+			"Test Salary Structure Additional Salary Defaults",
+			"Monthly",
+			employee=emp_id,
+			from_date=add_days(date, -50),
+			company="_Test Company",
+		)
+		create_salary_component("Bonus")
+		doc = frappe.get_doc(
+			{
+				"doctype": "Additional Salary",
+				"employee": emp_id,
+				"payroll_date": date,
+				"amount": 100,
+				"currency": "INR",
+			}
+		)
+		doc.insert()
+		self.assertEqual(doc.company, "_Test Company")
+		self.assertEqual(doc.salary_component, "Bonus")
+		self.assertEqual(doc.naming_series, "HR-ADS-.YY.-.MM.-")
+
 
 def get_additional_salary(
 	emp_id, recurring=True, payroll_date=None, salary_component=None, overwrite_salary_structure=0

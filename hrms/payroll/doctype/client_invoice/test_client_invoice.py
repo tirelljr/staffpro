@@ -144,6 +144,24 @@ class TestClientInvoice(HRMSTestSuite):
 		si.reload()
 		self.assertEqual(si.docstatus, 2)
 
+	def test_get_agents_includes_zero_hours_when_requested(self):
+		agent = self._make_agent("test_client_invoice_zero_hours@example.com", 18)
+		invoice = frappe.get_doc(
+			{
+				"doctype": "Client Invoice",
+				"customer": self.customer,
+				"company": "_Test Company",
+				"from_date": self.from_date,
+				"to_date": self.to_date,
+				"posting_date": self.to_date,
+			}
+		)
+		invoice.get_agents(include_zero_hours=True)
+
+		by_employee = {row.employee: row for row in invoice.agents}
+		self.assertIn(agent, by_employee)
+		self.assertAlmostEqual(flt(by_employee[agent].hours), 0.0)
+
 	def test_adding_agent_fills_hours_rate_and_usd_amount(self):
 		agent = self._make_agent("test_client_invoice_manual@example.com", 20)
 		self._mark_attendance(agent, self.from_date, "Present", 6.5)

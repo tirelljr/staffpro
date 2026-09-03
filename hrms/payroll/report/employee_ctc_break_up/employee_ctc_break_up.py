@@ -16,13 +16,16 @@ class SalaryBreakupReport:
 		self.employee = employee
 		self.salary_structure_assignment = salary_structure_assignment
 
-		self.salary_structure, self.currency, self.assignment_date, self.income_tax_slab, self.ctc = (
+		self.salary_structure, self.currency, self.assignment_date, self.income_tax_slab, stored_ctc = (
 			frappe.get_value(
 				"Salary Structure Assignment",
 				{"name": salary_structure_assignment, "employee": employee},
 				["salary_structure", "currency", "from_date", "income_tax_slab", "ctc"],
 			)
 		)
+		self.hourly_rate = flt(frappe.db.get_value("Employee", employee, "ctc") or 0)
+		self.stored_ctc = flt(stored_ctc)
+		self.ctc = self._annual_cost_to_company()
 		self.validate_ctc()
 		self.salary_slip = _make_salary_slip(
 			self.salary_structure,
@@ -50,19 +53,27 @@ class SalaryBreakupReport:
 		self.total_net_earnings = []
 		self.total_gross_earnings = []
 
+	def _annual_cost_to_company(self):
+		assignment = frappe.get_doc("Salary Structure Assignment", self.salary_structure_assignment)
+		annual_ctc, _annual_gross = assignment.get_annual_ctc_and_gross()
+		if annual_ctc:
+			return flt(annual_ctc)
+		return self.stored_ctc
+
 	def validate_ctc(self):
-		if not self.ctc:
-			frappe.throw(
-				_("Please set Agent Hourly for employee {0} in the {1}").format(
-					frappe.bold(self.employee),
-					get_link_to_form(
-						"Salary Structure Assignment",
-						self.salary_structure_assignment,
-						"Salary Structure Assignment",
-					),
+		if self.hourly_rate or self.ctc or self.stored_ctc:
+			return
+		frappe.throw(
+			_("Please set Agent Hourly for employee {0} in the {1}").format(
+				frappe.bold(self.employee),
+				get_link_to_form(
+					"Salary Structure Assignment",
+					self.salary_structure_assignment,
+					"Salary Structure Assignment",
 				),
-				title=_("Agent Hourly Missing for Employee"),
-			)
+			),
+			title=_("Agent Hourly Missing for Employee"),
+		)
 
 	def get_data(self):
 		self.set_salary_component_details()
@@ -309,7 +320,8 @@ class SalaryBreakupReport:
 				"image": image,
 				"salary_structure": self.salary_structure,
 				"per_cycle": self.payroll_frequency,
-				"annual_ctc": self.format_currency(self.ctc),
+				"annual_ctc": self.format_currency(self.hourly_rate or self.ctc),
+				"hourly_rate": self.format_currency(self.hourly_rate),
 				"per_cycle_ctc": self.format_currency(self.get_per_cycle_ctc()),
 				"per_cycle_gross_pay": self.format_currency(self.gross_pay),
 				"per_cycle_net_pay": self.format_currency(self.net_pay),

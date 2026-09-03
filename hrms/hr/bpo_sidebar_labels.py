@@ -7,6 +7,7 @@ LINK_LABELS: dict[str, str] = {
 	"in-out-today": "Who Is In",
 	"day-view": "Day View",
 	"organizational-chart": "Team Structure",
+	"paid-time-off": "Paid Time Off",
 	"Employee Onboarding": "New Hire Onboarding",
 	"Employee Separation": "Offboarding",
 	"Employee Grievance": "Concerns & Escalations",
@@ -189,6 +190,7 @@ HIDDEN_SIDEBAR_LINKS = frozenset(
 		"Activity Type",
 		"Employee Attendance Tool",
 		"Accrued Earnings Report",
+		"Leave Encashment",
 	}
 )
 
@@ -245,6 +247,8 @@ HIDDEN_SIDEBAR_LABELS = frozenset(
 		"Activity Type",
 		"Bulk Attendance",
 		"Accrued Earnings",
+		"PTO Cash-out",
+		"Leave Encashment",
 	}
 )
 

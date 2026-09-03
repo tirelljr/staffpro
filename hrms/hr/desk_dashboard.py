@@ -97,6 +97,23 @@ def get_upcoming_payroll(period: str = "monthly", company: str | None = None) ->
 	}
 
 
+@frappe.whitelist()
+def get_upcoming_absences(period: str = "monthly", company: str | None = None) -> dict:
+	"""Return upcoming leave applications for the HR dashboard panel."""
+	company = company or frappe.defaults.get_user_default("Company")
+	if not company:
+		return {"rows": [], "period_label": "", "start_date": None, "end_date": None}
+
+	start_date, end_date = _payroll_period_bounds(period)
+	rows = _get_absence_rows(company, start_date, end_date)
+	return {
+		"rows": rows[:PAYROLL_LIMIT],
+		"period_label": _payroll_period_label(start_date, end_date),
+		"start_date": start_date,
+		"end_date": end_date,
+	}
+
+
 def _payroll_period_bounds(period: str):
 	today = getdate()
 	if period == "weekly":
@@ -118,6 +135,107 @@ def _payroll_period_label(start_date, end_date):
 	if start_date.month == end_date.month and start_date.year == end_date.year:
 		return start_date.strftime("%B %Y")
 	return f"{formatdate(start_date)} – {formatdate(end_date)}"
+
+
+def _absence_status_class(status: str | None) -> str:
+	status = str(status or "")
+	if status == "Approved":
+		return "approved"
+	if status == "Open":
+		return "open"
+	if status == "Rejected":
+		return "rejected"
+	return "cancelled"
+
+
+def _absence_status_label(status: str | None) -> str:
+	status = str(status or "")
+	if status == "Approved":
+		return _("Approved")
+	if status == "Open":
+		return _("Pending")
+	return status or _("—")
+
+
+def _absence_date_label(from_date, to_date) -> str:
+	if not from_date:
+		return ""
+	if from_date == to_date:
+		return formatdate(from_date)
+	return f"{formatdate(from_date)} – {formatdate(to_date)}"
+
+
+def _get_absence_rows(company: str, start_date, end_date) -> list[dict]:
+	LeaveApplication = frappe.qb.DocType("Leave Application")
+	employee = frappe.qb.DocType("Employee")
+
+	select_fields = [
+		LeaveApplication.name,
+		LeaveApplication.employee,
+		LeaveApplication.employee_name,
+		LeaveApplication.leave_type,
+		LeaveApplication.from_date,
+		LeaveApplication.to_date,
+		LeaveApplication.total_leave_days,
+		LeaveApplication.description,
+		LeaveApplication.status,
+		LeaveApplication.docstatus,
+		LeaveApplication.company,
+		employee.designation,
+		employee.department,
+		employee.image,
+		employee.employee_name,
+	]
+
+	records = (
+		frappe.qb.from_(LeaveApplication)
+		.left_join(employee)
+		.on(LeaveApplication.employee == employee.name)
+		.select(*select_fields)
+		.where(LeaveApplication.company == company)
+		.where(LeaveApplication.from_date <= end_date)
+		.where(LeaveApplication.to_date >= start_date)
+		.where(LeaveApplication.docstatus != 2)
+		.where(LeaveApplication.status.isin(["Open", "Approved"]))
+		.orderby(LeaveApplication.from_date)
+		.orderby(employee.employee_name)
+		.orderby(LeaveApplication.name)
+	).run(as_dict=True)
+
+	rows: list[dict] = []
+	seen_employees: set[str] = set()
+	for rec in records:
+		if not rec.get("employee"):
+			continue
+		if rec.employee in seen_employees:
+			continue
+		seen_employees.add(rec.employee)
+
+		status = rec.get("status")
+		status_label = _absence_status_label(status)
+		status_class = _absence_status_class(status)
+
+		# Prefer showing the leave reason/description; fall back to employee subtitle.
+		subtitle = rec.get("description") or ""
+		if not subtitle:
+			subtitle = _employee_subtitle(rec)
+
+		rows.append(
+			{
+				"employee": rec.employee,
+				"employee_name": rec.get("employee_name") or rec.employee_name,
+				"subtitle": subtitle,
+				"image": rec.get("image"),
+				"leave_type": rec.get("leave_type"),
+				"date_label": _absence_date_label(rec.get("from_date"), rec.get("to_date")),
+				"status": status,
+				"status_label": status_label,
+				"status_class": status_class,
+				"leave_application": rec.name,
+			}
+		)
+
+	return rows
 
 
 def _get_payroll_rows(company, start_date, end_date):

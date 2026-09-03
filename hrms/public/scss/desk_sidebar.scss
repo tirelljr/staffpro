@@ -664,9 +664,11 @@ body.staff-pro-hide-form-sidebar {
 	}
 }
 
-/* Employee and User profiles: hide overflow menu */
+/* Employee, User, and payroll forms: hide overflow menu */
 [id="page-Employee"],
-[id="page-User"] {
+[id="page-User"],
+[id="page-Salary Structure Assignment"],
+[id="page-Salary Slip"] {
 	.menu-btn-group,
 	.menu-more-button {
 		display: none !important;

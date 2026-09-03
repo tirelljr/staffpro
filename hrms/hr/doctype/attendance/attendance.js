@@ -25,6 +25,8 @@ frappe.ui.form.on("Attendance", {
 			};
 		});
 
+		frm.trigger("show_late_by");
+
 		if (frm.doc.docstatus === 1 && frm.doc.status === "Absent") {
 			frm.add_custom_button(
 				__("Attendance Request"),
@@ -54,6 +56,11 @@ frappe.ui.form.on("Attendance", {
 
 	in_time(frm) {
 		frm.trigger("set_working_hours");
+		frm.trigger("show_late_by");
+	},
+
+	late_entry(frm) {
+		frm.trigger("show_late_by");
 	},
 
 	out_time(frm) {
@@ -69,6 +76,27 @@ frappe.ui.form.on("Attendance", {
 		if (hours && !flt(frm.doc.working_hours)) {
 			frm.set_value("working_hours", hours);
 		}
+	},
+
+	show_late_by(frm) {
+		frm.set_df_property("late_entry", "description", "");
+		if (!frm.doc.late_entry || !frm.doc.in_time) {
+			return;
+		}
+		frappe.call({
+			method: "hrms.hr.page.in_out_today.in_out_today.get_attendance_late_label",
+			args: {
+				employee: frm.doc.employee,
+				attendance_date: frm.doc.attendance_date,
+				in_time: frm.doc.in_time,
+				shift: frm.doc.shift,
+			},
+			callback(r) {
+				if (r.message) {
+					frm.set_df_property("late_entry", "description", __("Late by {0}", [r.message]));
+				}
+			},
+		});
 	},
 
 	set_employee_shift(frm) {

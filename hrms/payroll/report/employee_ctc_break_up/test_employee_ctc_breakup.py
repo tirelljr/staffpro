@@ -320,18 +320,20 @@ class TestEmployeeCTCBreakup(HRMSTestSuite):
 
 	def test_ctc_validation(self):
 		employee = make_employee("test_ctc@example.com", company="_Test Company")
+		frappe.db.set_value("Employee", employee, "ctc", 0)
 		salary_structure = make_salary_structure(
 			"Test CTC Breakup with Tax", payroll_frequency="Monthly", currency="INR", test_tax=True
 		)
 		salary_structure_assignment = create_salary_structure_assignment(
-			employee, salary_structure.name, base=60000, currency="INR", from_date=get_year_start(getdate())
+			employee, salary_structure.name, base=0, currency="INR", from_date=get_year_start(getdate())
 		)
-		# salary structure assignment auto calculates ctc on save, removing it manually for the test
-		salary_structure_assignment.db_set("ctc", 0)
+		salary_structure_assignment.db_set({"ctc": 0, "base": 0, "annual_gross_earning": 0})
 		self.assertRaises(
 			frappe.ValidationError, SalaryBreakupReport, employee, salary_structure_assignment.name
 		)
-		salary_structure_assignment.ctc = 1116000
+		frappe.db.set_value("Employee", employee, "ctc", 8)
+		salary_structure_assignment.base = 60000
 		salary_structure_assignment.save()
 		ctc_breakup = SalaryBreakupReport(employee, salary_structure_assignment.name)
+		self.assertEqual(ctc_breakup.hourly_rate, 8)
 		self.assertEqual(ctc_breakup.ctc, 1116000)

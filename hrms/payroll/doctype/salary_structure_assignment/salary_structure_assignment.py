@@ -262,11 +262,15 @@ class SalaryStructureAssignment(Document):
 			timesheet_component=ss.salary_component,
 		)
 
-	def calculate_ctc_and_gross(self) -> None:
+	def get_employee_hourly_rate(self) -> float:
+		if not self.employee:
+			return 0
+		return flt(frappe.db.get_value("Employee", self.employee, "ctc") or 0, self.precision("ctc"))
+
+	def get_annual_ctc_and_gross(self) -> tuple[float, float]:
+		"""Return (annual cost-to-company, annual payable gross). Agent Hourly is stored separately."""
 		if not self.base or not self.salary_structure:
-			self.annual_gross_earning = 0
-			self.ctc = 0
-			return
+			return 0, 0
 
 		salary_structure = frappe.get_cached_doc("Salary Structure", self.salary_structure)
 		periods = PERIODS_PER_YEAR.get(salary_structure.payroll_frequency, 12)
@@ -278,7 +282,7 @@ class SalaryStructureAssignment(Document):
 		# the salary slip's gross_pay.
 		gross_per_period = flt(data.get("gross_pay"))
 
-		# CTC also includes costs that are part of CTC but not payable: do_not_include_in_total
+		# Annual cost also includes amounts that are not payable: do_not_include_in_total
 		# earnings (shown on the slip, excluded from gross) and employer contributions (off-slip).
 		non_payable_earnings_per_period = sum(
 			flt(r.default_amount)
@@ -291,11 +295,17 @@ class SalaryStructureAssignment(Document):
 			if not r.statistical_component
 		)
 
-		self.annual_gross_earning = flt(gross_per_period * periods, self.precision("annual_gross_earning"))
-		self.ctc = flt(
+		annual_gross = flt(gross_per_period * periods, self.precision("annual_gross_earning"))
+		annual_ctc = flt(
 			(gross_per_period + non_payable_earnings_per_period + employer_per_period) * periods,
-			self.precision("ctc"),
+			self.precision("annual_gross_earning"),
 		)
+		return annual_ctc, annual_gross
+
+	def calculate_ctc_and_gross(self) -> None:
+		_annual_ctc, annual_gross = self.get_annual_ctc_and_gross()
+		self.annual_gross_earning = annual_gross
+		self.ctc = self.get_employee_hourly_rate()
 
 	def _evaluate_all_components(self) -> tuple[frappe._dict, dict]:
 		"""Single shared-context pass over earnings -> deductions ->

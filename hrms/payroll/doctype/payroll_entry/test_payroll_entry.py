@@ -15,9 +15,13 @@ from hrms.hr.doctype.employee_advance.employee_advance import (
 	create_return_through_additional_salary,
 )
 from hrms.payroll.doctype.payroll_entry.payroll_entry import (
+	ALL_CLIENTS,
 	PayrollEntry,
+	bulk_cancel_payroll_entries,
+	bulk_delete_payroll_entries,
 	get_end_date,
 	get_start_end_dates,
+	payroll_client_query,
 )
 from hrms.payroll.doctype.salary_component.test_salary_component import create_salary_component
 from hrms.payroll.doctype.salary_slip.salary_slip_loan_utils import if_lending_app_installed
@@ -1333,6 +1337,49 @@ class TestPayrollEntry(HRMSTestSuite):
 		payroll_entry.reload()
 		self.assertEqual(payroll_entry.status, "Cancelled")
 
+	def test_bulk_cancel_then_delete_draft_payroll_entries(self):
+		company = frappe.get_doc("Company", "_Test Company")
+		employee = frappe.db.get_value("Employee", {"company": "_Test Company"})
+		setup_salary_structure(employee, company)
+
+		dates = get_start_end_dates("Monthly", nowdate())
+		first = get_payroll_entry(
+			start_date=dates.start_date,
+			end_date=dates.end_date,
+			payable_account=company.default_payroll_payable_account,
+			currency=company.default_currency,
+			company=company.name,
+			cost_center="Main - _TC",
+		)
+		second = get_payroll_entry(
+			start_date=dates.start_date,
+			end_date=dates.end_date,
+			payable_account=company.default_payroll_payable_account,
+			currency=company.default_currency,
+			company=company.name,
+			cost_center="Main - _TC",
+		)
+
+		blocked = bulk_delete_payroll_entries([first.name])
+		self.assertEqual(blocked.get("deleted"), [])
+		self.assertTrue(blocked.get("errors"))
+		self.assertTrue(frappe.db.exists("Payroll Entry", first.name))
+
+		result = bulk_cancel_payroll_entries([first.name, second.name])
+		self.assertEqual(sorted(result.get("cancelled") or []), sorted([first.name, second.name]))
+		self.assertEqual(result.get("errors"), [])
+
+		first.reload()
+		second.reload()
+		self.assertEqual(first.status, "Cancelled")
+		self.assertEqual(second.status, "Cancelled")
+
+		deleted = bulk_delete_payroll_entries([first.name, second.name])
+		self.assertEqual(sorted(deleted.get("deleted") or []), sorted([first.name, second.name]))
+		self.assertEqual(deleted.get("errors"), [])
+		self.assertFalse(frappe.db.exists("Payroll Entry", first.name))
+		self.assertFalse(frappe.db.exists("Payroll Entry", second.name))
+
 	def test_fill_employees_by_customer_without_filters(self):
 		"""Selecting a client pulls billed agents; branch/department filters are optional."""
 		from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
@@ -1373,6 +1420,118 @@ class TestPayrollEntry(HRMSTestSuite):
 
 		payroll_entry.fill_employee_details(raise_if_empty=0)
 		self.assertIn(emp_a, {row.employee for row in payroll_entry.employees})
+
+	def test_fill_employees_customer_is_unassigned(self):
+		"""Calling fill_employee_details with `customer_is_unassigned` filters to agents without bill_to_customer."""
+		from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+
+		from hrms.setup import get_custom_fields
+
+		create_custom_fields(get_custom_fields(), ignore_validate=True)
+		if not frappe.get_meta("Employee").has_field("bill_to_customer"):
+			return
+		if not frappe.get_meta("Payroll Entry").has_field("customer"):
+			return
+
+		company = frappe.get_doc("Company", "_Test Company")
+		customer_a = _ensure_customer("_Test Payroll Client A")
+
+		emp_unassigned = make_employee("payroll.agent.unassigned@example.com", company=company.name)
+		emp_a = make_employee("payroll.client.a@example.com", company=company.name)
+		emp_b = make_employee("payroll.client.b@example.com", company=company.name)
+
+		frappe.db.set_value("Employee", emp_unassigned, "bill_to_customer", None)
+		frappe.db.set_value("Employee", emp_a, "bill_to_customer", customer_a)
+
+		setup_salary_structure(emp_unassigned, company)
+		setup_salary_structure(emp_a, company)
+		setup_salary_structure(emp_b, company)
+
+		dates = get_start_end_dates("Monthly", nowdate())
+		payroll_entry = frappe.new_doc("Payroll Entry")
+		payroll_entry.company = company.name
+		payroll_entry.start_date = dates.start_date
+		payroll_entry.end_date = dates.end_date
+		payroll_entry.payroll_frequency = "Monthly"
+		payroll_entry.currency = company.default_currency
+		payroll_entry.exchange_rate = 1
+
+		# Ensure unassigned bucket contains only employees without bill_to_customer.
+		payroll_entry.fill_employee_details(customer_is_unassigned=1)
+		employees = {row.employee for row in payroll_entry.employees}
+		self.assertIn(emp_unassigned, employees)
+		self.assertNotIn(emp_a, employees)
+		self.assertNotIn(emp_b, employees)
+
+		# Default behavior (customer not set) includes all agents.
+		payroll_entry.fill_employee_details(raise_if_empty=0)
+		employees_all = {row.employee for row in payroll_entry.employees}
+		self.assertIn(emp_unassigned, employees_all)
+		self.assertIn(emp_a, employees_all)
+		self.assertIn(emp_b, employees_all)
+
+	def test_fill_employees_all_clients(self):
+		"""Selecting All Clients includes agents from every client and unassigned agents."""
+		from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+
+		from hrms.setup import get_custom_fields
+
+		create_custom_fields(get_custom_fields(), ignore_validate=True)
+		if not frappe.get_meta("Employee").has_field("bill_to_customer"):
+			return
+		if not frappe.get_meta("Payroll Entry").has_field("customer"):
+			return
+
+		company = frappe.get_doc("Company", "_Test Company")
+		customer_a = _ensure_customer("_Test Payroll Client A")
+		customer_b = _ensure_customer("_Test Payroll Client B")
+
+		emp_unassigned = make_employee("payroll.all.clients.unassigned@example.com", company=company.name)
+		emp_a = make_employee("payroll.all.clients.a@example.com", company=company.name)
+		emp_b = make_employee("payroll.all.clients.b@example.com", company=company.name)
+
+		frappe.db.set_value("Employee", emp_unassigned, "bill_to_customer", None)
+		frappe.db.set_value("Employee", emp_a, "bill_to_customer", customer_a)
+		frappe.db.set_value("Employee", emp_b, "bill_to_customer", customer_b)
+
+		dates = get_start_end_dates("Monthly", nowdate())
+		payroll_entry = frappe.new_doc("Payroll Entry")
+		payroll_entry.company = company.name
+		payroll_entry.customer = ALL_CLIENTS
+		payroll_entry.start_date = dates.start_date
+		payroll_entry.end_date = dates.end_date
+		payroll_entry.payroll_frequency = "Monthly"
+		payroll_entry.currency = company.default_currency
+		payroll_entry.exchange_rate = 1
+		payroll_entry.fill_employee_details()
+
+		employees = {row.employee for row in payroll_entry.employees}
+		self.assertIn(emp_unassigned, employees)
+		self.assertIn(emp_a, employees)
+		self.assertIn(emp_b, employees)
+
+	def test_payroll_client_query_includes_all_clients(self):
+		rows = payroll_client_query(
+			doctype="Customer",
+			txt="",
+			searchfield="name",
+			start="0",
+			page_len="20",
+			filters="{}",
+		)
+		self.assertTrue(rows)
+		self.assertEqual(rows[0][0], ALL_CLIENTS)
+
+	def test_all_clients_is_not_an_invalid_link(self):
+		payroll_entry = frappe.new_doc("Payroll Entry")
+		payroll_entry.customer = ALL_CLIENTS
+		invalid_links, _cancelled = payroll_entry.get_invalid_links()
+		self.assertFalse(
+			any(
+				(row[0] == "customer" if isinstance(row, (list, tuple)) else row.get("fieldname") == "customer")
+				for row in (invalid_links or [])
+			)
+		)
 
 	def test_fill_employees_by_customer_ignores_currency_and_dates(self):
 		"""Client roster is independent of payroll currency, pay period, and salary structures."""
@@ -1424,6 +1583,40 @@ class TestPayrollEntry(HRMSTestSuite):
 		if frappe.get_meta("Payroll Employee Detail").has_field("bank_name"):
 			self.assertEqual(row.bank_name, "Atlantic Bank")
 			self.assertEqual(row.bank_ac_no, "998877")
+
+	def test_get_payroll_excel_data_columns_and_agent_row(self):
+		from hrms.payroll.doctype.payroll_entry.payroll_entry import get_payroll_excel_data
+
+		company = frappe.get_doc("Company", "_Test Company")
+		employee = make_employee("payroll.excel.view@example.com", company=company.name)
+		setup_salary_structure(employee, company)
+		dates = get_start_end_dates("Monthly", nowdate())
+		payroll_entry = get_payroll_entry(
+			start_date=dates.start_date,
+			end_date=dates.end_date,
+			currency=company.default_currency,
+			company=company.name,
+			cost_center="Main - _TC",
+		)
+		payload = get_payroll_excel_data(payroll_entry.name)
+		column_ids = [col["id"] for col in payload["columns"]]
+		self.assertIn("last_name", column_ids)
+		self.assertIn("first_name", column_ids)
+		self.assertNotIn("employee_name", column_ids)
+		self.assertIn("regular_hours", column_ids)
+		self.assertIn("holiday_pay", column_ids)
+		self.assertIn("pay_period_ee_social", column_ids)
+		self.assertIn("net_pay", column_ids)
+		self.assertTrue(any(row["employee"] == employee for row in payload["rows"]))
+		agent_row = next(row for row in payload["rows"] if row["employee"] == employee)
+		self.assertTrue(agent_row["first_name"] or agent_row["last_name"])
+
+	def test_split_full_name_into_first_and_last(self):
+		from hrms.payroll.doctype.payroll_entry.payroll_entry import _split_full_name
+
+		self.assertEqual(_split_full_name("Ana Cruz"), ("Ana", "Cruz"))
+		self.assertEqual(_split_full_name("Mary Ann Cruz"), ("Mary Ann", "Cruz"))
+		self.assertEqual(_split_full_name("Ana"), ("Ana", ""))
 
 
 def _ensure_customer(name: str) -> str:

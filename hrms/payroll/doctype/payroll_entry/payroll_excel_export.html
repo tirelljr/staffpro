@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<style>
+		body { font-family: Helvetica, Arial, sans-serif; font-size: 10px; color: #222; }
+		.banner { background: #000; margin-bottom: 14px; }
+		.banner table { width: 100%; border: none; }
+		.banner td { border: none; color: #fff; vertical-align: middle; padding: 12px; }
+		.banner img { max-height: 44px; max-width: 180px; }
+		.banner .title { font-size: 16px; font-weight: 600; }
+		.banner .meta { font-size: 11px; margin-top: 4px; opacity: 0.9; }
+		table.lines { width: 100%; border-collapse: collapse; }
+		.lines th, .lines td { border: 1px solid #ccc; padding: 4px 5px; text-align: left; }
+		.lines th { background: #e8f5ef; font-weight: bold; }
+		.num { text-align: right; }
+		.footer { margin-top: 14px; font-size: 9px; color: #666; }
+	</style>
+</head>
+<body>
+	<div class="banner">
+		<table cellpadding="0" cellspacing="0">
+			<tr>
+				<td style="width:55%;">
+					<img src="{{ logo }}" alt="Staff Pro BPO">
+				</td>
+				<td style="width:45%; text-align:right;">
+					<div class="title">{{ title }}</div>
+					<div class="meta">{{ meta.pay_period }}{% if meta.currency %} · {{ meta.currency }}{% endif %}</div>
+				</td>
+			</tr>
+		</table>
+	</div>
+	<table class="lines">
+		<thead>
+			<tr>
+				{% for col in columns %}
+				<th class="{% if col.align == 'right' %}num{% endif %}">{{ col.name }}</th>
+				{% endfor %}
+			</tr>
+		</thead>
+		<tbody>
+			{% for row in rows %}
+			<tr>
+				{% for col in columns %}
+				<td class="{% if col.align == 'right' %}num{% endif %}">{{ row[col.id] }}</td>
+				{% endfor %}
+			</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	<div class="footer">{{ _("Generated on {0}").format(generated_on) }}</div>
+</body>
+</html>

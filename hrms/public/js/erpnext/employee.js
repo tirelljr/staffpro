@@ -628,6 +628,7 @@ function setup_employee_profile_stats(frm) {
 			})} ${currency}`;
 		};
 		const hours = Number(stats.total_hours || 0);
+		const leave_remaining = Number(stats.leave_remaining || 0);
 		const rows = [
 			{ label: __("Total SS contributions"), value: money(stats.total_ss, company_currency) },
 			{ label: __("Total income"), value: money(stats.total_income, company_currency) },
@@ -637,6 +638,10 @@ function setup_employee_profile_stats(frm) {
 			{
 				label: __("Total hours worked"),
 				value: hours ? `${hours.toLocaleString(undefined, { maximumFractionDigits: 1 })}h` : "—",
+			},
+			{
+				label: __("Leave remaining"),
+				value: `${leave_remaining.toLocaleString(undefined, { maximumFractionDigits: 1 })} days`,
 			},
 		];
 		$stats.find(".sp-emp-stats__list").removeClass("is-loading").html(

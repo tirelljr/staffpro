@@ -8,14 +8,18 @@ function escape_html(value) {
 	return frappe.utils.escape_html(value == null ? "" : String(value));
 }
 
-function dept_short_label(name) {
-	const label = String(name || "").trim();
-	if (!label) return __("No Dept");
-	return label.replace(/\s*-\s*SPB\s*$/i, "").trim() || label;
+function client_label(row) {
+	const label = String(row?.client || row?.client_name || "").trim();
+	return label || __("Unassigned");
+}
+
+function is_past_date(dateStr) {
+	return Boolean(dateStr) && dateStr < frappe.datetime.get_today();
 }
 
 function inout_status_from_row(row, dateStr) {
 	if (row.inout === "IN" || row.inout === "OUT") return row.inout;
+	if (row.status === "IN" || row.status === "OUT") return row.status;
 	let status = "OUT";
 	if (row.in_time && !row.out_time) status = "IN";
 	else if (PRESENT_STATUSES.has(record_status(row)) && !row.out_time && dateStr === frappe.datetime.get_today()) {
@@ -59,6 +63,16 @@ function record_status(row) {
 	return row.status || status_from_title(row.title) || "";
 }
 
+function has_day_entry(row, dateStr) {
+	if (PRESENT_STATUSES.has(record_status(row))) return true;
+	if (row.inout === "IN" || row.inout === "OUT") return true;
+	if (row.status === "IN" || row.status === "OUT") return true;
+	if (dateStr && dateStr === frappe.datetime.get_today()) {
+		return Boolean(row.employee || row.employee_name);
+	}
+	return Boolean(row.in_time || row.out_time);
+}
+
 function avatar_html(row, className = "sp-att-cal-faces__avatar") {
 	const title = escape_html(row.employee_name || row.employee || "");
 	if (row.image) {
@@ -80,17 +94,21 @@ function faces_html(people) {
 	`;
 }
 
-function department_counts_html(people) {
+function client_counts_html(people, counted) {
 	const grouped = {};
 	people.forEach((row) => {
-		const key = row.department || __("No Department");
+		const key = client_label(row);
+		if (!grouped[key]) grouped[key] = 0;
+	});
+	counted.forEach((row) => {
+		const key = client_label(row);
 		grouped[key] = (grouped[key] || 0) + 1;
 	});
 	const rows = Object.keys(grouped)
 		.sort((a, b) => grouped[b] - grouped[a] || a.localeCompare(b))
-		.map((department) => ({
-			department,
-			count: grouped[department],
+		.map((client) => ({
+			client,
+			count: grouped[client],
 		}));
 	if (!rows.length) return "";
 
@@ -101,8 +119,8 @@ function department_counts_html(people) {
 			${visible
 				.map(
 					(row) => `
-				<div class="sp-att-cal-dept" title="${escape_html(row.department)}">
-					${escape_html(dept_short_label(row.department))} - ${row.count}
+				<div class="sp-att-cal-dept" title="${escape_html(row.client)}">
+					${escape_html(row.client)} - ${row.count}
 				</div>`,
 				)
 				.join("")}
@@ -111,11 +129,17 @@ function department_counts_html(people) {
 	`;
 }
 
-function day_cell_html(people) {
+function counted_people(people, dateStr) {
+	if (is_past_date(dateStr)) return people;
+	const inout_filter = hrms.attendance_calendar.inout_filter || "IN";
+	return people.filter((row) => row.inout === inout_filter);
+}
+
+function day_cell_html(people, dateStr) {
 	if (!people.length) return "";
 	return `
 		<div class="sp-att-cal-day">
-			${department_counts_html(people)}
+			${client_counts_html(people, counted_people(people, dateStr))}
 			${faces_html(people)}
 		</div>
 	`;
@@ -129,11 +153,26 @@ function calendar_root(api) {
 	return api?.el || document.getElementById("fc-calendar-wrapper");
 }
 
+function roster_row_to_event(row, date) {
+	const inout = row.inout || (row.status === "IN" || row.status === "OUT" ? row.status : "");
+	return {
+		employee: row.employee,
+		employee_name: row.employee_name,
+		image: row.image,
+		department: row.department || "",
+		client: row.client || row.client_name || "",
+		status: row.attendance_status || (PRESENT_STATUSES.has(row.status) ? row.status : "Present"),
+		in_time: row.in_time,
+		out_time: row.out_time,
+		inout: inout || inout_status_from_row(row, date),
+		title: `${row.employee_name || row.employee || ""} : ${row.attendance_status || "Present"}`,
+	};
+}
+
 function collect_people() {
-	const inout_filter = hrms.attendance_calendar.inout_filter || "IN";
 	const byDate = {};
 	const add = (row, date) => {
-		if (!date || !PRESENT_STATUSES.has(record_status(row))) return;
+		if (!date || !has_day_entry(row, date)) return;
 		const employee = row.employee || row.employee_name || row.title;
 		const already = (byDate[date] || []).some((item) => item.employee === employee);
 		if (already) return;
@@ -142,12 +181,12 @@ function collect_people() {
 			employee_name: row.employee_name || employee_name_from_title(row.title) || employee,
 			image: row.image,
 			department: row.department || "",
+			client: row.client || row.client_name || "",
 			status: record_status(row),
 			in_time: row.in_time,
 			out_time: row.out_time,
 		};
-		person.inout = inout_status_from_row(person, date);
-		if (person.inout !== inout_filter) return;
+		person.inout = inout_status_from_row({ ...person, inout: row.inout, status: row.inout || row.status }, date);
 		(byDate[date] ||= []).push(person);
 	};
 
@@ -162,6 +201,14 @@ function collect_people() {
 			const props = event_props(event);
 			if (props.doctype === "Holiday") return;
 			add(props, event_date(event));
+		});
+	}
+
+	const todayRoster = hrms.attendance_calendar.today_roster;
+	const today = frappe.datetime.get_today();
+	if (todayRoster?.details?.length && (!todayRoster.date || todayRoster.date === today)) {
+		todayRoster.details.forEach((row) => {
+			add(roster_row_to_event(row, today), today);
 		});
 	}
 
@@ -186,7 +233,11 @@ function paint_faces(api) {
 		inout_filter,
 		Object.keys(byDate)
 			.sort()
-			.map((date) => [date, byDate[date].length, byDate[date].slice(0, FACE_LIMIT).map((row) => row.employee)]),
+			.map((date) => [
+				date,
+				byDate[date].map((row) => row.employee),
+				counted_people(byDate[date], date).map((row) => [client_label(row), row.employee]),
+			]),
 	]);
 	if ($root.data("sp-att-sig") === signature && $root.find(".sp-att-cal-day").length) {
 		return;
@@ -195,7 +246,7 @@ function paint_faces(api) {
 	$root.find(".sp-att-cal-day").remove();
 
 	Object.keys(byDate).forEach((date) => {
-		const html = day_cell_html(byDate[date]);
+		const html = day_cell_html(byDate[date], date);
 		const $frames = $root.find(`.fc-daygrid-day[data-date="${date}"] .fc-daygrid-day-frame`);
 		if ($frames.length) {
 			$frames.append(html);
@@ -233,13 +284,17 @@ function roster_from_calendar(dateStr) {
 			employee_name: props.employee_name || employee_name_from_title(props.title),
 			image: props.image,
 			department: props.department || "",
+			client: props.client || "",
 			status,
-			late: Boolean(props.late_entry),
+			late: Boolean(props.late || props.late_entry),
+			late_minutes: Number(props.late_minutes || 0),
+			late_label: props.late_label || "",
 			attendance_status: record_status(props),
 			attendance: props.name || props.id,
 			in_time: inTime,
 			out_time: outTime,
 			time: outTime || inTime,
+			leave_type: props.leave_type || (record_status(props) === "On Leave" ? "On Leave" : ""),
 			pto_code: record_status(props) === "On Leave" ? "On Leave" : "",
 			device_id: "",
 		};
@@ -275,7 +330,10 @@ function select_html(className, variant, label, options, value) {
 }
 
 function status_label(row) {
-	if (row.late) return __("LATE");
+	if (hrms.ui?.late_status_label) {
+		return hrms.ui.late_status_label(row);
+	}
+	if (row.late) return row.late_label ? `${__("LATE")} ${row.late_label}` : __("LATE");
 	return row.status || __("OUT");
 }
 
@@ -319,7 +377,12 @@ function ensure_calendar_toolbar(cal) {
 }
 
 function hook_calendar() {
-	const route = frappe.get_route_str?.() || "";
+	let route = "";
+	try {
+		route = frappe.get_route_str?.() || "";
+	} catch (e) {
+		route = "";
+	}
 	if (!route.includes("Attendance/Calendar")) {
 		$("body").removeClass("sp-att-cal-page");
 		return false;
@@ -365,12 +428,14 @@ function hook_calendar() {
 	}
 
 	ensure_calendar_toolbar(cal);
+	hrms.attendance_calendar.load_today_roster();
 	hrms.attendance_calendar.paint(cal.fullCalendar);
 	return true;
 }
 
 hrms.attendance_calendar = Object.assign(hrms.attendance_calendar || {}, {
 	raw: [],
+	today_roster: null,
 	dialog: null,
 	payload: null,
 	date: "",
@@ -380,11 +445,35 @@ hrms.attendance_calendar = Object.assign(hrms.attendance_calendar || {}, {
 	sort: "department",
 	query: "",
 	_painting: false,
+	_today_roster_loading: false,
+
+	load_today_roster() {
+		const today = frappe.datetime.get_today();
+		if (this._today_roster_loading) return;
+		if (this.today_roster?.date === today && this.today_roster?.details) return;
+		this._today_roster_loading = true;
+		frappe.call({
+			method: "hrms.hr.doctype.attendance.attendance.get_calendar_day_roster",
+			args: { attendance_date: today },
+			callback: (r) => {
+				this._today_roster_loading = false;
+				if (!r.message?.details) return;
+				this.today_roster = r.message;
+				$(calendar_root()).removeData("sp-att-sig");
+				this.paint();
+			},
+			error: () => {
+				this._today_roster_loading = false;
+			},
+		});
+	},
 
 	paint(api) {
 		this._painting = true;
 		try {
 			paint_faces(api || calendar_api());
+		} catch (error) {
+			console.error("Attendance calendar paint failed", error);
 		} finally {
 			this._painting = false;
 		}

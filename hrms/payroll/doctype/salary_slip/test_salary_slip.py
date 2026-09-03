@@ -1984,10 +1984,17 @@ class TestSalarySlip(HRMSTestSuite):
 
 		self.assertEqual(income_tax.variable_based_on_taxable_salary, 1)
 
-		# Validate tax component matching company criteria is added in salary slip
+		frappe.cache().delete_value(TAX_COMPONENTS_BY_COMPANY)
+
+		# company-specific tax components are still discoverable from the master
 		tax_component = salary_slip.get_tax_components()
 		self.assertEqual(test_tds.accounts[0].company, salary_slip.company)
 		self.assertListEqual(tax_component, ["_Test TDS"])
+
+		# but they are not auto-added to the slip when the structure has no tax component
+		salary_slip = make_salary_slip(salary_structure_doc.name, employee=emp, posting_date=nowdate())
+		self.assertNotIn("_Test TDS", [com.salary_component for com in salary_slip.deductions])
+		self.assertNotIn("_Test Income Tax", [com.salary_component for com in salary_slip.deductions])
 
 	def test_opening_balances_excluded_from_tax_calculation(self):
 		"""tests if opening balances in salary structure assignment are excluded from tax when assignment date is before payroll period"""

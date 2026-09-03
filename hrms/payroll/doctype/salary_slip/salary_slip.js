@@ -207,6 +207,7 @@ frappe.ui.form.on("Salary Slip", {
 	},
 
 	refresh: function (frm) {
+		hide_salary_slip_menu(frm);
 		frm.trigger("toggle_fields");
 
 		var salary_detail_fields = [
@@ -425,3 +426,13 @@ frappe.ui.form.on("Salary Detail", {
 		}
 	},
 });
+
+function hide_salary_slip_menu(frm) {
+	const page = frm?.page;
+	if (!page) return;
+	if (typeof page.hide_menu === "function") {
+		page.hide_menu();
+	}
+	page.menu_btn_group?.addClass("hidden hide").hide();
+	page.wrapper?.find(".menu-btn-group, .menu-more-button").addClass("hidden hide").hide();
+}

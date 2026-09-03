@@ -1,18 +1,5 @@
 {
- "cards": [
-  {
-   "card": "Total Employees"
-  },
-  {
-   "card": "Agents Present (Today)"
-  },
-  {
-   "card": "Hours Worked (This Week)"
-  },
-  {
-   "card": "Daily Pay (This Week)"
-  }
- ],
+ "cards": [],
  "charts": [
   {
    "chart": "Hours Worked",
@@ -23,23 +10,7 @@
    "width": "Half"
   },
   {
-   "chart": "Daily Pay",
-   "width": "Half"
-  },
-  {
    "chart": "Clock-ins",
-   "width": "Half"
-  },
-  {
-   "chart": "Outgoing Salary",
-   "width": "Half"
-  },
-  {
-   "chart": "Social Security Contributions",
-   "width": "Half"
-  },
-  {
-   "chart": "Designation Wise Employee Count",
    "width": "Half"
   }
  ],
@@ -50,7 +21,7 @@
  "idx": 0,
  "is_default": 1,
  "is_standard": 1,
- "modified": "2026-08-21 00:00:00.000000",
+ "modified": "2026-09-03 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "HR",
  "name": "Human Resource",

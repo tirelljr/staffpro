@@ -183,6 +183,7 @@ body.staff-pro-alive #page-Workspaces .page-head {
 .sp-celebrations__type-filter,
 .sp-celebrations__period,
 .sp-payroll__period,
+.sp-absence__type-filter,
 .sp-inout-dash__department,
 .sp-inout-dash__status {
 	height: 32px;
@@ -208,6 +209,7 @@ body.staff-pro-alive #page-Workspaces .page-head {
 .sp-celebrations__type-filter:focus,
 .sp-celebrations__period:focus,
 .sp-payroll__period:focus,
+.sp-absence__type-filter:focus,
 .sp-inout-dash__department:focus,
 .sp-inout-dash__status:focus {
 	outline: none;
@@ -281,6 +283,14 @@ body.staff-pro-alive #page-Workspaces .page-head {
 
 .sp-dash-select:has(.sp-payroll__period) .sp-dash-select__btn {
 	min-width: 104px;
+}
+
+.sp-dash-select:has(.sp-absence__type-filter) .sp-dash-select__btn {
+	min-width: 150px;
+	max-width: 260px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .sp-dash-select:has(.sp-inout-dash__department) .sp-dash-select__btn {
@@ -658,11 +668,11 @@ body.staff-pro-alive #page-Workspaces .page-head {
 /* —— Upcoming payroll —— */
 .sp-dash-payroll {
 	margin: 0;
-	padding: 0;
-	border: 0;
-	border-radius: 0;
-	background: transparent;
-	box-shadow: none;
+	padding: 18px 20px 12px;
+	border: 1px solid var(--sp-card-border);
+	border-radius: var(--sp-card-radius);
+	background: var(--sp-card);
+	box-shadow: var(--sp-shadow);
 	container-type: inline-size;
 	container-name: payroll-panel;
 }
@@ -676,12 +686,9 @@ body.staff-pro-alive #page-Workspaces .page-head {
 .sp-payroll__row {
 	display: grid;
 	grid-template-columns:
-		minmax(0, 1.35fr)
-		minmax(0, 0.65fr)
-		minmax(0, 0.7fr)
-		minmax(0, 0.45fr)
-		minmax(0, 0.7fr)
-		minmax(0, 0.45fr)
+		minmax(0, 1.4fr)
+		minmax(0, 0.95fr)
+		minmax(0, 1.05fr)
 		minmax(0, 0.75fr);
 	align-items: center;
 	column-gap: 8px;
@@ -807,13 +814,18 @@ body.staff-pro-alive #page-Workspaces .page-head {
 	flex-shrink: 0;
 }
 
-.sp-payroll__status--paid .sp-payroll__status-dot,
-.sp-payroll__status--ready .sp-payroll__status-dot {
+.sp-payroll__status--approved .sp-payroll__status-dot {
 	background: #22c55e;
 }
 
+.sp-payroll__status--open .sp-payroll__status-dot,
 .sp-payroll__status--pending .sp-payroll__status-dot {
-	background: #ef4444;
+	background: #f59e0b;
+}
+
+.sp-payroll__status--rejected .sp-payroll__status-dot,
+.sp-payroll__status--cancelled .sp-payroll__status-dot {
+	background: #9aa3af;
 }
 
 .sp-payroll__date,
@@ -845,10 +857,6 @@ body.staff-pro-alive #page-Workspaces .page-head {
 	font-size: inherit;
 	font-weight: inherit;
 	color: inherit;
-}
-
-.sp-payroll__table-head span:last-child {
-	text-align: right;
 }
 
 .sp-payroll__empty {
@@ -894,16 +902,9 @@ body.staff-pro-alive #page-Workspaces .page-head {
 	}
 
 	.sp-payroll__date,
-	.sp-payroll__hours,
-	.sp-payroll__gross,
-	.sp-payroll__ss,
-	.sp-payroll__amount {
+	.sp-payroll__hours {
 		flex: 0 0 auto;
 		font-size: 12px;
-	}
-
-	.sp-payroll__amount {
-		margin-left: auto;
 	}
 }
 
@@ -999,7 +1000,7 @@ body.staff-pro-alive #page-Workspaces .page-head {
 .sp-inout-dash__table-head,
 .sp-inout-dash__row {
 	display: grid;
-	grid-template-columns: minmax(140px, 1.6fr) 0.7fr 0.7fr minmax(90px, 1fr) 0.8fr;
+	grid-template-columns: minmax(140px, 1.6fr) minmax(88px, 0.9fr) 0.7fr minmax(90px, 1fr) 0.8fr;
 	align-items: center;
 	gap: 12px;
 }
@@ -2278,10 +2279,7 @@ body.staff-pro-alive #page-dashboard-view.sp-dash--hours .sp-empty-chart {
 	}
 
 	.sp-payroll__date,
-	.sp-payroll__hours,
-	.sp-payroll__gross,
-	.sp-payroll__ss,
-	.sp-payroll__amount {
+	.sp-payroll__hours {
 		padding-left: 46px;
 		font-size: 12px;
 	}
@@ -2962,13 +2960,54 @@ body.staff-pro-alive .sp-hours__field .awesomplete mark {
 /* Social Security Deductions report: Export + Push actions in the page head */
 #page-query-report:has(.sp-ss-actions) .page-head,
 #page-query-report:has(.sp-ss-actions) .page-head-content,
-#page-query-report:has(.sp-ss-actions) .custom-actions {
+#page-query-report:has(.sp-ss-actions) .custom-actions,
+#page-query-report:has(.sp-hourly-actions) .page-head,
+#page-query-report:has(.sp-hourly-actions) .page-head-content,
+#page-query-report:has(.sp-hourly-actions) .custom-actions {
 	overflow: visible;
 }
 
 #page-query-report:has(.sp-ss-actions) .inner-group-button,
-#page-query-report:has(.sp-ss-actions) .menu-btn-group {
+#page-query-report:has(.sp-ss-actions) .menu-btn-group,
+#page-query-report:has(.sp-hourly-actions) .inner-group-button,
+#page-query-report:has(.sp-hourly-actions) .menu-btn-group,
+#page-query-report:has(.sp-hourly-actions) .menu-more-button,
+#page-query-report:has(.sp-hourly-actions) .page-icon-group {
 	display: none !important;
+}
+
+.sp-hourly-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	margin-right: 8px;
+}
+
+.sp-report-action-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	height: 28px;
+	padding: 0 12px;
+	border: 1px solid #e5e7eb;
+	border-radius: 6px;
+	background: #f3f4f6;
+	color: #374151;
+	font: inherit;
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 1;
+	white-space: nowrap;
+	cursor: pointer;
+	appearance: none;
+	box-shadow: none;
+}
+
+.sp-report-action-btn:hover,
+.sp-report-action-btn:focus {
+	background: #eceef1;
+	border-color: #d1d5db;
+	color: #111827;
 }
 
 .sp-ss-actions {

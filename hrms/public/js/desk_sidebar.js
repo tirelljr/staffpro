@@ -507,7 +507,11 @@ body.staff-pro-hide-form-sidebar .layout-main-section-wrapper {
 [id="page-Employee"] .menu-btn-group,
 [id="page-Employee"] .menu-more-button,
 [id="page-User"] .menu-btn-group,
-[id="page-User"] .menu-more-button {
+[id="page-User"] .menu-more-button,
+[id="page-Salary Structure Assignment"] .menu-btn-group,
+[id="page-Salary Structure Assignment"] .menu-more-button,
+[id="page-Salary Slip"] .menu-btn-group,
+[id="page-Salary Slip"] .menu-more-button {
 	display: none !important;
 }
 [id^="page-List/"] .view-switcher,
@@ -728,6 +732,7 @@ const SUBMENU_ICONS = {
 	"shift swap": "bell-dot",
 	"bulk attendance": "wrench",
 	"time off request": "clipboard-pen",
+	"paid time off": "sun",
 	"pto cash-out": "coins",
 	"time off admin": "sliders-horizontal",
 	"extra hours": "calendar-clock",
@@ -796,6 +801,7 @@ function sidebar_href_to_link(href) {
 		}
 		if (!last) return "";
 		if (last === "organizational-chart") return "organizational-chart";
+		if (last === "paid-time-off") return "paid-time-off";
 		return last
 			.split("-")
 			.map((part) => part.charAt(0).toUpperCase() + part.slice(1))

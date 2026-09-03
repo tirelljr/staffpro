@@ -53,7 +53,9 @@ frappe.ui.form.on("Salary Structure Assignment", {
 	},
 
 	refresh: function (frm) {
+		hide_salary_structure_assignment_menu(frm);
 		frm.trigger("toggle_opening_balances_section");
+		frm.trigger("display_agent_hourly_rate");
 
 		if (frm.doc.docstatus != 1) return;
 
@@ -72,11 +74,10 @@ frappe.ui.form.on("Salary Structure Assignment", {
 		frm.add_custom_button(
 			__("See Agent Hourly Breakdown"),
 			function () {
-				if (!frm.doc.ctc) {
+				const hourly = flt(frm._agent_hourly_rate ?? frm.doc.ctc);
+				if (!hourly) {
 					frm.scroll_to_field("ctc");
-					frappe.throw(
-						__("Please set Agent Hourly to see the breakdown."),
-					);
+					frappe.throw(__("Please set Agent Hourly to see the breakdown."));
 				}
 				frappe.set_route("query-report", "Employee CTC Break-up", {
 					employee: frm.doc.employee,
@@ -98,9 +99,15 @@ frappe.ui.form.on("Salary Structure Assignment", {
 		if (frm.doc.employee) {
 			frm.trigger("set_payroll_cost_centers");
 			frm.trigger("toggle_opening_balances_section");
+			frm.trigger("display_agent_hourly_rate");
 		} else {
 			frm.set_value("payroll_cost_centers", []);
+			frm.trigger("display_agent_hourly_rate");
 		}
+	},
+
+	display_agent_hourly_rate: function (frm) {
+		show_employee_hourly_rate(frm);
 	},
 
 	company: function (frm) {
@@ -184,6 +191,60 @@ frappe.ui.form.on("Salary Structure Assignment", {
 frappe.ui.form.on("Employee Benefit Detail", {
 	amount: (frm) => calculate_max_benefit_amount(frm.doc),
 });
+
+function hide_salary_structure_assignment_menu(frm) {
+	const page = frm?.page;
+	if (!page) return;
+	if (typeof page.hide_menu === "function") {
+		page.hide_menu();
+	}
+	page.menu_btn_group?.addClass("hidden hide").hide();
+	page.wrapper?.find(".menu-btn-group, .menu-more-button").addClass("hidden hide").hide();
+}
+
+function show_employee_hourly_rate(frm) {
+	const field = frm.get_field("ctc");
+	if (!field) return;
+
+	if (!field._agent_hourly_patched) {
+		field._agent_hourly_patched = true;
+		const original_refresh = field.refresh.bind(field);
+		field.refresh = function () {
+			original_refresh();
+			render_agent_hourly_value(frm, field);
+		};
+	}
+
+	if (!frm.doc.employee) {
+		frm._agent_hourly_rate = 0;
+		frm._agent_hourly_employee = null;
+		render_agent_hourly_value(frm, field);
+		return;
+	}
+
+	if (frm._agent_hourly_employee === frm.doc.employee && frm._agent_hourly_rate != null) {
+		render_agent_hourly_value(frm, field);
+		return;
+	}
+
+	frappe.db.get_value("Employee", frm.doc.employee, "ctc").then((r) => {
+		frm._agent_hourly_rate = flt(r?.message?.ctc);
+		frm._agent_hourly_employee = frm.doc.employee;
+		render_agent_hourly_value(frm, field);
+	});
+}
+
+function render_agent_hourly_value(frm, field) {
+	const rate = flt(frm._agent_hourly_rate);
+	const formatted = format_currency(rate, frm.doc.currency);
+	const $value = field.$wrapper?.find(".control-value");
+	if ($value?.length) {
+		$value.text(formatted);
+	}
+	if (field.$input?.length) {
+		field.$input.val(rate);
+	}
+}
 
 let calculate_max_benefit_amount = (doc) => {
 	let employee_benefits = doc.employee_benefits || [];

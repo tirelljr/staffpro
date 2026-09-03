@@ -310,6 +310,44 @@ class TestAttendance(HRMSTestSuite):
 		self.assertEqual(attendance_events[0].get("attendance_date"), getdate())
 		self.assertEqual(attendance_events[0].get("employee"), employee.name)
 		self.assertIn("image", attendance_events[0])
+		self.assertIn("client", attendance_events[0])
+
+	def test_get_events_includes_client_name(self):
+		from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+
+		from hrms.setup import get_custom_fields
+
+		create_custom_fields(get_custom_fields(), ignore_validate=True)
+		if not frappe.get_meta("Employee").has_field("bill_to_customer"):
+			self.skipTest("Employee.bill_to_customer is not installed")
+
+		customer_name = "_Test Calendar Client"
+		if not frappe.db.exists("Customer", customer_name):
+			customer_group = (
+				frappe.db.get_value("Customer Group", {"is_group": 0}, "name") or "Commercial"
+			)
+			territory = frappe.db.get_value("Territory", {"is_group": 0}, "name") or "All Territories"
+			frappe.get_doc(
+				{
+					"doctype": "Customer",
+					"customer_name": customer_name,
+					"customer_type": "Company",
+					"customer_group": customer_group,
+					"territory": territory,
+				}
+			).insert(ignore_permissions=True)
+
+		employee = make_employee("test_calendar_client@example.com", company="_Test Company")
+		frappe.db.set_value("Employee", employee, "bill_to_customer", customer_name)
+		mark_attendance(employee, getdate(), status="Present")
+
+		events = get_events(start=getdate(), end=getdate())
+		row = next(
+			event
+			for event in events
+			if event.get("doctype") == "Attendance" and event.get("employee") == employee
+		)
+		self.assertEqual(row.get("client"), customer_name)
 
 	def test_get_events_for_system_manager_without_employee(self):
 		employee = make_employee("test_calendar_admin_events@example.com", company="_Test Company")
@@ -343,6 +381,25 @@ class TestAttendance(HRMSTestSuite):
 		self.assertEqual(row["status"], "IN")
 		self.assertTrue(row["in_time"])
 		self.assertEqual(row["attendance_status"], "Present")
+		self.assertIn("client", row)
+
+	def test_get_events_includes_today_roster_without_attendance(self):
+		employee = make_employee(
+			"test_calendar_live_today@example.com",
+			company="_Test Company",
+			first_name="LiveToday",
+			last_name="Agent",
+		)
+
+		events = get_events(start=getdate(), end=getdate())
+		row = next(
+			event
+			for event in events
+			if event.get("doctype") == "Attendance" and event.get("employee") == employee
+		)
+		self.assertEqual(row.get("inout"), "OUT")
+		self.assertIn("client", row)
+		self.assertEqual(row.get("employee_name"), frappe.db.get_value("Employee", employee, "employee_name"))
 
 	def test_bulk_attendance_marking_through_bg(self):
 		user1 = "test_bg1@example.com"

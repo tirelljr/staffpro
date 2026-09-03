@@ -214,22 +214,6 @@
   },
   {
    "added": 0,
-   "child": 1,
-   "collapsible": 1,
-   "hidden": 0,
-   "icon": "coins",
-   "indent": 0,
-   "is_default_module": 0,
-   "keep_closed": 0,
-   "label": "PTO Cash-out",
-   "link_to": "Leave Encashment",
-   "link_type": "DocType",
-   "open_in_new_tab": 0,
-   "show_arrow": 0,
-   "type": "Link"
-  },
-  {
-   "added": 0,
    "child": 0,
    "collapsible": 1,
    "hidden": 0,

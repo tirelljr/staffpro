@@ -1,0 +1,206 @@
+body.staff-pro-alive #page-paid-time-off,
+body.staff-pro-alive .page-container[data-page-route="paid-time-off"] {
+	background: var(--sp-canvas, #f4f4f4) !important;
+}
+
+body.staff-pro-alive #page-paid-time-off .layout-main-section-wrapper,
+body.staff-pro-alive #page-paid-time-off .page-body,
+body.staff-pro-alive .page-container[data-page-route="paid-time-off"] .layout-main-section-wrapper,
+body.staff-pro-alive .page-container[data-page-route="paid-time-off"] .page-body {
+	background: var(--sp-canvas, #f4f4f4) !important;
+}
+
+body.staff-pro-alive #page-paid-time-off .layout-main-section,
+body.staff-pro-alive .page-container[data-page-route="paid-time-off"] .layout-main-section {
+	background: transparent !important;
+	border: 0 !important;
+	box-shadow: none !important;
+	padding: 8px 20px 32px !important;
+}
+
+body.staff-pro-alive #page-paid-time-off .page-head,
+body.staff-pro-alive .page-container[data-page-route="paid-time-off"] .page-head {
+	background: transparent !important;
+	border-bottom: 0 !important;
+	box-shadow: none !important;
+}
+
+.sp-pto-page {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	padding: 0 0 24px;
+}
+
+.sp-pto-page .sp-dash-panel {
+	margin: 0;
+}
+
+.sp-pto-form__hint,
+.sp-pto-period {
+	margin: 0 0 14px;
+	font-size: 13px;
+	color: var(--sp-muted, #6b7280);
+}
+
+.sp-pto-form__grid {
+	display: grid;
+	grid-template-columns: minmax(180px, 1.4fr) repeat(2, minmax(140px, 0.9fr)) minmax(180px, 1.2fr) 110px;
+	gap: 12px;
+	align-items: end;
+}
+
+.sp-pto-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 0;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--sp-muted, #6b7280);
+}
+
+.sp-pto-field select,
+.sp-pto-field input {
+	height: 36px;
+	padding: 0 10px;
+	border: 1px solid var(--sp-card-border, #e3e6ea);
+	border-radius: 8px;
+	background: #fff;
+	color: var(--sp-ink, #111);
+	font: inherit;
+	font-weight: 500;
+}
+
+.sp-pto-field select:focus,
+.sp-pto-field input:focus {
+	outline: 2px solid rgba(22, 103, 140, 0.28);
+	border-color: var(--sp-teal, #16678c);
+}
+
+.sp-pto-form__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-top: 16px;
+}
+
+.sp-pto-allocate,
+.sp-pto-book {
+	height: 36px;
+	padding: 0 16px;
+	border-radius: 999px;
+	font-family: inherit;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.sp-pto-allocate {
+	border: 1px solid var(--sp-teal, #16678c);
+	background: #fff;
+	color: var(--sp-teal, #16678c);
+}
+
+.sp-pto-allocate:hover {
+	background: rgba(167, 200, 204, 0.35);
+}
+
+.sp-pto-book {
+	border: 0;
+	background: var(--sp-teal, #16678c);
+	color: #fff;
+}
+
+.sp-pto-book:hover {
+	background: var(--sp-teal-hover, #125a7a);
+}
+
+.sp-pto-allocate:disabled,
+.sp-pto-book:disabled {
+	opacity: 0.55;
+	cursor: wait;
+}
+
+.sp-pto-table-wrap {
+	overflow-x: auto;
+}
+
+.sp-pto-table-head,
+.sp-pto-balance-row {
+	display: grid;
+	grid-template-columns: minmax(140px, 1.3fr) minmax(140px, 1.2fr) repeat(5, minmax(72px, 0.8fr));
+	gap: 8px;
+	align-items: center;
+	padding: 10px 4px;
+	width: 100%;
+}
+
+.sp-pto-absence-head,
+.sp-pto-absence-row {
+	display: grid;
+	grid-template-columns: minmax(160px, 1.3fr) minmax(140px, 1fr) minmax(140px, 1fr) 110px;
+	gap: 8px;
+	align-items: center;
+	padding: 10px 4px;
+	width: 100%;
+}
+
+.sp-pto-table-head,
+.sp-pto-absence-head {
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--sp-soft, #9aa3af);
+	border-bottom: 1px solid var(--sp-card-border, #e3e6ea);
+}
+
+.sp-pto-balance-row,
+.sp-pto-absence-row {
+	border: 0;
+	border-bottom: 1px solid var(--sp-card-border, #e3e6ea);
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.sp-pto-balance-row:hover,
+.sp-pto-absence-row:hover {
+	background: rgba(22, 103, 140, 0.04);
+}
+
+.sp-pto-balance-list.is-loading,
+.sp-pto-absence-list.is-loading {
+	min-height: 80px;
+}
+
+.sp-pto-empty {
+	padding: 28px 8px 24px;
+	text-align: center;
+}
+
+.sp-pto-empty p {
+	margin: 0;
+	font-size: 13px;
+	color: var(--sp-muted, #6b7280);
+}
+
+@media (max-width: 900px) {
+	.sp-pto-form__grid {
+		grid-template-columns: 1fr 1fr;
+	}
+
+	.sp-pto-table-head,
+	.sp-pto-absence-head {
+		display: none;
+	}
+
+	.sp-pto-balance-row,
+	.sp-pto-absence-row {
+		grid-template-columns: 1fr 1fr;
+		gap: 6px 10px;
+	}
+}

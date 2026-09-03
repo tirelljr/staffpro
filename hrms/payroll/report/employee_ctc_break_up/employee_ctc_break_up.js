@@ -66,6 +66,8 @@ frappe.query_reports["Employee CTC Break-up"] = {
 		},
 	],
 	onload: async function (report) {
+		mount_hourly_breakdown_actions(report);
+
 		if (report.get_filter_value("employee")) return;
 
 		const employee = await hrms.get_current_employee();
@@ -82,3 +84,78 @@ frappe.query_reports["Employee CTC Break-up"] = {
 		return value;
 	},
 };
+
+function mount_hourly_breakdown_actions(report) {
+	inject_hourly_breakdown_chrome_css();
+	hide_hourly_breakdown_menus(report);
+
+	const page = report?.page;
+	let $host = page?.custom_actions?.length
+		? page.custom_actions
+		: page?.wrapper?.find(".custom-actions").first();
+	if (!$host?.length) {
+		$host = page?.wrapper?.find(".page-head-content .page-actions").first();
+	}
+	if (!$host?.length || $host.find(".sp-hourly-actions").length) return;
+
+	const $wrap = $(hourly_breakdown_actions_html());
+	$host.removeClass("hidden hide").prepend($wrap);
+	$wrap.find(".sp-hourly-print").on("click", (event) => {
+		event.preventDefault();
+		if (typeof report.print_report === "function") {
+			report.print_report();
+		}
+	});
+	$wrap.find(".sp-hourly-export").on("click", (event) => {
+		event.preventDefault();
+		if (typeof report.export_report === "function") {
+			report.export_report();
+		}
+	});
+}
+
+function hourly_breakdown_actions_html() {
+	return `<div class="sp-hourly-actions">
+		<button type="button" class="sp-report-action-btn sp-hourly-print">${frappe.utils.escape_html(
+			__("Print"),
+		)}</button>
+		<button type="button" class="sp-report-action-btn sp-hourly-export">${frappe.utils.escape_html(
+			__("Export"),
+		)}</button>
+	</div>`;
+}
+
+function inject_hourly_breakdown_chrome_css() {
+	if (document.getElementById("staff-pro-hourly-breakdown-css")) return;
+	const style = document.createElement("style");
+	style.id = "staff-pro-hourly-breakdown-css";
+	style.textContent = `
+		#page-query-report:has(.sp-hourly-actions) .inner-group-button,
+		#page-query-report:has(.sp-hourly-actions) .menu-btn-group,
+		#page-query-report:has(.sp-hourly-actions) .menu-more-button {
+			display: none !important;
+		}
+		#page-query-report:has(.sp-hourly-actions) .page-icon-group {
+			display: none !important;
+		}
+	`;
+	document.head.appendChild(style);
+}
+
+function hide_hourly_breakdown_menus(report) {
+	const $wrapper = report?.page?.wrapper;
+	if (!$wrapper?.length) return;
+
+	const apply = () => {
+		$wrapper.find(".inner-group-button, .menu-btn-group, .menu-more-button").addClass("hidden").hide();
+		$wrapper.find(".page-icon-group").addClass("hidden").hide();
+		report?.refresh_button?.show?.();
+	};
+	apply();
+	if (report._staff_pro_hourly_chrome) return;
+	report._staff_pro_hourly_chrome = true;
+	const head = $wrapper.find(".page-head").get(0);
+	if (!head || typeof MutationObserver === "undefined") return;
+	const observer = new MutationObserver(apply);
+	observer.observe(head, { childList: true, subtree: true });
+}

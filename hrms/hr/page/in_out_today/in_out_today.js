@@ -268,40 +268,15 @@ frappe.in_out_today = {
 			$summary.empty().hide();
 			return;
 		}
-		$summary
-			.html(
-				`
-			<table class="sp-inout-dash__summary-table">
-				<thead>
-					<tr>
-						<th>${this.escape(__("Department"))}</th>
-						<th>${this.escape(__("Employees"))}</th>
-						<th>${this.escape(__("IN"))}</th>
-						<th>${this.escape(__("OUT"))}</th>
-					</tr>
-				</thead>
-				<tbody>
-					${rows
-						.map(
-							(row) => `
-						<tr>
-							<td>${this.escape(row.department || __("No Department"))}</td>
-							<td>${Number(row.employees || 0)}</td>
-							<td>${Number(row.in_count || 0)}</td>
-							<td>${Number(row.out_count || 0)}</td>
-						</tr>`,
-						)
-						.join("")}
-				</tbody>
-			</table>
-		`,
-			)
-			.show();
+		$summary.html(hrms.ui.inout_summary_table_html(rows, (value) => this.escape(value))).show();
 	},
 
 	status_label(row) {
+		if (hrms.ui.late_status_label) {
+			return hrms.ui.late_status_label(row);
+		}
 		if (row.late) {
-			return __("LATE");
+			return row.late_label ? `${__("LATE")} ${row.late_label}` : __("LATE");
 		}
 		return row.status || __("OUT");
 	},

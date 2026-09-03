@@ -11,7 +11,7 @@ frappe.pages["day-view"].on_page_load = function (wrapper) {
 };
 
 frappe.pages["day-view"].on_page_show = function () {
-	hrms.day_view.refresh();
+	hrms.day_view.start_on_today();
 };
 
 hrms.day_view = {
@@ -28,7 +28,7 @@ hrms.day_view = {
 	employee: "",
 	department: "",
 	group_by_date: false,
-	range_key: "this_week",
+	range_key: "today",
 	last_people: [],
 
 	make(page) {
@@ -61,7 +61,7 @@ hrms.day_view = {
 				<div class="sp-dayview__quick">
 					<button type="button" class="sp-dayview__quick-btn" aria-haspopup="listbox">${frappe.utils.escape_html(__("Quick Dates"))}</button>
 					<div class="sp-dayview__quick-menu" hidden>
-						<button type="button" data-range="today">${frappe.utils.escape_html(__("Today"))}</button>
+						<button type="button" data-range="today" class="is-selected">${frappe.utils.escape_html(__("Today"))}</button>
 						<button type="button" data-range="this_week">${frappe.utils.escape_html(__("This Week"))}</button>
 						<button type="button" data-range="last_week">${frappe.utils.escape_html(__("Last Week"))}</button>
 						<button type="button" data-range="this_month">${frappe.utils.escape_html(__("This Month"))}</button>
@@ -171,11 +171,11 @@ hrms.day_view = {
 			method: "hrms.hr.doctype.attendance.attendance.get_hours_date_presets",
 			callback(r) {
 				me.presets = r.message || me.local_presets();
-				me.set_range("this_week");
+				me.set_range("today");
 			},
 			error() {
 				me.presets = me.local_presets();
-				me.set_range("this_week");
+				me.set_range("today");
 			},
 		});
 		frappe.call({
@@ -211,6 +211,23 @@ hrms.day_view = {
 	close_quick() {
 		this.$body.find(".sp-dayview__quick-menu").prop("hidden", true);
 		this.$body.find(".sp-dayview__quick").removeClass("is-open");
+	},
+
+	start_on_today() {
+		if (!this.$body) return;
+		if (this.presets?.today) {
+			this.set_range("today");
+			return;
+		}
+		const today = frappe.datetime.get_today();
+		this.range_key = "today";
+		this.from_date = today;
+		this.to_date = today;
+		this.$body.find(".sp-dayview__from").val(today);
+		this.$body.find(".sp-dayview__to").val(today);
+		this.$body.find(".sp-dayview__quick-menu [data-range]").removeClass("is-selected");
+		this.$body.find('.sp-dayview__quick-menu [data-range="today"]').addClass("is-selected");
+		this.refresh();
 	},
 
 	set_range(key, skip_refresh) {

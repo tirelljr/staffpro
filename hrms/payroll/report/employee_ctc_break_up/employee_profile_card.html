@@ -117,10 +117,10 @@
                 <div
                     class="text-dark text-large no-wrap"
                 >
-                    {{ annual_ctc }}
+                    {{ hourly_rate or annual_ctc }}
                 </div>
                 <div class="mt-1 text-small no-wrap">
-                   {{_("Annual Agent Hourly")}}
+                   {{_("Agent Hourly")}}
                 </div>
 		    </div>
 
@@ -132,7 +132,7 @@
                 </div>
 
                 <div class="mt-1 text-small no-wrap">
-                    {{_(per_cycle + " Agent Hourly")}}
+                    {{_(per_cycle + " Cost")}}
                 </div>
 		    </div>
         </div>

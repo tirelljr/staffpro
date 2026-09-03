@@ -128,9 +128,12 @@
   },
   {
    "allow_on_submit": 1,
+   "description": "Hourly pay from the employee record.",
+   "fetch_from": "employee.ctc",
    "fieldname": "ctc",
    "fieldtype": "Currency",
    "label": "Agent Hourly",
+   "options": "currency",
    "read_only": 1
   },
   {
@@ -271,7 +274,7 @@
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-08-06 13:01:43.187327",
+ "modified": "2026-09-03 11:20:00.000000",
  "modified_by": "Administrator",
  "module": "Payroll",
  "name": "Salary Structure Assignment",

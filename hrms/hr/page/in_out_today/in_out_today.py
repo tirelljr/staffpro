@@ -10,6 +10,33 @@ from frappe.utils import add_days, cint, get_datetime, get_time, getdate, now_da
 
 
 @frappe.whitelist()
+def get_attendance_late_label(
+	employee: str | None = None,
+	attendance_date: str | None = None,
+	in_time: str | None = None,
+	shift: str | None = None,
+):
+	if not in_time:
+		return ""
+	day = getdate(attendance_date) if attendance_date else getdate(in_time)
+	employee_doc = frappe._dict(default_shift=None)
+	if employee:
+		employee_doc.default_shift = frappe.db.get_value("Employee", employee, "default_shift")
+	first_in = frappe._dict(time=in_time, shift=shift, shift_start=None)
+	shift_map = _get_shift_map([employee_doc], {employee or "": [first_in]}, {employee or "": frappe._dict(shift=shift)})
+	_, _, label = _late_status(
+		employee=employee_doc,
+		first_in=first_in,
+		attendance=frappe._dict(shift=shift, status="", late_entry=1),
+		leave=None,
+		shift_map=shift_map,
+		as_of=get_datetime(in_time),
+		attendance_date=day,
+	)
+	return label
+
+
+@frappe.whitelist()
 def get_in_out_today(department: str | None = None, attendance_date: str | None = None):
 	frappe.only_for(["HR Manager", "HR User", "System Manager", "Administrator"])
 	today = getdate(attendance_date) if attendance_date else getdate()
@@ -72,10 +99,18 @@ def _build_details(employees, today):
 		latest = punches[-1] if punches else None
 		first_in = next((punch for punch in punches if (punch.log_type or "IN") == "IN"), None)
 		status = "IN" if latest and (latest.log_type or "IN") != "OUT" else "OUT"
-		late = status == "IN" and first_in and _is_late(first_in, employee.default_shift, shift_map)
+		leave = leave_by_employee.get(employee.name)
+		late, late_minutes, late_label = _late_status(
+			employee=employee,
+			first_in=first_in,
+			attendance=attendance,
+			leave=leave,
+			shift_map=shift_map,
+			as_of=as_of,
+			attendance_date=today,
+		)
 
 		punch_dt = get_datetime(latest.time) if latest and latest.time else None
-		leave = leave_by_employee.get(employee.name)
 		in_dt = _first_in_datetime(punches, attendance)
 		out_dt = _last_out_datetime(punches, attendance, as_of)
 
@@ -87,12 +122,15 @@ def _build_details(employees, today):
 				"department": employee.department or "",
 				"status": status,
 				"late": bool(late),
+				"late_minutes": late_minutes,
+				"late_label": late_label,
 				"attendance_status": (attendance.status if attendance else "") or "",
 				"attendance": (attendance.name if attendance else "") or "",
 				"date": punch_dt.date().isoformat() if punch_dt else str(today),
 				"time": _format_time(punch_dt) if punch_dt else "",
 				"in_time": _format_time(in_dt) if in_dt else "",
 				"out_time": _format_time(out_dt) if out_dt else "",
+				"leave_type": (leave.leave_type or "").strip() if leave else "",
 				"pto_code": _pto_code(leave),
 				"device_id": (latest.device_id or "") if latest else "",
 			}
@@ -126,7 +164,7 @@ def _get_todays_attendance(employee_ids, today):
 		return {}
 	rows = frappe.get_all(
 		"Attendance",
-		fields=["name", "employee", "in_time", "out_time", "shift", "status"],
+		fields=["name", "employee", "in_time", "out_time", "shift", "status", "late_entry"],
 		filters=[
 			["employee", "in", employee_ids],
 			["attendance_date", "=", today],
@@ -236,19 +274,73 @@ def _get_shift_map(employees, punches_by_employee, attendance_by_employee=None):
 
 
 def _is_late(first_in, default_shift, shift_map):
-	shift_name = first_in.shift or default_shift
-	shift = shift_map.get(shift_name)
-	if not first_in or not shift or not cint(shift.enable_late_entry_marking):
-		return False
+	late, _, _ = _late_status(
+		employee=frappe._dict(default_shift=default_shift),
+		first_in=first_in,
+		attendance=None,
+		leave=None,
+		shift_map=shift_map,
+		as_of=get_datetime(first_in.time) if first_in and first_in.time else now_datetime(),
+		attendance_date=getdate(first_in.time) if first_in and first_in.time else getdate(),
+	)
+	return late
 
-	baseline = get_datetime(first_in.shift_start) if first_in.shift_start else None
-	if not baseline and shift.start_time is not None:
-		baseline = datetime.combine(getdate(first_in.time), get_time(shift.start_time))
+
+def _late_status(employee, first_in, attendance, leave, shift_map, as_of, attendance_date):
+	if leave or (attendance and attendance.status == "On Leave"):
+		return False, 0, ""
+
+	shift_name = (
+		(first_in.shift if first_in else None)
+		or (attendance.shift if attendance else None)
+		or getattr(employee, "default_shift", None)
+	)
+	shift = shift_map.get(shift_name) if shift_name else None
+	baseline = _shift_start(first_in, shift, attendance_date)
 	if not baseline:
-		return False
+		if attendance and cint(getattr(attendance, "late_entry", 0)):
+			return True, 0, ""
+		return False, 0, ""
 
-	grace = timedelta(minutes=cint(shift.late_entry_grace_period))
-	return get_datetime(first_in.time) > baseline + grace
+	grace_minutes = cint(shift.late_entry_grace_period) if shift and cint(shift.enable_late_entry_marking) else 0
+	deadline = baseline + timedelta(minutes=grace_minutes)
+	compare_at = get_datetime(first_in.time) if first_in and first_in.time else as_of
+	if not first_in:
+		if getdate(attendance_date) != getdate():
+			return False, 0, ""
+		if compare_at <= deadline:
+			return False, 0, ""
+	elif compare_at <= deadline:
+		return False, 0, ""
+
+	late_minutes = max(0, int((compare_at - baseline).total_seconds() // 60))
+	return True, late_minutes, format_late_label(late_minutes)
+
+
+def _shift_start(first_in, shift, attendance_date):
+	if first_in and getattr(first_in, "shift_start", None):
+		return get_datetime(first_in.shift_start)
+	if shift and shift.start_time is not None:
+		day = getdate(first_in.time) if first_in and first_in.time else getdate(attendance_date)
+		return datetime.combine(day, get_time(shift.start_time))
+	return None
+
+
+def format_late_label(minutes) -> str:
+	minutes = max(0, int(minutes or 0))
+	if minutes <= 0:
+		return ""
+	hours, mins = divmod(minutes, 60)
+	parts = []
+	if hours == 1:
+		parts.append(_("1 hour"))
+	elif hours > 1:
+		parts.append(_("{0} hours").format(hours))
+	if mins == 1:
+		parts.append(_("1 minute"))
+	elif mins:
+		parts.append(_("{0} minutes").format(mins))
+	return " ".join(parts)
 
 
 def _pto_code(leave):

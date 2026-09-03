@@ -10,17 +10,32 @@ frappe.ui.form.on("Additional Salary", {
 		);
 
 		frm.set_query("employee", function () {
-			return {
-				filters: {
-					company: frm.doc.company,
-					status: ["!=", "Inactive"],
-				},
-			};
+			const filters = { status: ["!=", "Inactive"] };
+			if (frm.doc.company) {
+				filters.company = frm.doc.company;
+			}
+			return { filters };
 		});
 	},
 
 	onload: function (frm) {
+		if (frm.is_new()) {
+			if (!frm.doc.company) {
+				frm.set_value("company", frappe.defaults.get_user_default("Company"));
+			}
+			if (!frm.doc.salary_component) {
+				frm.set_value("salary_component", "Bonus");
+			}
+			if (!frm.doc.naming_series) {
+				frm.set_value("naming_series", "HR-ADS-.YY.-.MM.-");
+			}
+		}
 		frm.trigger("set_component_query");
+	},
+
+	refresh: function (frm) {
+		frm.set_df_property("naming_series", "hidden", 1);
+		frm.set_df_property("company", "hidden", 1);
 	},
 
 	employee: function (frm) {
@@ -57,8 +72,6 @@ frappe.ui.form.on("Additional Salary", {
 	},
 
 	set_component_query: function (frm) {
-		if (!frm.doc.company) return;
-
 		frm.set_query("salary_component", function () {
 			return {
 				filters: {

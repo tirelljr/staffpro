@@ -212,6 +212,94 @@ def clear(company=None):
 	print(f"Cleared HR demo data for {company}.")
 
 
+PAYROLL_RUN_DOCTYPES = (
+	"Client Invoice",
+	"Salary Slip",
+	"Additional Salary",
+	"Overtime Slip",
+	"Payroll Correction",
+	"Arrear",
+	"Employee Incentive",
+	"Retention Bonus",
+	"Salary Withholding",
+	"Payroll Entry",
+)
+
+
+def clear_payroll(company=None):
+	"""Remove payroll run documents so a fresh payroll can be tested."""
+	company = company or _get_company()
+	frappe.only_for("System Manager")
+
+	deleted = {}
+	for doctype in PAYROLL_RUN_DOCTYPES:
+		if not frappe.db.exists("DocType", doctype):
+			continue
+		filters = {"company": company} if frappe.get_meta(doctype).has_field("company") else {}
+		names = frappe.get_all(doctype, filters=filters, pluck="name")
+		count = 0
+		for name in names:
+			_force_delete_doc(doctype, name)
+			count += 1
+		deleted[doctype] = count
+
+	_clear_payroll_accounting(company)
+	_reset_payroll_series()
+	if not frappe.flags.in_test:
+		frappe.db.commit()
+	print(f"Cleared demo payroll data for {company}: {deleted}")
+	status(company)
+
+
+def _force_delete_doc(doctype, name):
+	try:
+		doc = frappe.get_doc(doctype, name)
+		if cint(doc.docstatus) == 1:
+			doc.flags.ignore_permissions = True
+			doc.flags.ignore_links = True
+			try:
+				doc.cancel()
+			except Exception:
+				frappe.db.set_value(doctype, name, "docstatus", 2, update_modified=False)
+		frappe.delete_doc(
+			doctype,
+			name,
+			force=True,
+			ignore_permissions=True,
+			ignore_on_trash=True,
+			delete_permanently=True,
+		)
+	except Exception:
+		frappe.db.delete(doctype, {"name": name})
+
+
+def _clear_payroll_accounting(company):
+	if frappe.db.exists("DocType", "Journal Entry"):
+		for name in frappe.get_all(
+			"Journal Entry",
+			filters={"company": company, "voucher_type": "Journal Entry", "user_remark": ("like", "%Salary%")},
+			pluck="name",
+		):
+			_force_delete_doc("Journal Entry", name)
+		for name in frappe.get_all(
+			"Journal Entry",
+			or_filters={"cheque_no": ("like", "HR-PRUN%"), "bill_no": ("like", "Sal Slip%")},
+			pluck="name",
+		):
+			_force_delete_doc("Journal Entry", name)
+	if frappe.db.exists("DocType", "GL Entry"):
+		frappe.db.delete("GL Entry", {"voucher_type": "Salary Slip", "company": company})
+		frappe.db.delete("GL Entry", {"voucher_type": "Payroll Entry", "company": company})
+
+
+def _reset_payroll_series():
+	year = getdate().year
+	frappe.db.sql(
+		"update `tabSeries` set current=0 where name in (%s, %s)",
+		(f"HR-PRUN-{year}-", f"CI-{year}-"),
+	)
+
+
 def status(company=None):
 	company = company or _get_company()
 	for doctype in (

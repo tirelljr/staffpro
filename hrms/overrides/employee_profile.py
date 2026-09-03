@@ -59,6 +59,7 @@ def get_employee_profile_stats(employee: str) -> dict:
 	hours = _total_hours(employee)
 	income = _salary_totals(employee)
 	billed = _billed_totals(employee)
+	leave_remaining = _leave_remaining(employee)
 	billed_company = _convert_amount(billed["amount"], billed["currency"], company_currency)
 	agent_profit = flt(billed_company) - flt(income["gross_pay"])
 
@@ -74,7 +75,22 @@ def get_employee_profile_stats(employee: str) -> dict:
 		"total_tax": flt(income["tax"], 2),
 		"total_billed": flt(billed["amount"], 2),
 		"agent_profit": flt(agent_profit, 2),
+		"leave_remaining": leave_remaining,
 	}
+
+
+def _leave_remaining(employee: str) -> float:
+	try:
+		from hrms.hr.doctype.leave_application.leave_application import get_leave_details
+
+		details = get_leave_details(employee, getdate())
+	except Exception:
+		return 0.0
+
+	total = 0.0
+	for values in (details.get("leave_allocation") or {}).values():
+		total += flt(values.get("remaining_leaves"))
+	return flt(total, 2)
 
 
 def _total_hours(employee: str) -> float:

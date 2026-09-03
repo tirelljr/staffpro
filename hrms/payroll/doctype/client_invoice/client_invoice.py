@@ -4,7 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt, getdate
+from frappe.utils import cint, flt, getdate
 
 from hrms.payroll.bpo_client_accounts import get_invoice_receivable_account
 
@@ -106,7 +106,7 @@ class ClientInvoice(Document):
 		}
 
 	@frappe.whitelist()
-	def get_agents(self):
+	def get_agents(self, include_zero_hours: int | bool = 0):
 		"""Fill agents table from attendance for employees billed to this customer."""
 		self.validate_dates()
 		self.set_billing_currency()
@@ -129,14 +129,15 @@ class ClientInvoice(Document):
 
 		employee_names = [e.name for e in employees]
 		hours_by_employee = get_hours_by_employee(employee_names, self.from_date, self.to_date)
+		keep_zero_hours = bool(cint(include_zero_hours))
 
 		self.set("agents", [])
 		for employee in employees:
 			hours = flt(hours_by_employee.get(employee.name))
-			if not hours:
+			if not hours and not keep_zero_hours:
 				continue
 			rate = get_employee_billing_rate(employee.name, self.customer, employee.billing_rate)
-			if not rate:
+			if hours and not rate:
 				frappe.throw(
 					_("Set a billing rate on agent {0} or a default billing rate on client {1}").format(
 						frappe.bold(employee.employee_name or employee.name),
@@ -154,7 +155,7 @@ class ClientInvoice(Document):
 				},
 			)
 
-		if not self.agents:
+		if not self.agents and not keep_zero_hours:
 			frappe.throw(
 				_("No billable attendance found for agents of {0} between {1} and {2}").format(
 					frappe.bold(self.customer), self.from_date, self.to_date
@@ -165,10 +166,11 @@ class ClientInvoice(Document):
 		return self
 
 	def on_submit(self):
-		if not self.agents:
-			frappe.throw(_("Add at least one agent before submitting"))
 		self.set_billing_currency()
 		self.calculate_totals()
+		if not self.agents or flt(self.total_hours) <= 0:
+			self.db_set({"status": "Submitted", "sales_invoice": None})
+			return
 		sales_invoice = self.create_sales_invoice()
 		self.db_set(
 			{

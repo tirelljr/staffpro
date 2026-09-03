@@ -3,7 +3,7 @@
 
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
-from frappe.utils import add_days, getdate
+from frappe.utils import add_days, flt, getdate
 
 from erpnext.setup.doctype.employee.test_employee import make_employee
 
@@ -51,7 +51,9 @@ class TestAutoClientInvoice(HRMSTestSuite):
 		frappe.db.set_single_value("Payroll Settings", self._previous, update_modified=False)
 
 	def _ensure_customer(self):
-		name = "_Test BPO Client"
+		return self._ensure_named_customer("_Test BPO Client")
+
+	def _ensure_named_customer(self, name):
 		if not frappe.db.exists("Customer", name):
 			customer_group = (
 				frappe.db.get_value("Customer Group", {"is_group": 0}, "name") or "Commercial"
@@ -215,6 +217,29 @@ class TestAutoClientInvoice(HRMSTestSuite):
 		self.assertEqual(getdate(invoice.to_date), end_date)
 		self.assertEqual(invoice.payroll_entry, entry.name)
 		self.assertTrue(invoice.sales_invoice)
+
+	def test_payroll_entry_creates_invoice_without_attendance(self):
+		customer = self._ensure_named_customer("_Test Empty Hours Client")
+		employee = make_employee("test_payroll_invoice_no_hours@example.com", company="_Test Company")
+		frappe.db.set_value(
+			"Employee",
+			employee,
+			{"bill_to_customer": customer, "billing_rate": 20},
+		)
+		start_date = getdate()
+		end_date = add_days(start_date, 4)
+
+		entry = self._insert_payroll_entry(start_date, end_date)
+		entry.customer = customer
+		created = create_invoices_for_payroll_entry(entry)
+
+		self.assertTrue(created)
+		invoice = frappe.get_doc("Client Invoice", created[0])
+		self.assertEqual(invoice.docstatus, 1)
+		self.assertEqual(invoice.customer, customer)
+		self.assertFalse(invoice.sales_invoice)
+		self.assertGreaterEqual(len(invoice.agents), 1)
+		self.assertAlmostEqual(flt(invoice.total_hours), 0.0)
 
 	def test_payroll_entry_does_not_duplicate_client_invoice(self):
 		agent = self._make_agent("test_payroll_invoice_dedupe@example.com", 18)

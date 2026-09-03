@@ -12,8 +12,12 @@ from hrms.payroll.auto_payroll import (
 	days_for_frequency,
 	frequency_label,
 	get_pay_period,
+	get_payroll_agent_buckets,
+	get_payroll_customers,
 	get_working_period_end,
+	plan_payroll,
 	process_automatic_payroll,
+	resolve_custom_pay_period,
 	set_automatic_payroll_interval,
 	subtract_working_days,
 )
@@ -102,6 +106,54 @@ class TestAutoPayroll(HRMSTestSuite):
 		self.assertFalse(result["created"])
 		self.assertIn("turned off", result["message"].lower())
 
+	def test_preview_when_disabled(self):
+		frappe.db.set_single_value("Payroll Settings", "enable_automatic_payroll", 0)
+		result = plan_payroll(every_agent=True, force=True)
+		self.assertFalse(result["can_create"])
+		self.assertFalse(result["entries"])
+		self.assertIn("turned off", result["message"].lower())
+
+	def test_custom_pay_period_uses_selected_dates(self):
+		start, end = resolve_custom_pay_period({"interval": 5}, "2026-07-18", "2026-07-24")
+		self.assertEqual(start, date(2026, 7, 18))
+		self.assertEqual(end, date(2026, 7, 24))
+
+	def test_custom_pay_period_fills_end_from_interval(self):
+		start, end = resolve_custom_pay_period({"interval": 5}, "2026-07-20", None)
+		self.assertEqual(start, date(2026, 7, 20))
+		self.assertEqual(end, add_working_days(date(2026, 7, 20), 5))
+
+	def test_custom_pay_period_rejects_inverted_range(self):
+		self.assertRaises(
+			frappe.ValidationError,
+			resolve_custom_pay_period,
+			{"interval": 5},
+			"2026-07-24",
+			"2026-07-18",
+		)
+
+	def test_plan_payroll_uses_custom_dates(self):
+		frappe.db.set_single_value(
+			"Payroll Settings",
+			{
+				"enable_automatic_payroll": 1,
+				"automatic_payroll_company": "_Test Company",
+				"automatic_payroll_weekly_days": 5,
+				"automatic_payroll_fortnightly_days": 0,
+				"automatic_payroll_monthly_days": 0,
+			},
+			update_modified=False,
+		)
+		result = plan_payroll(
+			every_agent=True, force=True, start_date="2026-07-18", end_date="2026-07-24"
+		)
+		if result.get("entries"):
+			self.assertEqual(result.get("start_date"), "2026-07-18")
+			self.assertEqual(result.get("end_date"), "2026-07-24")
+			for entry in result["entries"]:
+				self.assertEqual(entry["start_date"], "2026-07-18")
+				self.assertEqual(entry["end_date"], "2026-07-24")
+
 	def test_set_automatic_payroll_interval(self):
 		result = set_automatic_payroll_interval(
 			weekly_days=7, fortnightly_days=14, monthly_days=30, enable=1
@@ -141,3 +193,57 @@ class TestAutoPayroll(HRMSTestSuite):
 		self.assertEqual(cint(entry.salary_slip_based_on_timesheet), 0)
 		self.assertEqual(entry.payroll_frequency, "Weekly")
 		self.assertEqual(cint(entry.deduct_social_security), 1)
+
+	def test_get_payroll_agent_buckets_skips_clients_without_agents(self):
+		from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+
+		from hrms.setup import get_custom_fields
+
+		create_custom_fields(get_custom_fields(), ignore_validate=True)
+		if not frappe.get_meta("Employee").has_field("bill_to_customer"):
+			self.skipTest("Employee.bill_to_customer is not configured")
+		if not frappe.get_meta("Payroll Entry").has_field("customer"):
+			self.skipTest("Payroll Entry.customer is not configured")
+
+		from erpnext.setup.doctype.employee.test_employee import make_employee
+
+		company = "_Test Company"
+		empty_client = "_Test Payroll Empty Client"
+		if not frappe.db.exists("Customer", empty_client):
+			customer_group = frappe.db.get_value("Customer Group", {"is_group": 0}, "name") or "Commercial"
+			territory = frappe.db.get_value("Territory", {"is_group": 0}, "name") or "All Territories"
+			frappe.get_doc(
+				{
+					"doctype": "Customer",
+					"customer_name": empty_client,
+					"customer_type": "Company",
+					"customer_group": customer_group,
+					"territory": territory,
+				}
+			).insert(ignore_permissions=True)
+
+		assigned_client = "_Test Payroll Assigned Client"
+		if not frappe.db.exists("Customer", assigned_client):
+			customer_group = frappe.db.get_value("Customer Group", {"is_group": 0}, "name") or "Commercial"
+			territory = frappe.db.get_value("Territory", {"is_group": 0}, "name") or "All Territories"
+			frappe.get_doc(
+				{
+					"doctype": "Customer",
+					"customer_name": assigned_client,
+					"customer_type": "Company",
+					"customer_group": customer_group,
+					"territory": territory,
+				}
+			).insert(ignore_permissions=True)
+
+		employee = make_employee("payroll.bucket.assigned@example.com", company=company)
+		frappe.db.set_value("Employee", employee, "bill_to_customer", assigned_client)
+
+		customers = get_payroll_customers(company)
+		self.assertIn(assigned_client, customers)
+		self.assertNotIn(empty_client, customers)
+
+		buckets = get_payroll_agent_buckets(company)
+		bucket_customers = {bucket.get("customer") for bucket in buckets if bucket.get("customer")}
+		self.assertIn(assigned_client, bucket_customers)
+		self.assertNotIn(empty_client, bucket_customers)

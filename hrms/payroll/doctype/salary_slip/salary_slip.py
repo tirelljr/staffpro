@@ -1757,16 +1757,6 @@ class SalarySlip(TransactionBase):
 				d.salary_component for d in self.get("deductions") if d.variable_based_on_taxable_salary
 			]
 
-		if self.is_new() and not tax_components:
-			tax_components = self.get_tax_components()
-			frappe.msgprint(
-				_(
-					"Added tax components from the Salary Component master as the salary structure didn't have any tax component."
-				),
-				indicator="blue",
-				alert=True,
-			)
-
 		self._component_based_variable_tax = {}
 		self._tax_adjustment = None
 		if self.payroll_period:

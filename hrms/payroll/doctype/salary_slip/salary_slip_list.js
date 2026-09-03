@@ -46,6 +46,7 @@ frappe.listview_settings["Salary Slip"] = {
 	},
 	onload: function (listview) {
 		inject_pay_agent_styles();
+		ensure_pay_period_sort(listview);
 		move_ss_column_beside_net_pay(listview);
 		apply_past_payment_columns(listview);
 		ensure_pay_agent_column(listview);
@@ -78,9 +79,11 @@ frappe.listview_settings["Salary Slip"] = {
 		});
 	},
 	refresh: function (listview) {
+		ensure_pay_period_sort(listview);
 		move_ss_column_beside_net_pay(listview);
 		apply_past_payment_columns(listview);
 		ensure_pay_agent_column(listview);
+		group_slips_by_pay_period(listview);
 		place_pay_agent_buttons(listview);
 		apply_pay_stubs_status_filter(listview);
 		set_pay_stubs_title(listview);
@@ -183,6 +186,249 @@ function set_pay_stubs_title(listview) {
 	if (typeof listview.page?.set_title === "function") {
 		listview.page.set_title(title);
 	}
+}
+
+function ensure_pay_period_sort(listview) {
+	if (!listview) return;
+	if (!listview._staff_pro_period_sort_default) {
+		if (listview.page_length && listview.page_length < 100) {
+			listview.page_length = 100;
+		}
+		listview.sort_by = "end_date";
+		listview.sort_order = "desc";
+		listview._staff_pro_period_sort_default = true;
+	}
+	if (!listview._staff_pro_period_sort_ui && listview.sort_selector) {
+		listview.sort_selector.sort_by = "end_date";
+		listview.sort_selector.sort_order = "desc";
+		if (typeof listview.sort_selector.update_option === "function") {
+			listview.sort_selector.update_option();
+		}
+		listview._staff_pro_period_sort_ui = true;
+	}
+	if (listview._staff_pro_period_render_hooked || typeof listview.render !== "function") {
+		return;
+	}
+	listview._staff_pro_period_render_hooked = true;
+	const original = listview.render.bind(listview);
+	listview.render = function () {
+		const result = original.apply(this, arguments);
+		if (!listview._staff_pro_rendering_payment_cols) {
+			group_slips_by_pay_period(listview);
+			place_pay_agent_buttons(listview);
+		}
+		return result;
+	};
+}
+
+function pay_period_list_host(listview) {
+	const $result = listview?.$result;
+	if (!$result?.length) return $();
+	if ($result.hasClass("result") || $result.find("> .list-row-container").length) {
+		return $result;
+	}
+	const $nested = $result.find(".result").first();
+	return $nested.length ? $nested : $result;
+}
+
+function slip_row_name($row) {
+	return (
+		$row.find(".list-row-checkbox").attr("data-name") ||
+		$row.attr("data-name") ||
+		""
+	);
+}
+
+function pay_period_from_doc(doc, past) {
+	const start = doc?.start_date || "";
+	const end = doc?.end_date || "";
+	if (start || end) {
+		return { key: `${start}|${end}`, start, end };
+	}
+	const fallback = past ? doc?.payment_date || doc?.posting_date : doc?.posting_date;
+	const date = fallback || "";
+	return { key: `${date}|${date}`, start: date, end: date };
+}
+
+function format_pay_period_label(start, end) {
+	if (!start && !end) {
+		return __("Unknown Pay Period");
+	}
+	const start_s = start ? frappe.datetime.str_to_user(start) : "";
+	const end_s = end ? frappe.datetime.str_to_user(end) : "";
+	if (start_s && end_s && start_s !== end_s) {
+		return __("Pay Period: {0} – {1}", [start_s, end_s]);
+	}
+	return __("Pay Period: {0}", [start_s || end_s]);
+}
+
+function pay_period_expanded_store() {
+	const key = `staff_pro_pay_period_expanded_${get_pay_stubs_mode()}`;
+	let stored = {};
+	try {
+		stored = JSON.parse(sessionStorage.getItem(key) || "{}") || {};
+	} catch (e) {
+		stored = {};
+	}
+	return {
+		get(period_key, fallback) {
+			return Object.prototype.hasOwnProperty.call(stored, period_key)
+				? Boolean(stored[period_key])
+				: fallback;
+		},
+		set(period_key, expanded) {
+			stored[period_key] = Boolean(expanded);
+			try {
+				sessionStorage.setItem(key, JSON.stringify(stored));
+			} catch (e) {
+				/* ignore */
+			}
+		},
+	};
+}
+
+function unwrap_pay_period_groups($host) {
+	$host.find(".staff-pro-pay-period-group").each(function () {
+		const $group = $(this);
+		$group.find(".staff-pro-pay-period-rows > .list-row-container").insertBefore($group);
+		$group.remove();
+	});
+}
+
+function set_pay_period_expanded($group, expanded) {
+	$group.attr("data-expanded", expanded ? "1" : "0");
+	$group
+		.find(".staff-pro-pay-period-toggle")
+		.attr("aria-expanded", expanded ? "true" : "false");
+}
+
+function group_slips_by_pay_period(listview) {
+	const $host = pay_period_list_host(listview);
+	if (!$host.length) return;
+
+	unwrap_pay_period_groups($host);
+
+	const $header = $host.children(".list-row-container").filter(function () {
+		return $(this).find(".list-row-head").length;
+	});
+	const $rows = $host.children(".list-row-container").filter(function () {
+		return !$(this).find(".list-row-head").length;
+	});
+	if (!$rows.length) return;
+
+	const past = get_pay_stubs_mode() === "past";
+	const data_by_name = Object.create(null);
+	(listview.data || []).forEach((row) => {
+		if (row?.name) data_by_name[row.name] = row;
+	});
+
+	const groups = new Map();
+	$rows.each(function () {
+		const $row = $(this);
+		const doc = data_by_name[slip_row_name($row)] || {};
+		const period = pay_period_from_doc(doc, past);
+		if (!groups.has(period.key)) {
+			groups.set(period.key, { ...period, $rows: [] });
+		}
+		groups.get(period.key).$rows.push($row);
+	});
+
+	const ordered = Array.from(groups.values()).sort((a, b) => {
+		if (a.end === b.end) {
+			return String(b.start || "").localeCompare(String(a.start || ""));
+		}
+		return String(b.end || "").localeCompare(String(a.end || ""));
+	});
+
+	const store = pay_period_expanded_store();
+	const escape = frappe.utils.escape_html;
+	const chevron =
+		typeof frappe.utils.icon === "function" ? frappe.utils.icon("down", "sm") : "▾";
+	let $after = $header.last();
+
+	ordered.forEach((group, idx) => {
+		const expanded = store.get(group.key, idx === 0);
+		const count_label =
+			group.$rows.length === 1
+				? __("1 pay stub")
+				: __("{0} pay stubs", [group.$rows.length]);
+		const $wrap = $(
+			`<div class="staff-pro-pay-period-group" data-period-key="${escape(group.key)}">
+				<div class="staff-pro-pay-period-header">
+					<label class="staff-pro-period-check-wrap">
+						<input type="checkbox" class="staff-pro-period-check" aria-label="${escape(
+							__("Select pay period"),
+						)}">
+					</label>
+					<button type="button" class="staff-pro-pay-period-toggle">
+						<span class="staff-pro-pay-period-chevron">${chevron}</span>
+						<span class="staff-pro-pay-period-title">${escape(
+							format_pay_period_label(group.start, group.end),
+						)}</span>
+						<span class="staff-pro-pay-period-count">${escape(count_label)}</span>
+					</button>
+				</div>
+				<div class="staff-pro-pay-period-rows"></div>
+			</div>`,
+		);
+		set_pay_period_expanded($wrap, expanded);
+		const $body = $wrap.find(".staff-pro-pay-period-rows");
+		group.$rows.forEach(($row) => $body.append($row));
+		if ($after.length) {
+			$after.after($wrap);
+		} else {
+			$host.prepend($wrap);
+		}
+		$after = $wrap;
+	});
+
+	bind_pay_period_group_events($host, listview);
+	sync_period_group_checkboxes(listview);
+}
+
+function bind_pay_period_group_events($host, listview) {
+	$host.off("click.payperiod").on("click.payperiod", ".staff-pro-pay-period-toggle", function (e) {
+		e.preventDefault();
+		e.stopPropagation();
+		const $group = $(this).closest(".staff-pro-pay-period-group");
+		const next = $group.attr("data-expanded") !== "1";
+		set_pay_period_expanded($group, next);
+		pay_period_expanded_store().set($group.attr("data-period-key"), next);
+	});
+	$host
+		.off("change.payperiod")
+		.on("change.payperiod", ".staff-pro-period-check", function (e) {
+			e.stopPropagation();
+			const checked = this.checked;
+			$(this)
+				.closest(".staff-pro-pay-period-group")
+				.find(".staff-pro-pay-period-rows .list-row-checkbox")
+				.each(function () {
+					this.checked = checked;
+				});
+			if (typeof listview.on_row_checked === "function") {
+				listview.on_row_checked();
+			}
+		});
+	$host
+		.off("click.payperiod-check")
+		.on("click.payperiod-check", ".staff-pro-period-check-wrap, .staff-pro-period-check", function (e) {
+			e.stopPropagation();
+		});
+}
+
+function sync_period_group_checkboxes(listview) {
+	const $host = pay_period_list_host(listview);
+	if (!$host.length) return;
+	$host.find(".staff-pro-pay-period-group").each(function () {
+		const $group = $(this);
+		const $boxes = $group.find(".staff-pro-pay-period-rows .list-row-checkbox");
+		const total = $boxes.length;
+		const checked = $boxes.filter(":checked").length;
+		const $master = $group.find(".staff-pro-period-check");
+		$master.prop("checked", total > 0 && checked === total);
+		$master.prop("indeterminate", checked > 0 && checked < total);
+	});
 }
 
 function move_ss_column_beside_net_pay(listview) {
@@ -472,6 +718,56 @@ function inject_pay_agent_styles() {
 			border-color: #1e3a8a !important;
 			color: #fff !important;
 		}
+		.staff-pro-pay-period-group {
+			border-bottom: 1px solid var(--border-color, #e5e7eb);
+		}
+		.staff-pro-pay-period-header {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			min-height: 42px;
+			padding: 6px 15px;
+			background: var(--subtle-fg, var(--control-bg, #f3f4f6));
+		}
+		.staff-pro-period-check-wrap {
+			display: inline-flex;
+			align-items: center;
+			margin: 0;
+		}
+		.staff-pro-pay-period-toggle {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			flex: 1;
+			min-width: 0;
+			padding: 0;
+			border: 0;
+			background: none;
+			color: inherit;
+			font: inherit;
+			text-align: left;
+			cursor: pointer;
+		}
+		.staff-pro-pay-period-chevron {
+			display: inline-flex;
+			align-items: center;
+			flex-shrink: 0;
+			transition: transform 0.15s ease;
+		}
+		.staff-pro-pay-period-group[data-expanded="0"] .staff-pro-pay-period-chevron {
+			transform: rotate(-90deg);
+		}
+		.staff-pro-pay-period-group[data-expanded="0"] .staff-pro-pay-period-rows {
+			display: none;
+		}
+		.staff-pro-pay-period-title {
+			font-weight: 600;
+		}
+		.staff-pro-pay-period-count {
+			color: var(--text-muted, #6b7280);
+			font-weight: 400;
+			white-space: nowrap;
+		}
 	`;
 	document.head.appendChild(style);
 }
@@ -558,6 +854,7 @@ function bind_bulk_slip_actions(listview) {
 		if (typeof original === "function") {
 			original.apply(this, arguments);
 		}
+		sync_period_group_checkboxes(listview);
 		sync_bulk_slip_actions(listview);
 	};
 	listview.page?.wrapper?.on(

@@ -1020,25 +1020,18 @@ function load_celebrations($widget, period, eventType = "all") {
 	});
 }
 
-function hr_kpi_widget_group($root) {
-	return $root
-		.find(".dashboard-graph .widget-group")
-		.filter(function () {
-			return $(this).find(kpi_card_selector()).length;
-		})
-		.first();
-}
-
 const KPI_HOURS_CARDS = new Set(["Hours Worked (This Week)"]);
-const HIDDEN_HR_KPI_CARDS = new Set([
-	"Total Outgoing Salary(Last month)",
-	"Payroll Payouts (Last Month)",
-]);
 const HIDDEN_HR_CHARTS = new Set([
 	"Shift Assignment Breakup",
 	"Shift Coverage",
 	"Hiring vs Attrition Count",
 	"Hiring vs Attrition",
+	"Daily Pay",
+	"Outgoing Salary",
+	"Payroll Payouts",
+	"Social Security Contributions",
+	"Designation Wise Employee Count",
+	"Agents by Role",
 ]);
 const PERCENT_LEGEND_CHARTS = new Set(["Floor Attendance"]);
 
@@ -1068,12 +1061,11 @@ function apply_kpi_value_format($card) {
 function filter_hr_kpi_cards($root) {
 	if (dashboard_name() !== "Human Resource") return;
 
-	$root.find(".sp-dash-kpi-group").find(kpi_card_selector()).each(function () {
-		const $card = $(this);
-		if (HIDDEN_HR_KPI_CARDS.has(kpi_card_name($card))) {
-			$card.remove();
-		}
-	});
+	$root.find(".widget-group").filter(function () {
+		const $group = $(this);
+		if ($group.closest(".dashboard-graph").length) return false;
+		return $group.find(kpi_card_selector()).length;
+	}).remove();
 }
 
 function chart_widget_label($widget) {
@@ -1148,15 +1140,6 @@ function reorder_hr_dashboard_layout($root) {
 		return;
 	}
 
-	const $kpiGroup = hr_kpi_widget_group($root);
-	const $home = $root.find(".sp-dash-home").first();
-	if (!$kpiGroup.length || !$home.length) return;
-
-	$kpiGroup.addClass("sp-dash-kpi-group");
-	if (!$home.prev().is($kpiGroup)) {
-		$home.before($kpiGroup);
-	}
-
 	filter_hr_kpi_cards($root);
 }
 
@@ -1171,13 +1154,15 @@ function inject_celebrations($root) {
 		$existingHome.length &&
 		$existingHome.find(".sp-inout-dash__department").length &&
 		$existingHome.find(".sp-clock-btn").length &&
-		$existingHome.find(".sp-payroll__gross").length &&
-		$existingHome.find(".sp-payroll__ss").length
+		$existingHome.find(".sp-dash-payroll").length &&
+		$existingHome.find(".sp-payroll__list").length &&
+		$existingHome.find(".sp-absence__type-filter").length &&
+		$existingHome.find(".sp-absence__book").length
 	) {
 		return;
 	}
 	$existingHome.remove();
-	$root.find(".sp-dash-split, .sp-dash-inout").remove();
+	$root.find(".sp-dash-split, .sp-dash-inout, .sp-dash-payroll").remove();
 
 	const $pills = $root.find(".sp-dash-pills").first();
 	if (!$pills.length) return;
@@ -1185,7 +1170,7 @@ function inject_celebrations($root) {
 	const $home = $(`
 		<div class="sp-dash-home">
 			<section class="sp-dash-split">
-				<section class="sp-dash-panel sp-dash-celebrations" aria-label="${escape_html(__("Birthdays & Anniversaries"))}">
+				<section class="sp-dash-panel sp-dash-celebrations" aria-label="${escape_html(__("Birthdays & Anniversaries"))}" style="grid-column: 1 / -1;">
 					<div class="sp-dash-panel__head">
 						<h2 class="sp-dash-panel__title">${escape_html(__("Birthdays & Anniversaries"))}</h2>
 						<div class="sp-dash-panel__filters">
@@ -1219,10 +1204,19 @@ function inject_celebrations($root) {
 					</div>
 					<div class="sp-celebrations__list"></div>
 				</section>
-				<section class="sp-dash-panel sp-dash-payroll" aria-label="${escape_html(__("Upcoming Payroll"))}">
+				<section class="sp-dash-panel sp-dash-payroll" aria-label="${escape_html(__("Upcoming Absences"))}">
 					<div class="sp-dash-panel__head">
-						<h2 class="sp-dash-panel__title">${escape_html(__("Upcoming Payroll"))}</h2>
+						<h2 class="sp-dash-panel__title">${escape_html(__("Upcoming Absences"))}</h2>
 						<div class="sp-dash-panel__filters">
+							<div class="sp-dash-panel__filter">
+								${dash_select_html({
+									className: "sp-absence__type-filter",
+									variant: "solid",
+									label: __("Type"),
+									value: "all",
+									options: [{ value: "all", label: __("All Types") }],
+								})}
+							</div>
 							<div class="sp-dash-panel__filter">
 								${dash_select_html({
 									className: "sp-payroll__period",
@@ -1236,17 +1230,15 @@ function inject_celebrations($root) {
 									],
 								})}
 							</div>
+							<button type="button" class="sp-inout-dash__open sp-absence__book">${escape_html(__("Book Time Off"))}</button>
 						</div>
 					</div>
 					<div class="sp-payroll__table-wrap">
 						<div class="sp-payroll__table-head">
 							<span>${escape_html(__("Agent"))}</span>
+							<span>${escape_html(__("Absence Type"))}</span>
+							<span>${escape_html(__("Dates"))}</span>
 							<span>${escape_html(__("Status"))}</span>
-							<span>${escape_html(__("Pay Date"))}</span>
-							<span>${escape_html(__("Hours"))}</span>
-							<span class="sp-payroll__gross">${escape_html(__("Gross Pay"))}</span>
-							<span class="sp-payroll__ss">${escape_html(__("SS"))}</span>
-							<span>${escape_html(__("Net Pay"))}</span>
 						</div>
 						<div class="sp-payroll__list"></div>
 					</div>
@@ -1289,6 +1281,14 @@ function inject_celebrations($root) {
 	`);
 
 	$pills.after($home);
+
+	// Move absences panel below "Who Is In" panel (requested layout).
+	const $inout_panel = $home.find(".sp-dash-inout").first();
+	const $payroll_panel = $home.find(".sp-dash-payroll").first();
+	if ($inout_panel.length && $payroll_panel.length) {
+		$payroll_panel.insertAfter($inout_panel);
+	}
+
 	bind_dash_selects($home);
 
 	const $celebrations = $home.find(".sp-dash-celebrations");
@@ -1302,6 +1302,10 @@ function inject_celebrations($root) {
 	$payroll.find(".sp-payroll__period").on("change", function () {
 		reload_payroll($payroll);
 	});
+	$payroll.find(".sp-absence__type-filter").on("change", function () {
+		render_payroll_panel($payroll);
+	});
+	$payroll.find(".sp-absence__book").on("click", () => go(["paid-time-off"]));
 
 	const $inout = $home.find(".sp-dash-inout");
 	$inout.find(".sp-inout-dash__open").on("click", () => go(["in-out-today"]));
@@ -1355,7 +1359,7 @@ function render_payroll_rows(rows) {
 	if (!rows.length) {
 		return `
 			<div class="sp-payroll__empty">
-				<p>${escape_html(__("No payroll activity for this period yet."))}</p>
+				<p>${escape_html(__("No upcoming absences for this period yet."))}</p>
 			</div>
 		`;
 	}
@@ -1363,7 +1367,7 @@ function render_payroll_rows(rows) {
 	return rows
 		.map(
 			(row) => `
-			<button type="button" class="sp-payroll__row" data-employee="${escape_html(row.employee)}" data-slip="${escape_html(row.salary_slip || "")}">
+			<button type="button" class="sp-payroll__row" data-employee="${escape_html(row.employee || "")}" data-leave="${escape_html(row.leave_application || "")}">
 				<span class="sp-payroll__agent">
 					<span class="sp-payroll__avatar">${celebration_avatar(row)}</span>
 					<span class="sp-payroll__agent-meta">
@@ -1371,19 +1375,51 @@ function render_payroll_rows(rows) {
 						${row.subtitle ? `<span class="sp-payroll__subtitle">${escape_html(row.subtitle)}</span>` : ""}
 					</span>
 				</span>
-				<span class="sp-payroll__status sp-payroll__status--${escape_html(row.status)}">
+				<span class="sp-payroll__hours">${escape_html(row.leave_type || __("—"))}</span>
+				<span class="sp-payroll__date">${escape_html(row.date_label || "")}</span>
+				<span class="sp-payroll__status sp-payroll__status--${escape_html(row.status_class || row.status || "open")}">
 					<span class="sp-payroll__status-dot" aria-hidden="true"></span>
-					<span class="sp-payroll__status-label">${escape_html(row.status_label)}</span>
+					<span class="sp-payroll__status-label">${escape_html(row.status_label || row.status || "")}</span>
 				</span>
-				<span class="sp-payroll__date">${escape_html(row.pay_date_label || "")}</span>
-				<span class="sp-payroll__hours">${escape_html(format_hours(row.hours_worked))}</span>
-				<span class="sp-payroll__gross">${escape_html(format_gross_amount(row))}</span>
-				<span class="sp-payroll__ss">${escape_html(format_ss_amount(row))}</span>
-				<span class="sp-payroll__amount">${escape_html(format_pay_amount(row))}</span>
 			</button>
 		`
 		)
 		.join("");
+}
+
+function absence_type_value($widget) {
+	return $widget.find(".sp-absence__type-filter").val() || "all";
+}
+
+function absence_type_options(rows) {
+	const options = [{ value: "all", label: __("All Types") }];
+	const types = Array.from(
+		new Set(
+			(rows || [])
+				.map((row) => row.leave_type)
+				.filter((type) => type != null && type !== ""),
+		),
+	);
+	types.sort((a, b) => String(a).localeCompare(String(b)));
+	return options.concat(types.map((type) => ({ value: type, label: type })));
+}
+
+function render_payroll_panel($widget) {
+	const $list = $widget.find(".sp-payroll__list");
+	const rows = $widget.data("absence-rows") || [];
+	const type = absence_type_value($widget);
+	const filtered = type === "all" ? rows : rows.filter((row) => row.leave_type === type);
+
+	$list.html(render_payroll_rows(filtered));
+	$list.find(".sp-payroll__row").on("click", function () {
+		const leaveApplication = $(this).data("leave");
+		const employee = $(this).data("employee");
+		if (leaveApplication) {
+			frappe.set_route("Form", "Leave Application", leaveApplication);
+			return;
+		}
+		if (employee) frappe.set_route("Form", "Employee", employee);
+	});
 }
 
 function reload_payroll($widget) {
@@ -1396,27 +1432,33 @@ function load_payroll($widget, period) {
 	$list.addClass("is-loading");
 
 	frappe.call({
-		method: "hrms.hr.desk_dashboard.get_upcoming_payroll",
+		method: "hrms.hr.desk_dashboard.get_upcoming_absences",
 		args: { period },
 		callback(r) {
 			$list.removeClass("is-loading");
 			const rows = r.message?.rows || [];
-			$list.html(render_payroll_rows(rows));
-			$list.find(".sp-payroll__row").on("click", function () {
-				const slip = $(this).data("slip");
-				const employee = $(this).data("employee");
-				if (slip) {
-					frappe.set_route("Form", "Salary Slip", slip);
-					return;
-				}
-				if (employee) frappe.set_route("Form", "Employee", employee);
-			});
+
+			$widget.data("absence-rows", rows);
+
+			const $typeSelect = $widget.find(".sp-absence__type-filter");
+			if ($typeSelect.length) {
+				set_dash_select_options($typeSelect, absence_type_options(rows));
+			}
+
+			render_payroll_panel($widget);
 		},
 		error() {
 			$list.removeClass("is-loading");
+			$widget.data("absence-rows", []);
+
+			const $typeSelect = $widget.find(".sp-absence__type-filter");
+			if ($typeSelect.length) {
+				set_dash_select_options($typeSelect, [{ value: "all", label: __("All Types") }], true);
+			}
+
 			$list.html(`
 				<div class="sp-payroll__empty">
-					<p>${escape_html(__("Could not load upcoming payroll."))}</p>
+					<p>${escape_html(__("Could not load upcoming absences."))}</p>
 				</div>
 			`);
 		},
@@ -1424,7 +1466,10 @@ function load_payroll($widget, period) {
 }
 
 function inout_status_label(row) {
-	if (row.late) return __("LATE");
+	if (hrms.ui.late_status_label) {
+		return hrms.ui.late_status_label(row);
+	}
+	if (row.late) return row.late_label ? `${__("LATE")} ${row.late_label}` : __("LATE");
 	return row.status || __("OUT");
 }
 
@@ -1509,35 +1554,7 @@ function render_inout_summary($widget) {
 		return;
 	}
 
-	$summary
-		.html(
-			`
-		<table class="sp-inout-dash__summary-table">
-			<thead>
-				<tr>
-					<th>${escape_html(__("Department"))}</th>
-					<th>${escape_html(__("Employees"))}</th>
-					<th>${escape_html(__("IN"))}</th>
-					<th>${escape_html(__("OUT"))}</th>
-				</tr>
-			</thead>
-			<tbody>
-				${rows
-					.map(
-						(row) => `
-					<tr>
-						<td>${escape_html(row.department || __("No Department"))}</td>
-						<td>${Number(row.employees || 0)}</td>
-						<td>${Number(row.in_count || 0)}</td>
-						<td>${Number(row.out_count || 0)}</td>
-					</tr>`,
-					)
-					.join("")}
-			</tbody>
-		</table>
-	`,
-		)
-		.show();
+	$summary.html(hrms.ui.inout_summary_table_html(rows, escape_html)).show();
 }
 
 function render_inout_panel($widget) {

@@ -24,6 +24,7 @@ class TestSalaryStructureAssignment(HRMSTestSuite):
 		"""base=50000; gross = Basic (50000) only - statistical earning (1000) is
 		excluded; CTC = gross + employer contribution (6000)."""
 		emp = make_employee("ssa_ctc_calc@test.com", company="_Test Company")
+		frappe.db.set_value("Employee", emp, "ctc", 8)
 
 		_make_component("SSA Test Basic", "SSATB", "Earning", amount_based_on_formula=1, formula="base")
 		_make_component("SSA Test Statistical", "SSATS", "Earning", statistical_component=1)
@@ -60,10 +61,12 @@ class TestSalaryStructureAssignment(HRMSTestSuite):
 		ssa = frappe.get_last_doc("Salary Structure Assignment", filters={"employee": emp})
 
 		self.assertEqual(ssa.annual_gross_earning, 50000 * 12)
-		self.assertEqual(ssa.ctc, (50000 + 6000) * 12)
+		self.assertEqual(ssa.ctc, 8)
+		self.assertEqual(ssa.get_annual_ctc_and_gross()[0], (50000 + 6000) * 12)
 
 	def test_ctc_reset_when_base_missing(self):
 		emp = make_employee("ssa_ctc_nobase@test.com", company="_Test Company")
+		frappe.db.set_value("Employee", emp, "ctc", 7)
 		make_salary_structure("SSA Test No Base Structure", "Monthly", company="_Test Company")
 		ssa = frappe.new_doc("Salary Structure Assignment")
 		ssa.employee = emp
@@ -72,7 +75,7 @@ class TestSalaryStructureAssignment(HRMSTestSuite):
 		ssa.from_date = get_first_day(nowdate())
 		ssa.base = 0
 		ssa.calculate_ctc_and_gross()
-		self.assertEqual(ssa.ctc, 0)
+		self.assertEqual(ssa.ctc, 7)
 		self.assertEqual(ssa.annual_gross_earning, 0)
 
 	def test_get_evaluated_components_does_not_mutate_cached_structure(self):
@@ -173,6 +176,7 @@ class TestSalaryStructureAssignment(HRMSTestSuite):
 		"""A 'Do Not Include in Total' earning is part of CTC but not payable - it
 		must be excluded from annual_gross_earning yet included in ctc."""
 		emp = make_employee("ssa_dniit@test.com", company="_Test Company")
+		frappe.db.set_value("Employee", emp, "ctc", 9)
 
 		_make_component("SSA Test Basic Pay", "SSATBP", "Earning", amount_based_on_formula=1, formula="base")
 		_make_component("SSA Test Company Car", "SSATCAR", "Earning", do_not_include_in_total=1)
@@ -204,13 +208,15 @@ class TestSalaryStructureAssignment(HRMSTestSuite):
 		ssa = frappe.get_last_doc("Salary Structure Assignment", filters={"employee": emp})
 
 		self.assertEqual(ssa.annual_gross_earning, 50000 * 12)
-		self.assertEqual(ssa.ctc, (50000 + 2000) * 12)
+		self.assertEqual(ssa.ctc, 9)
+		self.assertEqual(ssa.get_annual_ctc_and_gross()[0], (50000 + 2000) * 12)
 
 	def test_ctc_for_timesheet_structure_evaluates_base_driven_components(self):
 		"""For a timesheet-based structure, only the wage component is paid as
 		hour_rate * hours (variable, excluded from CTC). The rest of the structure
 		(base-driven components) must still evaluate normally into gross / ctc."""
 		emp = make_employee("ssa_ts_ctc@test.com", company="_Test Company")
+		frappe.db.set_value("Employee", emp, "ctc", 12.5)
 
 		# wage component is the structure-level timesheet component, NOT an earning row
 		_make_component("SSA TS Wage", "SSATSW", "Earning")
@@ -241,9 +247,10 @@ class TestSalaryStructureAssignment(HRMSTestSuite):
 		)
 		ssa = frappe.get_last_doc("Salary Structure Assignment", filters={"employee": emp})
 
-		# base-driven earning evaluates normally; the variable hourly wage is excluded from CTC
+		# base-driven earning evaluates normally; the variable hourly wage is excluded from annual cost
 		self.assertEqual(ssa.annual_gross_earning, 50000 * 12)
-		self.assertEqual(ssa.ctc, 50000 * 12)
+		self.assertEqual(ssa.ctc, 12.5)
+		self.assertEqual(ssa.get_annual_ctc_and_gross()[0], 50000 * 12)
 
 	def test_get_evaluated_components_excludes_timesheet_wage(self):
 		"""SSA evaluation is period-independent: the timesheet wage (hour_rate * hours)

@@ -2,6 +2,7 @@
 # License: GNU General Public License v3. See license.txt
 
 
+from collections import defaultdict
 from datetime import date, datetime, timedelta
 
 import frappe
@@ -358,6 +359,7 @@ def get_events(start: date | str, end: date | str, filters: str | list | None = 
 	else:
 		filters["attendance_date"] = ["between", [get_datetime(start).date(), get_datetime(end).date()]]
 	attendance_records = add_attendance(filters)
+	_merge_live_day_entries(attendance_records, start, end)
 	if employee:
 		add_holidays(attendance_records, start, end, employee)
 	return attendance_records
@@ -366,18 +368,33 @@ def get_events(start: date | str, end: date | str, filters: str | list | None = 
 @frappe.whitelist()
 def get_calendar_day_roster(attendance_date: str):
 	day = getdate(attendance_date)
-	hr_roles = {"HR Manager", "HR User", "System Manager", "Administrator"}
-	payload = None
-	if hr_roles.intersection(frappe.get_roles()):
-		from hrms.hr.page.in_out_today.in_out_today import get_in_out_today
-
-		try:
-			payload = get_in_out_today(attendance_date=str(day))
-		except frappe.PermissionError:
-			payload = None
+	payload = _today_live_payload(day)
 	if payload is None:
 		payload = roster_from_attendance(day)
+		_attach_clients(payload)
 	return _trim_inactive_roster(payload, day)
+
+
+def _today_live_payload(day):
+	hr_roles = {"HR Manager", "HR User", "System Manager", "Administrator"}
+	if not hr_roles.intersection(frappe.get_roles()):
+		return None
+	from hrms.hr.page.in_out_today.in_out_today import get_in_out_today
+
+	try:
+		payload = get_in_out_today(attendance_date=str(day))
+	except frappe.PermissionError:
+		return None
+	_attach_clients(payload)
+	return payload
+
+
+def _attach_clients(payload: dict) -> dict:
+	details = payload.get("details") or []
+	clients = _employee_clients([row.get("employee") for row in details])
+	for row in details:
+		row["client"] = clients.get(row.get("employee")) or row.get("client") or ""
+	return payload
 
 
 def _has_day_activity(row: dict) -> bool:
@@ -444,12 +461,15 @@ def roster_from_attendance(attendance_date):
 				"department": row.department or "",
 				"status": status,
 				"late": bool(row.late_entry),
+				"late_minutes": 0,
+				"late_label": "",
 				"attendance_status": row.status or "",
 				"attendance": row.name,
 				"date": str(getdate(attendance_date)),
 				"in_time": _format_clock(in_dt),
 				"out_time": _format_clock(out_dt),
 				"time": _format_clock(out_dt or in_dt),
+				"leave_type": "On Leave" if row.status == "On Leave" else "",
 				"pto_code": row.status if row.status == "On Leave" else "",
 				"device_id": "",
 			}
@@ -486,6 +506,32 @@ def _employee_images(employee_ids: list[str]) -> dict[str, str]:
 	}
 
 
+def _employee_clients(employee_ids: list[str]) -> dict[str, str]:
+	ids = [name for name in {cstr(employee_id) for employee_id in employee_ids} if name]
+	if not ids or not frappe.get_meta("Employee").has_field("bill_to_customer"):
+		return {}
+	employees = frappe.get_all(
+		"Employee",
+		filters={"name": ["in", ids]},
+		fields=["name", "bill_to_customer"],
+	)
+	customer_ids = [row.bill_to_customer for row in employees if row.bill_to_customer]
+	customer_names = {}
+	if customer_ids and frappe.db.exists("DocType", "Customer"):
+		customer_names = {
+			row.name: row.customer_name or row.name
+			for row in frappe.get_all(
+				"Customer",
+				filters={"name": ["in", customer_ids]},
+				fields=["name", "customer_name"],
+			)
+		}
+	return {
+		row.name: customer_names.get(row.bill_to_customer) or row.bill_to_customer or ""
+		for row in employees
+	}
+
+
 def add_attendance(filters):
 	attendance = frappe.get_list(
 		"Attendance",
@@ -505,14 +551,164 @@ def add_attendance(filters):
 		filters=filters,
 	)
 	images = _employee_images([record.employee for record in attendance])
+	clients = _employee_clients([record.employee for record in attendance])
 	for record in attendance:
 		record["image"] = images.get(record.employee) or ""
+		record["client"] = clients.get(record.employee) or ""
 		record["title"] = f"{record['employee_name']} : {record['status']}"
 		record["allDay"] = 1
 		record["color"] = "transparent"
 		record["in_time"] = cstr(record.get("in_time") or "")
 		record["out_time"] = cstr(record.get("out_time") or "")
+		if record["in_time"] and not record["out_time"]:
+			record["inout"] = "IN"
+		elif record["out_time"]:
+			record["inout"] = "OUT"
 	return attendance
+
+
+def _merge_live_day_entries(events: list[dict], start: date | str, end: date | str) -> None:
+	"""Include today's clock-ins even when Attendance has not been marked yet."""
+	today = getdate()
+	range_start = get_datetime(start).date()
+	range_end = get_datetime(end).date()
+	if today < range_start or today > range_end:
+		return
+
+	existing = {}
+	for row in events:
+		if row.get("doctype") == "Holiday":
+			continue
+		if getdate(row.get("attendance_date")) != today:
+			continue
+		if row.get("employee"):
+			existing[row["employee"]] = row
+
+	checkins = frappe.get_list(
+		"Employee Checkin",
+		fields=["employee", "log_type", "time"],
+		filters=[
+			["time", ">=", get_datetime(today)],
+			["time", "<", get_datetime(add_days(today, 1))],
+		],
+		order_by="time asc",
+	)
+	punches_by_employee = defaultdict(list)
+	for row in checkins:
+		punches_by_employee[row.employee].append(row)
+
+	employee_ids = list(set(punches_by_employee) | set(existing))
+	if not employee_ids:
+		_merge_today_roster(events, existing, today)
+		return
+
+	images = _employee_images(employee_ids)
+	clients = _employee_clients(employee_ids)
+	employees = {
+		row.name: row
+		for row in frappe.get_all(
+			"Employee",
+			filters={"name": ["in", employee_ids]},
+			fields=["name", "employee_name", "department", "image"],
+		)
+	}
+	as_of = now_datetime()
+
+	for employee_id, punches in punches_by_employee.items():
+		occurred = [punch for punch in punches if punch.time and get_datetime(punch.time) <= as_of]
+		if not occurred:
+			continue
+		first_in = next((punch for punch in occurred if (punch.log_type or "IN") == "IN"), None)
+		last_out = None
+		for punch in occurred:
+			if (punch.log_type or "IN") == "OUT":
+				last_out = punch
+		latest = occurred[-1]
+		inout = "IN" if (latest.log_type or "IN") != "OUT" else "OUT"
+		in_time = cstr(first_in.time) if first_in else ""
+		out_time = cstr(last_out.time) if last_out else ""
+
+		if employee_id in existing:
+			row = existing[employee_id]
+			if in_time:
+				row["in_time"] = in_time
+			if out_time:
+				row["out_time"] = out_time
+			row["inout"] = inout
+			if not row.get("client"):
+				row["client"] = clients.get(employee_id) or ""
+			continue
+
+		employee = employees.get(employee_id)
+		employee_name = (employee.employee_name if employee else None) or employee_id
+		events.append(
+			{
+				"doctype": "Attendance",
+				"attendance_date": today,
+				"employee": employee_id,
+				"employee_name": employee_name,
+				"department": (employee.department if employee else "") or "",
+				"client": clients.get(employee_id) or "",
+				"status": "Present",
+				"in_time": in_time,
+				"out_time": out_time,
+				"inout": inout,
+				"late_entry": 0,
+				"image": images.get(employee_id) or (employee.image if employee else "") or "",
+				"title": f"{employee_name} : Present",
+				"allDay": 1,
+				"color": "transparent",
+			}
+		)
+		existing[employee_id] = events[-1]
+
+	_merge_today_roster(events, existing, today)
+
+
+def _merge_today_roster(events: list[dict], existing: dict, today) -> None:
+	"""Keep today's cell populated from the live In/Out roster, not only saved attendance."""
+	payload = _today_live_payload(today)
+	if not payload:
+		return
+
+	for detail in payload.get("details") or []:
+		employee_id = detail.get("employee")
+		if not employee_id:
+			continue
+		inout = detail.get("status") or "OUT"
+		attendance_status = detail.get("attendance_status") or "Present"
+		if employee_id in existing:
+			row = existing[employee_id]
+			row["inout"] = inout
+			if detail.get("client"):
+				row["client"] = detail["client"]
+			if detail.get("image") and not row.get("image"):
+				row["image"] = detail["image"]
+			continue
+
+		employee_name = detail.get("employee_name") or employee_id
+		events.append(
+			{
+				"doctype": "Attendance",
+				"attendance_date": today,
+				"employee": employee_id,
+				"employee_name": employee_name,
+				"department": detail.get("department") or "",
+				"client": detail.get("client") or "",
+				"status": attendance_status,
+				"in_time": detail.get("in_time") or "",
+				"out_time": detail.get("out_time") or "",
+				"inout": inout,
+				"late_entry": 1 if detail.get("late") else 0,
+				"late_minutes": detail.get("late_minutes") or 0,
+				"late_label": detail.get("late_label") or "",
+				"image": detail.get("image") or "",
+				"title": f"{employee_name} : {attendance_status}",
+				"allDay": 1,
+				"color": "transparent",
+			}
+		)
+		existing[employee_id] = events[-1]
 
 
 def add_holidays(events, start, end, employee=None):

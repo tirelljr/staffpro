@@ -14,7 +14,7 @@ from frappe.utils import add_days, cint, comma_and, date_diff, get_link_to_form,
 from hrms.payroll.auto_payroll import canonical_frequency, frequency_label, get_pay_period
 from hrms.payroll.doctype.client_invoice.client_invoice import CLIENT_BILLING_CURRENCY
 
-MAX_PERIODS_PER_RUN = 3
+MAX_PERIODS_PER_RUN = 1
 
 INVOICE_TEMPLATES = (
 	("Weekly", "automatic_invoice_weekly_days", 5),
@@ -42,6 +42,19 @@ def get_enabled_invoice_templates(settings=None) -> list[dict]:
 def run_scheduled_invoices():
 	"""Daily scheduler entry: invoice clients after each completed billing period."""
 	return process_automatic_invoices(force=False)
+
+
+def backfill_invoices_for_submitted_payroll(company: str | None = None) -> list[str]:
+	"""Create Client Invoices for submitted payrolls that never got one."""
+	filters = {"docstatus": 1}
+	if company:
+		filters["company"] = company
+	created = []
+	for name in frappe.get_all("Payroll Entry", filters=filters, pluck="name", order_by="end_date asc"):
+		created.extend(create_invoices_for_payroll_entry(frappe.get_doc("Payroll Entry", name)) or [])
+	if created and not frappe.flags.in_test:
+		frappe.db.commit()
+	return created
 
 
 def create_invoices_for_payroll_entry(doc, method=None):
@@ -468,8 +481,9 @@ def create_or_submit_client_invoice(
 		invoice.payroll_entry = payroll_entry
 
 	try:
-		invoice.get_agents()
+		invoice.get_agents(include_zero_hours=True)
 	except frappe.ValidationError:
+		frappe.clear_messages()
 		if existing and existing.docstatus == 0:
 			return None
 		return None

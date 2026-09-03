@@ -15,14 +15,15 @@ frappe.ui.form.on("Payroll Settings", {
 
 		if (frm.doc.enable_automatic_payroll && !frm.is_new()) {
 			frm.add_custom_button(__("Run Payroll Now"), () => {
-				frappe.call({
-					method: "hrms.payroll.auto_payroll.run_automatic_payroll_now",
-					freeze: true,
+				hrms.payroll_utils.confirm_payroll_run({
+					preview_method: "hrms.payroll.auto_payroll.preview_automatic_payroll",
+					run_method: "hrms.payroll.auto_payroll.run_automatic_payroll_now",
+					title: __("Approve Payroll"),
 					freeze_message: __("Running payroll..."),
-					callback: function (r) {
+					on_done(payload) {
 						frm.reload_doc();
-						if (r.message && r.message.message) {
-							frappe.msgprint(r.message.message);
+						if (payload?.message) {
+							frappe.msgprint(payload.message);
 						}
 					},
 				});

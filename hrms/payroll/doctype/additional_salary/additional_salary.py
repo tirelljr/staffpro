@@ -45,6 +45,19 @@ class AdditionalSalary(Document):
 		if self.payroll_date and self.is_recurring:
 			self.payroll_date = None
 
+		if not self.company:
+			self.company = (
+				(self.employee and frappe.db.get_value("Employee", self.employee, "company"))
+				or frappe.defaults.get_user_default("Company")
+				or frappe.defaults.get_global_default("company")
+			)
+
+		if not self.salary_component and frappe.db.exists("Salary Component", "Bonus"):
+			self.salary_component = "Bonus"
+
+		if not self.naming_series:
+			self.naming_series = "HR-ADS-.YY.-.MM.-"
+
 	def on_submit(self):
 		self.update_employee_referral()
 

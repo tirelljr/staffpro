@@ -139,15 +139,17 @@
 					v-if="selectedItem"
 					:title="selectedItem.title"
 					:data="
-						selectedItem.fields.map((field) => {
-							const [label, fieldtype] = getFieldInfo(field)
-							return {
-								fieldname: field,
-								value: getFieldValue(field),
-								label: label,
-								fieldtype: fieldtype,
-							}
-						})
+						selectedItem.fields
+							.map((field) => {
+								const [label, fieldtype] = getFieldInfo(field)
+								return {
+									fieldname: field,
+									value: getFieldValue(field),
+									label: label,
+									fieldtype: fieldtype,
+								}
+							})
+							.filter((item) => item.label)
 					"
 				/>
 			</ion-modal>
@@ -223,18 +225,24 @@ const profileLinks = [
 		title: __("Salary Information"),
 		fields: [
 			"ctc",
+			"total_ss",
+			"total_income",
+			"total_hours",
+			"leave_remaining",
 			"payroll_cost_center",
-			"pan_number",
-			"provident_fund_account",
 			"salary_mode",
 			"bank_name",
 			"bank_ac_no",
-			"ifsc_code",
-			"micr_code",
-			"iban",
 		],
 	},
 ]
+
+const STAT_FIELDS = {
+	total_ss: [__("Total SS contributions"), "Currency"],
+	total_income: [__("Total income"), "Currency"],
+	total_hours: [__("Total hours worked"), "Data"],
+	leave_remaining: [__("Leave remaining"), "Data"],
+}
 
 const isInfoModalOpen = ref(false)
 const selectedItem = ref(null)
@@ -244,16 +252,6 @@ const allowPushNotifications = computed(
 		window.frappe?.boot?.push_relay_server_url &&
 		arePushNotificationsEnabled.data
 )
-
-const openInfoModal = async (request) => {
-	selectedItem.value = request
-	isInfoModalOpen.value = true
-}
-
-const closeInfoModal = async (_request) => {
-	isInfoModalOpen.value = false
-	selectedItem.value = null
-}
 
 const employeeDoc = createDocumentResource({
 	doctype: DOCTYPE,
@@ -265,6 +263,25 @@ const employeeDoc = createDocumentResource({
 		return data
 	},
 })
+
+const profileStats = createResource({
+	url: "hrms.overrides.employee_profile.get_employee_profile_stats",
+	params: { employee: employee.data.name },
+	auto: true,
+})
+
+const openInfoModal = async (request) => {
+	selectedItem.value = request
+	isInfoModalOpen.value = true
+	if (request.fields?.some((field) => STAT_FIELDS[field])) {
+		profileStats.reload()
+	}
+}
+
+const closeInfoModal = async (_request) => {
+	isInfoModalOpen.value = false
+	selectedItem.value = null
+}
 
 const reportsToName = createResource({
 	url: "hrms.api.get_reports_to_employee_name",
@@ -286,10 +303,19 @@ const employeeDocType = createResource({
 })
 
 const getFieldInfo = (fieldname) => {
-	const field = employeeDocType.data.find(
+	if (STAT_FIELDS[fieldname]) {
+		return STAT_FIELDS[fieldname]
+	}
+	const field = employeeDocType.data?.find(
 		(field) => field.fieldname === fieldname
 	)
 	return [__(field?.label, null, "Employee"), field?.fieldtype]
+}
+
+const formatStatNumber = (value, suffix) => {
+	const amount = Number(value || 0)
+	const formatted = amount.toLocaleString(undefined, { maximumFractionDigits: 1 })
+	return suffix ? `${formatted} ${suffix}` : formatted
 }
 
 const getFieldValue = (fieldname) => {
@@ -298,6 +324,20 @@ const getFieldValue = (fieldname) => {
 	}
 	if (fieldname === "reports_to") {
 		return reportsToName.data || employeeDoc.doc[fieldname]
+	}
+	if (fieldname === "total_ss") {
+		if (!profileStats.data) return ""
+		return formatCurrency(profileStats.data.total_ss ?? 0, profileStats.data.company_currency)
+	}
+	if (fieldname === "total_income") {
+		if (!profileStats.data) return ""
+		return formatCurrency(profileStats.data.total_income ?? 0, profileStats.data.company_currency)
+	}
+	if (fieldname === "total_hours") {
+		return formatStatNumber(profileStats.data?.total_hours, "h")
+	}
+	if (fieldname === "leave_remaining") {
+		return formatStatNumber(profileStats.data?.leave_remaining, __("days"))
 	}
 	return employeeDoc.doc[fieldname]
 }
@@ -319,6 +359,7 @@ onMounted(() => {
 	socket.on("list_update", (data) => {
 		if (data.doctype === DOCTYPE && data.name === employee.data.name) {
 			employeeDoc.reload()
+			profileStats.reload()
 		}
 	})
 })

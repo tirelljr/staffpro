@@ -19,6 +19,8 @@ from frappe.utils import (
 	comma_and,
 	date_diff,
 	flt,
+	fmt_money,
+	formatdate,
 	get_link_to_form,
 	getdate,
 )
@@ -31,6 +33,12 @@ from erpnext.accounts.utils import get_fiscal_year
 
 from hrms.payroll.doctype.salary_slip.salary_slip_loan_utils import if_lending_app_installed
 from hrms.payroll.doctype.salary_withholding.salary_withholding import link_bank_entry_in_salary_withholdings
+
+ALL_CLIENTS = "All Clients"
+
+
+def is_all_clients(customer) -> bool:
+	return bool(customer) and str(customer).strip() == ALL_CLIENTS
 
 
 class PayrollEntry(Document):
@@ -100,6 +108,18 @@ class PayrollEntry(Document):
 				"company"
 			)
 		self.set_cost_center()
+
+	def get_invalid_links(self, *args, **kwargs):
+		result = super().get_invalid_links(*args, **kwargs)
+		if not is_all_clients(self.customer):
+			return result
+		if not (isinstance(result, tuple) and len(result) == 2):
+			return result
+		invalid_links, cancelled_links = result
+		return (
+			[row for row in (invalid_links or []) if not _link_row_is_field(row, "customer")],
+			[row for row in (cancelled_links or []) if not _link_row_is_field(row, "customer")],
+		)
 
 	def validate(self):
 		self.number_of_employees = len(self.employees)
@@ -277,15 +297,20 @@ class PayrollEntry(Document):
 		return filters
 
 	@frappe.whitelist()
-	def fill_employee_details(self, raise_if_empty: int | bool = True) -> list[dict] | None:
+	def fill_employee_details(
+		self, raise_if_empty: int | bool = True, customer_is_unassigned: int | bool = False
+	) -> list[dict] | None:
 		filters = self.make_filters()
+		if cint(customer_is_unassigned):
+			filters.customer_is_unassigned = 1
 		employees = get_employee_list(filters=filters, as_dict=True, ignore_match_conditions=True)
 		self.set("employees", [])
 
 		if not employees:
 			error_msg = _("No agents found for the mentioned criteria:")
 			if self.customer:
-				error_msg += "<br>" + _("Client: {0}").format(frappe.bold(self.customer))
+				client_label = _("All Clients") if is_all_clients(self.customer) else self.customer
+				error_msg += "<br>" + _("Client: {0}").format(frappe.bold(client_label))
 			if self.branch:
 				error_msg += "<br>" + _("Branch: {0}").format(frappe.bold(self.branch))
 			if self.department:
@@ -1710,8 +1735,14 @@ def set_filter_conditions(query, filters, qb_object):
 		if filters.get(fltr_key):
 			query = query.where(qb_object[fltr_key] == filters[fltr_key])
 
-	if filters.get("customer") and frappe.get_meta("Employee").has_field("bill_to_customer"):
-		query = query.where(qb_object["bill_to_customer"] == filters.customer)
+	if frappe.get_meta("Employee").has_field("bill_to_customer"):
+		if cint(filters.get("customer_is_unassigned")):
+			# "Not set" is represented as NULL for link fields.
+			query = query.where(
+				(qb_object["bill_to_customer"].isnull()) | (qb_object["bill_to_customer"] == "")
+			)
+		elif filters.get("customer") and not is_all_clients(filters.get("customer")):
+			query = query.where(qb_object["bill_to_customer"] == filters.customer)
 
 	return query
 
@@ -2053,6 +2084,54 @@ def get_payroll_entries_for_jv(
 	).run()
 
 
+def _link_row_is_field(row, fieldname: str) -> bool:
+	if isinstance(row, dict):
+		return row.get("fieldname") == fieldname or row.get("field") == fieldname
+	if isinstance(row, (list, tuple)):
+		return bool(row) and row[0] == fieldname
+	return False
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def payroll_client_query(doctype, txt, searchfield, start, page_len, filters):
+	"""Client link search with an All Clients option that includes every agent."""
+	results = []
+	start = cint(start)
+	page_len = cint(page_len)
+	txt = txt or ""
+	if start == 0 and (not txt or ALL_CLIENTS.lower().startswith(txt.lower()) or txt.lower() in ALL_CLIENTS.lower()):
+		results.append([ALL_CLIENTS, _("Include agents from every client")])
+		page_len = max(page_len - 1, 0)
+
+	meta = frappe.get_meta("Customer")
+	conditions = ["1=1"]
+	values = {"txt": f"%{txt}%", "start": start, "page_len": page_len}
+	if meta.has_field("disabled"):
+		conditions.append("ifnull(disabled, 0) = 0")
+	search_fields = [field for field in (searchfield, "name", "customer_name") if field]
+	search_clause = " or ".join(f"`{field}` like %(txt)s" for field in dict.fromkeys(search_fields))
+	if search_clause:
+		conditions.append(f"({search_clause})")
+
+	if page_len < 1:
+		return results
+
+	customers = frappe.db.sql(
+		f"""
+		select name, customer_name
+		from `tabCustomer`
+		where {" and ".join(conditions)}
+		{get_match_cond(doctype)}
+		order by name
+		limit %(start)s, %(page_len)s
+		""",
+		values,
+	)
+	results.extend(customers)
+	return results
+
+
 def get_employee_list(
 	filters: frappe._dict,
 	searchfield=None,
@@ -2063,6 +2142,20 @@ def get_employee_list(
 	offset=None,
 	ignore_match_conditions=False,
 ) -> list:
+	if is_all_clients(filters.get("customer")) and frappe.get_meta("Employee").has_field("bill_to_customer"):
+		all_client_filters = frappe._dict(filters)
+		all_client_filters.customer = None
+		return get_employees_for_client(
+			all_client_filters,
+			searchfield=searchfield,
+			search_string=search_string,
+			fields=fields,
+			as_dict=as_dict,
+			limit=limit,
+			offset=offset,
+			ignore_match_conditions=ignore_match_conditions,
+		)
+
 	if filters.get("customer") and frappe.get_meta("Employee").has_field("bill_to_customer"):
 		return get_employees_for_client(
 			filters,
@@ -2112,7 +2205,8 @@ def employee_query(
 ) -> list:
 	filters = frappe._dict(filters)
 
-	if not (filters.get("customer") and frappe.get_meta("Employee").has_field("bill_to_customer")):
+	client_filter = filters.get("customer") and not is_all_clients(filters.get("customer"))
+	if not (client_filter and frappe.get_meta("Employee").has_field("bill_to_customer")):
 		if not filters.payroll_frequency:
 			frappe.throw(_("Select Payroll Frequency."))
 
@@ -2160,3 +2254,487 @@ def get_salary_withholdings(
 	if pluck:
 		return withheld_salaries.run(pluck=pluck)
 	return withheld_salaries.run(as_dict=True)
+
+
+PAYROLL_EXCEL_COLUMNS = (
+	{"key": "last_name", "label": "Last Name", "align": "left"},
+	{"key": "first_name", "label": "First Name", "align": "left"},
+	{"key": "pay_period", "label": "Pay Period", "align": "left"},
+	{"key": "regular_hours", "label": "Regular Hours", "align": "right"},
+	{"key": "overtime_hours", "label": "Overtime Hours", "align": "right"},
+	{"key": "holiday_pay", "label": "Holiday Pay", "align": "right"},
+	{"key": "hourly_rate", "label": "Hourly Rate", "align": "right"},
+	{"key": "bonus", "label": "Bonus", "align": "right"},
+	{"key": "gross_pay", "label": "Gross Pay", "align": "right"},
+	{"key": "income_tax_wh", "label": "Income Tax W/H", "align": "right"},
+	{"key": "wage_band", "label": "Wage Band", "align": "left"},
+	{"key": "weekly_insurable_earnings", "label": "Weekly Insurable Earnings", "align": "right"},
+	{"key": "employee_social_security", "label": "Employee Social Security", "align": "right"},
+	{"key": "employer_social_security", "label": "Employer Social Security", "align": "right"},
+	{"key": "pay_period_ee_social", "label": "Pay Period EE Social", "align": "right"},
+	{"key": "pay_period_er_social", "label": "Pay Period ER Social", "align": "right"},
+	{"key": "net_pay", "label": "Net Pay", "align": "right"},
+)
+
+
+@frappe.whitelist()
+def get_payroll_excel_data(name: str | None = None) -> dict:
+	"""One row per agent for the Payroll Entry spreadsheet view."""
+	name = name or frappe.form_dict.get("name")
+	if not name:
+		frappe.throw(_("Payroll Entry is required"))
+
+	if not frappe.db.exists("Payroll Entry", name):
+		frappe.throw(_("Payroll Entry {0} not found").format(name))
+
+	entry = frappe.get_doc("Payroll Entry", name)
+	entry.check_permission("read")
+
+	period_label = _format_pay_period(entry.start_date, entry.end_date)
+	slips = _get_excel_salary_slips(entry)
+	overtime_by_employee = _overtime_hours_by_employee(entry)
+	holiday_pay_by_employee = _holiday_pay_by_employee(entry)
+	bonus_by_slip = _bonus_by_salary_slip([row.name for row in slips])
+	ytd_social_by_employee = _ytd_social_by_employee(entry)
+
+	employees = [slip.employee for slip in slips] + [
+		emp.employee for emp in (entry.employees or []) if emp.employee
+	]
+	names_by_id = _employee_name_parts_by_id(employees)
+
+	rows = []
+	seen = set()
+	for slip in slips:
+		seen.add(slip.employee)
+		first_name, last_name = names_by_id.get(slip.employee) or _split_full_name(
+			slip.employee_name or slip.employee
+		)
+		overtime_hours = flt(overtime_by_employee.get(slip.employee))
+		total_hours = flt(slip.total_working_hours)
+		regular_hours = max(total_hours - overtime_hours, 0.0) if total_hours else 0.0
+		ee_period, er_period = _slip_social_amounts(slip)
+		ee_ytd, er_ytd = ytd_social_by_employee.get(slip.employee) or (ee_period, er_period)
+		rows.append(
+			{
+				"employee": slip.employee,
+				"employee_name": slip.employee_name or slip.employee,
+				"first_name": first_name,
+				"last_name": last_name,
+				"pay_period": _format_pay_period(slip.start_date, slip.end_date) or period_label,
+				"regular_hours": regular_hours,
+				"overtime_hours": overtime_hours,
+				"holiday_pay": flt(holiday_pay_by_employee.get(slip.employee)),
+				"hourly_rate": flt(slip.hour_rate),
+				"bonus": flt(bonus_by_slip.get(slip.name)),
+				"gross_pay": flt(slip.gross_pay),
+				"income_tax_wh": _slip_income_tax(slip),
+				"wage_band": slip.ss_wage_band or "",
+				"weekly_insurable_earnings": flt(slip.ss_insurable_earnings),
+				"employee_social_security": ee_ytd,
+				"employer_social_security": er_ytd,
+				"pay_period_ee_social": ee_period,
+				"pay_period_er_social": er_period,
+				"net_pay": flt(slip.net_pay),
+			}
+		)
+
+	# Agents queued in this run whose salary slip does not exist yet.
+	for emp in entry.employees or []:
+		if emp.employee in seen:
+			continue
+		first_name, last_name = names_by_id.get(emp.employee) or _split_full_name(
+			emp.employee_name or emp.employee
+		)
+		ee_ytd, er_ytd = ytd_social_by_employee.get(emp.employee) or (0.0, 0.0)
+		rows.append(
+			{
+				"employee": emp.employee,
+				"employee_name": emp.employee_name or emp.employee,
+				"first_name": first_name,
+				"last_name": last_name,
+				"pay_period": period_label,
+				"regular_hours": 0,
+				"overtime_hours": flt(overtime_by_employee.get(emp.employee)),
+				"holiday_pay": flt(holiday_pay_by_employee.get(emp.employee)),
+				"hourly_rate": 0,
+				"bonus": 0,
+				"gross_pay": 0,
+				"income_tax_wh": 0,
+				"wage_band": "",
+				"weekly_insurable_earnings": 0,
+				"employee_social_security": ee_ytd,
+				"employer_social_security": er_ytd,
+				"pay_period_ee_social": 0,
+				"pay_period_er_social": 0,
+				"net_pay": 0,
+			}
+		)
+
+	rows.sort(
+		key=lambda row: (
+			(row.get("last_name") or "").lower(),
+			(row.get("first_name") or "").lower(),
+			row.get("employee") or "",
+		)
+	)
+
+	return {
+		"columns": [
+			{"id": col["key"], "name": _(col["label"]), "align": col["align"]}
+			for col in PAYROLL_EXCEL_COLUMNS
+		],
+		"rows": rows,
+		"meta": {
+			"payroll_entry": entry.name,
+			"pay_period": period_label,
+			"currency": entry.currency,
+			"branch": entry.branch,
+			"status": entry.status,
+		},
+	}
+
+
+@frappe.whitelist()
+def download_payroll_excel(name: str | None = None) -> None:
+	payload = get_payroll_excel_data(name)
+	from frappe.utils.xlsxutils import make_xlsx
+
+	xlsx_file = make_xlsx(_payroll_export_table(payload), "Payroll Entry")
+	_respond_payroll_file(_payroll_export_filename(payload, "xlsx"), xlsx_file.getvalue())
+
+
+@frappe.whitelist()
+def download_payroll_excel_pdf(name: str | None = None) -> None:
+	payload = get_payroll_excel_data(name)
+	from frappe.utils.pdf import get_pdf
+
+	from hrms.branding import staff_pro_logo_url
+
+	html = frappe.render_template(
+		"hrms/payroll/doctype/payroll_entry/payroll_excel_export.html",
+		{
+			"title": _("Payroll Entry"),
+			"logo": staff_pro_logo_url(),
+			"generated_on": formatdate(getdate()),
+			"meta": payload.get("meta") or {},
+			"columns": payload.get("columns") or [],
+			"rows": _payroll_pdf_rows(payload),
+		},
+	)
+	_respond_payroll_file(_payroll_export_filename(payload, "pdf"), get_pdf(html))
+
+
+def _employee_name_parts_by_id(employees: list[str]) -> dict[str, tuple[str, str]]:
+	names = {name for name in employees if name}
+	if not names:
+		return {}
+
+	rows = frappe.get_all(
+		"Employee",
+		filters={"name": ("in", list(names))},
+		fields=["name", "first_name", "last_name", "employee_name"],
+	)
+	out = {}
+	for row in rows:
+		first = (row.first_name or "").strip()
+		last = (row.last_name or "").strip()
+		if not first or not last:
+			split_first, split_last = _split_full_name(row.employee_name or "")
+			first = first or split_first
+			last = last or split_last
+		out[row.name] = (first, last)
+	return out
+
+
+def _split_full_name(full_name: str) -> tuple[str, str]:
+	parts = [part for part in (full_name or "").strip().split() if part]
+	if not parts:
+		return "", ""
+	if len(parts) == 1:
+		return parts[0], ""
+	return " ".join(parts[:-1]), parts[-1]
+
+
+def _payroll_export_table(payload: dict) -> list[list]:
+	columns = payload.get("columns") or []
+	rows = [ [col.get("name") or col.get("id") for col in columns] ]
+	for row in payload.get("rows") or []:
+		rows.append([row.get(col["id"], "") for col in columns])
+	return rows
+
+
+def _payroll_pdf_rows(payload: dict) -> list[dict]:
+	meta = payload.get("meta") or {}
+	currency = meta.get("currency")
+	formatted = []
+	for row in payload.get("rows") or []:
+		out = {}
+		for col in payload.get("columns") or []:
+			value = row.get(col["id"], "")
+			if col["id"] in PAYROLL_EXCEL_MONEY_KEYS:
+				value = fmt_money(flt(value), currency=currency) if value not in (None, "") else ""
+			elif col["id"] in ("regular_hours", "overtime_hours") and value not in (None, ""):
+				value = f"{flt(value):.2f}"
+			out[col["id"]] = value
+		formatted.append(out)
+	return formatted
+
+
+PAYROLL_EXCEL_MONEY_KEYS = {
+	"holiday_pay",
+	"hourly_rate",
+	"bonus",
+	"gross_pay",
+	"income_tax_wh",
+	"weekly_insurable_earnings",
+	"employee_social_security",
+	"employer_social_security",
+	"pay_period_ee_social",
+	"pay_period_er_social",
+	"net_pay",
+}
+
+
+def _payroll_export_filename(payload: dict, extension: str) -> str:
+	period = (payload.get("meta") or {}).get("pay_period") or "Payroll"
+	safe = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in str(period))
+	return f"Payroll_Entry_{safe}.{extension}"
+
+
+def _respond_payroll_file(filename: str, content) -> None:
+	frappe.response["filename"] = filename
+	frappe.response["filecontent"] = content
+	frappe.response["type"] = "binary"
+
+
+def _format_pay_period(start_date, end_date) -> str:
+	if not start_date:
+		return ""
+	start = frappe.format(start_date, {"fieldtype": "Date"})
+	if not end_date:
+		return start
+	return f"{start} – {frappe.format(end_date, {'fieldtype': 'Date'})}"
+
+
+def _get_excel_salary_slips(entry) -> list:
+	return frappe.get_all(
+		"Salary Slip",
+		filters={"payroll_entry": entry.name, "docstatus": ("<", 2)},
+		fields=[
+			"name",
+			"employee",
+			"employee_name",
+			"start_date",
+			"end_date",
+			"total_working_hours",
+			"hour_rate",
+			"gross_pay",
+			"net_pay",
+			"company",
+			"ss_wage_band",
+			"ss_insurable_earnings",
+			"ss_employee_amount",
+			"ss_employer_amount",
+			"current_month_income_tax",
+			"total_income_tax",
+		],
+		order_by="employee_name asc, employee asc",
+	)
+
+
+def _slip_income_tax(slip) -> float:
+	return flt(slip.current_month_income_tax) or flt(slip.total_income_tax)
+
+
+def _slip_social_amounts(slip) -> tuple[float, float]:
+	return flt(slip.ss_employee_amount), flt(slip.ss_employer_amount)
+
+
+def _ytd_social_by_employee(entry) -> dict[str, tuple[float, float]]:
+	"""Social security totals per agent from the start of the fiscal year up to this period."""
+	employees = [row.employee for row in (entry.employees or []) if row.employee]
+	if not employees or not entry.end_date:
+		return {}
+
+	try:
+		year_start = get_fiscal_year(entry.end_date, company=entry.company)[1]
+	except Exception:
+		year_start = datetime.date(getdate(entry.end_date).year, 1, 1)
+
+	slips = frappe.get_all(
+		"Salary Slip",
+		filters={
+			"employee": ("in", employees),
+			"docstatus": 1,
+			"start_date": (">=", year_start),
+			"end_date": ("<=", entry.end_date),
+		},
+		fields=["employee", "ss_employee_amount", "ss_employer_amount"],
+	)
+
+	totals: dict[str, tuple[float, float]] = {}
+	for slip in slips:
+		employee_amount, employer_amount = totals.get(slip.employee, (0.0, 0.0))
+		totals[slip.employee] = (
+			employee_amount + flt(slip.ss_employee_amount),
+			employer_amount + flt(slip.ss_employer_amount),
+		)
+	return totals
+
+
+def _overtime_hours_by_employee(entry) -> dict[str, float]:
+	"""Overtime hours per agent, preferring Overtime Slip detail rows over attendance."""
+	hours: dict[str, float] = {}
+	slips = frappe.get_all(
+		"Overtime Slip",
+		filters={"payroll_entry": entry.name, "docstatus": ("<", 2)},
+		fields=["name", "employee", "total_overtime_duration"],
+	)
+
+	if slips:
+		employee_by_slip = {row.name: row.employee for row in slips}
+		details = frappe.get_all(
+			"Overtime Details",
+			filters={"parent": ("in", list(employee_by_slip))},
+			fields=["parent", "overtime_duration"],
+		)
+		if details:
+			for detail in details:
+				employee = employee_by_slip.get(detail.parent)
+				if employee:
+					hours[employee] = hours.get(employee, 0) + flt(detail.overtime_duration)
+			return hours
+
+		for slip in slips:
+			hours[slip.employee] = hours.get(slip.employee, 0) + flt(slip.total_overtime_duration)
+		return hours
+
+	for row in _period_attendance(entry, ["employee", "actual_overtime_duration"]):
+		hours[row.employee] = hours.get(row.employee, 0) + flt(row.actual_overtime_duration)
+	return hours
+
+
+def _holiday_pay_by_employee(entry) -> dict[str, float]:
+	"""Total pay booked on public holidays, which already includes any statutory premium."""
+	from hrms.payroll.daily_pay import get_public_holiday_pay_context
+
+	holiday_pay: dict[str, float] = {}
+	is_holiday: dict[tuple[str, str], bool] = {}
+	for row in _period_attendance(entry, ["employee", "attendance_date", "daily_pay"]):
+		key = (row.employee, str(row.attendance_date))
+		if key not in is_holiday:
+			is_holiday[key] = bool(get_public_holiday_pay_context(row.employee, row.attendance_date))
+		if is_holiday[key]:
+			holiday_pay[row.employee] = holiday_pay.get(row.employee, 0) + flt(row.daily_pay)
+	return holiday_pay
+
+
+def _period_attendance(entry, fields: list[str]) -> list[dict]:
+	if not entry.start_date or not entry.end_date:
+		return []
+
+	filters = {
+		"company": entry.company,
+		"docstatus": 1,
+		"attendance_date": ("between", [entry.start_date, entry.end_date]),
+	}
+	employees = [row.employee for row in (entry.employees or []) if row.employee]
+	if employees:
+		filters["employee"] = ("in", employees)
+
+	return frappe.get_all("Attendance", filters=filters, fields=fields)
+
+
+def _bonus_by_salary_slip(slip_names: list[str]) -> dict[str, float]:
+	if not slip_names:
+		return {}
+
+	SalaryDetail = frappe.qb.DocType("Salary Detail")
+	SalaryComponent = frappe.qb.DocType("Salary Component")
+	rows = (
+		frappe.qb.from_(SalaryDetail)
+		.inner_join(SalaryComponent)
+		.on(SalaryDetail.salary_component == SalaryComponent.name)
+		.select(SalaryDetail.parent, SalaryDetail.amount)
+		.where(
+			(SalaryDetail.parent.isin(slip_names))
+			& (SalaryDetail.parentfield == "earnings")
+			& (SalaryComponent.earning_category == "Bonus")
+		)
+	).run(as_dict=True)
+
+	totals: dict[str, float] = {}
+	for row in rows:
+		totals[row.parent] = totals.get(row.parent, 0) + flt(row.amount)
+	return totals
+
+
+def _as_payroll_entry_names(names) -> list[str]:
+	if isinstance(names, str):
+		names = frappe.parse_json(names)
+	if not isinstance(names, (list, tuple)):
+		frappe.throw(_("No Payroll Entries selected"))
+	return [name for name in names if name]
+
+
+def _is_cancelled_payroll_entry(doc) -> bool:
+	return cint(doc.docstatus) == 2 or doc.status == "Cancelled"
+
+
+@frappe.whitelist()
+def bulk_cancel_payroll_entries(names):
+	"""Cancel submitted payroll runs and discard drafts so they can be deleted next."""
+	cancelled = []
+	skipped = []
+	errors = []
+
+	for name in _as_payroll_entry_names(names):
+		try:
+			doc = frappe.get_doc("Payroll Entry", name)
+			if _is_cancelled_payroll_entry(doc):
+				skipped.append(name)
+				continue
+			if cint(doc.docstatus) == 1:
+				doc.check_permission("cancel")
+				doc.cancel()
+			elif cint(doc.docstatus) == 0:
+				doc.check_permission("write")
+				if not hasattr(doc, "discard"):
+					frappe.throw(_("Cannot cancel a draft Payroll Entry."))
+				doc.discard()
+			else:
+				skipped.append(name)
+				continue
+			cancelled.append(name)
+			if not frappe.in_test:
+				frappe.db.commit()
+		except Exception as e:
+			if not frappe.in_test:
+				frappe.db.rollback()
+			errors.append({"name": name, "error": frappe.utils.cstr(e)})
+
+	return {"cancelled": cancelled, "skipped": skipped, "errors": errors}
+
+
+@frappe.whitelist()
+def bulk_delete_payroll_entries(names):
+	"""Permanently delete cancelled payroll runs."""
+	deleted = []
+	errors = []
+
+	for name in _as_payroll_entry_names(names):
+		try:
+			doc = frappe.get_doc("Payroll Entry", name)
+			doc.check_permission("delete")
+			if not _is_cancelled_payroll_entry(doc):
+				frappe.throw(_("Cancel this Payroll Entry before deleting it."))
+			frappe.delete_doc("Payroll Entry", name)
+			deleted.append(name)
+			if not frappe.in_test:
+				frappe.db.commit()
+		except Exception as e:
+			if not frappe.in_test:
+				frappe.db.rollback()
+			errors.append({"name": name, "error": frappe.utils.cstr(e)})
+
+	return {"deleted": deleted, "errors": errors}

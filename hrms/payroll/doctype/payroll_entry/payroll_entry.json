@@ -36,6 +36,7 @@
   "number_of_employees",
   "section_break_24",
   "employees",
+  "payroll_excel_html",
   "section_break_26",
   "validate_attendance",
   "attendance_detail_html",
@@ -72,7 +73,7 @@
    "reqd": 1
   },
   {
-   "description": "Payroll includes agents billed to this client.",
+   "description": "Select a client, or All Clients to include every agent.",
    "fieldname": "customer",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -153,7 +154,8 @@
   {
    "fieldname": "start_date",
    "fieldtype": "Date",
-   "label": "Start Date",
+   "in_list_view": 1,
+   "label": "Pay Period",
    "reqd": 1
   },
   {
@@ -362,6 +364,11 @@
    "hidden": 1,
    "label": "Overtime Slip Step",
    "options": "\nCreate\nSubmit"
+  },
+  {
+   "fieldname": "payroll_excel_html",
+   "fieldtype": "HTML",
+   "label": "Payroll Spreadsheet"
   }
  ],
  "icon": "fa fa-cog",
@@ -376,7 +383,7 @@
    "link_fieldname": "payroll_entry"
   }
  ],
- "modified": "2026-08-21 14:30:00.000000",
+ "modified": "2026-09-03 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Payroll",
  "name": "Payroll Entry",
