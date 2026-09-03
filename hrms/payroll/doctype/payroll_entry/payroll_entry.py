@@ -492,8 +492,10 @@ class PayrollEntry(Document):
 			"Salary Component Account",
 			{"parent": salary_component, "company": self.company},
 			"account",
-			cache=True,
 		)
+
+		if not account:
+			account = self._ensure_salary_component_account(salary_component)
 
 		if not account:
 			frappe.throw(
@@ -503,6 +505,22 @@ class PayrollEntry(Document):
 			)
 
 		return account
+
+	def _ensure_salary_component_account(self, salary_component: str) -> str | None:
+		from hrms.payroll.social_security import (
+			SS_EMPLOYEE_COMPONENT,
+			SS_EMPLOYER_COMPONENT,
+			ensure_ss_component_accounts,
+		)
+
+		if salary_component not in {SS_EMPLOYEE_COMPONENT, SS_EMPLOYER_COMPONENT}:
+			return None
+		ensure_ss_component_accounts(self.company)
+		return frappe.db.get_value(
+			"Salary Component Account",
+			{"parent": salary_component, "company": self.company},
+			"account",
+		)
 
 	def get_salary_components(self, component_type):
 		salary_slips = self.get_sal_slip_list(ss_status=1, as_dict=True)

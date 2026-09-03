@@ -1,6 +1,8 @@
 # Copyright (c) 2026, Staff Pro BPO and Contributors
 # License: GNU General Public License v3. See license.txt
 
+from __future__ import annotations
+
 from datetime import date
 
 import frappe
@@ -315,7 +317,7 @@ def ensure_employee_ss_fields():
 		frappe.clear_cache(doctype="Employee")
 
 
-def ensure_ss_salary_components():
+def ensure_ss_salary_components(company: str | None = None):
 	_ensure_component(
 		SS_EMPLOYEE_COMPONENT,
 		abbr="SS",
@@ -334,6 +336,102 @@ def ensure_ss_salary_components():
 		do_not_include_in_total=1,
 		remove_if_zero_valued=0,
 	)
+	ensure_ss_component_accounts(company)
+
+
+def ensure_ss_component_accounts(company: str | None = None) -> dict[str, str]:
+	"""Map Social Security components to a payable account so payroll JVs can post."""
+	mapped = {}
+	companies = [company] if company else frappe.get_all("Company", pluck="name")
+	for company_name in companies:
+		if not company_name:
+			continue
+		account = get_or_create_ss_payable_account(company_name)
+		if not account:
+			continue
+		for component in (SS_EMPLOYEE_COMPONENT, SS_EMPLOYER_COMPONENT):
+			if frappe.db.exists("Salary Component", component):
+				_ensure_component_account(component, company_name, account)
+				mapped[f"{component}:{company_name}"] = account
+	return mapped
+
+
+def get_or_create_ss_payable_account(company: str) -> str | None:
+	existing = frappe.db.get_value(
+		"Account",
+		{"account_name": SS_PAYABLE_ACCOUNT_NAME, "company": company, "is_group": 0},
+		"name",
+	)
+	if existing:
+		return existing
+
+	parent = (
+		frappe.db.get_value(
+			"Account",
+			{"company": company, "account_type": "Tax", "is_group": 1, "disabled": 0},
+			"name",
+		)
+		or frappe.db.get_value(
+			"Account",
+			{"company": company, "account_name": ("like", "%Duties and Taxes%"), "is_group": 1},
+			"name",
+		)
+		or frappe.db.get_value(
+			"Account",
+			{"company": company, "account_type": "Payable", "is_group": 1, "disabled": 0},
+			"name",
+		)
+		or frappe.db.get_value(
+			"Account",
+			{"company": company, "root_type": "Liability", "is_group": 1, "disabled": 0},
+			"name",
+			order_by="lft asc",
+		)
+	)
+	if parent:
+		try:
+			return (
+				frappe.get_doc(
+					{
+						"doctype": "Account",
+						"account_name": SS_PAYABLE_ACCOUNT_NAME,
+						"parent_account": parent,
+						"company": company,
+						"account_type": "Payable",
+						"root_type": "Liability",
+						"is_group": 0,
+					}
+				)
+				.insert(ignore_permissions=True)
+				.name
+			)
+		except Exception:
+			existing = frappe.db.get_value(
+				"Account",
+				{"account_name": SS_PAYABLE_ACCOUNT_NAME, "company": company, "is_group": 0},
+				"name",
+			)
+			if existing:
+				return existing
+
+	return (
+		frappe.get_cached_value("Company", company, "default_payroll_payable_account")
+		or frappe.db.get_value(
+			"Account",
+			{"company": company, "root_type": "Liability", "is_group": 0, "disabled": 0},
+			"name",
+			order_by="creation",
+		)
+	)
+
+
+def _ensure_component_account(component_name: str, company: str, account: str):
+	if frappe.db.exists("Salary Component Account", {"parent": component_name, "company": company}):
+		return
+	component = frappe.get_doc("Salary Component", component_name)
+	component.append("accounts", {"company": company, "account": account})
+	component.flags.ignore_permissions = True
+	component.save()
 
 
 def _ensure_component(name: str, abbr: str, component_type: str, **kwargs):

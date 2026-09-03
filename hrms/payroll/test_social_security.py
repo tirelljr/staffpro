@@ -156,6 +156,16 @@ class TestSocialSecuritySalarySlip(HRMSTestSuite):
 		frappe.flags.apply_social_security = False
 		super().tearDown()
 
+	def test_ss_component_gets_company_account(self):
+		ensure_ss_salary_components("_Test Company")
+		account = frappe.db.get_value(
+			"Salary Component Account",
+			{"parent": SS_EMPLOYEE_COMPONENT, "company": "_Test Company"},
+			"account",
+		)
+		self.assertTrue(account)
+		self.assertTrue(frappe.db.exists("Account", account))
+
 	def test_weekly_slip_deducts_ss_from_net_pay(self):
 		employee = make_employee(
 			"ss_weekly_agent@example.com",

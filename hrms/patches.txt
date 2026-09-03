@@ -127,3 +127,4 @@ hrms.patches.v16_0.add_paid_time_off_page #2026-09-03
 hrms.patches.v16_0.sync_ssa_agent_hourly_from_employee #2026-09-03
 hrms.patches.v16_0.add_hr_request_ticketing #2026-09-03
 hrms.patches.v16_0.relabel_employee_username #2026-09-03-username-login
+hrms.patches.v16_0.ensure_social_security_accounts #2026-09-03
