@@ -217,6 +217,59 @@ export const SHIFT_REQUEST_FIELDS = [
 	},
 ]
 
+export const HR_REQUEST_FIELDS = [
+	{
+		fieldname: "name",
+		label: "ID",
+		fieldtype: "Data",
+	},
+	{
+		fieldname: "request_type",
+		label: "Request Type",
+		fieldtype: "Link",
+	},
+	{
+		fieldname: "subject",
+		label: "Subject",
+		fieldtype: "Data",
+	},
+	{
+		fieldname: "status",
+		label: "Status",
+		fieldtype: "Select",
+	},
+	{
+		fieldname: "priority",
+		label: "Priority",
+		fieldtype: "Select",
+	},
+	{
+		fieldname: "employee",
+		label: "Employee",
+		fieldtype: "Link",
+	},
+	{
+		fieldname: "letter_purpose",
+		label: "Letter Purpose",
+		fieldtype: "Small Text",
+	},
+	{
+		fieldname: "addressed_to",
+		label: "Addressed To",
+		fieldtype: "Data",
+	},
+	{
+		fieldname: "description",
+		label: "Description",
+		fieldtype: "Small Text",
+	},
+	{
+		fieldname: "resolution",
+		label: "Resolution",
+		fieldtype: "Small Text",
+	},
+]
+
 export const EMPLOYEE_CHECKIN_FIELDS = [
 	{
 		fieldname: "name",

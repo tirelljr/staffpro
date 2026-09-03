@@ -58,7 +58,7 @@ def backfill_invoices_for_submitted_payroll(company: str | None = None) -> list[
 
 
 def create_invoices_for_payroll_entry(doc, method=None):
-	"""Payroll Entry on_submit: create the Client Invoice for the same client and period."""
+	"""Payroll Entry on_submit: create Client Invoices for the agents' clients."""
 	if getattr(frappe.flags, "skip_client_invoice_on_payroll", False):
 		return []
 	if not doc or getattr(doc, "doctype", None) != "Payroll Entry":
@@ -118,19 +118,28 @@ def create_invoices_for_payroll_entry(doc, method=None):
 
 
 def _customers_for_payroll(doc) -> list[str]:
-	if doc.get("customer"):
-		return [doc.customer]
+	"""Clients to invoice after payroll. Payroll itself is agent-based.
+
+	A leftover "All Clients" value is not a real Customer — derive clients from agents.
+	"""
+	from hrms.payroll.doctype.payroll_entry.payroll_entry import is_all_agents_payroll
+
+	customer = doc.get("customer")
+	if customer and not is_all_agents_payroll(customer) and frappe.db.exists("Customer", customer):
+		return [customer]
 
 	employees = [row.employee for row in doc.get("employees") or [] if row.employee]
-	if not employees or not frappe.get_meta("Employee").has_field("bill_to_customer"):
-		return []
+	if employees and frappe.get_meta("Employee").has_field("bill_to_customer"):
+		rows = frappe.get_all(
+			"Employee",
+			filters={"name": ("in", employees), "bill_to_customer": ("is", "set")},
+			pluck="bill_to_customer",
+		)
+		return list(dict.fromkeys(row for row in rows if row and not is_all_agents_payroll(row)))
 
-	rows = frappe.get_all(
-		"Employee",
-		filters={"name": ("in", employees), "bill_to_customer": ("is", "set")},
-		pluck="bill_to_customer",
-	)
-	return list(dict.fromkeys(customer for customer in rows if customer))
+	if doc.get("company"):
+		return get_billable_customers(doc.company)
+	return []
 
 
 @frappe.whitelist()

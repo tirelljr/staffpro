@@ -14,8 +14,10 @@ from hrms.payroll.auto_payroll import (
 	get_pay_period,
 	get_payroll_agent_buckets,
 	get_payroll_customers,
+	get_last_working_period,
 	get_working_period_end,
 	plan_payroll,
+	_safe_plan_payroll,
 	process_automatic_payroll,
 	resolve_custom_pay_period,
 	set_automatic_payroll_interval,
@@ -57,6 +59,11 @@ class TestAutoPayroll(HRMSTestSuite):
 		self.assertEqual(add_working_days(date(2026, 8, 1), 10), date(2026, 8, 14))
 		self.assertEqual(subtract_working_days(date(2026, 8, 14), 10), date(2026, 8, 3))
 		self.assertEqual(get_working_period_end("2026-08-03", 10)["end_date"], "2026-08-14")
+		# Thursday 3 Sep 2026: last 10 weekdays start on Friday 21 Aug
+		self.assertEqual(
+			get_last_working_period(10, as_of="2026-09-03"),
+			{"start_date": "2026-08-21", "end_date": "2026-09-03"},
+		)
 
 	def test_pay_period_from_last_end(self):
 		start, end = get_pay_period(
@@ -112,6 +119,23 @@ class TestAutoPayroll(HRMSTestSuite):
 		self.assertFalse(result["can_create"])
 		self.assertFalse(result["entries"])
 		self.assertIn("turned off", result["message"].lower())
+
+	def test_preview_defaults_to_last_ten_working_days(self):
+		frappe.db.set_single_value(
+			"Payroll Settings",
+			{
+				"enable_automatic_payroll": 1,
+				"automatic_payroll_company": "_Test Company",
+				"automatic_payroll_weekly_days": 5,
+				"automatic_payroll_fortnightly_days": 0,
+				"automatic_payroll_monthly_days": 0,
+			},
+			update_modified=False,
+		)
+		period = get_last_working_period()
+		result = _safe_plan_payroll(every_agent=True)
+		self.assertEqual(result.get("start_date"), period["start_date"])
+		self.assertEqual(result.get("end_date"), period["end_date"])
 
 	def test_custom_pay_period_uses_selected_dates(self):
 		start, end = resolve_custom_pay_period({"interval": 5}, "2026-07-18", "2026-07-24")
@@ -194,7 +218,7 @@ class TestAutoPayroll(HRMSTestSuite):
 		self.assertEqual(entry.payroll_frequency, "Weekly")
 		self.assertEqual(cint(entry.deduct_social_security), 1)
 
-	def test_get_payroll_agent_buckets_skips_clients_without_agents(self):
+	def test_get_payroll_agent_buckets_is_one_run_for_all_agents(self):
 		from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 		from hrms.setup import get_custom_fields
@@ -244,6 +268,26 @@ class TestAutoPayroll(HRMSTestSuite):
 		self.assertNotIn(empty_client, customers)
 
 		buckets = get_payroll_agent_buckets(company)
-		bucket_customers = {bucket.get("customer") for bucket in buckets if bucket.get("customer")}
-		self.assertIn(assigned_client, bucket_customers)
-		self.assertNotIn(empty_client, bucket_customers)
+		self.assertEqual(len(buckets), 1)
+		self.assertFalse(buckets[0].get("customer"))
+		self.assertFalse(buckets[0].get("customer_is_unassigned"))
+
+		frappe.db.set_single_value(
+			"Payroll Settings",
+			{
+				"enable_automatic_payroll": 1,
+				"automatic_payroll_company": company,
+				"automatic_payroll_weekly_days": 5,
+				"automatic_payroll_fortnightly_days": 0,
+				"automatic_payroll_monthly_days": 0,
+			},
+			update_modified=False,
+		)
+		preview = plan_payroll(
+			every_agent=True, force=True, start_date="2026-07-18", end_date="2026-07-24"
+		)
+		self.assertTrue(preview.get("entries"))
+		self.assertEqual(len(preview["entries"]), 1)
+		self.assertFalse(preview["entries"][0]["customer"])
+		self.assertEqual(preview["entries"][0]["customer_label"], "All Agents")
+		self.assertIn(frappe.db.get_value("Employee", employee, "employee_name"), preview["entries"][0]["agent_names"])

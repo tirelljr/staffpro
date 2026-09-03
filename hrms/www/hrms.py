@@ -26,6 +26,7 @@ def get_boot():
 		{
 			"site_name": frappe.local.site,
 			"socketio_port": frappe.conf.get("socketio_port") or 9000,
+			"webserver_port": frappe.conf.get("webserver_port") or 8000,
 			"push_relay_server_url": frappe.conf.get("push_relay_server_url") or "",
 			"default_route": get_default_route(),
 		}

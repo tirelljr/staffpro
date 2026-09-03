@@ -659,6 +659,30 @@ def make_fixtures():
 		{"doctype": "Expense Claim Type", "name": _("Medical"), "expense_type": _("Medical")},
 		{"doctype": "Expense Claim Type", "name": _("Others"), "expense_type": _("Others")},
 		{"doctype": "Expense Claim Type", "name": _("Travel"), "expense_type": _("Travel")},
+		{
+			"doctype": "HR Request Type",
+			"name": _("Job Letter"),
+			"request_type_name": _("Job Letter"),
+			"description": _("Request an employment or job letter for banks, visas, or other official use."),
+		},
+		{
+			"doctype": "HR Request Type",
+			"name": _("Employment Verification"),
+			"request_type_name": _("Employment Verification"),
+			"description": _("Ask HR to confirm employment details for a third party."),
+		},
+		{
+			"doctype": "HR Request Type",
+			"name": _("Address / Personal Details Update"),
+			"request_type_name": _("Address / Personal Details Update"),
+			"description": _("Request a change to address, name, or other personal details."),
+		},
+		{
+			"doctype": "HR Request Type",
+			"name": _("General Inquiry"),
+			"request_type_name": _("General Inquiry"),
+			"description": _("Send a general question or request to the HR team."),
+		},
 		# vehicle service item
 		{"doctype": "Vehicle Service Item", "service_item": "Brake Oil"},
 		{"doctype": "Vehicle Service Item", "service_item": "Brake Pad"},
@@ -978,8 +1002,9 @@ def get_user_types_data():
 				"Shift Request": ["read", "write", "create", "delete", "submit", "cancel", "amend"],
 				# misc
 				"Employee Grievance": ["read", "write", "create", "delete"],
+				"HR Request": ["read", "write", "create", "delete"],
+				"HR Request Type": ["read"],
 				"Employee Referral": ["read", "write", "create", "delete"],
-				"Travel Request": ["read", "write", "create", "delete"],
 			},
 		}
 	}

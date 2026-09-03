@@ -7,6 +7,7 @@ from frappe import _
 def get_dashboard_for_employee(data):
 	data["transactions"].extend(
 		[
+			{"label": _("Requests"), "items": ["HR Request"]},
 			{"label": _("Attendance"), "items": ["Attendance", "Attendance Request", "Employee Checkin"]},
 			{
 				"label": _("Leave"),

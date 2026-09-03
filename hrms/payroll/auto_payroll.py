@@ -69,7 +69,7 @@ def subtract_working_days(end_date, working_days: int):
 
 
 @frappe.whitelist()
-def get_working_period_end(start_date, working_days: int | None = None):
+def get_working_period_end(start_date: str | None, working_days: int | None = None) -> dict:
 	"""Form helper: end date N working days from start. Default is a 2-week (10-day) period."""
 	if not start_date:
 		return {"end_date": None}
@@ -77,6 +77,20 @@ def get_working_period_end(start_date, working_days: int | None = None):
 	if days < 1:
 		days = 10
 	return {"end_date": add_working_days(getdate(start_date), days).strftime("%Y-%m-%d")}
+
+
+@frappe.whitelist()
+def get_last_working_period(working_days: int | None = None, as_of: str | None = None) -> dict:
+	"""Last N weekdays ending on as_of (today by default). Today counts when it is a weekday."""
+	days = cint(working_days) if working_days not in (None, "") else 10
+	if days < 1:
+		days = 10
+	end = getdate(as_of or nowdate())
+	start = subtract_working_days(end, days)
+	return {
+		"start_date": start.strftime("%Y-%m-%d"),
+		"end_date": end.strftime("%Y-%m-%d"),
+	}
 
 
 def canonical_frequency(name: str | None) -> str:
@@ -132,47 +146,59 @@ def get_enabled_templates(settings=None) -> list[dict]:
 
 
 def run_scheduled_payroll():
-	"""Daily scheduler entry: run payroll after each completed pay period."""
-	return process_automatic_payroll(force=False)
+	"""Daily scheduler entry: one payroll for every agent, then invoices run separately."""
+	return process_payroll_for_every_agent(force=False)
 
 
 @frappe.whitelist()
-def run_automatic_payroll_now(start_date=None, end_date=None):
+def run_automatic_payroll_now(start_date: str | None = None, end_date: str | None = None) -> dict:
 	if not frappe.has_permission("Payroll Entry", "create"):
 		frappe.throw(_("Not permitted to run payroll"))
 	return process_automatic_payroll(force=True, start_date=start_date, end_date=end_date)
 
 
 @frappe.whitelist()
-def run_payroll_for_every_agent_now(start_date=None, end_date=None):
-	"""Bulk payroll run across all agents (including agents without bill_to_customer)."""
+def run_payroll_for_every_agent_now(start_date: str | None = None, end_date: str | None = None) -> dict:
+	"""Create one payroll covering every agent, regardless of client."""
 	if not frappe.has_permission("Payroll Entry", "create"):
 		frappe.throw(_("Not permitted to run payroll"))
 	return process_payroll_for_every_agent(force=True, start_date=start_date, end_date=end_date)
 
 
 @frappe.whitelist()
-def preview_automatic_payroll(start_date=None, end_date=None):
+def preview_automatic_payroll(start_date: str | None = None, end_date: str | None = None) -> dict:
 	if not frappe.has_permission("Payroll Entry", "create"):
 		frappe.throw(_("Not permitted to run payroll"))
 	return _safe_plan_payroll(every_agent=False, start_date=start_date, end_date=end_date)
 
 
 @frappe.whitelist()
-def preview_payroll_for_every_agent(start_date=None, end_date=None):
+def preview_payroll_for_every_agent(start_date: str | None = None, end_date: str | None = None) -> dict:
 	if not frappe.has_permission("Payroll Entry", "create"):
 		frappe.throw(_("Not permitted to run payroll"))
 	return _safe_plan_payroll(every_agent=True, start_date=start_date, end_date=end_date)
 
 
 def _safe_plan_payroll(every_agent: bool, start_date=None, end_date=None) -> dict:
+	if not start_date and not end_date:
+		period = get_last_working_period()
+		start_date = period["start_date"]
+		end_date = period["end_date"]
 	try:
-		return plan_payroll(every_agent=every_agent, force=True, start_date=start_date, end_date=end_date)
+		result = plan_payroll(every_agent=every_agent, force=True, start_date=start_date, end_date=end_date)
 	except frappe.ValidationError:
 		raise
 	except Exception:
 		frappe.log_error(title=_("Payroll preview failed"))
-		return _preview_result(_("Could not prepare the payroll preview. Check Error Log."))
+		return _preview_result(
+			_("Could not prepare the payroll preview. Check Error Log."),
+			start_date=start_date,
+			end_date=end_date,
+		)
+	if not result.get("start_date"):
+		result["start_date"] = str(getdate(start_date)) if start_date else None
+		result["end_date"] = str(getdate(end_date)) if end_date else None
+	return result
 
 
 @frappe.whitelist()
@@ -283,51 +309,12 @@ def get_automatic_payroll_status() -> dict:
 
 
 def process_automatic_payroll(force: bool = False, start_date=None, end_date=None) -> dict:
-	settings = frappe.get_single("Payroll Settings")
-	if not cint(settings.get("enable_automatic_payroll")):
-		return _result(_("Automatic payroll is turned off in Payroll Settings."))
-
-	company = settings.get("automatic_payroll_company") or frappe.defaults.get_global_default("company")
-	if not company:
-		return _result(_("Set a company in Payroll Settings or Global Defaults."))
-
-	as_of = getdate(nowdate())
-	created = []
-	skipped = []
-	custom_period = bool(start_date or end_date)
-
-	if not custom_period:
-		draft_result = submit_due_drafts(settings, company, as_of, force=force)
-		created.extend(draft_result["created"])
-		skipped.extend(draft_result["skipped"])
-		if draft_result.get("blocked"):
-			return _result(draft_result["blocked"], created=created, skipped=skipped)
-
-	templates = get_enabled_templates(settings)
-	if not templates:
-		return _result(_("Set auto-run days for Weekly, 2-weeks, or Monthly."))
-
-	for template in templates:
-		result = _process_template(
-			settings, company, template, as_of, force=force, start_date=start_date, end_date=end_date
-		)
-		created.extend(result["created"])
-		skipped.extend(result["skipped"])
-		if result.get("blocked"):
-			return _result(result["blocked"], created=created, skipped=skipped)
-
-	if created:
-		message = _("Created payroll {0}.").format(", ".join(created))
-	elif skipped:
-		message = skipped[0]
-	else:
-		message = _("No payroll was due.")
-
-	return _result(message, created=created, skipped=skipped)
+	"""Payroll is for agents. Client invoices are created separately on submit."""
+	return process_payroll_for_every_agent(force=force, start_date=start_date, end_date=end_date)
 
 
 def process_payroll_for_every_agent(force: bool = False, start_date=None, end_date=None) -> dict:
-	"""Run payroll for every agent. Clients with no assigned agents are skipped."""
+	"""Create one payroll per pay template covering every agent, regardless of client."""
 	settings = frappe.get_single("Payroll Settings")
 	if not cint(settings.get("enable_automatic_payroll")):
 		return _result(_("Automatic payroll is turned off in Payroll Settings."))
@@ -396,6 +383,8 @@ def process_payroll_for_every_agent(force: bool = False, start_date=None, end_da
 
 def plan_payroll(every_agent: bool = True, force: bool = True, start_date=None, end_date=None) -> dict:
 	"""Describe the next payroll run without creating documents."""
+	from hrms.payroll.doctype.payroll_entry.payroll_entry import is_all_agents_payroll
+
 	settings = frappe.get_single("Payroll Settings")
 	if not cint(settings.get("enable_automatic_payroll")):
 		return _preview_result(_("Automatic payroll is turned off in Payroll Settings."))
@@ -487,7 +476,7 @@ def plan_payroll(every_agent: bool = True, force: bool = True, start_date=None, 
 			if not count_active_agents(
 				company, customer=customer, customer_is_unassigned=bool(customer_is_unassigned)
 			):
-				if customer:
+				if customer and not is_all_agents_payroll(customer):
 					skipped.append(_("Skipped {0}: no agents assigned.").format(customer))
 				continue
 			existing = find_existing_entry(
@@ -510,7 +499,7 @@ def plan_payroll(every_agent: bool = True, force: bool = True, start_date=None, 
 				skipped.append(
 					_("Could not preview {0} for {1}.").format(
 						template.get("label") or template.get("frequency"),
-						bucket.get("customer") or _("Unassigned Agents"),
+						_bucket_label(bucket),
 					)
 				)
 				continue
@@ -542,15 +531,22 @@ def plan_payroll(every_agent: bool = True, force: bool = True, start_date=None, 
 	)
 
 
+def _bucket_label(bucket: dict) -> str:
+	from hrms.payroll.doctype.payroll_entry.payroll_entry import is_all_agents_payroll
+
+	if cint(bucket.get("customer_is_unassigned")):
+		return _("Unassigned Agents")
+	if is_all_agents_payroll(bucket.get("customer")):
+		return _("All Agents")
+	return bucket.get("customer") or _("All Agents")
+
+
 def _preview_row(company, template, start_date, end_date, bucket, existing=None) -> dict:
 	from hrms.payroll.doctype.client_invoice.client_invoice import get_hours_by_employee
 
 	customer = bucket.get("customer")
 	customer_is_unassigned = cint(bucket.get("customer_is_unassigned"))
-	if customer_is_unassigned or not customer:
-		customer_label = _("Unassigned Agents")
-	else:
-		customer_label = customer
+	customer_label = _bucket_label(bucket)
 
 	employees = _bucket_employees(company, customer, bool(customer_is_unassigned))
 	hours_by_employee = get_hours_by_employee(
@@ -578,11 +574,13 @@ def _preview_row(company, template, start_date, end_date, bucket, existing=None)
 
 
 def _bucket_employees(company: str, customer: str | None = None, customer_is_unassigned: bool = False):
+	from hrms.payroll.doctype.payroll_entry.payroll_entry import is_all_clients
+
 	filters = {"company": company, "status": "Active"}
 	if frappe.get_meta("Employee").has_field("bill_to_customer"):
 		if customer_is_unassigned:
 			filters["bill_to_customer"] = ("is", "not set")
-		elif customer:
+		elif customer and not is_all_clients(customer):
 			filters["bill_to_customer"] = customer
 	return frappe.get_all(
 		"Employee",
@@ -773,7 +771,7 @@ def _process_template_for_every_agent(
 			if not count_active_agents(
 				company, customer=customer, customer_is_unassigned=bool(customer_is_unassigned)
 			):
-				if customer:
+				if customer and not _is_all_agents_customer(customer):
 					skipped.append(_("Skipped {0}: no agents assigned.").format(customer))
 				continue
 			existing = find_existing_entry(
@@ -808,15 +806,14 @@ def _process_template_for_every_agent(
 				}
 
 			if not entry:
-				if customer:
+				if customer and not _is_all_agents_customer(customer):
 					skipped.append(_("Skipped {0}: no agents assigned.").format(customer))
 				continue
 
 			created.append(entry.name)
 			period_created = True
 			if created_by_bucket is not None:
-				bucket_key = customer or _("Unassigned Agents")
-				created_by_bucket.setdefault(bucket_key, []).append(entry.name)
+				created_by_bucket.setdefault(_bucket_label(bucket), []).append(entry.name)
 			mark_last_run(as_of, entry.name)
 
 		if not period_created:
@@ -958,23 +955,44 @@ def find_existing_entry(
 	if customer_is_unassigned:
 		# Match payroll entries created for unassigned agents (no bill_to_customer).
 		filters["customer"] = ("is", "not set")
-	elif customer is not None:
+	elif customer and not _is_all_agents_customer(customer):
 		filters["customer"] = customer
 
-	name = frappe.db.get_value("Payroll Entry", filters, "name", order_by="docstatus desc, creation desc")
-	if not name:
-		return None
-	return frappe.get_doc("Payroll Entry", name)
+	if customer_is_unassigned or (customer and not _is_all_agents_customer(customer)):
+		name = frappe.db.get_value("Payroll Entry", filters, "name", order_by="docstatus desc, creation desc")
+		if not name:
+			return None
+		return frappe.get_doc("Payroll Entry", name)
+
+	# All-agent payroll: match blank customer or leftover "All Clients" sentinel.
+	candidates = frappe.get_all(
+		"Payroll Entry",
+		filters=filters,
+		fields=["name", "customer"],
+		order_by="docstatus desc, creation desc",
+	)
+	for row in candidates:
+		if _is_all_agents_customer(row.customer):
+			return frappe.get_doc("Payroll Entry", row.name)
+	return None
+
+
+def _is_all_agents_customer(customer) -> bool:
+	from hrms.payroll.doctype.payroll_entry.payroll_entry import is_all_agents_payroll
+
+	return is_all_agents_payroll(customer)
 
 
 def count_active_agents(
 	company: str, customer: str | None = None, customer_is_unassigned: bool = False
 ) -> int:
+	from hrms.payroll.doctype.payroll_entry.payroll_entry import is_all_clients
+
 	filters = {"company": company, "status": "Active"}
 	if frappe.get_meta("Employee").has_field("bill_to_customer"):
 		if customer_is_unassigned:
 			filters["bill_to_customer"] = ("is", "not set")
-		elif customer:
+		elif customer and not is_all_clients(customer):
 			filters["bill_to_customer"] = customer
 	return frappe.db.count("Employee", filters)
 
@@ -998,32 +1016,10 @@ def get_payroll_customers(company: str) -> list[str]:
 
 
 def get_payroll_agent_buckets(company: str) -> list[dict]:
-	"""Per-client buckets for clients that have agents, plus unassigned agents."""
-	customers = get_payroll_customers(company) or []
-	buckets: list[dict] = [{"customer": customer, "customer_is_unassigned": 0} for customer in customers]
-
-	unassigned_count = 0
-	if (
-		frappe.get_meta("Employee").has_field("bill_to_customer")
-		and frappe.get_meta("Payroll Entry").has_field("customer")
-	):
-		unassigned_count = frappe.db.count(
-			"Employee",
-			{
-				"company": company,
-				"status": "Active",
-				"bill_to_customer": ("is", "not set"),
-			},
-		)
-
-	if unassigned_count:
-		buckets.append({"customer": None, "customer_is_unassigned": 1})
-
-	if not buckets:
-		# Fallback: keep behavior compatible with systems where bill_to_customer isn't configured.
-		buckets = [{"customer": None, "customer_is_unassigned": 0}]
-
-	return buckets
+	"""One payroll covering every active agent. Do not store a fake Client link."""
+	if not count_active_agents(company):
+		return []
+	return [{"customer": None, "customer_is_unassigned": 0}]
 
 
 def create_or_submit_payroll_entry(
@@ -1041,8 +1037,7 @@ def create_or_submit_payroll_entry(
 	to_submit = []
 	if existing and existing.docstatus == 0:
 		entry = existing
-		if customer is not None and not entry.get("customer"):
-			entry.customer = customer
+		_set_payroll_customer(entry, customer)
 		if not entry.employees:
 			try:
 				entry.fill_employee_details(customer_is_unassigned=customer_is_unassigned)
@@ -1129,8 +1124,7 @@ def build_payroll_entry(
 
 	entry = frappe.new_doc("Payroll Entry")
 	entry.company = company
-	if frappe.get_meta("Payroll Entry").has_field("customer"):
-		entry.customer = customer
+	_set_payroll_customer(entry, customer)
 	entry.posting_date = nowdate()
 	entry.start_date = getdate(start_date)
 	entry.end_date = getdate(end_date)
@@ -1147,6 +1141,20 @@ def build_payroll_entry(
 
 	entry.bank_account = get_default_payroll_bank_account(company)
 	return entry
+
+
+def _set_payroll_customer(entry, customer: str | None):
+	"""Payroll is agent-based. Never write the fake All Clients Customer link."""
+	if not frappe.get_meta("Payroll Entry").has_field("customer"):
+		return
+	from hrms.payroll.doctype.payroll_entry.payroll_entry import is_all_agents_payroll
+
+	if is_all_agents_payroll(customer):
+		entry.customer = None
+	elif customer:
+		entry.customer = customer
+	elif is_all_agents_payroll(entry.get("customer")):
+		entry.customer = None
 
 
 def mark_last_run(as_of, entry_name: str):

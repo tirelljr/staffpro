@@ -21,6 +21,14 @@
 					/>
 				</div>
 				<div>
+					<div class="text-lg text-gray-800 font-bold">{{ __("Job Letters") }}</div>
+					<RequestList
+						:component="markRaw(HRRequestItem)"
+						:items="approvedJobLetters"
+						:emptyStateMessage="__('Approved job letters will show here for download')"
+					/>
+				</div>
+				<div>
 					<div class="text-lg text-gray-800 font-bold">{{ __("Upcoming Shifts") }}</div>
 					<RequestList
 						:component="markRaw(ShiftAssignmentItem)"
@@ -60,8 +68,10 @@ import CheckInPanel from "@/components/CheckInPanel.vue"
 import AttendanceRequestItem from "@/components/AttendanceRequestItem.vue"
 import ShiftRequestItem from "@/components/ShiftRequestItem.vue"
 import ShiftAssignmentItem from "@/components/ShiftAssignmentItem.vue"
+import HRRequestItem from "@/components/HRRequestItem.vue"
 import RequestList from "@/components/RequestList.vue"
 import AttendanceCalendar from "@/components/AttendanceCalendar.vue"
+import { approvedJobLetters } from "@/data/hr_requests"
 
 import {
 	getShiftDates,

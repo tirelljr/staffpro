@@ -6,8 +6,10 @@ hrms.payroll_utils = {
 		const freeze_message = opts.freeze_message || __("Creating payroll...");
 		const on_done = opts.on_done;
 
+		const period = hrms.payroll_utils.last_working_period();
 		frappe.call({
 			method: preview_method,
+			args: { start_date: period.start, end_date: period.end },
 			freeze: true,
 			freeze_message: __("Preparing payroll preview..."),
 			callback(r) {
@@ -39,6 +41,23 @@ hrms.payroll_utils = {
 		});
 	},
 
+	last_working_period(working_days = 10) {
+		let end = frappe.datetime.get_today();
+		let current = end;
+		let remaining = Math.max(cint(working_days) || 10, 1);
+		while (remaining > 0) {
+			const weekday = frappe.datetime.str_to_obj(current).getDay();
+			if (weekday !== 0 && weekday !== 6) {
+				remaining -= 1;
+				if (remaining === 0) {
+					break;
+				}
+			}
+			current = frappe.datetime.add_days(current, -1);
+		}
+		return { start: current, end };
+	},
+
 	preview_period_dates(preview) {
 		const source = preview || {};
 		const entries = source.entries || [];
@@ -53,6 +72,11 @@ hrms.payroll_utils = {
 			end = entries.reduce((latest, row) => {
 				return !latest || row.end_date > latest ? row.end_date : latest;
 			}, "");
+		}
+		if (!start || !end) {
+			const fallback = hrms.payroll_utils.last_working_period();
+			start = start || fallback.start;
+			end = end || fallback.end;
 		}
 		return { start, end };
 	},
@@ -224,7 +248,7 @@ hrms.payroll_utils = {
 			? `<table class="table table-bordered" style="margin-top: 12px;">
 				<thead>
 					<tr>
-						<th>${__("Client")}</th>
+						<th>${__("Payroll")}</th>
 						<th>${__("Pay Template")}</th>
 						<th>${__("Pay Period")}</th>
 						<th>${__("Agents")}</th>

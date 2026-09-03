@@ -111,6 +111,20 @@
                       "default_workspace":  0,
                       "indent":  0,
                       "keep_closed":  0,
+                      "label":  "Employee Requests",
+                      "open_in_new_tab":  0,
+                      "show_arrow":  0,
+                      "type":  "Link",
+                      "icon":  "inbox",
+                      "link_to":  "HR Request",
+                      "link_type":  "DocType"
+                  },
+                  {
+                      "child":  0,
+                      "collapsible":  1,
+                      "default_workspace":  0,
+                      "indent":  0,
+                      "keep_closed":  0,
                       "label":  "Concerns & Escalations",
                       "open_in_new_tab":  0,
                       "show_arrow":  0,
@@ -284,6 +298,20 @@
                       "link_to":  "Grievance Type",
                       "link_type":  "DocType",
                       "icon":  "flag"
+                  },
+                  {
+                      "child":  1,
+                      "collapsible":  1,
+                      "default_workspace":  0,
+                      "indent":  0,
+                      "keep_closed":  0,
+                      "label":  "Request Types",
+                      "open_in_new_tab":  0,
+                      "show_arrow":  0,
+                      "type":  "Link",
+                      "link_to":  "HR Request Type",
+                      "link_type":  "DocType",
+                      "icon":  "tags"
                   },
                   {
                       "child":  1,

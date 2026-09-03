@@ -31,6 +31,32 @@
 		<div v-else class="font-medium text-sm text-gray-500 mt-1.5">
 			{{ dayjs().format("ddd, D MMMM, YYYY") }}
 		</div>
+
+		<div v-if="upcomingPay.data" class="grid grid-cols-3 gap-3 mt-5 pt-4 border-t border-gray-100">
+			<div class="flex flex-col gap-0.5 min-w-0">
+				<span class="text-xs text-gray-500 font-medium leading-4">{{ __("Upcoming Pay") }}</span>
+				<span class="text-sm text-gray-900 font-semibold leading-5 truncate">
+					{{ formatPay(upcomingPay.data.gross_pay) }}
+				</span>
+			</div>
+			<div class="flex flex-col gap-0.5 min-w-0">
+				<span class="text-xs text-gray-500 font-medium leading-4">{{ __("Upcoming Net Pay") }}</span>
+				<span class="text-sm text-gray-900 font-semibold leading-5 truncate">
+					{{ formatPay(upcomingPay.data.net_pay) }}
+				</span>
+			</div>
+			<div class="flex flex-col gap-0.5 min-w-0">
+				<span class="text-xs text-gray-500 font-medium leading-4">
+					{{ __("Hours (next pay period)") }}
+				</span>
+				<span class="text-sm text-gray-900 font-semibold leading-5 truncate">
+					{{ formatHours(upcomingPay.data.total_hours, true) }}
+				</span>
+			</div>
+			<div v-if="payPeriodLabel" class="col-span-3 text-xs text-gray-400 font-medium">
+				{{ payPeriodLabel }}
+			</div>
+		</div>
 	</div>
 
 	<ion-modal
@@ -82,8 +108,9 @@ import { createListResource, toast, FeatherIcon } from "frappe-ui"
 import { computed, inject, ref, onMounted, onBeforeUnmount } from "vue"
 import { IonModal, modalController } from "@ionic/vue"
 
-import { formatTimestamp } from "@/utils/formatters"
+import { formatCurrency, formatHours, formatTimestamp } from "@/utils/formatters"
 import { settings } from "@/data/settings"
+import { employeeUpcomingPay } from "@/data/hours"
 
 const DOCTYPE = "Employee Checkin"
 
@@ -95,6 +122,23 @@ const checkinTimestamp = ref(null)
 const latitude = ref(0)
 const longitude = ref(0)
 const locationStatus = ref("")
+
+const upcomingPay = employeeUpcomingPay
+
+const payPeriodLabel = computed(() => {
+	const start = upcomingPay.data?.start_date
+	const end = upcomingPay.data?.end_date
+	if (!start || !end) return ""
+	return `${dayjs(start).format("D MMM")} – ${dayjs(end).format("D MMM, YYYY")}`
+})
+
+const formatPay = (amount) => {
+	try {
+		return formatCurrency(amount || 0, upcomingPay.data?.currency)
+	} catch {
+		return Number(amount || 0).toFixed(2)
+	}
+}
 
 const checkins = createListResource({
 	doctype: DOCTYPE,
@@ -167,6 +211,7 @@ const submitLog = (logType) => {
 		{
 			onSuccess() {
 				modalController.dismiss()
+				upcomingPay.reload()
 				toast({
 					title: __("Success"),
 					text: __("{0} successful!", [actionLabel]),
@@ -197,6 +242,7 @@ onMounted(() => {
 	socket.on("list_update", (data) => {
 		if (data.doctype == DOCTYPE) {
 			checkins.reload()
+			upcomingPay.reload()
 		}
 	})
 })

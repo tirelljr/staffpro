@@ -7,12 +7,19 @@ frappe.provide("erpnext.accounts.dimensions");
 
 frappe.ui.form.on("Payroll Entry", {
 	onload: function (frm) {
-		frm.ignore_doctypes_on_cancel_all = ["Salary Slip", "Journal Entry", "Client Invoice"];
+		frm.ignore_doctypes_on_cancel_all = [
+			"Salary Slip",
+			"Journal Entry",
+			"Client Invoice",
+			"Payroll Settings",
+		];
 
 		if (!frm.doc.posting_date) {
 			frm.doc.posting_date = frappe.datetime.nowdate();
 		}
-		frm.toggle_reqd(["payroll_frequency", "customer"], 1);
+		frm.toggle_reqd(["payroll_frequency"], 1);
+		frm.toggle_reqd("customer", 0);
+		frm.set_df_property("customer", "hidden", 1);
 		if (frm.is_new()) {
 			if (!cint(frm.doc.salary_slip_based_on_timesheet)) {
 				frm.set_value("salary_slip_based_on_timesheet", 1);
@@ -88,7 +95,9 @@ frappe.ui.form.on("Payroll Entry", {
 		frm.set_df_property("accounting_dimensions_tab", "hidden", 1);
 		frm.set_df_property("payment_account", "hidden", 1);
 		frm.set_df_property("overtime_step", "hidden", 1);
-		frm.toggle_reqd(["payroll_frequency", "customer"], 1);
+		frm.toggle_reqd(["payroll_frequency"], 1);
+		frm.toggle_reqd("customer", 0);
+		frm.set_df_property("customer", "hidden", 1);
 		if (hrms.relabel_payroll_frequency) {
 			hrms.relabel_payroll_frequency(frm);
 		}
@@ -100,12 +109,12 @@ frappe.ui.form.on("Payroll Entry", {
 			if (!frm.is_new()) {
 				frm.page.clear_primary_action();
 			}
-			if (frm.doc.customer) {
+			if (frm.doc.company) {
 				frm.add_custom_button(__("Get Agents"), function () {
 					frm.events.get_employee_details(frm);
 				}).toggleClass("btn-primary", !frm.is_new() && !(frm.doc.employees || []).length);
 			}
-			if (frm.doc.customer && !(frm.doc.employees || []).length) {
+			if (frm.doc.company && !(frm.doc.employees || []).length) {
 				frm.events.queue_fill_employees(frm);
 			}
 		}
@@ -182,12 +191,12 @@ frappe.ui.form.on("Payroll Entry", {
 		if (frm.doc.docstatus !== 0 || cint(frm.doc.salary_slips_created) || frm._filling_employees) {
 			return;
 		}
-		if (!frm.doc.customer || !frm.doc.company) {
+		if (!frm.doc.company) {
 			return;
 		}
 
 		const fill_key = [
-			frm.doc.customer,
+			frm.doc.customer || "all-agents",
 			frm.doc.branch || "",
 			frm.doc.department || "",
 			frm.doc.designation || "",
@@ -229,10 +238,7 @@ frappe.ui.form.on("Payroll Entry", {
 					name: frm.doc.name,
 				},
 				freeze: true,
-				freeze_message:
-					frm.doc.customer === "All Clients"
-						? __("Fetching agents for all clients")
-						: __("Fetching agents for this client"),
+				freeze_message: __("Fetching agents"),
 			}),
 		)
 			.then((r) => {
@@ -326,16 +332,6 @@ frappe.ui.form.on("Payroll Entry", {
 				query: "hrms.payroll.doctype.payroll_entry.payroll_entry.payroll_client_query",
 			};
 		});
-		const customer_field = frm.get_field("customer");
-		if (customer_field) {
-			const original_validate = customer_field.validate?.bind(customer_field);
-			customer_field.validate = function (value) {
-				if (value === "All Clients") {
-					return;
-				}
-				return original_validate ? original_validate(value) : undefined;
-			};
-		}
 
 		frm.set_query("bank_account", function () {
 			return {
@@ -348,7 +344,7 @@ frappe.ui.form.on("Payroll Entry", {
 
 		frm.set_query("employee", "employees", () => {
 			let error_fields = [];
-			let mandatory_fields = ["customer", "company", "payroll_frequency", "start_date", "end_date"];
+			let mandatory_fields = ["company", "payroll_frequency", "start_date", "end_date"];
 
 			let message = __("Mandatory fields required in {0}", [__(frm.doc.doctype)]);
 

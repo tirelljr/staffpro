@@ -159,6 +159,93 @@ def get_attendance_calendar_events(from_date: str, to_date: str) -> dict[str, st
 	return events
 
 
+def _employee_hours_payload(from_date: str | None = None, to_date: str | None = None, preset: str | None = None) -> dict:
+	from hrms.hr.doctype.attendance.attendance import (
+		_decorate_hours_rows,
+		_expand_attendance_to_hour_rows,
+		_hours_approval_status,
+		_hours_comments_by_attendance,
+		_hours_filters,
+		_hours_list_fields,
+		_sum_hour_buckets,
+		get_hours_date_presets,
+	)
+
+	employee_info = get_current_employee_info()
+	if not employee_info or not employee_info.get("name"):
+		frappe.throw(_("Employee not found"), frappe.PermissionError)
+
+	employee = employee_info.name
+	presets = get_hours_date_presets()
+	selected = (preset or "").strip()
+	if selected and selected in presets:
+		from_date, to_date = presets[selected]
+	if not from_date or not to_date:
+		from_date, to_date = presets.get("current_pay_period") or [str(getdate()), str(getdate())]
+
+	rows = frappe.get_list(
+		"Attendance",
+		fields=_hours_list_fields(),
+		filters=_hours_filters(from_date, to_date, employee),
+		order_by="attendance_date desc, employee_name asc",
+		limit=500,
+	)
+	expanded = _expand_attendance_to_hour_rows(rows)
+	comments = _hours_comments_by_attendance([row.name for row in rows])
+	decorated = _decorate_hours_rows(expanded)
+	seen_comments = set()
+	for row in decorated:
+		name = row.get("name")
+		if name and name not in seen_comments and row.get("kind") != "lunch":
+			row["comments"] = comments.get(name, [])
+			seen_comments.add(name)
+		else:
+			row["comments"] = []
+
+	jobs = sorted({(row.get("job") or "").strip() for row in decorated if (row.get("job") or "").strip()})
+	company = employee_info.get("company")
+	currency = frappe.db.get_value("Company", company, "default_currency") if company else None
+
+	return {
+		"rows": decorated,
+		"totals": _sum_hour_buckets(decorated),
+		"approval": _hours_approval_status(decorated),
+		"from_date": str(getdate(from_date)),
+		"to_date": str(getdate(to_date)),
+		"employee": employee,
+		"employee_name": employee_info.get("employee_name") or "",
+		"currency": currency or "BZD",
+		"presets": presets,
+		"jobs": jobs,
+	}
+
+
+@frappe.whitelist()
+def get_employee_hours(
+	from_date: str | None = None, to_date: str | None = None, preset: str | None = None
+) -> dict:
+	"""Clock rows for the signed-in employee, matching desk Day View / List View."""
+	return _employee_hours_payload(from_date=from_date, to_date=to_date, preset=preset)
+
+
+@frappe.whitelist()
+def get_employee_upcoming_pay() -> dict:
+	"""Gross, net, and hours for the current (upcoming) pay period."""
+	data = _employee_hours_payload(preset="current_pay_period")
+	totals = data.get("totals") or {}
+	return {
+		"start_date": data["from_date"],
+		"end_date": data["to_date"],
+		"gross_pay": totals.get("daily_pay") or 0,
+		"net_pay": totals.get("net_daily_pay") or 0,
+		"total_hours": totals.get("total") or 0,
+		"paid_hours": totals.get("paid") or 0,
+		"unpaid_hours": totals.get("unpaid") or 0,
+		"currency": data.get("currency"),
+		"employee_name": data.get("employee_name"),
+	}
+
+
 def get_attendance_for_calendar(employee: str, from_date: str, to_date: str) -> list[dict[str, str]]:
 	attendance = frappe.get_all(
 		"Attendance",
@@ -621,6 +708,85 @@ def get_expense_claim_types() -> list[dict]:
 
 
 @frappe.whitelist()
+def get_hr_request_types() -> list[dict]:
+	RequestType = frappe.qb.DocType("HR Request Type")
+	return (
+		frappe.qb.from_(RequestType).select(RequestType.name, RequestType.description).orderby(RequestType.name)
+	).run(as_dict=True)
+
+
+@frappe.whitelist()
+def get_hr_requests(
+	employee: str | None = None,
+	for_approval: bool = False,
+	request_type: str | None = None,
+	limit: int | None = None,
+) -> list[dict]:
+	from hrms.hr.doctype.hr_request.hr_request import is_hr_user
+
+	current_employee = get_current_employee()
+	if not is_hr_user():
+		employee = current_employee
+		for_approval = False
+	elif not employee:
+		employee = current_employee
+
+	filters = frappe._dict()
+	if for_approval:
+		filters.status = ("not in", ["Resolved", "Rejected", "Cancelled"])
+		filters.assigned_to = ("in", [frappe.session.user, ""])
+	else:
+		filters.employee = employee
+
+	if request_type:
+		filters.request_type = request_type
+
+	fields = [
+		"name",
+		"employee",
+		"employee_name",
+		"request_type",
+		"subject",
+		"description",
+		"status",
+		"priority",
+		"assigned_to",
+		"assigned_to_name",
+		"letter_purpose",
+		"addressed_to",
+		"resolution",
+		"resolved_on",
+		"creation",
+	]
+
+	return frappe.get_list(
+		"HR Request",
+		fields=fields,
+		filters=filters,
+		order_by="creation desc",
+		limit=limit,
+	)
+
+
+@frappe.whitelist()
+def get_hr_request_summary(employee: str | None = None) -> dict:
+	from hrms.hr.doctype.hr_request.hr_request import is_hr_user
+
+	current_employee = get_current_employee()
+	if not is_hr_user() or not employee:
+		employee = current_employee
+
+	base = {"employee": employee}
+	return {
+		"open": frappe.db.count("HR Request", {**base, "status": "Open"}),
+		"in_progress": frappe.db.count(
+			"HR Request", {**base, "status": ["in", ["In Progress", "Waiting on Employee"]]}
+		),
+		"resolved": frappe.db.count("HR Request", {**base, "status": "Resolved"}),
+	}
+
+
+@frappe.whitelist()
 def get_expense_approval_details(employee: str) -> dict:
 	frappe.has_permission("Employee", "read", employee, throw=True)
 	expense_approver, department = frappe.get_cached_value(
@@ -803,12 +969,22 @@ def delete_attachment(filename: str):
 
 
 @frappe.whitelist()
-def _download_pdf(doctype: str, docname: str) -> str:
+def _download_pdf(doctype: str, docname: str, print_format: str | None = None) -> str:
 	import base64
 
 	from frappe.utils.print_format import download_pdf
 
-	default_print_format = frappe.get_meta(doctype).default_print_format or "Standard"
+	if doctype == "HR Request":
+		values = frappe.db.get_value("HR Request", docname, ["status", "request_type"])
+		status, request_type = values or (None, None)
+		if request_type == "Job Letter" and status not in ("Resolved", "Approved"):
+			frappe.throw(_("The job letter is available after HR approves the request"))
+
+	default_print_format = (
+		print_format or frappe.get_meta(doctype).default_print_format or "Standard"
+	)
+	if doctype == "HR Request" and not print_format:
+		default_print_format = "Job Letter"
 
 	try:
 		download_pdf(doctype, docname, format=default_print_format)

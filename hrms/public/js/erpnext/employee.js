@@ -198,6 +198,7 @@ frappe.ui.form.on("Employee", {
 			frm.set_df_property(fieldname, "hidden", 1);
 		}
 		frm.set_df_property("grade", "label", __("Campaign"));
+		setup_employee_username_field(frm);
 		setup_belize_bank_picker(frm);
 
 		// hide naming series field based on hr settings
@@ -214,12 +215,12 @@ frappe.ui.form.on("Employee", {
 	},
 
 	add_hourly_rate_action: function (frm) {
-		if (!flt(frm.doc.ctc)) return;
-		frm.add_custom_button(__("Apply Hourly Rate"), () => open_apply_hourly_rate_dialog(frm));
+		if (frm.is_new() || !frappe.model.can_write("Employee")) return;
+		frm.add_custom_button(__("Change Hourly Rate"), () => open_apply_hourly_rate_dialog(frm));
 	},
 
 	ctc: function (frm) {
-		if (!flt(frm.doc.ctc)) return;
+		if (frm._skip_hourly_prompt || !flt(frm.doc.ctc)) return;
 		frappe.confirm(
 			__("Apply this hourly rate to other agents, a branch, campaign, or team?"),
 			() => open_apply_hourly_rate_dialog(frm),
@@ -261,7 +262,143 @@ frappe.ui.form.on("Employee", {
 	bank_name(frm) {
 		setup_belize_bank_picker(frm);
 	},
+
+	user_id(frm) {
+		if (frm._applying_username) return;
+		toggle_username_save(frm);
+	},
 });
+
+function setup_employee_username_field(frm) {
+	frm.set_df_property("user_id", "label", __("Username"));
+	frm.set_df_property("user_id", "fieldtype", "Data");
+	frm.set_df_property("user_id", "options", "");
+	frm.set_df_property("user_id", "description", "");
+	const suggested = suggested_username(frm);
+	if (suggested) {
+		frm.set_df_property("user_id", "placeholder", suggested);
+	}
+	frm.refresh_field("user_id");
+	mount_username_save(frm);
+	show_login_username(frm);
+}
+
+function username_field(frm) {
+	return frm.get_field("user_id");
+}
+
+function typed_username(frm) {
+	const field = username_field(frm);
+	return String(field?.$input?.val() || frm.doc.user_id || "").trim();
+}
+
+function mount_username_save(frm) {
+	const field = username_field(frm);
+	if (!field?.$wrapper) return;
+
+	field.$wrapper.find(".help-box").remove();
+	let $btn = field.$wrapper.find(".sp-username-save");
+	if (!$btn.length) {
+		$btn = $(
+			`<button type="button" class="btn btn-sm sp-username-save">${frappe.utils.escape_html(
+				__("Save"),
+			)}</button>`,
+		);
+		const $host = field.$wrapper.find(".control-input-wrapper");
+		($host.length ? $host : field.$wrapper).append($btn);
+		$btn.on("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			save_typed_username(frm);
+		});
+	}
+	const $input = field.$input;
+	if ($input?.length && !$input.data("sp-username-bound")) {
+		$input.data("sp-username-bound", 1);
+		$input.on("input.spUsername keyup.spUsername", () => toggle_username_save(frm));
+	}
+	toggle_username_save(frm);
+}
+
+function toggle_username_save(frm) {
+	const field = username_field(frm);
+	if (!field?.$wrapper) return;
+	field.$wrapper.find(".help-box").remove();
+	const typed = typed_username(frm);
+	const dirty = Boolean(typed) && typed !== frm._displayed_username && !typed.includes("@");
+	field.$wrapper.find(".sp-username-save").toggleClass("is-visible", dirty);
+}
+
+function show_login_username(frm) {
+	if (frm.is_new()) {
+		frm._linked_user = "";
+		frm._displayed_username = "";
+		toggle_username_save(frm);
+		return;
+	}
+
+	frappe.call({
+		method: "hrms.overrides.employee_master.get_employee_login_username",
+		args: { employee: frm.doc.name },
+	}).then((r) => {
+		const user = r.message?.user || "";
+		const username = r.message?.username || "";
+		frm._linked_user = user;
+		frm._displayed_username = username;
+		const field = username_field(frm);
+		frm._applying_username = true;
+		if (field?.$input) {
+			field.$input.val(username);
+		}
+		if (field && username) {
+			field.value = username;
+		}
+		frm._applying_username = false;
+		toggle_username_save(frm);
+		setup_employee_password_panel(frm);
+	});
+}
+
+function save_typed_username(frm) {
+	const username = typed_username(frm);
+	if (!username || frm.is_new() || !frappe.model.can_write("Employee")) return;
+	if (username.includes("@")) {
+		frappe.msgprint(__("Use a username, not an email address."));
+		return;
+	}
+
+	frappe.call({
+		method: "hrms.overrides.employee_master.set_employee_username",
+		args: { employee: frm.doc.name, username },
+		freeze: true,
+		freeze_message: __("Saving username..."),
+	}).then((r) => {
+		frm._linked_user = r.message?.user || frm._linked_user;
+		frm._displayed_username = r.message?.username || username;
+		frm._applying_username = true;
+		if (frm._linked_user) {
+			frm.doc.user_id = frm._linked_user;
+		}
+		const field = username_field(frm);
+		if (field?.$input) {
+			field.$input.val(frm._displayed_username);
+		}
+		frm._applying_username = false;
+		toggle_username_save(frm);
+		setup_employee_password_panel(frm);
+		frappe.show_alert({
+			message: __("Username set to {0}", [frm._displayed_username]),
+			indicator: "green",
+		});
+	});
+}
+
+function suggested_username(frm) {
+	const first = String(frm.doc.first_name || "").replace(/[^A-Za-z0-9]/g, "");
+	const last = String(frm.doc.last_name || "").replace(/[^A-Za-z0-9]/g, "");
+	if (first && last) return `${first.charAt(0)}${last}`;
+	return first || last || "";
+}
 
 function set_employee_salary_defaults(frm) {
 	if (!frm.is_new()) return;
@@ -283,24 +420,66 @@ function hourly_rate_dialog_values(d) {
 	return { employees, branches, campaigns, teams };
 }
 
-function open_apply_hourly_rate_dialog(frm) {
-	const rate = flt(frm.doc.ctc);
-	if (!rate) {
-		frappe.msgprint(__("Set Agent Hourly first."));
-		frm.scroll_to_field("ctc");
+function sync_employee_hourly_rate(frm, rate) {
+	if (frm.is_dirty()) {
+		frm._skip_hourly_prompt = true;
+		frm.set_value("ctc", rate).then(() => {
+			frm._skip_hourly_prompt = false;
+		});
 		return;
 	}
+	frm.reload_doc();
+}
 
+function apply_hourly_rate_from_dialog(frm, dialog, rate, args) {
+	frappe.call({
+		method: "hrms.hr.bpo_hourly_rate.apply_hourly_rate",
+		args: {
+			source_employee: frm.doc.name,
+			hourly_rate: rate,
+			company: frm.doc.company,
+			...args,
+		},
+		freeze: true,
+		freeze_message: __("Updating hourly rates..."),
+	}).then((r) => {
+		const updated = r.message?.updated || 0;
+		frappe.show_alert({
+			message: __("Updated Agent Hourly for {0} agent(s).", [updated]),
+			indicator: "green",
+		});
+		dialog.hide();
+		sync_employee_hourly_rate(frm, rate);
+	});
+}
+
+function open_apply_hourly_rate_dialog(frm) {
+	const current_rate = flt(frm.doc.ctc);
 	const currency = frm.doc.salary_currency || "BZD";
 	const dialog = new frappe.ui.Dialog({
-		title: __("Apply Hourly Rate"),
+		title: __("Change Hourly Rate"),
 		fields: [
 			{
-				fieldtype: "HTML",
-				fieldname: "rate_html",
-				options: `<p>${__("Apply {0}/hr to other agents, a branch, campaign, or team.", [
-					format_currency(rate, currency),
-				])}</p>`,
+				fieldtype: "Link",
+				fieldname: "currency",
+				options: "Currency",
+				hidden: 1,
+				default: currency,
+			},
+			{
+				fieldtype: "Currency",
+				fieldname: "hourly_rate",
+				label: __("Agent Hourly"),
+				options: "currency",
+				reqd: 1,
+				default: current_rate || "",
+				description: __(
+					"Hourly pay for this agent. Optionally apply the same rate to other agents, a branch, campaign, or team.",
+				),
+			},
+			{
+				fieldtype: "Section Break",
+				label: __("Also apply to"),
 			},
 			{
 				fieldtype: "Table",
@@ -359,16 +538,19 @@ function open_apply_hourly_rate_dialog(frm) {
 				}),
 			},
 		],
-		primary_action_label: __("Apply"),
+		primary_action_label: __("Save"),
 		primary_action: () => {
+			const rate = flt(dialog.get_value("hourly_rate"));
+			if (rate <= 0) {
+				frappe.msgprint(__("Enter an Agent Hourly greater than zero."));
+				return;
+			}
+
 			const args = hourly_rate_dialog_values(dialog);
-			if (
-				!args.employees.length &&
-				!args.branches.length &&
-				!args.campaigns.length &&
-				!args.teams.length
-			) {
-				frappe.msgprint(__("Select other agents, a branch, campaign, or team."));
+			const has_others =
+				args.employees.length || args.branches.length || args.campaigns.length || args.teams.length;
+			if (!has_others) {
+				apply_hourly_rate_from_dialog(frm, dialog, rate, args);
 				return;
 			}
 
@@ -382,30 +564,11 @@ function open_apply_hourly_rate_dialog(frm) {
 					return;
 				}
 				frappe.confirm(
-					__("Update Agent Hourly to {0}/hr for {1} agent(s)?", [
+					__("Update Agent Hourly to {0}/hr for this agent and {1} other agent(s)?", [
 						format_currency(rate, currency),
 						count,
 					]),
-					() => {
-						frappe.call({
-							method: "hrms.hr.bpo_hourly_rate.apply_hourly_rate",
-							args: {
-								source_employee: frm.doc.name,
-								hourly_rate: rate,
-								company: frm.doc.company,
-								...args,
-							},
-							freeze: true,
-							freeze_message: __("Updating hourly rates..."),
-						}).then((r) => {
-							const updated = r.message?.updated || 0;
-							frappe.show_alert({
-								message: __("Updated Agent Hourly for {0} agent(s).", [updated]),
-								indicator: "green",
-							});
-							dialog.hide();
-						});
-					},
+					() => apply_hourly_rate_from_dialog(frm, dialog, rate, args),
 				);
 			});
 		},
@@ -522,8 +685,8 @@ function setup_employee_password_panel(frm) {
 			$panel.on("click", ".sp-emp-password__save", () => {
 				const password = String($panel.find(".sp-emp-password__input").val() || "");
 				const confirm = String($panel.find(".sp-emp-password__confirm").val() || "");
-				if (!frm.doc.user_id) {
-					frappe.msgprint(__("Link a User ID first, or create a user for this employee."));
+				if (!(frm._linked_user || frm.doc.user_id)) {
+					frappe.msgprint(__("Link a Username first, or create a username for this employee."));
 					return;
 				}
 				if (password.length < 8) {
@@ -547,18 +710,19 @@ function setup_employee_password_panel(frm) {
 					$panel.find(".sp-emp-password__input, .sp-emp-password__confirm").val("");
 					$panel.find(".sp-emp-password__logout").prop("checked", false);
 					frappe.show_alert({
-						message: __("Password updated for {0}", [frm.doc.user_id]),
+						message: __("Password updated for {0}", [frm._displayed_username || frm.doc.user_id]),
 						indicator: "green",
 					});
 				});
 			});
 		}
 
-		const user = frm.doc.user_id || "";
+		const linked = frm._linked_user || (String(frm.doc.user_id || "").includes("@") ? frm.doc.user_id : "");
+		const username = frm._displayed_username || "";
 		$panel
 			.find(".sp-emp-password__user")
-			.text(user ? __("User: {0}", [user]) : __("No User ID linked yet."));
-		$panel.find(".sp-emp-password__save").prop("disabled", !user);
+			.text(username ? __("Username: {0}", [username]) : __("No username linked yet."));
+		$panel.find(".sp-emp-password__save").prop("disabled", !linked);
 		return true;
 	};
 

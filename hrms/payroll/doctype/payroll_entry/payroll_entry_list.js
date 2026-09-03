@@ -4,7 +4,8 @@
 (function applyPayrollEntryListLabels() {
 	const messages = frappe._messages || frappe.boot?.__messages || {};
 	Object.assign(messages, {
-		"Add Payroll Entry": "Client Payroll Entry",
+		"Add Payroll Entry": "Payroll Entry",
+		"Client Payroll Entry": "Payroll Entry",
 	});
 	frappe._messages = messages;
 	if (frappe.boot) {
@@ -20,7 +21,7 @@ frappe.listview_settings["Payroll Entry"] = {
 			return hrms.payroll_frequency_label ? hrms.payroll_frequency_label(value) : __(value);
 		},
 		customer: function (value) {
-			return value === "All Clients" ? __("All Clients") : value || "";
+			return !value || value === "All Clients" ? __("All Agents") : value;
 		},
 		start_date: function (value, df, options, doc) {
 			if (!value) return "";
@@ -136,7 +137,7 @@ function set_client_payroll_entry_action(listview) {
 
 	listview.set_primary_action = () => {
 		if (can_add) {
-			listview.page.set_primary_action(__("Client Payroll Entry"), () => make_new());
+			listview.page.set_primary_action(__("Payroll Entry"), () => make_new());
 		} else {
 			listview.page.clear_primary_action();
 		}
@@ -631,7 +632,7 @@ function show_run_payroll_details_dialog(payload) {
 						${skippedHtml}
 					</div>
 					<div style="margin-bottom: 12px;">
-						<div><b>${__("Breakdown by Bucket")}:</b></div>
+						<div><b>${__("Created For")}:</b></div>
 						${bucketHtml}
 					</div>
 				`,

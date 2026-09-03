@@ -727,7 +727,8 @@ function handleDownload() {
 	downloadPDF({
 		doctype: props.doctype,
 		docname: props.id,
-		filename: props.id,
+		filename: formModel.value.subject || props.id,
+		print_format: props.doctype === "HR Request" ? "Job Letter" : null,
 	})
 }
 

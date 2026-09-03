@@ -45,6 +45,9 @@ class TestAutoClientInvoice(HRMSTestSuite):
 				"Payroll Settings", "automatic_payroll_company"
 			),
 			"client_invoice_item": frappe.db.get_single_value("Payroll Settings", "client_invoice_item"),
+			"last_automatic_payroll_entry": frappe.db.get_single_value(
+				"Payroll Settings", "last_automatic_payroll_entry"
+			),
 		}
 
 	def tearDown(self):
@@ -200,6 +203,35 @@ class TestAutoClientInvoice(HRMSTestSuite):
 		entry.insert()
 		return entry
 
+	def test_all_agent_payroll_invoices_each_agent_client(self):
+		"""Payroll is agent-based. Invoices are created from each agent's bill-to client."""
+		from hrms.payroll.doctype.payroll_entry.payroll_entry import ALL_CLIENTS
+
+		client_a = self._ensure_named_customer("_Test All Agent Invoice A")
+		client_b = self._ensure_named_customer("_Test All Agent Invoice B")
+		agent_a = make_employee("test_all_agent_invoice_a@example.com", company="_Test Company")
+		agent_b = make_employee("test_all_agent_invoice_b@example.com", company="_Test Company")
+		frappe.db.set_value("Employee", agent_a, {"bill_to_customer": client_a, "billing_rate": 20})
+		frappe.db.set_value("Employee", agent_b, {"bill_to_customer": client_b, "billing_rate": 18})
+
+		start_date = getdate()
+		end_date = add_days(start_date, 4)
+		self._mark_attendance(agent_a, start_date, "Present", 8)
+		self._mark_attendance(agent_b, start_date, "Present", 8)
+
+		entry = self._insert_payroll_entry(start_date, end_date)
+		entry.customer = ALL_CLIENTS
+		entry.append("employees", {"employee": agent_a})
+		entry.append("employees", {"employee": agent_b})
+		created = create_invoices_for_payroll_entry(entry)
+
+		self.assertEqual(len(created), 2, created)
+		invoiced = {
+			frappe.db.get_value("Client Invoice", name, "customer") for name in created
+		}
+		self.assertEqual(invoiced, {client_a, client_b})
+		self.assertNotIn(ALL_CLIENTS, invoiced)
+
 	def test_payroll_entry_creates_client_invoice(self):
 		agent = self._make_agent("test_payroll_creates_invoice@example.com", 22)
 		start_date = getdate()
@@ -265,3 +297,41 @@ class TestAutoClientInvoice(HRMSTestSuite):
 			),
 			1,
 		)
+
+	def test_cancelling_payroll_leaves_client_invoice(self):
+		agent = self._make_agent("test_payroll_cancel_keeps_invoice@example.com", 21)
+		start_date = getdate()
+		end_date = add_days(start_date, 4)
+		self._mark_attendance(agent, start_date, "Present", 8)
+
+		entry = self._insert_payroll_entry(start_date, end_date)
+		created = create_invoices_for_payroll_entry(entry)
+		self.assertTrue(created)
+
+		frappe.db.set_value("Payroll Entry", entry.name, "docstatus", 1, update_modified=False)
+		entry.reload()
+		entry.flags.ignore_permissions = True
+		entry.cancel()
+
+		self.assertEqual(entry.docstatus, 2)
+		invoice = frappe.get_doc("Client Invoice", created[0])
+		self.assertEqual(invoice.docstatus, 1)
+		self.assertFalse(invoice.payroll_entry)
+
+	def test_cancelling_payroll_clears_payroll_settings_link(self):
+		agent = self._make_agent("test_payroll_cancel_clears_settings@example.com", 19)
+		start_date = getdate()
+		end_date = add_days(start_date, 4)
+		self._mark_attendance(agent, start_date, "Present", 8)
+
+		entry = self._insert_payroll_entry(start_date, end_date)
+		frappe.db.set_single_value(
+			"Payroll Settings", "last_automatic_payroll_entry", entry.name, update_modified=False
+		)
+		frappe.db.set_value("Payroll Entry", entry.name, "docstatus", 1, update_modified=False)
+		entry.reload()
+		entry.flags.ignore_permissions = True
+		entry.cancel()
+
+		self.assertEqual(entry.docstatus, 2)
+		self.assertFalse(frappe.db.get_single_value("Payroll Settings", "last_automatic_payroll_entry"))

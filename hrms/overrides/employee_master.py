@@ -170,6 +170,231 @@ def get_assignable_masters(company: str) -> dict[str, bool]:
 	}
 
 
+def suggest_username(first_name: str | None = None, last_name: str | None = None, existing: str | None = None) -> str:
+	"""Build a short login username like TArzu from first + last name."""
+	first = "".join(ch for ch in (first_name or "") if ch.isalnum())
+	last = "".join(ch for ch in (last_name or "") if ch.isalnum())
+	if first and last:
+		base = f"{first[0]}{last}"
+	else:
+		base = first or last or (existing or "user")
+	base = "".join(ch for ch in base if ch.isalnum()) or "user"
+	return base[:140]
+
+
+def unique_username(base: str, ignore_user: str | None = None) -> str:
+	candidate = (base or "user").strip() or "user"
+	suffix = 0
+	while True:
+		name = candidate if not suffix else f"{candidate}{suffix}"
+		if ignore_user and (
+			ignore_user == name or frappe.db.get_value("User", ignore_user, "username") == name
+		):
+			return name
+		taken_name = frappe.db.exists("User", name) and name != ignore_user
+		taken_username = frappe.db.exists("User", {"username": name, "name": ("!=", ignore_user or "")})
+		if not taken_name and not taken_username:
+			return name
+		suffix += 1
+
+
+def resolve_user_from_login(login: str | None) -> str | None:
+	"""Resolve a username or email to the User document name."""
+	value = (login or "").strip()
+	if not value:
+		return None
+	if frappe.db.exists("User", value):
+		return value
+	return frappe.db.get_value("User", {"username": value}, "name")
+
+
+def clean_username(value: str | None) -> str:
+	typed = (value or "").strip()
+	if not typed:
+		frappe.throw(_("Enter a username."))
+	if "@" in typed:
+		frappe.throw(_("Use a username, not an email address."))
+	cleaned = "".join(ch for ch in typed if ch.isalnum() or ch in "._-")
+	if not cleaned:
+		frappe.throw(_("Enter a valid username."))
+	return cleaned[:140]
+
+
+def _previous_user_id(doc) -> str | None:
+	before = doc.get_doc_before_save() if hasattr(doc, "get_doc_before_save") else None
+	if before and before.user_id:
+		return before.user_id
+	if doc.name and not doc.is_new() and frappe.db.exists("Employee", doc.name):
+		return frappe.db.get_value("Employee", doc.name, "user_id")
+	return None
+
+
+def _ensure_username(user_name: str, employee) -> None:
+	if frappe.db.get_value("User", user_name, "username"):
+		return
+	suggested = unique_username(
+		suggest_username(employee.first_name, employee.last_name, user_name),
+		user_name,
+	)
+	frappe.db.set_value("User", user_name, "username", suggested, update_modified=False)
+
+
+def _create_user_for_employee(employee, login: str) -> str:
+	user_email = (employee.company_email or employee.personal_email or "").strip()
+	if not user_email:
+		user_email = f"{login.lower()}@users.staffpro.local"
+	existing = frappe.db.get_value("User", {"email": user_email}, "name")
+	if existing:
+		_apply_username_to_user(existing, login)
+		return existing
+
+	user = frappe.get_doc(
+		{
+			"doctype": "User",
+			"email": user_email,
+			"first_name": employee.first_name or employee.employee_name or login,
+			"last_name": employee.last_name,
+			"username": login,
+			"send_welcome_email": 0,
+			"enabled": 1,
+		}
+	)
+	user.flags.ignore_permissions = True
+	user.insert()
+	user.add_roles("Employee")
+	return user.name
+
+
+def _apply_username_to_user(user_name: str, login: str) -> str:
+	taken = frappe.db.get_value("User", {"username": login, "name": ("!=", user_name)}, "name")
+	if taken:
+		frappe.throw(_("Username {0} is already taken.").format(frappe.bold(login)))
+
+	user = frappe.get_doc("User", user_name)
+	user.username = login
+	user.flags.ignore_permissions = True
+	user.save()
+	return user.name
+
+
+def _login_username(user_name: str | None) -> str:
+	if not user_name:
+		return ""
+	username = frappe.db.get_value("User", user_name, "username") or ""
+	if username and "@" not in username:
+		return username
+	if "@" not in user_name:
+		return user_name
+	return ""
+
+
+def sync_employee_username(doc, method=None):
+	"""Keep Employee.user_id as the User email and store the typed login on User.username."""
+	typed = (doc.user_id or "").strip()
+	if not typed:
+		return
+
+	previous = _previous_user_id(doc)
+	if previous and typed == previous:
+		if frappe.db.exists("User", previous):
+			_ensure_username(previous, doc)
+		return
+
+	previous_username = _login_username(previous) if previous else ""
+	if previous and typed == previous_username:
+		doc.user_id = previous
+		return
+
+	if "@" in typed:
+		if frappe.db.exists("User", typed):
+			doc.user_id = typed
+			_ensure_username(typed, doc)
+			return
+		if previous and frappe.db.exists("User", previous):
+			doc.user_id = previous
+			return
+		frappe.throw(_("Use a username, not an email address."))
+
+	login = clean_username(typed)
+	if previous and frappe.db.exists("User", previous):
+		_apply_username_to_user(previous, login)
+		doc.user_id = previous
+		return
+
+	resolved = resolve_user_from_login(login)
+	if resolved:
+		doc.user_id = resolved
+		_ensure_username(resolved, doc)
+		return
+
+	doc.user_id = _create_user_for_employee(doc, login)
+
+
+@frappe.whitelist()
+def get_employee_login_username(employee: str) -> dict:
+	frappe.has_permission("Employee", "read", employee, throw=True)
+	user = frappe.db.get_value("Employee", employee, "user_id") or ""
+	return {"user": user, "username": _login_username(user)}
+
+
+@frappe.whitelist()
+def set_employee_username(employee: str, username: str) -> dict:
+	"""Apply a typed username to the linked User. Employee.user_id stays the User email."""
+	frappe.has_permission("Employee", "write", employee, throw=True)
+	emp = frappe.get_doc("Employee", employee)
+	emp.user_id = username
+	sync_employee_username(emp)
+	emp.db_set("user_id", emp.user_id)
+	return {"user": emp.user_id, "username": _login_username(emp.user_id) or clean_username(username)}
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def user_username_query(doctype, txt, searchfield, start, page_len, filters):
+	"""Link search that prefers username over email."""
+	txt = f"%{txt or ''}%"
+	return frappe.db.sql(
+		"""
+		select name, ifnull(nullif(username, ''), name), ifnull(full_name, '')
+		from `tabUser`
+		where enabled = 1
+			and name not in ('Guest', 'Administrator')
+			and user_type = 'System User'
+			and (
+				name like %(txt)s
+				or ifnull(username, '') like %(txt)s
+				or ifnull(full_name, '') like %(txt)s
+				or ifnull(email, '') like %(txt)s
+			)
+		order by
+			(case when ifnull(username, '') like %(txt)s then 0 else 1 end),
+			username, name
+		limit %(start)s, %(page_len)s
+		""",
+		{"txt": txt, "start": start, "page_len": page_len},
+	)
+
+
+@frappe.whitelist()
+def create_employee_username_user(employee: str, username: str | None = None, email: str | None = None) -> dict:
+	"""Create or rename the linked User so the employee logs in with a username."""
+	frappe.has_permission("Employee", "write", employee, throw=True)
+	emp = frappe.get_doc("Employee", employee)
+	if emp.status and emp.status != "Active":
+		frappe.throw(_("Username can only be created for an Active employee."))
+
+	if email:
+		emp.company_email = emp.company_email or email
+	login = unique_username(
+		(username or "").strip() or suggest_username(emp.first_name, emp.last_name, emp.name),
+		emp.user_id,
+	)
+	emp.user_id = login
+	sync_employee_username(emp)
+	emp.db_set("user_id", emp.user_id)
+	return {"user": emp.user_id, "username": _login_username(emp.user_id) or login, "created": True}
+
+
 @frappe.whitelist()
 def get_retirement_date(date_of_birth: str | None = None):
 	if date_of_birth:

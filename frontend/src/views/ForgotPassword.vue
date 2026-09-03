@@ -19,13 +19,13 @@
 					<div class="bg-white grow overflow-y-auto">
 						<form class="flex flex-col space-y-4 p-4" @submit.prevent="sendPasswordReset">
 							<p class="text-sm leading-5 text-gray-600">
-								{{ __("Enter your email address and we'll send you a link to reset your password.") }}
+								{{ __("Enter your username and we'll send a reset link to the email on your account.") }}
 							</p>
 							<Input
-								:label="__('Email') + ' *'"
-								type="email"
-								placeholder="johndoe@mail.com"
-								v-model="email"
+								:label="__('Username') + ' *'"
+								type="text"
+								placeholder="TArzu"
+								v-model="username"
 								autocomplete="username"
 								required
 							/>
@@ -62,16 +62,20 @@ const __ = inject("$translate")
 const route = useRoute()
 const router = useRouter()
 
-const email = ref(Array.isArray(route.query.email) ? route.query.email[0] : route.query.email || "")
+const username = ref(
+	Array.isArray(route.query.username)
+		? route.query.username[0]
+		: route.query.username || route.query.email || "",
+)
 const errorMessage = ref("")
 
 const forgotPasswordResource = createResource({
-	url: "frappe.core.doctype.user.user.reset_password",
+	url: "hrms.api.kiosk.send_password_reset",
 	method: "POST",
 	onSuccess() {
 		toast({
 			title: __("Success"),
-			text: __("Password reset link has been sent to your email."),
+			text: __("If that username exists, a password reset link has been sent to the account email."),
 			icon: "check-circle",
 			position: "bottom-center",
 			iconClasses: "text-green-500",
@@ -84,10 +88,6 @@ const forgotPasswordResource = createResource({
 	},
 })
 
-function isValidEmail(value) {
-	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
-}
-
 function goBack() {
 	if (window.history.state?.back) {
 		router.back()
@@ -98,19 +98,14 @@ function goBack() {
 }
 
 function sendPasswordReset() {
-	const emailValue = (email.value || "").trim()
+	const usernameValue = (username.value || "").trim()
 
-	if (!emailValue) {
-		errorMessage.value = __("Please enter your email address")
-		return
-	}
-
-	if (!isValidEmail(emailValue)) {
-		errorMessage.value = __("Please enter a valid email address")
+	if (!usernameValue) {
+		errorMessage.value = __("Please enter your username")
 		return
 	}
 
 	errorMessage.value = ""
-	forgotPasswordResource.submit({ user: emailValue })
+	forgotPasswordResource.submit({ username: usernameValue })
 }
 </script>

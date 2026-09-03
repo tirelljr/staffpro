@@ -8,6 +8,7 @@ from frappe.utils import date_diff, flt, getdate
 
 SS_EMPLOYEE_COMPONENT = "Social Security"
 SS_EMPLOYER_COMPONENT = "Social Security Employer"
+SS_PAYABLE_ACCOUNT_NAME = "Social Security Payable"
 SS_CATEGORY_STANDARD = "Standard"
 SS_CATEGORY_INJURY_ONLY = "Employment Injury Only"
 

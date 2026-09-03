@@ -112,7 +112,7 @@ def apply_hourly_rate(
 
 	rate = flt(hourly_rate)
 	if rate <= 0:
-		frappe.throw(_("Set Agent Hourly before applying it to others."))
+		frappe.throw(_("Enter an Agent Hourly greater than zero."))
 
 	targets = find_hourly_rate_targets(
 		source_employee=source_employee,
@@ -122,8 +122,10 @@ def apply_hourly_rate(
 		teams=teams,
 		company=company,
 	)
+	if source_employee:
+		targets = [source_employee, *[name for name in targets if name != source_employee]]
 	if not targets:
-		frappe.throw(_("Select other agents, a branch, campaign, or team."))
+		frappe.throw(_("Select this agent or other agents, a branch, campaign, or team."))
 
 	updated = 0
 	for name in targets:

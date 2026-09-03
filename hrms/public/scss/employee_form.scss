@@ -19,6 +19,24 @@
 	}
 }
 
+.frappe-control[data-fieldname="user_id"] .help-box {
+	display: none !important;
+}
+
+.sp-username-save {
+	display: none;
+	margin-top: 8px;
+	background: #dc2626 !important;
+	border-color: #dc2626 !important;
+	color: #fff !important;
+}
+
+.sp-username-save.is-visible {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
 .sp-emp-password {
 	margin-top: 4px;
 	padding: 12px;

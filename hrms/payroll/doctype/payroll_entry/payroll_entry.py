@@ -38,10 +38,21 @@ ALL_CLIENTS = "All Clients"
 
 
 def is_all_clients(customer) -> bool:
-	return bool(customer) and str(customer).strip() == ALL_CLIENTS
+	"""Legacy Payroll Entry.customer sentinel. Not a real Customer/Client."""
+	if not customer:
+		return False
+	return str(customer).strip().lower() in {ALL_CLIENTS.lower(), "all agents"}
+
+
+def is_all_agents_payroll(customer) -> bool:
+	"""Payroll is for agents, not clients. Empty or leftover All Clients means every agent."""
+	return not customer or is_all_clients(customer)
 
 
 class PayrollEntry(Document):
+	# These docs keep their own records after payroll is cancelled or deleted.
+	ignore_linked_doctypes = ("Client Invoice", "Payroll Settings")
+
 	# begin: auto-generated types
 	# This code is auto-generated. Do not modify anything in this block.
 
@@ -107,6 +118,9 @@ class PayrollEntry(Document):
 			self.company = frappe.defaults.get_user_default("Company") or frappe.defaults.get_global_default(
 				"company"
 			)
+		# Never persist the fake "All Clients" Customer link — payroll is agent-based.
+		if is_all_clients(self.customer):
+			self.customer = None
 		self.set_cost_center()
 
 	def get_invalid_links(self, *args, **kwargs):
@@ -197,8 +211,13 @@ class PayrollEntry(Document):
 		"""Payroll Payable is no longer used; agents are paid via Bank or Cash directly."""
 		return
 
+	def before_cancel(self):
+		self._allow_standalone_links()
+		self.detach_standalone_links()
+
 	def on_cancel(self):
-		self.ignore_linked_doctypes = ("GL Entry", "Salary Slip", "Journal Entry")
+		self._allow_standalone_links()
+		self.detach_standalone_links()
 
 		self.delete_linked_salary_slips()
 		self.cancel_linked_journal_entries()
@@ -211,7 +230,45 @@ class PayrollEntry(Document):
 		self.db_set("error_message", "")
 
 	def on_discard(self):
+		self.detach_standalone_links()
 		self.db_set("status", "Cancelled")
+
+	def delete(self):
+		self.detach_standalone_links()
+		return super().delete()
+
+	def _allow_standalone_links(self):
+		self.ignore_linked_doctypes = (
+			"GL Entry",
+			"Salary Slip",
+			"Journal Entry",
+			"Client Invoice",
+			"Payroll Settings",
+		)
+
+	def detach_standalone_links(self):
+		"""Drop informational links so invoices and settings can stand alone."""
+		self._detach_client_invoices()
+		self._detach_payroll_settings()
+
+	def _detach_client_invoices(self):
+		if not self.name or not frappe.db.exists("DocType", "Client Invoice"):
+			return
+		if not frappe.get_meta("Client Invoice").has_field("payroll_entry"):
+			return
+		for invoice in frappe.get_all("Client Invoice", {"payroll_entry": self.name}, pluck="name"):
+			frappe.db.set_value("Client Invoice", invoice, "payroll_entry", None, update_modified=False)
+
+	def _detach_payroll_settings(self):
+		if not self.name or not frappe.db.exists("DocType", "Payroll Settings"):
+			return
+		if not frappe.get_meta("Payroll Settings").has_field("last_automatic_payroll_entry"):
+			return
+		if frappe.db.get_single_value("Payroll Settings", "last_automatic_payroll_entry") != self.name:
+			return
+		frappe.db.set_single_value(
+			"Payroll Settings", "last_automatic_payroll_entry", None, update_modified=False
+		)
 
 	def cancel(self):
 		if len(self.get_linked_salary_slips()) > 50:
@@ -308,9 +365,8 @@ class PayrollEntry(Document):
 
 		if not employees:
 			error_msg = _("No agents found for the mentioned criteria:")
-			if self.customer:
-				client_label = _("All Clients") if is_all_clients(self.customer) else self.customer
-				error_msg += "<br>" + _("Client: {0}").format(frappe.bold(client_label))
+			if self.customer and not is_all_clients(self.customer):
+				error_msg += "<br>" + _("Client: {0}").format(frappe.bold(self.customer))
 			if self.branch:
 				error_msg += "<br>" + _("Branch: {0}").format(frappe.bold(self.branch))
 			if self.department:
@@ -2095,15 +2151,10 @@ def _link_row_is_field(row, fieldname: str) -> bool:
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def payroll_client_query(doctype, txt, searchfield, start, page_len, filters):
-	"""Client link search with an All Clients option that includes every agent."""
-	results = []
+	"""Optional client filter. Leave blank to include every agent."""
 	start = cint(start)
 	page_len = cint(page_len)
 	txt = txt or ""
-	if start == 0 and (not txt or ALL_CLIENTS.lower().startswith(txt.lower()) or txt.lower() in ALL_CLIENTS.lower()):
-		results.append([ALL_CLIENTS, _("Include agents from every client")])
-		page_len = max(page_len - 1, 0)
-
 	meta = frappe.get_meta("Customer")
 	conditions = ["1=1"]
 	values = {"txt": f"%{txt}%", "start": start, "page_len": page_len}
@@ -2115,9 +2166,9 @@ def payroll_client_query(doctype, txt, searchfield, start, page_len, filters):
 		conditions.append(f"({search_clause})")
 
 	if page_len < 1:
-		return results
+		return []
 
-	customers = frappe.db.sql(
+	return frappe.db.sql(
 		f"""
 		select name, customer_name
 		from `tabCustomer`
@@ -2128,8 +2179,6 @@ def payroll_client_query(doctype, txt, searchfield, start, page_len, filters):
 		""",
 		values,
 	)
-	results.extend(customers)
-	return results
 
 
 def get_employee_list(
@@ -2142,11 +2191,13 @@ def get_employee_list(
 	offset=None,
 	ignore_match_conditions=False,
 ) -> list:
-	if is_all_clients(filters.get("customer")) and frappe.get_meta("Employee").has_field("bill_to_customer"):
-		all_client_filters = frappe._dict(filters)
-		all_client_filters.customer = None
+	if is_all_agents_payroll(filters.get("customer")) and frappe.get_meta("Employee").has_field(
+		"bill_to_customer"
+	):
+		all_agent_filters = frappe._dict(filters)
+		all_agent_filters.customer = None
 		return get_employees_for_client(
-			all_client_filters,
+			all_agent_filters,
 			searchfield=searchfield,
 			search_string=search_string,
 			fields=fields,
@@ -2669,7 +2720,7 @@ def _bonus_by_salary_slip(slip_names: list[str]) -> dict[str, float]:
 	return totals
 
 
-def _as_payroll_entry_names(names) -> list[str]:
+def _as_payroll_entry_names(names: str | list | tuple | None) -> list[str]:
 	if isinstance(names, str):
 		names = frappe.parse_json(names)
 	if not isinstance(names, (list, tuple)):
@@ -2682,7 +2733,7 @@ def _is_cancelled_payroll_entry(doc) -> bool:
 
 
 @frappe.whitelist()
-def bulk_cancel_payroll_entries(names):
+def bulk_cancel_payroll_entries(names: str | list) -> dict:
 	"""Cancel submitted payroll runs and discard drafts so they can be deleted next."""
 	cancelled = []
 	skipped = []
@@ -2696,11 +2747,13 @@ def bulk_cancel_payroll_entries(names):
 				continue
 			if cint(doc.docstatus) == 1:
 				doc.check_permission("cancel")
+				doc.detach_standalone_links()
 				doc.cancel()
 			elif cint(doc.docstatus) == 0:
 				doc.check_permission("write")
 				if not hasattr(doc, "discard"):
 					frappe.throw(_("Cannot cancel a draft Payroll Entry."))
+				doc.detach_standalone_links()
 				doc.discard()
 			else:
 				skipped.append(name)
@@ -2717,7 +2770,7 @@ def bulk_cancel_payroll_entries(names):
 
 
 @frappe.whitelist()
-def bulk_delete_payroll_entries(names):
+def bulk_delete_payroll_entries(names: str | list) -> dict:
 	"""Permanently delete cancelled payroll runs."""
 	deleted = []
 	errors = []
@@ -2728,6 +2781,7 @@ def bulk_delete_payroll_entries(names):
 			doc.check_permission("delete")
 			if not _is_cancelled_payroll_entry(doc):
 				frappe.throw(_("Cancel this Payroll Entry before deleting it."))
+			doc.detach_standalone_links()
 			frappe.delete_doc("Payroll Entry", name)
 			deleted.append(name)
 			if not frappe.in_test:

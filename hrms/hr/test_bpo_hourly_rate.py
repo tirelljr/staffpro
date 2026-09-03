@@ -22,9 +22,21 @@ class TestBPOHourlyRate(HRMSTestSuite):
 			employees=[other],
 			company="_Test Company",
 		)
-		self.assertEqual(result["updated"], 1)
+		self.assertEqual(result["updated"], 2)
 		self.assertEqual(flt(frappe.db.get_value("Employee", other, "ctc")), 14.5)
 		self.assertEqual(flt(frappe.db.get_value("Employee", source, "ctc")), 14.5)
+
+	def test_change_this_agent_hourly_rate(self):
+		source = make_employee("hourly_self@example.com", company="_Test Company")
+		frappe.db.set_value("Employee", source, "ctc", 18)
+
+		result = apply_hourly_rate(
+			source_employee=source,
+			hourly_rate=20.5,
+			company="_Test Company",
+		)
+		self.assertEqual(result["updated"], 1)
+		self.assertEqual(flt(frappe.db.get_value("Employee", source, "ctc")), 20.5)
 
 	def test_apply_hourly_rate_by_branch(self):
 		branch = "Hourly Rate Branch"
@@ -54,3 +66,4 @@ class TestBPOHourlyRate(HRMSTestSuite):
 			company="_Test Company",
 		)
 		self.assertEqual(flt(frappe.db.get_value("Employee", teammate, "ctc")), 11)
+		self.assertEqual(flt(frappe.db.get_value("Employee", source, "ctc")), 11)

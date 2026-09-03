@@ -24,8 +24,15 @@ function handleLogin(response) {
 }
 
 export const session = reactive({
-	login: async (email, password) => {
-		const response = await call("login", { usr: email, pwd: password })
+	login: async (username, password) => {
+		let usr = username
+		try {
+			const resolved = await call("hrms.api.kiosk.resolve_login", { username })
+			if (resolved) usr = resolved
+		} catch {
+			// Fall back to the typed value; Frappe login still accepts email.
+		}
+		const response = await call("login", { usr, pwd: password })
 		handleLogin(response)
 		return response
 	},

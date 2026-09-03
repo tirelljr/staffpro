@@ -158,15 +158,15 @@ const searchItems = computed(() => {
 	const items = [
 		{ title: __("Attendance"), group: __("Dashboards"), icon: "clock", route: "AttendanceDashboard" },
 		{ title: __("Leaves"), group: __("Dashboards"), icon: "calendar", route: "LeavesDashboard" },
-		{ title: __("Expense Claims"), group: __("Dashboards"), icon: "credit-card", route: "ExpenseClaimsDashboard" },
+		{ title: __("Requests"), group: __("Dashboards"), icon: "inbox", route: "RequestsDashboard" },
 		{ title: __("Salary Slips"), group: __("Dashboards"), icon: "file-text", route: "SalarySlipsDashboard" },
 		{ title: __("Attendance Requests"), group: __("Attendance"), icon: "check-square", route: "AttendanceRequestListView" },
 		{ title: __("Employee Checkins"), group: __("Attendance"), icon: "log-in", route: "EmployeeCheckinListView" },
 		{ title: __("Shift Requests"), group: __("Attendance"), icon: "repeat", route: "ShiftRequestListView" },
 		{ title: __("Shift Assignments"), group: __("Attendance"), icon: "briefcase", route: "ShiftAssignmentListView" },
 		{ title: __("Leave Applications"), group: __("Leaves"), icon: "sun", route: "LeaveApplicationListView" },
-		{ title: __("Expense Claims"), group: __("Expenses"), icon: "pocket", route: "ExpenseClaimListView" },
-		{ title: __("Employee Advances"), group: __("Expenses"), icon: "dollar-sign", route: "EmployeeAdvanceListView" },
+		{ title: __("Requests"), group: __("Requests"), icon: "inbox", route: "HRRequestListView" },
+		{ title: __("Job Letter"), group: __("Requests"), icon: "file-text", route: "HRRequestFormView", query: { request_type: "Job Letter" } },
 		{ title: __("Notifications"), group: __("Account"), icon: "bell", route: "Notifications" },
 		{ title: __("Settings"), group: __("Account"), icon: "settings", route: "Settings" },
 		{ title: __("Profile"), group: __("Account"), icon: "user", route: "Profile" },
@@ -254,7 +254,7 @@ function goTo(item) {
 		window.location.href = item.href
 		return
 	}
-	router.push({ name: item.route })
+	router.push({ name: item.route, query: item.query })
 }
 
 function onSearchKeydown(event) {

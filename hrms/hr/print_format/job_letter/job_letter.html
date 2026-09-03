@@ -1,0 +1,40 @@
+{%- from "templates/print_formats/standard_macros.html" import add_header -%}
+
+<div class="text-center" style="margin-bottom: 8%;">
+	<h3>{{ _("Employment Letter") }}</h3>
+</div>
+
+<div class="row" style="margin-bottom: 5%;">
+	<div class="col-sm-6">
+		<b>{{ doc.addressed_to or _("To Whom It May Concern") }},</b>
+	</div>
+	<div class="col-sm-6">
+		<span style="float: right;"><b>{{ _("Date") }}:</b> {{ frappe.utils.formatdate(doc.resolved_on or doc.creation) }}</span>
+	</div>
+</div>
+
+<div style="margin-bottom: 5%; line-height: 1.6;">
+	{{ _("This is to certify that {0} is employed with {1}").format(
+		frappe.bold(doc.employee_name or doc.employee),
+		frappe.bold(doc.company)
+	) }}
+	{%- if doc.designation %} {{ _("as {0}").format(frappe.bold(doc.designation)) }}{%- endif %}
+	{%- if doc.department %} {{ _("in the {0} department").format(frappe.bold(doc.department)) }}{%- endif %}
+	{%- if doc.date_of_joining %} {{ _("since {0}").format(frappe.bold(frappe.utils.formatdate(doc.date_of_joining))) }}{%- endif %}.
+</div>
+
+{%- if doc.letter_purpose %}
+<div style="margin-bottom: 5%;">
+	{{ _("This letter is issued at the employee's request for the purpose of {0}.").format(doc.letter_purpose) }}
+</div>
+{%- endif %}
+
+<div style="margin-bottom: 8%;">
+	{{ _("This letter is issued for official purposes and does not constitute a contract of employment.") }}
+</div>
+
+<div>
+	<span>{{ _("Yours sincerely,") }}</span><br><br>
+	<span><b>{{ _("For {0}").format(doc.company) }}</b></span><br>
+	<span>{{ _("Human Resources") }}</span>
+</div>

@@ -42,3 +42,33 @@ export const formatTimestamp = (timestamp) => {
 
 	return `${formattedTime} on ${dayjs(timestamp).format("D MMM, YYYY")}`
 }
+
+export const formatHours = (value, keepZero = false) => {
+	if (value === null || value === undefined || value === "") {
+		return keepZero ? "0h 0m" : ""
+	}
+	const totalMinutes = Math.round(Number(value) * 60)
+	if (!keepZero && !totalMinutes) return ""
+	const sign = totalMinutes < 0 ? "-" : ""
+	const abs = Math.abs(totalMinutes)
+	const hours = Math.floor(abs / 60)
+	const minutes = abs % 60
+	return `${sign}${hours}h ${minutes}m`
+}
+
+export const formatClock = (value) => {
+	if (!value) return ""
+	const parsed = dayjs(value)
+	return parsed.isValid() ? parsed.format("hh:mm a") : ""
+}
+
+export const formatHoursNote = (comment) => {
+	if (!comment) return ""
+	const when = dayjs(comment.creation)
+	const time = when.isValid() ? when.format("hh:mm A") : ""
+	const date = when.isValid() ? when.format("MM/DD/YYYY") : ""
+	const author = comment.comment_by || "Admin"
+	const text = comment.content || ""
+	if (time && date) return `Note (${author}, ${time}, ${date}): ${text}`
+	return text ? `Note (${author}): ${text}` : ""
+}

@@ -1,7 +1,7 @@
 import { toast } from "frappe-ui"
 
 export function useDownloadPDF() {
-	async function downloadPDF({ doctype, docname, filename = null }) {
+	async function downloadPDF({ doctype, docname, filename = null, print_format = null }) {
 		
 		const headers = {
 			"X-Frappe-Site-Name": window.location.hostname,
@@ -13,7 +13,11 @@ export function useDownloadPDF() {
 		fetch("/api/method/hrms.api._download_pdf", {
 			method: "POST",
 			headers,
-			body: new URLSearchParams({ doctype: doctype, docname: docname }),
+			body: new URLSearchParams({
+				doctype,
+				docname,
+				...(print_format ? { print_format } : {}),
+			}),
 			responseType: "blob",
 		}).then((response) => {
 				if (response.ok) {

@@ -27,8 +27,8 @@ services:
       - ..:/workspace/hrms
       - bench-data:/home/frappe
     ports:
-      - 8000:8000
-      - 9000:9000
+      - 8001:8000
+      - 9001:9000
 
 volumes:
   mariadb-data:

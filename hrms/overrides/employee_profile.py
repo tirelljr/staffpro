@@ -17,7 +17,7 @@ def update_employee_user_password(employee: str, new_password: str, logout_all_s
 	emp = frappe.get_doc("Employee", employee)
 	user = (emp.user_id or "").strip()
 	if not user:
-		frappe.throw(_("Link a User ID on this employee before setting a password."))
+		frappe.throw(_("Link a Username on this employee before setting a password."))
 
 	password = (new_password or "").strip()
 	if len(password) < 8:

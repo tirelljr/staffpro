@@ -11,6 +11,8 @@ LINK_LABELS: dict[str, str] = {
 	"Employee Onboarding": "New Hire Onboarding",
 	"Employee Separation": "Offboarding",
 	"Employee Grievance": "Concerns & Escalations",
+	"HR Request": "Employee Requests",
+	"HR Request Type": "Request Types",
 	"Employee Exits": "Agent Exits",
 	"Employee Birthday": "Team Birthdays",
 	"Employee Information": "Agent Directory",

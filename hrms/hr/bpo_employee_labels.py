@@ -13,6 +13,7 @@ EMPLOYEE_FIELD_LABELS = {
 	"pan_number": "Tax Number",
 	"designation": "Role",
 	"grade": "Campaign",
+	"user_id": "Username",
 }
 
 EMPLOYEE_FIELD_DEFAULTS = {
@@ -80,10 +81,62 @@ def apply_employee_salary_defaults():
 			"Employee",
 			"ctc",
 			"description",
-			"Hourly pay in salary currency. After setting it, you can apply the same rate to other agents, a branch, campaign, or team.",
+			"Hourly pay in salary currency. Use Change Hourly Rate to update this agent, or apply the same rate to other agents, a branch, campaign, or team.",
 			"Small Text",
 			validate_fields_for_doctype=False,
 		)
+
+	apply_employee_username_field()
+	enable_username_login()
+
+
+def enable_username_login():
+	"""Frappe only accepts User.username at login when this System Setting is on."""
+	if not frappe.db.exists("DocType", "System Settings"):
+		return
+	frappe.db.set_single_value("System Settings", "allow_login_using_user_name", 1)
+
+
+def apply_employee_username_field():
+	if not frappe.db.exists("DocType", "Employee"):
+		return
+
+	meta = frappe.get_meta("Employee")
+	if not meta.has_field("user_id"):
+		return
+
+	make_property_setter(
+		"Employee",
+		"user_id",
+		"label",
+		"Username",
+		"Data",
+		validate_fields_for_doctype=False,
+	)
+	make_property_setter(
+		"Employee",
+		"user_id",
+		"fieldtype",
+		"Data",
+		"Data",
+		validate_fields_for_doctype=False,
+	)
+	make_property_setter(
+		"Employee",
+		"user_id",
+		"options",
+		"",
+		"Small Text",
+		validate_fields_for_doctype=False,
+	)
+	make_property_setter(
+		"Employee",
+		"user_id",
+		"description",
+		"",
+		"Small Text",
+		validate_fields_for_doctype=False,
+	)
 
 
 def apply_payroll_payment_layout():

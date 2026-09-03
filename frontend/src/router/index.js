@@ -3,8 +3,7 @@ import { createRouter, createWebHistory } from "@ionic/vue-router"
 import TabbedView from "@/views/TabbedView.vue"
 import attendanceRoutes from "./attendance"
 import leaveRoutes from "./leaves"
-import claimRoutes from "./claims"
-import employeeAdvanceRoutes from "./advances"
+import hrRequestRoutes from "./hr_requests"
 import salarySlipRoutes from "./salary_slips"
 
 const routes = [
@@ -35,9 +34,13 @@ const routes = [
 				component: () => import("@/views/leave/Dashboard.vue"),
 			},
 			{
+				path: "/dashboard/requests",
+				name: "RequestsDashboard",
+				component: () => import("@/views/hr_request/Dashboard.vue"),
+			},
+			{
 				path: "/dashboard/expense-claims",
-				name: "ExpenseClaimsDashboard",
-				component: () => import("@/views/expense_claim/Dashboard.vue"),
+				redirect: "/dashboard/requests",
 			},
 			{
 				path: "/dashboard/salary-slips",
@@ -83,8 +86,7 @@ const routes = [
 	},
 	...attendanceRoutes,
 	...leaveRoutes,
-	...claimRoutes,
-	...employeeAdvanceRoutes,
+	...hrRequestRoutes,
 	...salarySlipRoutes,
 ]
 

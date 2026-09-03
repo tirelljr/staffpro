@@ -128,7 +128,23 @@
 		</div>
 
 		<div
-			v-else-if="document?.doc?.docstatus === 1 && hasPermission('cancel')"
+			v-if="canDownloadLetter"
+			class="flex w-full flex-row items-center justify-between gap-3 sticky bottom-0 border-t z-[100] p-4"
+		>
+			<Button
+				@click="downloadLetter"
+				class="w-full py-5"
+				variant="solid"
+			>
+				<template #prefix>
+					<FeatherIcon name="download" class="w-4" />
+				</template>
+				{{ __("Download Job Letter") }}
+			</Button>
+		</div>
+
+		<div
+			v-if="document?.doc?.docstatus === 1 && hasPermission('cancel')"
 			class="flex w-full flex-row items-center justify-between gap-3 sticky bottom-0 border-t z-[100] p-4"
 		>
 			<Button
@@ -172,9 +188,13 @@ import WorkflowActionSheet from "@/components/WorkflowActionSheet.vue"
 
 import { getCompanyCurrency } from "@/data/currencies"
 import { settings } from "@/data/settings"
+import { canDownloadJobLetter } from "@/data/hr_requests"
 import { formatCurrency } from "@/utils/formatters"
+import { useDownloadPDF } from "@/utils/commonUtils"
 
 import useWorkflow from "@/composables/workflow"
+
+const { downloadPDF } = useDownloadPDF()
 
 const __ = inject("$translate")
 
@@ -332,6 +352,20 @@ const updateDocumentStatus = ({ status = "", docstatus = 0 }) => {
 			},
 		}
 	)
+}
+
+const canDownloadLetter = computed(() =>
+	canDownloadJobLetter(document?.doc || props.modelValue)
+)
+
+function downloadLetter() {
+	const doc = document?.doc || props.modelValue
+	downloadPDF({
+		doctype: "HR Request",
+		docname: doc.name,
+		filename: doc.subject || doc.name,
+		print_format: "Job Letter",
+	})
 }
 
 const openFormView = () => {

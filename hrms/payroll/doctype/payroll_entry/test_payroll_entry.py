@@ -1470,8 +1470,8 @@ class TestPayrollEntry(HRMSTestSuite):
 		self.assertIn(emp_a, employees_all)
 		self.assertIn(emp_b, employees_all)
 
-	def test_fill_employees_all_clients(self):
-		"""Selecting All Clients includes agents from every client and unassigned agents."""
+	def test_fill_employees_all_agents_without_client(self):
+		"""Payroll without a client includes agents from every client and unassigned agents."""
 		from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 		from hrms.setup import get_custom_fields
@@ -1497,7 +1497,7 @@ class TestPayrollEntry(HRMSTestSuite):
 		dates = get_start_end_dates("Monthly", nowdate())
 		payroll_entry = frappe.new_doc("Payroll Entry")
 		payroll_entry.company = company.name
-		payroll_entry.customer = ALL_CLIENTS
+		payroll_entry.customer = None
 		payroll_entry.start_date = dates.start_date
 		payroll_entry.end_date = dates.end_date
 		payroll_entry.payroll_frequency = "Monthly"
@@ -1510,7 +1510,7 @@ class TestPayrollEntry(HRMSTestSuite):
 		self.assertIn(emp_a, employees)
 		self.assertIn(emp_b, employees)
 
-	def test_payroll_client_query_includes_all_clients(self):
+	def test_payroll_client_query_does_not_include_all_clients(self):
 		rows = payroll_client_query(
 			doctype="Customer",
 			txt="",
@@ -1519,10 +1519,9 @@ class TestPayrollEntry(HRMSTestSuite):
 			page_len="20",
 			filters="{}",
 		)
-		self.assertTrue(rows)
-		self.assertEqual(rows[0][0], ALL_CLIENTS)
+		self.assertFalse(any(row[0] == ALL_CLIENTS for row in (rows or [])))
 
-	def test_all_clients_is_not_an_invalid_link(self):
+	def test_all_clients_is_cleared_before_validate(self):
 		payroll_entry = frappe.new_doc("Payroll Entry")
 		payroll_entry.customer = ALL_CLIENTS
 		invalid_links, _cancelled = payroll_entry.get_invalid_links()
@@ -1532,6 +1531,8 @@ class TestPayrollEntry(HRMSTestSuite):
 				for row in (invalid_links or [])
 			)
 		)
+		payroll_entry.before_validate()
+		self.assertFalse(payroll_entry.customer)
 
 	def test_fill_employees_by_customer_ignores_currency_and_dates(self):
 		"""Client roster is independent of payroll currency, pay period, and salary structures."""
