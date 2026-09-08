@@ -442,6 +442,10 @@ $.extend(hrms, {
 		const messages = frappe._messages || frappe.boot?.__messages || {};
 		messages.Fortnightly = label;
 		messages["2 Weeks"] = label;
+		messages["Additional Salary"] = "Bonuses";
+		messages["Additional Salaries"] = "Bonuses";
+		messages["Add Additional Salary"] = "Add Bonus";
+		messages["New Additional Salary"] = "New Bonus";
 		frappe._messages = messages;
 		if (frappe.boot) {
 			frappe.boot.__messages = messages;

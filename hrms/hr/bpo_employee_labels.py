@@ -195,6 +195,8 @@ def apply_belize_employee_bank_fields():
 			update_modified=False,
 		)
 
+	_ensure_employee_bank_account_type()
+
 	if not meta.has_field("bank_name"):
 		return
 
@@ -213,6 +215,30 @@ def apply_belize_employee_bank_fields():
 		"\n" + "\n".join(BELIZE_EMPLOYEE_BANKS),
 		"Text",
 		validate_fields_for_doctype=False,
+	)
+
+
+def _ensure_employee_bank_account_type():
+	from frappe.custom.doctype.custom_field.custom_field import create_custom_field
+
+	if not frappe.db.exists("DocType", "Employee"):
+		return
+	if frappe.db.exists("Custom Field", {"dt": "Employee", "fieldname": "bank_account_type"}):
+		return
+	if frappe.get_meta("Employee").has_field("bank_account_type"):
+		return
+
+	create_custom_field(
+		"Employee",
+		{
+			"fieldname": "bank_account_type",
+			"label": "Bank Account Type",
+			"fieldtype": "Select",
+			"options": "\nChecking\nSavings",
+			"insert_after": "bank_ac_no",
+			"default": "Checking",
+		},
+		ignore_validate=True,
 	)
 
 

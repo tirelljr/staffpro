@@ -24,17 +24,26 @@
 			<div
 				v-for="(allocation, leave_type, index) in leaveBalance.data"
 				:key="leave_type"
-				class="flex flex-col bg-white border-none rounded-lg drop-shadow-md gap-2 p-4 items-start first:ml-4"
+				class="flex flex-col bg-white border-none rounded-[20px] shadow-[0_8px_28px_rgba(16,24,40,0.06)] gap-3 p-5 items-center first:ml-4 min-w-[148px]"
 			>
 				<SemicircleChart
 					:percentage="allocation.balance_percentage"
 					:colorClass="getChartColor(index)"
 				/>
-				<div class="text-gray-800 font-bold text-base">
-					{{ `${allocation.balance_leaves}/${allocation.allocated_leaves}` }}
+				<div class="text-gray-900 font-bold text-base tracking-tight">
+					{{ `${allocation.balance_leaves} of ${allocation.allocated_leaves}` }}
 				</div>
-				<div class="text-gray-600 font-normal text-sm w-24 leading-4">
+				<div class="text-gray-400 font-medium text-sm w-28 leading-4 text-center">
 					{{ __("{0} balance", [__(leave_type, null, "Leave Type")]) }}
+				</div>
+				<div class="w-full h-1.5 rounded-full bg-[#eef1f6] overflow-hidden">
+					<div
+						class="h-full rounded-full"
+						:style="{
+							width: `${Math.max(0, Math.min(100, allocation.balance_percentage || 0))}%`,
+							background: getChartHex(index),
+						}"
+					></div>
 				</div>
 			</div>
 		</div>
@@ -49,9 +58,10 @@ import { leaveBalance } from "@/data/leaves"
 import { inject } from "vue"
 
 const __ = inject("$translate")
+const CHART_HEX = ["#7c5cfc", "#3ddc97", "#ff6b8a", "#ff9f43"]
 const getChartColor = (index) => {
-	// note: tw colors - rose-400, pink-400 & purple-500 of the old frappeui palette #918ef5
-	const chartColors = ["text-[#fb7185]", "text-[#f472b6]", "text-[#918ef5]"]
+	const chartColors = ["text-[#918ef5]", "text-[#3ddc97]", "text-[#fb7185]"]
 	return chartColors[index % chartColors.length]
 }
+const getChartHex = (index) => CHART_HEX[index % CHART_HEX.length]
 </script>

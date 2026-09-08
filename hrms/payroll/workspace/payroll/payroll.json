@@ -77,7 +77,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Additional Salary",
+   "label": "Bonuses",
    "link_count": 0,
    "link_to": "Additional Salary",
    "link_type": "DocType",
@@ -452,7 +452,7 @@
    "icon": "piggy-bank",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Additional Salary",
+   "label": "Bonuses",
    "link_to": "Additional Salary",
    "link_type": "DocType",
    "open_in_new_tab": 1,

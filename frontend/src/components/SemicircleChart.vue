@@ -1,29 +1,32 @@
 <template>
 	<svg
-		viewBox="0 0 48 24"
-		preserveAspectRatio="xMidYMin slice"
-		class="h-[84px] w-[84px] -mt-10"
+		viewBox="0 0 120 78"
+		class="w-[132px] h-[86px] overflow-visible"
+		aria-hidden="true"
 	>
-		<circle cx="24" cy="24" r="9" fill="#fff"></circle>
+		<path
+			d="M18 58 A42 42 0 0 1 102 58"
+			fill="none"
+			stroke="#eef1f6"
+			stroke-width="10"
+			stroke-linecap="round"
+		/>
+		<path
+			d="M18 58 A42 42 0 0 1 102 58"
+			fill="none"
+			:stroke="strokeColor"
+			stroke-width="10"
+			stroke-linecap="round"
+			:stroke-dasharray="dashArray"
+		/>
 		<circle
-			class="stroke-current text-gray-200"
-			cx="24"
-			cy="24"
-			r="9"
-			fill="transparent"
-			stroke-width="4"
-		></circle>
-		<circle
-			class="stroke-current"
-			:class="colorClass"
-			cx="24"
-			cy="24"
-			r="9"
-			fill="transparent"
-			stroke-width="4"
-			:stroke-dasharray="circumference"
-			:stroke-dashoffset="dashOffset"
-		></circle>
+			:cx="handle.x"
+			:cy="handle.y"
+			r="6"
+			fill="#fff"
+			:stroke="strokeColor"
+			stroke-width="3"
+		/>
 	</svg>
 </template>
 
@@ -35,25 +38,44 @@ const props = defineProps({
 		type: Number,
 		default: 0,
 	},
+	color: {
+		type: String,
+		default: "#3ddc97",
+	},
 	colorClass: {
 		type: String,
-		default: "text-orange-500",
+		default: "",
 	},
 })
 
-const circumference = computed(() => {
-	return 2 * Math.PI * 9
+const palette = {
+	"text-[#fb7185]": "#ff6b8a",
+	"text-[#f472b6]": "#ff6b8a",
+	"text-[#918ef5]": "#7c5cfc",
+	"text-[#3ddc97]": "#3ddc97",
+	"text-orange-500": "#ff9f43",
+}
+
+const strokeColor = computed(() => palette[props.colorClass] || props.color)
+
+const clamped = computed(() => {
+	if (isNaN(props.percentage)) return 0
+	return Math.max(0, Math.min(100, props.percentage))
 })
 
-const dashOffset = computed(() => {
-	let halfCircumference = circumference.value / 2
-	if (isNaN(props.percentage)) {
-		return halfCircumference
+const radius = 42
+const halfCircumference = Math.PI * radius
+
+const dashArray = computed(() => {
+	const dash = (clamped.value / 100) * halfCircumference
+	return `${dash} ${halfCircumference}`
+})
+
+const handle = computed(() => {
+	const angle = Math.PI - (clamped.value / 100) * Math.PI
+	return {
+		x: 60 + radius * Math.cos(angle),
+		y: 58 - radius * Math.sin(angle),
 	}
-	let percentage = props.percentage
-	if (percentage > 100) {
-		percentage = 100
-	}
-	return halfCircumference - (percentage / 100) * halfCircumference
 })
 </script>

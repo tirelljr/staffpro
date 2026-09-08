@@ -28,6 +28,7 @@ services:
       - bench-data:/home/frappe
     ports:
       - 8001:8000
+      - 9000:9000
       - 9001:9000
 
 volumes:

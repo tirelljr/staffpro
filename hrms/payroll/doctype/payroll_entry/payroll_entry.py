@@ -825,7 +825,9 @@ class PayrollEntry(Document):
 			account = self.get_selected_bank_gl_account()
 			label = _("Pay From Bank Account")
 			if not account:
-				account = frappe.db.get_value("Company", self.company, "default_bank_account")
+				from hrms.hr.belize_banks import ensure_company_default_bank_account
+
+				account = ensure_company_default_bank_account(self.company)
 				label = _("Default Bank Account")
 
 		if not account:
@@ -2326,8 +2328,7 @@ def get_salary_withholdings(
 
 
 PAYROLL_EXCEL_COLUMNS = (
-	{"key": "last_name", "label": "Last Name", "align": "left"},
-	{"key": "first_name", "label": "First Name", "align": "left"},
+	{"key": "agent_name", "label": "Agent Name", "align": "left"},
 	{"key": "pay_period", "label": "Pay Period", "align": "left"},
 	{"key": "regular_hours", "label": "Regular Hours", "align": "right"},
 	{"key": "overtime_hours", "label": "Overtime Hours", "align": "right"},
@@ -2343,6 +2344,17 @@ PAYROLL_EXCEL_COLUMNS = (
 	{"key": "pay_period_ee_social", "label": "Pay Period EE Social", "align": "right"},
 	{"key": "pay_period_er_social", "label": "Pay Period ER Social", "align": "right"},
 	{"key": "net_pay", "label": "Net Pay", "align": "right"},
+)
+
+PAYROLL_EXCEL_EDITABLE_FIELDS = frozenset(
+	{
+		"regular_hours",
+		"overtime_hours",
+		"holiday_pay",
+		"hourly_rate",
+		"bonus",
+		"income_tax_wh",
+	}
 )
 
 
@@ -2361,6 +2373,7 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 
 	period_label = _format_pay_period(entry.start_date, entry.end_date)
 	slips = _get_excel_salary_slips(entry)
+	working_by_employee = _working_hours_by_employee(entry)
 	overtime_by_employee = _overtime_hours_by_employee(entry)
 	holiday_pay_by_employee = _holiday_pay_by_employee(entry)
 	bonus_by_slip = _bonus_by_salary_slip([row.name for row in slips])
@@ -2375,20 +2388,20 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 	seen = set()
 	for slip in slips:
 		seen.add(slip.employee)
-		first_name, last_name = names_by_id.get(slip.employee) or _split_full_name(
-			slip.employee_name or slip.employee
+		agent_name = _payroll_agent_name(slip.employee, slip.employee_name, names_by_id)
+		overtime_hours, regular_hours = _excel_hours_for_employee(
+			slip.employee,
+			slip.total_working_hours,
+			working_by_employee,
+			overtime_by_employee,
 		)
-		overtime_hours = flt(overtime_by_employee.get(slip.employee))
-		total_hours = flt(slip.total_working_hours)
-		regular_hours = max(total_hours - overtime_hours, 0.0) if total_hours else 0.0
 		ee_period, er_period = _slip_social_amounts(slip)
 		ee_ytd, er_ytd = ytd_social_by_employee.get(slip.employee) or (ee_period, er_period)
 		rows.append(
 			{
 				"employee": slip.employee,
-				"employee_name": slip.employee_name or slip.employee,
-				"first_name": first_name,
-				"last_name": last_name,
+				"salary_slip": slip.name,
+				"agent_name": agent_name,
 				"pay_period": _format_pay_period(slip.start_date, slip.end_date) or period_label,
 				"regular_hours": regular_hours,
 				"overtime_hours": overtime_hours,
@@ -2411,19 +2424,22 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 	for emp in entry.employees or []:
 		if emp.employee in seen:
 			continue
-		first_name, last_name = names_by_id.get(emp.employee) or _split_full_name(
-			emp.employee_name or emp.employee
-		)
+		agent_name = _payroll_agent_name(emp.employee, emp.employee_name, names_by_id)
 		ee_ytd, er_ytd = ytd_social_by_employee.get(emp.employee) or (0.0, 0.0)
+		overtime_hours, regular_hours = _excel_hours_for_employee(
+			emp.employee,
+			0,
+			working_by_employee,
+			overtime_by_employee,
+		)
 		rows.append(
 			{
 				"employee": emp.employee,
-				"employee_name": emp.employee_name or emp.employee,
-				"first_name": first_name,
-				"last_name": last_name,
+				"salary_slip": "",
+				"agent_name": agent_name,
 				"pay_period": period_label,
-				"regular_hours": 0,
-				"overtime_hours": flt(overtime_by_employee.get(emp.employee)),
+				"regular_hours": regular_hours,
+				"overtime_hours": overtime_hours,
 				"holiday_pay": flt(holiday_pay_by_employee.get(emp.employee)),
 				"hourly_rate": 0,
 				"bonus": 0,
@@ -2441,15 +2457,19 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 
 	rows.sort(
 		key=lambda row: (
-			(row.get("last_name") or "").lower(),
-			(row.get("first_name") or "").lower(),
+			(row.get("agent_name") or "").lower(),
 			row.get("employee") or "",
 		)
 	)
 
 	return {
 		"columns": [
-			{"id": col["key"], "name": _(col["label"]), "align": col["align"]}
+			{
+				"id": col["key"],
+				"name": _(col["label"]),
+				"align": col["align"],
+				"editable": col["key"] in PAYROLL_EXCEL_EDITABLE_FIELDS,
+			}
 			for col in PAYROLL_EXCEL_COLUMNS
 		],
 		"rows": rows,
@@ -2461,6 +2481,213 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 			"status": entry.status,
 		},
 	}
+
+
+@frappe.whitelist()
+def save_payroll_excel_cell(
+	name: str | None = None,
+	employee: str | None = None,
+	field: str | None = None,
+	value=None,
+) -> dict:
+	"""Persist one editable spreadsheet cell to the agent's draft salary slip."""
+	name = name or frappe.form_dict.get("name")
+	employee = employee or frappe.form_dict.get("employee")
+	field = field or frappe.form_dict.get("field")
+	if not name or not employee or not field:
+		frappe.throw(_("Payroll Entry, employee, and field are required"))
+	if field not in PAYROLL_EXCEL_EDITABLE_FIELDS:
+		frappe.throw(_("Field {0} cannot be edited from the spreadsheet").format(field))
+
+	entry = frappe.get_doc("Payroll Entry", name)
+	entry.check_permission("write")
+
+	slip_name = frappe.db.get_value(
+		"Salary Slip",
+		{"payroll_entry": name, "employee": employee, "docstatus": ("<", 2)},
+		"name",
+		order_by="creation desc",
+	)
+	if not slip_name:
+		frappe.throw(_("Create salary slips before editing the spreadsheet."))
+
+	slip = frappe.get_doc("Salary Slip", slip_name)
+	if slip.docstatus != 0:
+		frappe.throw(_("Only draft salary slips can be edited from the spreadsheet."))
+
+	numeric_value = flt(value)
+	if field == "hourly_rate":
+		slip.hour_rate = numeric_value
+	elif field == "income_tax_wh":
+		if slip.meta.has_field("current_month_income_tax"):
+			slip.current_month_income_tax = numeric_value
+		slip.total_income_tax = numeric_value
+	elif field in ("regular_hours", "overtime_hours"):
+		overtime = flt(_overtime_hours_by_employee(entry).get(employee))
+		total = flt(slip.total_working_hours)
+		regular = max(total - overtime, 0.0) if total else 0.0
+		if field == "regular_hours":
+			regular = numeric_value
+		else:
+			overtime = numeric_value
+		slip.total_working_hours = regular + overtime
+	elif field == "bonus":
+		_set_slip_bonus_amount(slip, numeric_value)
+	elif field == "holiday_pay":
+		_set_slip_holiday_pay_amount(slip, numeric_value)
+
+	slip.flags.ignore_validate = True
+	slip.save(ignore_permissions=True)
+	if hasattr(slip, "calculate_net_pay"):
+		slip.calculate_net_pay()
+		slip.db_update()
+
+	return get_payroll_excel_data(name)
+
+
+def _payroll_agent_name(employee: str, employee_name: str | None, names_by_id: dict) -> str:
+	if employee_name and employee_name.strip() and employee_name != employee:
+		return employee_name.strip()
+	first_name, last_name = names_by_id.get(employee) or _split_full_name(employee_name or employee)
+	return " ".join(part for part in (first_name, last_name) if part) or employee
+
+
+def _set_slip_bonus_amount(slip, amount: float) -> None:
+	for row in slip.earnings or []:
+		component = frappe.db.get_value("Salary Component", row.salary_component, "earning_category")
+		if component == "Bonus":
+			row.amount = amount
+			return
+	if amount:
+		bonus_component = frappe.db.get_value("Salary Component", {"earning_category": "Bonus"}, "name")
+		if bonus_component:
+			slip.append("earnings", {"salary_component": bonus_component, "amount": amount})
+
+
+def _set_slip_holiday_pay_amount(slip, amount: float) -> None:
+	for row in slip.earnings or []:
+		if "holiday" in (row.salary_component or "").lower():
+			row.amount = amount
+			return
+	if amount:
+		holiday_component = frappe.db.get_value(
+			"Salary Component", {"name": ("like", "%Holiday%")}, "name"
+		)
+		if holiday_component:
+			slip.append("earnings", {"salary_component": holiday_component, "amount": amount})
+
+
+@frappe.whitelist()
+def get_bank_payroll_data(name: str | None = None) -> dict:
+	"""Rows for the Heritage Bank remittance sheet: name, account, SAV, net pay, bank code."""
+	from hrms.hr.belize_banks import bank_code_for
+
+	payload = get_payroll_excel_data(name)
+	employees = [row.get("employee") for row in payload.get("rows") or [] if row.get("employee")]
+	bank_by_id = _employee_bank_details_by_id(employees)
+	slip_bank_by_id = _salary_slip_bank_details_by_id((payload.get("meta") or {}).get("payroll_entry"), employees)
+	names_by_id = _employee_name_parts_by_id(employees)
+
+	rows = []
+	for row in payload.get("rows") or []:
+		employee = row.get("employee")
+		first_name, last_name = names_by_id.get(employee) or _split_full_name(
+			row.get("agent_name") or employee
+		)
+		bank = bank_by_id.get(employee) or {}
+		slip_bank = slip_bank_by_id.get(employee) or {}
+		if not bank.get("bank_name"):
+			bank["bank_name"] = slip_bank.get("bank_name")
+		if not bank.get("bank_ac_no"):
+			bank["bank_ac_no"] = slip_bank.get("bank_account_no")
+		account_type = (bank.get("bank_account_type") or "").strip()
+		is_savings = account_type.lower() in {"savings", "saving", "sav"}
+		rows.append(
+			{
+				"employee": employee,
+				"first_name": first_name,
+				"last_name": last_name,
+				"bank_account_no": bank.get("bank_ac_no") or "",
+				"account_type": "SAV" if is_savings else "",
+				"net_pay": flt(row.get("net_pay")),
+				"payment_type": "SALARY",
+				"bank_code": bank_code_for(bank.get("bank_name")),
+			}
+		)
+
+	rows.sort(
+		key=lambda item: (
+			(item.get("first_name") or "").lower(),
+			(item.get("last_name") or "").lower(),
+			item.get("employee") or "",
+		)
+	)
+	return {
+		"rows": rows,
+		"meta": payload.get("meta") or {},
+	}
+
+
+def _employee_bank_details_by_id(employees: list[str]) -> dict[str, dict]:
+	names = {name for name in employees if name}
+	if not names:
+		return {}
+
+	fields = ["name", "bank_name", "bank_ac_no"]
+	meta = frappe.get_meta("Employee")
+	if meta.has_field("bank_account_type"):
+		fields.append("bank_account_type")
+
+	out = {}
+	for row in frappe.get_all("Employee", filters={"name": ("in", list(names))}, fields=fields):
+		out[row.name] = row
+	return out
+
+
+def _salary_slip_bank_details_by_id(payroll_entry: str | None, employees: list[str]) -> dict[str, dict]:
+	if not payroll_entry or not employees:
+		return {}
+	rows = frappe.get_all(
+		"Salary Slip",
+		filters={"payroll_entry": payroll_entry, "employee": ("in", employees), "docstatus": ("<", 2)},
+		fields=["employee", "bank_name", "bank_account_no"],
+	)
+	return {row.employee: row for row in rows}
+
+
+@frappe.whitelist()
+def download_bank_payroll(name: str | None = None) -> None:
+	payload = get_bank_payroll_data(name)
+	xlsx_file = _bank_payroll_xlsx(payload.get("rows") or [])
+	period = (payload.get("meta") or {}).get("pay_period") or "Payroll"
+	safe = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in str(period))
+	_respond_payroll_file(f"Bank_Payroll_{safe}.xlsx", xlsx_file.getvalue())
+
+
+def _bank_payroll_xlsx(rows: list[dict]):
+	"""Build the bank remittance workbook. Column E is a number with 2 decimals."""
+	from io import BytesIO
+
+	import xlsxwriter
+
+	xlsx_file = BytesIO()
+	workbook = xlsxwriter.Workbook(xlsx_file, {"constant_memory": True})
+	worksheet = workbook.add_worksheet("HERITAGE BANK SHEET")
+	money = workbook.add_format({"num_format": "0.00"})
+	worksheet.set_column(4, 4, 12, money)
+
+	for row_idx, row in enumerate(rows):
+		worksheet.write(row_idx, 0, row.get("first_name") or "")
+		worksheet.write(row_idx, 1, row.get("last_name") or "")
+		worksheet.write(row_idx, 2, row.get("bank_account_no") or "")
+		worksheet.write(row_idx, 3, row.get("account_type") or "")
+		worksheet.write_number(row_idx, 4, round(flt(row.get("net_pay")), 2), money)
+		worksheet.write(row_idx, 5, row.get("payment_type") or "SALARY")
+		worksheet.write(row_idx, 6, row.get("bank_code") or "")
+
+	workbook.close()
+	xlsx_file.seek(0)
+	return xlsx_file
 
 
 @frappe.whitelist()
@@ -2651,6 +2878,35 @@ def _ytd_social_by_employee(entry) -> dict[str, tuple[float, float]]:
 	return totals
 
 
+def _excel_hours_for_employee(
+	employee: str,
+	slip_total_hours,
+	working_by_employee: dict[str, float],
+	overtime_by_employee: dict[str, float],
+) -> tuple[float, float]:
+	"""Return (overtime_hours, regular_hours) for the spreadsheet row."""
+	overtime_hours = flt(overtime_by_employee.get(employee))
+	total_hours = flt(slip_total_hours) or flt(working_by_employee.get(employee))
+	regular_hours = max(total_hours - overtime_hours, 0.0) if total_hours else 0.0
+	return overtime_hours, regular_hours
+
+
+def _working_hours_by_employee(entry) -> dict[str, float]:
+	"""Attendance hours per agent for the pay period (draft or submitted)."""
+	from hrms.payroll.daily_pay import ensure_working_hours_from_times
+
+	hours: dict[str, float] = {}
+	fields = ["employee", "working_hours", "status"]
+	if frappe.db.has_column("Attendance", "in_time"):
+		fields += ["in_time", "out_time"]
+	for row in _period_attendance(entry, fields, include_draft=True):
+		if (row.get("status") or "") == "Absent":
+			continue
+		worked = flt(row.working_hours) or flt(ensure_working_hours_from_times(row))
+		hours[row.employee] = hours.get(row.employee, 0) + worked
+	return hours
+
+
 def _overtime_hours_by_employee(entry) -> dict[str, float]:
 	"""Overtime hours per agent, preferring Overtime Slip detail rows over attendance."""
 	hours: dict[str, float] = {}
@@ -2678,8 +2934,13 @@ def _overtime_hours_by_employee(entry) -> dict[str, float]:
 			hours[slip.employee] = hours.get(slip.employee, 0) + flt(slip.total_overtime_duration)
 		return hours
 
-	for row in _period_attendance(entry, ["employee", "actual_overtime_duration"]):
-		hours[row.employee] = hours.get(row.employee, 0) + flt(row.actual_overtime_duration)
+	ot_field = (
+		["employee", "actual_overtime_duration"]
+		if frappe.db.has_column("Attendance", "actual_overtime_duration")
+		else ["employee"]
+	)
+	for row in _period_attendance(entry, ot_field, include_draft=True):
+		hours[row.employee] = hours.get(row.employee, 0) + flt(row.get("actual_overtime_duration"))
 	return hours
 
 
@@ -2698,18 +2959,19 @@ def _holiday_pay_by_employee(entry) -> dict[str, float]:
 	return holiday_pay
 
 
-def _period_attendance(entry, fields: list[str]) -> list[dict]:
+def _period_attendance(entry, fields: list[str], include_draft: bool = False) -> list[dict]:
 	if not entry.start_date or not entry.end_date:
 		return []
 
 	filters = {
-		"company": entry.company,
-		"docstatus": 1,
+		"docstatus": ("<", 2) if include_draft else 1,
 		"attendance_date": ("between", [entry.start_date, entry.end_date]),
 	}
 	employees = [row.employee for row in (entry.employees or []) if row.employee]
 	if employees:
 		filters["employee"] = ("in", employees)
+	elif entry.company:
+		filters["company"] = entry.company
 
 	return frappe.get_all("Attendance", filters=filters, fields=fields)
 

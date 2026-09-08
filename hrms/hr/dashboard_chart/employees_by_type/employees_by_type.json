@@ -1,8 +1,9 @@
 {
  "chart_name": "Agents by Type",
  "chart_type": "Group By",
+ "color": "#7c5cfc",
  "creation": "2022-08-22 13:49:59.343893",
- "custom_options": "",
+ "custom_options": "{\n\t\"colors\": [\"#7c5cfc\", \"#3ddc97\", \"#ff6b8a\", \"#ff9f43\", \"#5b9fff\"]\n}",
  "docstatus": 0,
  "doctype": "Dashboard Chart",
  "document_type": "Employee",

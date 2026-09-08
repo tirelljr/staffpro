@@ -16,6 +16,8 @@
   "exchange_rate",
   "payroll_payable_account",
   "status",
+  "payroll_excel_section",
+  "payroll_excel_html",
   "section_break_cypo",
   "salary_slip_based_on_timesheet",
   "deduct_social_security",
@@ -36,7 +38,6 @@
   "number_of_employees",
   "section_break_24",
   "employees",
-  "payroll_excel_html",
   "section_break_26",
   "validate_attendance",
   "attendance_detail_html",
@@ -367,6 +368,10 @@
    "options": "\nCreate\nSubmit"
   },
   {
+   "fieldname": "payroll_excel_section",
+   "fieldtype": "Section Break"
+  },
+  {
    "fieldname": "payroll_excel_html",
    "fieldtype": "HTML",
    "label": "Payroll Spreadsheet"
@@ -384,7 +389,7 @@
    "link_fieldname": "payroll_entry"
   }
  ],
- "modified": "2026-09-03 09:00:00.000000",
+ "modified": "2026-09-03 22:40:00.000000",
  "modified_by": "Administrator",
  "module": "Payroll",
  "name": "Payroll Entry",

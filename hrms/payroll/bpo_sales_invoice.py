@@ -200,8 +200,13 @@ def apply_bpo_sales_invoice_layout():
 		return
 
 	_hide_fields("Sales Invoice", HIDDEN_SALES_INVOICE_FIELDS)
+	_unrequire_fields(
+		"Sales Invoice",
+		("selling_price_list", "price_list_currency", "plc_conversion_rate"),
+	)
 	_relabel_fields("Sales Invoice", SALES_INVOICE_LABELS)
 	_sync_custom_field_labels("Sales Invoice", SALES_INVOICE_LABELS)
+	remove_unused_selling_price_list()
 
 	if frappe.db.exists("DocType", "Sales Invoice Item"):
 		_hide_fields("Sales Invoice Item", HIDDEN_SALES_INVOICE_ITEM_FIELDS)
@@ -225,6 +230,35 @@ def _hide_fields(doctype: str, fieldnames: tuple[str, ...]):
 			"Check",
 			validate_fields_for_doctype=False,
 		)
+
+
+def _unrequire_fields(doctype: str, fieldnames: tuple[str, ...]):
+	meta = frappe.get_meta(doctype)
+	for fieldname in fieldnames:
+		if not meta.has_field(fieldname):
+			continue
+		make_property_setter(
+			doctype,
+			fieldname,
+			"reqd",
+			0,
+			"Check",
+			validate_fields_for_doctype=False,
+		)
+
+
+def remove_unused_selling_price_list():
+	"""BPO invoices use agent billing rates, not ERPNext Price Lists."""
+	if frappe.db.exists("DocType", "Selling Settings"):
+		current = frappe.db.get_single_value("Selling Settings", "selling_price_list")
+		if current in (None, "", "Standard Selling USD"):
+			frappe.db.set_single_value("Selling Settings", "selling_price_list", "", update_modified=False)
+
+	if frappe.db.exists("Price List", "Standard Selling USD"):
+		try:
+			frappe.delete_doc("Price List", "Standard Selling USD", ignore_permissions=True, force=True)
+		except Exception:
+			frappe.log_error(title="Could not remove Standard Selling USD")
 
 
 def _relabel_fields(doctype: str, labels: dict[str, str]):

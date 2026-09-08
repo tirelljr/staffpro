@@ -21,8 +21,10 @@ const ICONS = {
 	file: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>`,
 	inbox: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>`,
 	arrowUpRight: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>`,
+	info: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="8" r="1" fill="currentColor" stroke="none"/></svg>`,
 	sortDesc: `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4.2 2.2c.4 0 .7.3.7.7v7.1l1.3-1.3.9.9-2.4 2.4c-.3.3-.7.3-1 0L1.3 9.6l.9-.9 1.3 1.3V2.9c0-.4.3-.7.7-.7z"/><rect x="8.2" y="2.8" width="6.4" height="1.45" rx=".45"/><rect x="8.2" y="5.7" width="4.9" height="1.45" rx=".45"/><rect x="8.2" y="8.6" width="3.4" height="1.45" rx=".45"/><rect x="8.2" y="11.5" width="1.9" height="1.45" rx=".45"/></svg>`,
 	sortAsc: `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4.2 13.8c-.4 0-.7-.3-.7-.7V6l-1.3 1.3-.9-.9 2.4-2.4c.3-.3.7-.3 1 0l2.4 2.4-.9.9-1.3-1.3v7.1c0 .4-.3.7-.7.7z"/><rect x="8.2" y="2.8" width="6.4" height="1.45" rx=".45"/><rect x="8.2" y="5.7" width="4.9" height="1.45" rx=".45"/><rect x="8.2" y="8.6" width="3.4" height="1.45" rx=".45"/><rect x="8.2" y="11.5" width="1.9" height="1.45" rx=".45"/></svg>`,
+	chevron: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg>`,
 };
 
 function empty_face({ bg, skin, hair, path, extra = "" }) {
@@ -128,6 +130,70 @@ const DASH_PILL_CSS = `
 .sp-dash-pill__icon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:24px;height:24px;max-width:24px;max-height:24px;overflow:hidden;border-radius:50%;background:#0f1b2d;color:var(--sp-icon-accent,#90ba93)}
 .sp-dash-pill__icon svg{width:12px!important;height:12px!important;max-width:12px;max-height:12px;stroke:currentColor;fill:none}
 .sp-dash-pill__label{white-space:nowrap}
+.sp-chart-replaced{position:absolute!important;width:0!important;height:0!important;overflow:hidden!important;visibility:hidden!important;pointer-events:none!important}
+.widget:has(.sp-bubbles) .sp-empty-chart,.widget:has(.sp-gauge) .sp-empty-chart,.sp-chart:has(.sp-bubbles) .sp-empty-chart,.sp-chart:has(.sp-gauge) .sp-empty-chart{display:none!important}
+#page-dashboard-view .page-head,#page-dashboard .page-head,.page-container[data-page-route="dashboard-view"] .page-head,#page-Workspaces .page-head{display:none!important}
+#page-dashboard-view .widget-subtitle,#page-dashboard .widget-subtitle,.dashboard-view .widget-subtitle,.dashboard-graph .widget-subtitle{display:none!important}
+#page-dashboard-view .filter-chart,#page-dashboard-view .chart-actions,#page-dashboard .filter-chart,#page-dashboard .chart-actions{display:none!important}
+#page-dashboard-view:not(:has(.sp-dash-pills)) .dashboard-graph,#page-dashboard:not(:has(.sp-dash-pills)) .dashboard-graph{visibility:hidden!important}
+`;
+
+const KPI_CARD_CSS = `
+body.staff-pro-alive .number-widget-area,body.staff-pro-alive .number-card-container,body.staff-pro-alive .dashboard-graph .widget-group-body{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px!important}
+body.staff-pro-alive .number-widget-box,body.staff-pro-alive .sp-kpi{--sp-kpi-bg:#fff;--sp-kpi-ink:#111;--sp-kpi-muted:#9aa3af;--sp-kpi-soft:#6b7280;--sp-kpi-line:#eceef2;--sp-kpi-footer:#f6f7f9;--sp-kpi-accent:#f97316;--sp-kpi-accent-soft:#f3e0d4;position:relative;display:flex!important;flex-direction:column;min-height:188px;padding:0!important;border:1px solid var(--sp-kpi-line)!important;border-radius:20px!important;background:#fff!important;box-shadow:0 1px 2px rgba(16,24,40,.04),0 8px 20px rgba(16,24,40,.05)!important;overflow:hidden;cursor:pointer}
+body.staff-pro-alive .sp-kpi:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(16,24,40,.1)!important}
+body.staff-pro-alive .sp-kpi .widget-head,body.staff-pro-alive .number-widget-box .widget-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:18px 18px 0!important;margin:0!important;border:0!important;background:transparent!important}
+body.staff-pro-alive .sp-kpi .widget-label{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
+body.staff-pro-alive .sp-kpi .widget-control{display:none!important}
+body.staff-pro-alive .sp-kpi .widget-title,body.staff-pro-alive .sp-kpi .widget-title .ellipsis,body.staff-pro-alive .number-widget-box .widget-title,body.staff-pro-alive .number-widget-box .widget-title .ellipsis{margin:0!important;font-size:16px!important;font-weight:700!important;line-height:1.25!important;color:#111!important;letter-spacing:-.02em;white-space:normal!important}
+body.staff-pro-alive .sp-kpi .widget-body{padding:14px 18px 16px!important}
+body.staff-pro-alive .sp-kpi .widget-content{display:flex;flex-direction:column;align-items:stretch;padding:0!important}
+body.staff-pro-alive .sp-kpi .number,body.staff-pro-alive .number-widget-box .number{margin:0!important;font-size:34px!important;font-weight:750!important;letter-spacing:-.04em;line-height:1.05!important;color:#111!important}
+body.staff-pro-alive .sp-kpi .card-stats,body.staff-pro-alive .sp-kpi .percentage-stat-area{display:none!important}
+.sp-kpi__info{display:inline-flex;align-items:center;color:#c5cad3;flex-shrink:0}
+.sp-kpi__info svg{width:15px;height:15px}
+.sp-kpi__report{flex-shrink:0;padding:6px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;color:#111;font:inherit;font-size:12px;font-weight:600;line-height:1;white-space:nowrap;cursor:pointer}
+.sp-kpi__report:hover{background:#f8f9fb}
+.sp-kpi__sub{padding:4px 18px 0;font-size:12px;font-weight:500;color:#9aa3af}
+.sp-kpi__period{position:relative;z-index:3;display:block}
+.sp-kpi__period-btn{display:inline-flex;align-items:center;gap:3px;padding:0;border:0;background:transparent;color:#9aa3af;font:inherit;font-size:12px;font-weight:500;line-height:1.2;cursor:pointer}
+.sp-kpi__period-btn:hover,.sp-kpi__period.is-open .sp-kpi__period-btn{color:#6b7280}
+.sp-kpi__period-caret{display:inline-flex;align-items:center;opacity:.7;transition:transform .15s ease}
+.sp-kpi__period-caret svg{width:10px;height:10px}
+.sp-kpi__period.is-open .sp-kpi__period-caret{transform:rotate(180deg)}
+.sp-kpi__period-menu{position:fixed;z-index:1080;min-width:148px;padding:4px;border:1px solid #eceef2;border-radius:12px;background:#fff;box-shadow:0 8px 24px rgba(16,24,40,.16)}
+.sp-kpi__period-menu[hidden]{display:none}
+.sp-kpi__period-option{display:block;width:100%;padding:8px 12px;border:0;border-radius:8px;background:transparent;color:#374151;font:inherit;font-size:13px;font-weight:500;line-height:1.2;text-align:left;cursor:pointer}
+.sp-kpi__period-option:hover,.sp-kpi__period-option.is-selected{background:#f3f4f6;color:#111}
+.sp-kpi.is-period-loading .number{opacity:.4}
+.sp-kpi__value-row{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;width:100%}
+.sp-kpi__hero{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 8px;min-width:0}
+.sp-kpi__of{font-size:14px;font-weight:500;color:#9aa3af}
+.sp-kpi__pill{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:#eef1f4;color:#6b7280;font-size:11px;font-weight:700;line-height:1;white-space:nowrap}
+.sp-kpi__pill.is-up{background:#e7f7ed;color:#15803d}
+.sp-kpi__pill.is-down{background:#fde8e8;color:#dc2626}
+.sp-kpi__track{display:flex;align-items:center;gap:5px;width:100%;margin-top:16px}
+.sp-kpi__seg{flex:1 1 0;height:10px;border-radius:999px;background:#f3e0d4}
+.sp-kpi__seg.is-full{background:#f97316}
+.sp-kpi__seg.is-partial{background:linear-gradient(90deg,#f97316 calc(var(--seg)*100%),#f3e0d4 calc(var(--seg)*100%))}
+.sp-kpi__footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 12px;margin-top:auto;padding:11px 16px;background:#f6f7f9;border-top:1px solid #eceef2}
+.sp-kpi__foot-item{display:inline-flex;align-items:center;gap:5px;min-width:0;font-size:12px;font-weight:500;color:#9aa3af}
+.sp-kpi__foot-icon{display:inline-flex;color:#b0b7c3}
+.sp-kpi__foot-icon svg{width:13px;height:13px}
+.sp-kpi__foot-value{color:#111;font-weight:700}
+.sp-kpi__foot-change.is-up .sp-kpi__foot-delta{color:#15803d}
+.sp-kpi__foot-change.is-down .sp-kpi__foot-delta{color:#dc2626}
+.sp-kpi-icon,.sp-kpi-hint,.sp-kpi__arrow,.sp-kpi__viz,.sp-kpi__more,.sp-kpi__trend{display:none!important}
+`;
+
+const HOURS_TABLE_CSS = `
+.sp-dash-hours{grid-column:1/-1;width:100%;max-width:100%;min-width:0}
+body.staff-pro-alive #page-dashboard-view .dashboard-graph:has(.sp-dash-hours){display:flex;flex-direction:column;align-items:stretch}
+.sp-hours__table-wrap{min-width:0;max-height:560px;overflow:auto}
+.sp-hours__list{max-height:none!important;overflow:visible!important}
+.sp-hours__table-head{position:sticky;top:0;z-index:2;background:#fff}
+.sp-hours__table-head,.sp-hours__row-main,.sp-hours__group-head{width:100%;min-width:0!important;grid-template-columns:minmax(72px,1.2fr) minmax(56px,.8fr) repeat(2,minmax(48px,.55fr)) minmax(52px,.6fr) repeat(2,minmax(52px,.65fr)) minmax(64px,.75fr) minmax(56px,.65fr) minmax(64px,.75fr) minmax(44px,.5fr)!important}
+.sp-hours__gross,.sp-hours__ss,.sp-hours__net{overflow:visible;text-align:right;text-overflow:unset;font-variant-numeric:tabular-nums}
 `;
 
 const LIST_META_CSS = `
@@ -161,17 +227,38 @@ const LIST_META_CSS = `
 `;
 
 function inject_dash_css() {
-	if (!document.getElementById("staff-pro-dash-css")) {
-		const style = document.createElement("style");
+	let style = document.getElementById("staff-pro-dash-css");
+	if (!style) {
+		style = document.createElement("style");
 		style.id = "staff-pro-dash-css";
-		style.textContent = DASH_PILL_CSS;
 		document.head.appendChild(style);
+	}
+	if (style.textContent !== DASH_PILL_CSS) {
+		style.textContent = DASH_PILL_CSS;
 	}
 	if (!document.getElementById("staff-pro-list-meta-css")) {
 		const style = document.createElement("style");
 		style.id = "staff-pro-list-meta-css";
 		style.textContent = LIST_META_CSS;
 		document.head.appendChild(style);
+	}
+	let kpiStyle = document.getElementById("staff-pro-kpi-css");
+	if (!kpiStyle) {
+		kpiStyle = document.createElement("style");
+		kpiStyle.id = "staff-pro-kpi-css";
+		document.head.appendChild(kpiStyle);
+	}
+	if (kpiStyle.textContent !== KPI_CARD_CSS) {
+		kpiStyle.textContent = KPI_CARD_CSS;
+	}
+	let hoursStyle = document.getElementById("staff-pro-hours-css");
+	if (!hoursStyle) {
+		hoursStyle = document.createElement("style");
+		hoursStyle.id = "staff-pro-hours-css";
+		document.head.appendChild(hoursStyle);
+	}
+	if (hoursStyle.textContent !== HOURS_TABLE_CSS) {
+		hoursStyle.textContent = HOURS_TABLE_CSS;
 	}
 }
 
@@ -209,14 +296,6 @@ const HOURS_SORT_COLUMNS = [
 	["net_daily_pay", "Net"],
 ];
 const HOURS_DEFAULT_SORT = { field: "attendance_date", order: "desc" };
-
-const KPI_ACCENTS = [
-	{ accent: "#c47a4a", soft: "#f0e0d4" },
-	{ accent: "#3b82c4", soft: "#d6e6f5", ring: true },
-	{ accent: "#d4708a", soft: "#f5d6de" },
-	{ accent: "#0f766e", soft: "#d7ebe7" },
-	{ accent: "#7c6bc4", soft: "#e4dff5" },
-];
 
 const kpi_sparkline_cache = {};
 let kpi_sparkline_request = null;
@@ -479,7 +558,9 @@ function run_pill(pill) {
 function page_root() {
 	const route = frappe.get_route?.() || [];
 	if (route[0] === "dashboard-view" || route[0] === "dashboard") {
-		return $("#page-dashboard-view, .page-container[data-page-route='dashboard-view']").first();
+		return $(
+			"#page-dashboard-view, #page-dashboard, .page-container[data-page-route='dashboard-view'], .page-container[data-page-route='dashboard']"
+		).first();
 	}
 	if (route[0] === "List") {
 		return $(".page-container[id^='page-List/']").filter(":visible").first();
@@ -1032,10 +1113,19 @@ const HIDDEN_HR_CHARTS = new Set([
 	"Outgoing Salary",
 	"Payroll Payouts",
 	"Social Security Contributions",
-	"Designation Wise Employee Count",
-	"Agents by Role",
 ]);
 const PERCENT_LEGEND_CHARTS = new Set(["Floor Attendance"]);
+const COMPOSITION_CHARTS = new Set([
+	"Agents by Role",
+	"Claims by Type",
+	"Department Wise Employee Count",
+	"Designation Wise Employee Count",
+	"Employees by Branch",
+	"Employees by Grade",
+	"Employees by Type",
+	"Floor Attendance",
+	"Gender Diversity Ratio",
+]);
 
 function format_kpi_hours(value) {
 	const hours = Number(value || 0);
@@ -1088,6 +1178,7 @@ function filter_hr_charts($root) {
 	$root.find(".dashboard-graph .widget.dashboard-widget-box, .dashboard-graph .chart-widget").each(function () {
 		const $widget = $(this).closest(".widget");
 		if (HIDDEN_HR_CHARTS.has(chart_widget_label($widget))) {
+			freeze_charts_in($widget);
 			$widget.remove();
 		}
 	});
@@ -1133,6 +1224,402 @@ function format_pie_legend_percentages($root) {
 				$(this).text(labels[index]);
 			}
 		});
+	});
+}
+
+const SP_CHART_COLORS = ["#7c5cfc", "#3ddc97", "#ff6b8a", "#ff9f43", "#5b9fff", "#90ba93", "#16678c"];
+
+function sanitize_chart_color(value) {
+	if (typeof value !== "string") return "";
+	const color = value.trim();
+	if (!color) return "";
+	if (/^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(color)) return color;
+	if (/^(rgb|hsl)a?\(/i.test(color)) return color;
+	if (/^[a-z][a-z0-9-]*$/i.test(color)) return color;
+	return "";
+}
+
+function collect_chart_colors(args) {
+	const values = [];
+	if (Array.isArray(args.colors)) values.push(...args.colors);
+	else if (args.colors) values.push(args.colors);
+	if (args.color) values.push(args.color);
+	return values.map(sanitize_chart_color).filter(Boolean);
+}
+
+function sanitize_chart_data(data, colors) {
+	if (!data || typeof data !== "object") return data;
+	if (!Array.isArray(data.datasets)) return data;
+	return Object.assign({}, data, {
+		datasets: data.datasets.map((dataset, index) => {
+			if (!dataset || typeof dataset !== "object") return dataset;
+			const color = sanitize_chart_color(dataset.color);
+			if (color) return Object.assign({}, dataset, { color });
+			const next = Object.assign({}, dataset);
+			delete next.color;
+			if (colors[index]) next.color = colors[index];
+			return next;
+		}),
+	});
+}
+
+function apply_sp_chart_args(args) {
+	const next = Object.assign({}, args || {});
+	const incoming = collect_chart_colors(next);
+	next.colors = incoming.length ? incoming.concat(SP_CHART_COLORS).slice(0, 8) : SP_CHART_COLORS.slice();
+	if (!sanitize_chart_color(next.color)) delete next.color;
+	if (next.data) next.data = sanitize_chart_data(next.data, next.colors);
+	next.type = String(next.type || "bar").trim().toLowerCase() || "bar";
+	next.barOptions = Object.assign({ spaceRatio: 0.62 }, next.barOptions || {});
+	next.lineOptions = Object.assign({ hideDots: 1, regionFill: 1 }, next.lineOptions || {});
+	next.axisOptions = Object.assign({ xIsSeries: 1, shortenYAxisNumbers: 1 }, next.axisOptions || {});
+	next.tooltipOptions = Object.assign({}, next.tooltipOptions || {});
+	return next;
+}
+
+function bind_chart_to_parent(parent, chart) {
+	const el = typeof parent === "string" ? document.querySelector(parent) : parent;
+	if (!el || !chart) return;
+	el._spChart = chart;
+	const widget = el.closest?.(".widget, .chart-widget, .dashboard-widget-box");
+	if (widget) $(widget).data("sp-chart", chart);
+}
+
+function chart_from_node(node) {
+	if (!node) return null;
+	if (node._spChart) return node._spChart;
+	const $widget = $(node).closest(".widget, .chart-widget, .dashboard-widget-box");
+	const stored = $widget.data("sp-chart");
+	if (stored) return stored;
+	let found = null;
+	$widget.find(".chart-container, .frappe-chart, .widget-body, .widget-chart-box").addBack().each(function () {
+		if (this._spChart) found = this._spChart;
+	});
+	return found;
+}
+
+function freeze_chart_instance(chart) {
+	if (!chart || chart.__sp_frozen) return;
+	chart.__sp_frozen = true;
+	try {
+		chart.resizeObserver?.disconnect();
+	} catch (error) {
+		/* already gone */
+	}
+	try {
+		if (chart.boundDrawFn) {
+			window.removeEventListener("resize", chart.boundDrawFn);
+			window.removeEventListener("orientationchange", chart.boundDrawFn);
+		}
+	} catch (error) {
+		/* already gone */
+	}
+	try {
+		chart.destroy?.();
+	} catch (error) {
+		/* already gone */
+	}
+	chart.draw = function () {};
+}
+
+function freeze_charts_in($root) {
+	if (!$root?.length) return;
+	$root.each(function () {
+		const chart = $(this).data("sp-chart") || chart_from_node(this);
+		if (chart) freeze_chart_instance(chart);
+		$(this)
+			.find(".chart-container, .frappe-chart, .widget-body, .widget-chart-box")
+			.addBack()
+			.each(function () {
+				if (this._spChart) freeze_chart_instance(this._spChart);
+			});
+	});
+}
+
+function hide_replaced_chart($chart) {
+	freeze_charts_in($chart);
+	$chart.addClass("sp-chart-replaced");
+}
+
+function harden_chart_instance(chart) {
+	if (!chart || chart.__sp_hardened) return chart;
+	chart.__sp_hardened = true;
+	if (typeof chart.draw === "function") {
+		const origDraw = chart.draw.bind(chart);
+		chart.draw = function (...drawArgs) {
+			if (chart.__sp_frozen) return;
+			try {
+				return origDraw(...drawArgs);
+			} catch (error) {
+				if (error && error.name === "NotFoundError") return;
+				throw error;
+			}
+		};
+	}
+	if (typeof chart.makeChartArea === "function") {
+		const origMake = chart.makeChartArea.bind(chart);
+		chart.makeChartArea = function (...makeArgs) {
+			if (this.svg && this.container && this.svg.parentNode !== this.container) {
+				this.svg = null;
+			}
+			return origMake(...makeArgs);
+		};
+	}
+	return chart;
+}
+
+function patch_frappe_chart() {
+	if (typeof frappe === "undefined" || !frappe.Chart || frappe.Chart.__sp_patched) return;
+
+	const Orig = frappe.Chart;
+	function StaffProChart(parent, args) {
+		const chart = new Orig(parent, apply_sp_chart_args(args));
+		harden_chart_instance(chart);
+		bind_chart_to_parent(parent, chart);
+		return chart;
+	}
+	StaffProChart.prototype = Orig.prototype;
+	Object.assign(StaffProChart, Orig);
+	StaffProChart.__sp_patched = true;
+	frappe.Chart = StaffProChart;
+}
+
+function chart_color(index) {
+	return SP_CHART_COLORS[index % SP_CHART_COLORS.length];
+}
+
+function parse_legend_items($widget) {
+	const items = [];
+	$widget.find(".legend-dataset-value").each(function () {
+		const $value = $(this);
+		if ($value.closest(".sp-bubbles, .sp-gauge").length) return;
+		const raw = $value.text().replace(/\s+/g, " ").trim();
+		const $row = $value.closest(".legend-dataset-label, .legend-item, .legend > div, .chart-legend > div");
+		const label = $row
+			.clone()
+			.find(".legend-dataset-value, .legend-indicator")
+			.remove()
+			.end()
+			.text()
+			.replace(/\s+/g, " ")
+			.trim();
+		if (!label && !raw) return;
+		items.push({
+			label: label || raw,
+			raw: raw || "",
+			value: kpi_parse_number(raw) || 0,
+		});
+	});
+	const unique = [];
+	const seen = new Set();
+	items.forEach((item) => {
+		const key = `${item.label}|${item.raw}`;
+		if (seen.has(key)) return;
+		seen.add(key);
+		unique.push(item);
+	});
+	return unique;
+}
+
+function is_composition_chart($widget, $chart) {
+	if ($widget.find(".sp-bubbles, .sp-gauge").length) return true;
+	if (COMPOSITION_CHARTS.has(chart_widget_label($widget))) return true;
+	if ($chart.find(".pie-chart, .donut-chart, .percentage-graph, .pie, .donut").length) return true;
+	if ($chart.find("path.pie-path, .pie-path, path[class*='pie']").length) return true;
+	const type = String($widget.attr("data-chart-type") || $widget.data("chartType") || "").toLowerCase();
+	return type === "pie" || type === "donut" || type === "percentage";
+}
+
+function chart_has_plotted_data($widget) {
+	if ($widget.find(".sp-bubbles, .sp-gauge").length) return true;
+	if (parse_legend_items($widget).some((item) => Number(item.value) > 0)) return true;
+	const $live = $widget.find(".frappe-chart, .chart-container").not(".sp-chart-replaced");
+	return Boolean(
+		$live.find(
+			"rect.bar, .bar, path.line-graph-path, path.area-path, path.pie-path, .pie-path, .dataset-units rect"
+		).length
+	);
+}
+
+function widget_chart_is_empty($widget) {
+	if (chart_has_plotted_data($widget)) return false;
+	const $body = $widget.find(".widget-body").first();
+	if (!$body.length) return false;
+
+	let text = "";
+	$body.find("*").addBack().each(function () {
+		if ($(this).closest(".sp-chart-replaced, .sp-empty-chart, .sp-bubbles, .sp-gauge").length) return;
+		this.childNodes.forEach((node) => {
+			if (node.nodeType === 3) text += ` ${node.textContent}`;
+		});
+	});
+	return /no data/i.test(text.replace(/\s+/g, " ").trim());
+}
+
+function clear_empty_chart_overlay($widget) {
+	if (!$widget?.length || (!$widget.data("sp-empty") && !$widget.find(".sp-empty-chart").length)) return;
+	$widget.removeData("sp-empty");
+	$widget.find(".sp-empty-chart").remove();
+	if (!$widget.find(".sp-bubbles, .sp-gauge").length) {
+		$widget.find(".widget-body .sp-chart-replaced").removeClass("sp-chart-replaced");
+	}
+}
+
+function bubble_slots(count) {
+	if (count <= 1) return [{ x: 50, y: 50 }];
+	if (count === 2) return [{ x: 38, y: 48 }, { x: 64, y: 52 }];
+	if (count === 3) return [{ x: 36, y: 46 }, { x: 64, y: 38 }, { x: 62, y: 68 }];
+	if (count === 4) return [{ x: 36, y: 44 }, { x: 62, y: 36 }, { x: 70, y: 64 }, { x: 46, y: 72 }];
+	return [{ x: 34, y: 42 }, { x: 58, y: 32 }, { x: 72, y: 56 }, { x: 52, y: 74 }, { x: 28, y: 68 }, { x: 78, y: 78 }];
+}
+
+function render_composition_chart($widget, $chart) {
+	const items = parse_legend_items($widget);
+	if (!items.length) return false;
+
+	const percents = format_legend_percentages(items.map((item) => item.value));
+	const fingerprint = items.map((item, index) => `${item.label}:${percents[index]}`).join("|");
+	if ($widget.data("sp-bubbles") === fingerprint && $widget.find(".sp-bubbles, .sp-gauge").length) {
+		hide_replaced_chart($chart);
+		$widget.find(".legend, .chart-legend").not(".sp-bubbles__legend").hide();
+		return true;
+	}
+
+	$widget.find(".sp-bubbles, .sp-gauge").remove();
+	hide_replaced_chart($chart);
+	$widget.find(".legend, .chart-legend").hide();
+
+	if (items.length === 1) {
+		const pct = Math.max(0, Math.min(100, parseFloat(percents[0]) || 0));
+		const color = chart_color(0);
+		const radius = 42;
+		const circ = Math.PI * radius;
+		const dash = (pct / 100) * circ;
+		const angle = Math.PI - (pct / 100) * Math.PI;
+		const hx = 60 + radius * Math.cos(angle);
+		const hy = 58 - radius * Math.sin(angle);
+		$chart.after(`
+			<div class="sp-gauge">
+				<svg class="sp-gauge__svg" viewBox="0 0 120 78" aria-hidden="true">
+					<path d="M18 58 A42 42 0 0 1 102 58" fill="none" stroke="var(--sp-chart-track)" stroke-width="10" stroke-linecap="round"></path>
+					<path d="M18 58 A42 42 0 0 1 102 58" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${dash} ${circ}"></path>
+					<circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="6" fill="#fff" stroke="${color}" stroke-width="3"></circle>
+				</svg>
+				<div class="sp-gauge__value">${escape_html(items[0].raw || percents[0])}</div>
+				<div class="sp-gauge__hint">${escape_html(items[0].label)}</div>
+			</div>
+		`);
+		$widget.data("sp-bubbles", fingerprint);
+		return true;
+	}
+
+	const ranked = items
+		.map((item, index) => ({ ...item, percent: percents[index], color: chart_color(index), index }))
+		.sort((a, b) => b.value - a.value);
+	const slots = bubble_slots(ranked.length);
+	const max = ranked[0]?.value || 1;
+	const dots = ranked
+		.map((item, index) => {
+			const slot = slots[index] || { x: 50, y: 50 };
+			const size = Math.round(46 + (item.value / max) * 78);
+			return `<span class="sp-bubbles__dot" style="left:${slot.x}%;top:${slot.y}%;width:${size}px;height:${size}px;background:${item.color};z-index:${20 - index}">${escape_html(item.percent)}</span>`;
+		})
+		.join("");
+	const legend = items
+		.map((item, index) => {
+			return `<div class="sp-bubbles__item"><i class="sp-bubbles__swatch" style="background:${chart_color(index)}"></i><span class="sp-bubbles__name">${escape_html(item.label)}</span><span class="sp-bubbles__value">${escape_html(item.raw || percents[index])}</span></div>`;
+		})
+		.join("");
+
+	$chart.after(`
+		<div class="sp-bubbles">
+			<div class="sp-bubbles__canvas">${dots}</div>
+			<div class="sp-bubbles__legend">${legend}</div>
+		</div>
+	`);
+	$widget.data("sp-bubbles", fingerprint);
+	return true;
+}
+
+function polish_axis_chart($chart) {
+	const colors = SP_CHART_COLORS;
+	$chart.find("rect.bar, .bar, .dataset-units rect").each(function (index) {
+		const node = this;
+		if (node.getAttribute("data-sp-bar")) return;
+		node.setAttribute("data-sp-bar", "1");
+		const width = parseFloat(node.getAttribute("width"));
+		const x = parseFloat(node.getAttribute("x"));
+		if (Number.isFinite(width) && width > 10) {
+			const next = Math.max(7, width * 0.52);
+			node.setAttribute("width", String(next));
+			if (Number.isFinite(x)) node.setAttribute("x", String(x + (width - next) / 2));
+		}
+		node.setAttribute("rx", "8");
+		node.setAttribute("ry", "8");
+		const current = node.getAttribute("fill") || "";
+		if (!current || /#5e64ff|#2490ef|#7cd6fd|#449cf0|#4463f0|#28a745|#cbd5e2/i.test(current)) {
+			const group = node.closest("[data-dataset-index], .dataset-units, .dataset-bars");
+			const dataset = Number(group?.getAttribute?.("data-dataset-index"));
+			node.setAttribute("fill", colors[Number.isFinite(dataset) ? dataset : index % colors.length]);
+		}
+	});
+
+	$chart.find("path.line-graph-path, .line-graph-path, path.area-path, .area-path").each(function (index) {
+		const node = this;
+		const color = colors[index % colors.length];
+		if (node.classList.contains("area-path") || (node.getAttribute("class") || "").includes("area")) {
+			node.setAttribute("fill", color);
+			node.setAttribute("fill-opacity", "0.16");
+			node.setAttribute("stroke", "none");
+		} else {
+			node.setAttribute("stroke", color);
+			node.setAttribute("stroke-width", "2.5");
+			node.setAttribute("stroke-linecap", "round");
+			node.setAttribute("stroke-linejoin", "round");
+		}
+	});
+
+	$chart.find(".legend-indicator, .legend-dot, .legend .indicator").each(function (index) {
+		this.style.background = colors[index % colors.length];
+		this.style.borderRadius = "50%";
+	});
+}
+
+function remove_chart_filter_buttons($root) {
+	if (!$root?.length) return;
+	$root
+		.find(
+			".chart-widget .filter-chart, .dashboard-graph .filter-chart, .dashboard-widget-box .filter-chart, .widget-chart-box .filter-chart, #page-query-report .filter-chart, .report-wrapper .filter-chart"
+		)
+		.remove();
+}
+
+function theme_charts($root) {
+	patch_frappe_chart();
+	remove_chart_filter_buttons($root);
+	if (!$root?.length) return;
+
+	$root.find(".chart-widget, .dashboard-graph .widget, .widget-chart-box, .frappe-chart").each(function () {
+		const $node = $(this);
+		const $widget = $node.closest(".widget, .chart-widget, .dashboard-widget-box");
+		const $chart = $node.hasClass("frappe-chart") ? $node : $widget.find(".frappe-chart, .chart-container").first();
+		if (!$chart.length) return;
+		if ($widget.hasClass("number-widget-box") || $widget.hasClass("sp-kpi")) return;
+
+		if ($widget.length) {
+			$widget.addClass("sp-chart");
+			if (is_composition_chart($widget, $chart)) {
+				if (render_composition_chart($widget, $chart)) {
+					clear_empty_chart_overlay($widget);
+					return;
+				}
+			} else {
+				$widget.find(".sp-bubbles, .sp-gauge").remove();
+				$chart.removeClass("sp-chart-replaced").show();
+				$widget.removeData("sp-bubbles");
+			}
+		}
+		polish_axis_chart($chart);
 	});
 }
 
@@ -1909,8 +2396,10 @@ function render_hours_row(row) {
 				<span>${escape_html(format_hours_duration(row_working_hours(row)))}</span>
 				<span>${escape_html(__(row.status || ""))}</span>
 				<span>${escape_html(row.shift || row.leave_type || row.job || "")}</span>
-				<span>${escape_html(format_hours_money(row.daily_pay))}</span>
-				<span class="sp-hours__ss"></span>
+				<span class="sp-hours__gross">${escape_html(format_hours_money(row.daily_pay))}</span>
+				<span class="sp-hours__ss">${escape_html(
+					Number(row.ss_deduction) ? format_hours_money(row.ss_deduction) : "—",
+				)}</span>
 				<span class="sp-hours__net">${escape_html(format_hours_money(row.net_daily_pay))}</span>
 				${actions || "<span class=\"sp-hours__row-actions\"></span>"}
 			</div>
@@ -2002,7 +2491,7 @@ function render_hours_week_group(week, group_by_date) {
 				<span>${escape_html(format_hours_duration(week.hours))}</span>
 				<span></span>
 				<span></span>
-				<span>${escape_html(format_hours_money(week.pay))}</span>
+				<span class="sp-hours__gross">${escape_html(format_hours_money(week.pay))}</span>
 				<span class="sp-hours__ss">${escape_html(format_hours_money(week.ss))}</span>
 				<span class="sp-hours__net">${escape_html(format_hours_money(week.net))}</span>
 				<span></span>
@@ -2340,6 +2829,7 @@ function kpi_card_name($card) {
 		$card.attr("data-widget-name") ||
 		$card.attr("data-number-card-name") ||
 		$card.data("widget-name") ||
+		$card.data("sp-kpi-title") ||
 		$card.find(".widget-title").first().text().trim() ||
 		""
 	);
@@ -2392,56 +2882,291 @@ function kpi_synthesize_series($card) {
 	return values;
 }
 
-function kpi_bar_svg(values, accent) {
-	const width = 28;
-	const height = 22;
-	const pad = 2;
-	const n = Math.max(values.length, 1);
-	const gap = 1.5;
-	const bar_w = Math.max(2.5, (width - pad * 2 - gap * (n - 1)) / n);
-	const peak = Math.max(...values.map((v) => Math.abs(v)), 0.0001);
-	const bars = values
-		.map((value, index) => {
-			const ratio = Math.max(0.12, Math.abs(value) / peak);
-			const h = Math.max(2, (height - pad * 2) * ratio);
-			const x = pad + index * (bar_w + gap);
-			const y = height - pad - h;
-			const fill = index === values.length - 1 ? accent.accent : accent.soft;
-			return `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${bar_w.toFixed(2)}" height="${h.toFixed(
-				2,
-			)}" rx="1.2" fill="${fill}"></rect>`;
+function kpi_split_title(title) {
+	const raw = String(title || "").replace(/\s+/g, " ").trim();
+	const match = raw.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+	if (match) {
+		return { title: match[1].trim() || raw, subtitle: match[2].trim() };
+	}
+	return { title: raw, subtitle: "" };
+}
+
+function kpi_default_subtitle($card) {
+	const stats = $card.find(".card-stats, .percentage-stat-area").first().text().replace(/\s+/g, " ");
+	const since = stats.match(/since\s+(.+)/i);
+	if (since) return since[1].trim();
+	const name = $card.data("sp-kpi-title") || kpi_card_name($card);
+	if (/this month/i.test(name)) return __("This Month");
+	if (/this week/i.test(name)) return __("This Week");
+	if (/this year/i.test(name)) return __("This Year");
+	if (/this quarter/i.test(name)) return __("This Quarter");
+	if (/today/i.test(name)) return __("Today");
+	return __("Current period");
+}
+
+const KPI_PERIODS = [
+	{ value: "day", label: __("Today") },
+	{ value: "week", label: __("This Week") },
+	{ value: "month", label: __("This Month") },
+	{ value: "year", label: __("This Year") },
+];
+
+function kpi_period_from_text(text) {
+	const raw = String(text || "").toLowerCase();
+	if (/\btoday\b|\bthis day\b/.test(raw)) return "day";
+	if (/\bweek\b/.test(raw)) return "week";
+	if (/\byear\b/.test(raw)) return "year";
+	if (/\bmonth\b/.test(raw)) return "month";
+	return "";
+}
+
+function kpi_period_label(period, fallback) {
+	const match = KPI_PERIODS.find((opt) => opt.value === period);
+	return match ? match.label : fallback || __("Current period");
+}
+
+function close_kpi_period_menus() {
+	$(".sp-kpi__period").removeClass("is-open");
+	$(".sp-kpi__period-btn").attr("aria-expanded", "false");
+	$(".sp-kpi__period-menu").prop("hidden", true);
+}
+
+function position_kpi_period_menu($btn, $menu) {
+	const rect = $btn[0].getBoundingClientRect();
+	const width = Math.max(rect.width, 148);
+	$menu.css({
+		position: "fixed",
+		top: rect.bottom + 6,
+		left: Math.min(rect.left, window.innerWidth - width - 8),
+		minWidth: width,
+	});
+	const menuH = $menu.outerHeight() || 0;
+	if (rect.bottom + 6 + menuH > window.innerHeight - 8) {
+		$menu.css("top", Math.max(8, rect.top - menuH - 6));
+	}
+}
+
+function kpi_period_menu_html(selected) {
+	return `<div class="sp-kpi__period-menu" hidden role="listbox" aria-label="${escape_html(__("Period"))}">
+		${KPI_PERIODS.map((opt) => {
+			const isSelected = opt.value === selected;
+			return `<button type="button" class="sp-kpi__period-option${isSelected ? " is-selected" : ""}" role="option" data-value="${escape_html(opt.value)}" aria-selected="${isSelected ? "true" : "false"}">${escape_html(opt.label)}</button>`;
+		}).join("")}
+	</div>`;
+}
+
+function open_kpi_period_menu($card, $sub) {
+	let $menu = $card.data("sp-kpi-period-menu");
+	if (!$menu || !$menu.length || !document.body.contains($menu[0])) {
+		$menu = $(kpi_period_menu_html($card.data("sp-kpi-period")));
+		$(document.body).append($menu);
+		$card.data("sp-kpi-period-menu", $menu);
+		$menu.on("click", ".sp-kpi__period-option", function (event) {
+			event.preventDefault();
+			event.stopPropagation();
+			set_kpi_card_period($card, String($(this).data("value")));
+		});
+		$menu.on("click", (event) => event.stopPropagation());
+	}
+
+	const selected = $card.data("sp-kpi-period") || "";
+	$menu.find(".sp-kpi__period-option").each(function () {
+		const isSelected = String($(this).data("value")) === selected;
+		$(this).toggleClass("is-selected", isSelected).attr("aria-selected", isSelected ? "true" : "false");
+	});
+
+	$sub.addClass("is-open");
+	$sub.find(".sp-kpi__period-btn").attr("aria-expanded", "true");
+	$menu.prop("hidden", false);
+	position_kpi_period_menu($sub.find(".sp-kpi__period-btn"), $menu);
+}
+
+function bind_kpi_period_dropdown($card, $sub) {
+	if ($sub.data("sp-kpi-period-bound")) return;
+	$sub.data("sp-kpi-period-bound", true);
+
+	$sub.on("click mousedown", (event) => {
+		event.preventDefault();
+		event.stopPropagation();
+	});
+
+	$sub.find(".sp-kpi__period-btn").on("click", function (event) {
+		event.preventDefault();
+		event.stopPropagation();
+		const willOpen = !$sub.hasClass("is-open");
+		close_kpi_period_menus();
+		if (willOpen) open_kpi_period_menu($card, $sub);
+	});
+
+	if (!window.__spKpiPeriodDocBound) {
+		window.__spKpiPeriodDocBound = true;
+		$(document).on("click.sp-kpi-period", () => close_kpi_period_menus());
+		$(document).on("keydown.sp-kpi-period", (event) => {
+			if (event.key === "Escape") close_kpi_period_menus();
+		});
+		$(window).on("resize.sp-kpi-period scroll.sp-kpi-period", () => close_kpi_period_menus());
+	}
+}
+
+function set_kpi_card_period($card, period) {
+	close_kpi_period_menus();
+	if (!period) return;
+	if ($card.data("sp-kpi-period") === period && $card.data("sp-kpi-period-user")) {
+		return;
+	}
+	$card.data("sp-kpi-period", period);
+	$card.data("sp-kpi-period-user", 1);
+	$card.find(".sp-kpi__period-label").text(kpi_period_label(period));
+	load_kpi_card_period($card, period);
+}
+
+function load_kpi_card_period($card, period) {
+	const name = kpi_card_name($card);
+	if (!name) return;
+	$card.addClass("is-period-loading");
+	frappe
+		.xcall("hrms.hr.desk_dashboard.get_number_card_period", {
+			card_name: name,
+			period,
 		})
-		.join("");
-	return `<svg class="sp-kpi__chart" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">${bars}</svg>`;
+		.then((res) => {
+			if (!res || res.supported === false) {
+				frappe.show_alert({
+					message: __("This card cannot change period."),
+					indicator: "orange",
+				});
+				return;
+			}
+			apply_kpi_period_result($card, res);
+		})
+		.catch(() => {
+			frappe.show_alert({
+				message: __("Could not update this card."),
+				indicator: "red",
+			});
+		})
+		.finally(() => $card.removeClass("is-period-loading"));
 }
 
-function kpi_ring_svg(values, accent) {
-	const peak = Math.max(...values.map((v) => Math.abs(v)), 0.0001);
-	const latest = Math.abs(values[values.length - 1] || 0);
-	const ratio = Math.max(0.04, Math.min(0.96, latest / peak));
-	const r = 8;
-	const c = 2 * Math.PI * r;
-	const dash = (ratio * c).toFixed(2);
-	const gap = (c - ratio * c).toFixed(2);
-	return `
-		<svg class="sp-kpi__chart" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-			<circle cx="12" cy="12" r="${r}" fill="none" stroke="${accent.soft}" stroke-width="3"></circle>
-			<circle cx="12" cy="12" r="${r}" fill="none" stroke="${accent.accent}" stroke-width="3"
-				stroke-linecap="round" stroke-dasharray="${dash} ${gap}" transform="rotate(-90 12 12)"></circle>
-		</svg>
-	`;
+function apply_kpi_period_result($card, result) {
+	$card.data("sp-kpi-period", result.period);
+	$card.data("sp-kpi-period-user", 1);
+	$card.find(".sp-kpi__period-label").text(result.label || kpi_period_label(result.period));
+
+	const $number = $card.find(".number").first();
+	if ($number.length && result.formatted_value != null) {
+		$number.text(result.formatted_value);
+	}
+
+	const $stats = kpi_stats_source($card);
+	if ($stats.length && result.percent != null) {
+		const pct = Number(result.percent) || 0;
+		const sign = pct > 0 ? "↑" : pct < 0 ? "↓" : "";
+		$stats
+			.text(`${sign} ${Math.abs(pct)}%`.trim())
+			.removeClass("green-stat red-stat")
+			.toggleClass("green-stat", pct > 0)
+			.toggleClass("red-stat", pct < 0);
+	}
+
+	const name = kpi_card_name($card);
+	if (name && result.sparkline) {
+		kpi_sparkline_cache[name] = result.sparkline;
+		$card.removeData("sp-spark").removeData("sp-kpi-ratio");
+	}
+
+	sync_kpi_chrome($card);
 }
 
-function kpi_viz_html(accent, series) {
-	const values = Array.isArray(series?.values) ? series.values : [];
-	const kind = series?.kind || (accent.ring ? "ring" : "bars");
-	if (!values.length) {
-		return `<span class="sp-kpi__viz is-loading" aria-hidden="true"></span>`;
+function ensure_kpi_period_dropdown($card, subtitle) {
+	let $sub = $card.children(".sp-kpi__sub");
+	if (!$sub.length) {
+		$sub = $('<div class="sp-kpi__sub"></div>');
+		const $head = $card.find(".widget-head").first();
+		if ($head.length) $head.after($sub);
+		else $card.prepend($sub);
 	}
-	if (kind === "ring" || accent.ring) {
-		return `<span class="sp-kpi__viz sp-kpi__viz--ring" aria-hidden="true">${kpi_ring_svg(values, accent)}</span>`;
+
+	if (!$sub.hasClass("sp-kpi__period")) {
+		const inferred = kpi_period_from_text(subtitle) || $card.data("sp-kpi-period") || "";
+		if (!$card.data("sp-kpi-period")) $card.data("sp-kpi-period", inferred);
+		$sub.addClass("sp-kpi__period");
+		$sub.html(`
+			<button type="button" class="sp-kpi__period-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="${escape_html(__("Change period"))}">
+				<span class="sp-kpi__period-label"></span>
+				<span class="sp-kpi__period-caret" aria-hidden="true">${ICONS.chevron}</span>
+			</button>
+		`);
+		bind_kpi_period_dropdown($card, $sub);
 	}
-	return `<span class="sp-kpi__viz" aria-hidden="true">${kpi_bar_svg(values, accent)}</span>`;
+
+	const period = $card.data("sp-kpi-period");
+	const label = kpi_period_label(period, subtitle);
+	$sub.find(".sp-kpi__period-label").text(label);
+	$sub.toggle(Boolean(label));
+}
+
+function kpi_stats_source($card) {
+	return $card
+		.find(
+			".widget-content .card-stats, .widget-content .percentage-stat-area, .widget-body > .card-stats, .widget-body > .percentage-stat-area",
+		)
+		.first();
+}
+
+function kpi_format_trend(text) {
+	const raw = String(text || "").replace(/\s+/g, " ").trim();
+	if (!raw) return "";
+	const pct = kpi_parse_percent_text(raw);
+	if (pct == null) return raw;
+	const abs = String(Math.abs(pct) % 1 ? Math.abs(pct).toFixed(1) : Math.abs(pct));
+	if (pct > 0) return `↗ ${abs}%`;
+	if (pct < 0) return `↘ ${abs}%`;
+	return `${abs}%`;
+}
+
+function kpi_trend_payload($card) {
+	const $source = kpi_stats_source($card);
+	const text = $source.length ? $source.text().replace(/\s+/g, " ").trim() : "";
+	const class_hint = [$source.attr("class"), $source.find(".green-stat, .red-stat, .grey-stat").attr("class")]
+		.filter(Boolean)
+		.join(" ");
+	return {
+		text,
+		label: kpi_format_trend(text),
+		tone: kpi_trend_class(`${class_hint} ${text}`),
+	};
+}
+
+function kpi_is_percent_card($card) {
+	const name = `${$card.data("sp-kpi-title") || ""} ${kpi_card_name($card)}`;
+	const raw = $card.find(".number").first().text();
+	return /%/.test(raw) || /percent|rate/i.test(name);
+}
+
+function kpi_progress_ratio($card, series) {
+	const value = Math.abs(kpi_parse_number($card.find(".number").first().text()) || 0);
+	if (kpi_is_percent_card($card)) {
+		return Math.max(0, Math.min(1, value / 100));
+	}
+	if (value <= 0) return 0;
+	const values = Array.isArray(series?.values) ? series.values.map((v) => Math.abs(Number(v) || 0)) : [];
+	const peak = Math.max(...values, value, 0);
+	if (peak <= 0) return 0.5;
+	return Math.max(0.18, Math.min(0.82, value / (peak * 1.15)));
+}
+
+function kpi_segments_html(ratio, segments = 8) {
+	const filled = Number(ratio || 0) * segments;
+	const pills = [];
+	for (let i = 0; i < segments; i++) {
+		const leftover = Math.max(0, Math.min(1, filled - i));
+		let cls = "is-empty";
+		if (leftover >= 0.92) cls = "is-full";
+		else if (leftover > 0.08) cls = "is-partial";
+		pills.push(`<span class="sp-kpi__seg ${cls}" style="--seg:${leftover.toFixed(3)}"></span>`);
+	}
+	return `<div class="sp-kpi__track" aria-hidden="true">${pills.join("")}</div>`;
 }
 
 function request_kpi_sparklines(names) {
@@ -2495,92 +3220,179 @@ function series_for_card($card, name) {
 	return { values: kpi_synthesize_series($card), kind: "bars" };
 }
 
-function render_kpi_viz($card) {
-	const accent = $card.data("sp-kpi-accent") || KPI_ACCENTS[0];
-	const name = kpi_card_name($card);
-	const $label = $card.find(".widget-label").first();
-	if (!$label.length) return;
+function kpi_trend_class(text) {
+	const raw = String(text || "").toLowerCase();
+	if (/\bgreen-stat\b|↑|↗|\bincrease|\+\s*\d/.test(raw)) return "is-up";
+	if (/\bred-stat\b|↓|↘|\bdecrease|−|–/.test(raw)) return "is-down";
+	return "";
+}
 
-	const series = series_for_card($card, name);
-	const html = kpi_viz_html(accent, series);
-	const $existing = $label.children(".sp-kpi__viz");
-	if ($existing.length) {
-		$existing.replaceWith(html);
+function sync_kpi_copy($card) {
+	const $title = $card.find(".widget-title").first();
+	if (!$title.length) return;
+
+	const $ellipsis = $title.find(".ellipsis").first();
+	const $target = $ellipsis.length ? $ellipsis : $title;
+	const current = $target.text().replace(/\s+/g, " ").trim();
+	const stored = $card.data("sp-kpi-title");
+	const original = /\(.*\)/.test(current) || !stored ? current : stored;
+	$card.data("sp-kpi-title", original);
+
+	const parts = kpi_split_title(original);
+	if ($target.text().replace(/\s+/g, " ").trim() !== parts.title) {
+		$target.text(parts.title);
+	}
+	if ($target.is("[title]")) {
+		$target.attr("title", original);
+	}
+
+	const $label = $card.find(".widget-label").first();
+	if ($label.length && !$label.children(".sp-kpi__info").length) {
+		$label.append(`<span class="sp-kpi__info" aria-hidden="true">${ICONS.info}</span>`);
+	}
+
+	const subtitle = parts.subtitle || kpi_default_subtitle($card);
+	ensure_kpi_period_dropdown($card, subtitle);
+}
+
+function kpi_content($card) {
+	const $content = $card.find(".widget-content").first();
+	return $content.length ? $content : $card.find(".widget-body").first();
+}
+
+function ensure_kpi_value_row($card) {
+	const $content = kpi_content($card);
+	const $number = $content.find(".number").first();
+	if (!$number.length) return $();
+
+	if ($number.parent().hasClass("sp-kpi__hero")) {
+		return $number.closest(".sp-kpi__value-row");
+	}
+
+	const $row = $('<div class="sp-kpi__value-row"></div>');
+	const $hero = $('<div class="sp-kpi__hero"></div>');
+	$number.before($row);
+	$hero.append($number);
+	$hero.append('<span class="sp-kpi__of" hidden></span>');
+	$row.append($hero);
+	$row.append('<span class="sp-kpi__pill" hidden></span>');
+	return $row;
+}
+
+function sync_kpi_value_meta($card) {
+	const $row = ensure_kpi_value_row($card);
+	if (!$row.length) return;
+
+	const $of = $row.find(".sp-kpi__of");
+	if (kpi_is_percent_card($card)) {
+		$of.text(__("of 100%")).prop("hidden", false);
 	} else {
-		$label.prepend(html);
+		$of.text("").prop("hidden", true);
+	}
+
+	const trend = kpi_trend_payload($card);
+	const $pill = $row.find(".sp-kpi__pill");
+	$pill.removeClass("is-up is-down");
+	if (trend.label) {
+		$pill.text(trend.label).prop("hidden", false);
+		if (trend.tone) $pill.addClass(trend.tone);
+	} else {
+		$pill.text("").prop("hidden", true);
 	}
 }
 
-function kpi_trend_class(text) {
-	const raw = String(text || "").toLowerCase();
-	if (/\bgreen-stat\b|↑|\bincrease|\+\s*\d/.test(raw)) return "is-up";
-	if (/\bred-stat\b|↓|\bdecrease|−|–/.test(raw)) return "is-down";
-	return "";
+function render_kpi_track($card) {
+	const $content = kpi_content($card);
+	if (!$content.length) return;
+
+	const series = series_for_card($card, kpi_card_name($card));
+	const ratio = kpi_progress_ratio($card, series);
+	const fingerprint = ratio.toFixed(3);
+	if ($card.data("sp-kpi-ratio") === fingerprint && $content.children(".sp-kpi__track").length) {
+		return;
+	}
+	$card.data("sp-kpi-ratio", fingerprint);
+
+	const html = kpi_segments_html(ratio);
+	const $existing = $content.children(".sp-kpi__track");
+	if ($existing.length) {
+		$existing.replaceWith(html);
+	} else {
+		const $row = $content.children(".sp-kpi__value-row");
+		if ($row.length) $row.after(html);
+		else $content.append(html);
+	}
 }
 
 function sync_kpi_footer($card) {
 	let $footer = $card.children(".sp-kpi__footer");
+	if ($footer.find(".sp-kpi__more").length) {
+		$footer.remove();
+		$footer = $();
+	}
 	if (!$footer.length) {
 		$footer = $(`
 			<div class="sp-kpi__footer">
-				<button type="button" class="sp-kpi__more">${escape_html(__("View more"))}</button>
-				<div class="sp-kpi__trend"></div>
+				<span class="sp-kpi__foot-item">
+					<span class="sp-kpi__foot-icon">${ICONS.file}</span>
+					<span class="sp-kpi__foot-label">${escape_html(__("Total"))}</span>
+					<span class="sp-kpi__foot-sep">:</span>
+					<b class="sp-kpi__foot-value sp-kpi__foot-total"></b>
+				</span>
+				<span class="sp-kpi__foot-item sp-kpi__foot-change">
+					<span class="sp-kpi__foot-icon">${ICONS.chart}</span>
+					<span class="sp-kpi__foot-label">${escape_html(__("Change"))}</span>
+					<span class="sp-kpi__foot-sep">:</span>
+					<b class="sp-kpi__foot-value sp-kpi__foot-delta"></b>
+				</span>
 			</div>
 		`);
-		$footer.find(".sp-kpi__more").on("click", (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			kpi_open_card($card);
-		});
 		$card.append($footer);
 	}
 
-	const $trend = $footer.find(".sp-kpi__trend");
-	const $source = $card
-		.find(
-			".widget-content .card-stats, .widget-content .percentage-stat-area, .widget-body > .card-stats, .widget-body > .percentage-stat-area",
-		)
-		.first();
-	let text = "";
-	if ($source.length) {
-		text = $source.text().replace(/\s+/g, " ").trim();
+	const value = $card.find(".number").first().text().replace(/\s+/g, " ").trim() || "0";
+	$footer.find(".sp-kpi__foot-total").text(value);
+
+	const trend = kpi_trend_payload($card);
+	const $change = $footer.find(".sp-kpi__foot-change");
+	$change.removeClass("is-up is-down");
+	if (trend.label) {
+		$change.find(".sp-kpi__foot-delta").text(trend.label);
+		if (trend.tone) $change.addClass(trend.tone);
+		$change.show();
+	} else {
+		$change.hide();
 	}
-	$trend.text(text || "");
-	$trend.removeClass("is-up is-down");
-	const class_hint = [$source.attr("class"), $source.find(".green-stat, .red-stat, .grey-stat").attr("class")]
-		.filter(Boolean)
-		.join(" ");
-	const tone = kpi_trend_class(`${class_hint} ${text}`);
-	if (tone) $trend.addClass(tone);
-	$trend.toggle(Boolean(text));
 }
 
-function ensure_kpi_chrome($card, index) {
-	const accent = KPI_ACCENTS[index % KPI_ACCENTS.length];
-	$card.data("sp-kpi-accent", accent);
-	$card
-		.addClass("sp-kpi")
-		.toggleClass("sp-kpi--dark", index % 3 === 0)
-		.css({
-			"--sp-kpi-accent": accent.accent,
-			"--sp-kpi-accent-soft": accent.soft,
-		});
+function sync_kpi_chrome($card) {
+	$card.children(".sp-kpi__arrow").remove();
+	$card.find(".sp-kpi__viz").remove();
+	$card.removeClass("sp-kpi--dark");
+	apply_kpi_value_format($card);
+	sync_kpi_copy($card);
+	sync_kpi_value_meta($card);
+	render_kpi_track($card);
+	sync_kpi_footer($card);
+}
 
-	if (!$card.children(".sp-kpi__arrow").length) {
-		const $arrow = $(
-			`<button type="button" class="sp-kpi__arrow" aria-label="${escape_html(__("Open"))}">${ICONS.arrowUpRight}</button>`,
+function ensure_kpi_chrome($card) {
+	$card.addClass("sp-kpi");
+
+	const $head = $card.find(".widget-head").first();
+	if ($head.length && !$head.children(".sp-kpi__report").length) {
+		const $btn = $(
+			`<button type="button" class="sp-kpi__report">${escape_html(__("View more"))}</button>`,
 		);
-		$arrow.on("click", (e) => {
+		$btn.on("click", (e) => {
 			e.preventDefault();
 			e.stopPropagation();
 			kpi_open_card($card);
 		});
-		$card.prepend($arrow);
+		$head.append($btn);
 	}
 
-	render_kpi_viz($card);
-	sync_kpi_footer($card);
-	apply_kpi_value_format($card);
+	sync_kpi_chrome($card);
 }
 
 function theme_number_cards($root) {
@@ -2589,17 +3401,16 @@ function theme_number_cards($root) {
 	});
 
 	const names = [];
-	$cards.each(function (index) {
+	$cards.each(function () {
 		const $card = $(this);
 		const name = kpi_card_name($card);
 		if (name) names.push(name);
 		if ($card.data("sp-themed")) {
-			sync_kpi_footer($card);
-			apply_kpi_value_format($card);
+			sync_kpi_chrome($card);
 			return;
 		}
 		$card.data("sp-themed", 1);
-		ensure_kpi_chrome($card, index);
+		ensure_kpi_chrome($card);
 	});
 
 	const unique = [...new Set(names)];
@@ -2608,14 +3419,14 @@ function theme_number_cards($root) {
 	request_kpi_sparklines(unique).then(() => {
 		$cards.each(function () {
 			const $card = $(this);
+			if ($card.data("sp-kpi-period-user")) return;
 			const name = kpi_card_name($card);
 			const payload = name ? kpi_sparkline_cache[name] : null;
 			if (!payload || !payload.values || !payload.values.length) return;
 			const fingerprint = `${payload.kind}:${payload.values.join(",")}`;
 			if ($card.data("sp-spark") === fingerprint) return;
 			$card.data("sp-spark", fingerprint);
-			render_kpi_viz($card);
-			apply_kpi_value_format($card);
+			sync_kpi_chrome($card);
 		});
 	});
 
@@ -2625,30 +3436,46 @@ function theme_number_cards($root) {
 }
 
 function clean_number_cards($root) {
-	$root.find(".sp-kpi__arrow, .sp-kpi__viz, .sp-kpi__footer").remove();
+	$root.find(".sp-kpi__value-row").each(function () {
+		const $number = $(this).find(".number").first();
+		if ($number.length) $(this).replaceWith($number);
+	});
+	$root.find(".sp-kpi__arrow, .sp-kpi__viz, .sp-kpi__footer, .sp-kpi__report, .sp-kpi__sub, .sp-kpi__info, .sp-kpi__track").remove();
+	$(".sp-kpi__period-menu").remove();
+	close_kpi_period_menus();
 	$root.find(kpi_card_selector()).each(function () {
 		$(this)
 			.removeData("sp-themed")
-			.removeData("sp-kpi-accent")
-			.removeClass("sp-kpi sp-kpi--dark")
-			.css({ "--sp-kpi-accent": "", "--sp-kpi-accent-soft": "" });
+			.removeData("sp-kpi-title")
+			.removeData("sp-spark")
+			.removeData("sp-kpi-ratio")
+			.removeData("sp-kpi-period")
+			.removeData("sp-kpi-period-user")
+			.removeData("sp-kpi-period-menu")
+			.removeClass("sp-kpi sp-kpi--dark is-period-loading");
 	});
 }
 
 function enhance_empty_charts($root) {
 	$root.find(".chart-widget, .dashboard-graph .widget, .widget-chart-box").each(function () {
 		const $widget = $(this).closest(".widget");
-		if (!$widget.length || $widget.data("sp-empty")) return;
+		if (!$widget.length) return;
+		if ($widget.hasClass("number-widget-box") || $widget.hasClass("sp-kpi")) return;
 
-		const body_text = $widget.find(".widget-body, .chart-container, .widget-chart-box").text();
-		const is_empty = /no data/i.test(body_text);
-		if (!is_empty) return;
+		if (chart_has_plotted_data($widget) || !widget_chart_is_empty($widget)) {
+			clear_empty_chart_overlay($widget);
+			return;
+		}
+
+		if ($widget.data("sp-empty") && $widget.find(".sp-empty-chart").length) return;
 
 		$widget.data("sp-empty", 1);
 		const cfg = dashboard_config();
 		const $body = $widget.find(".widget-body").first();
 		if (!$body.length) return;
-		$body.find(".chart-container, .widget-chart-box, .flex.justify-center").hide();
+		freeze_charts_in($widget);
+		$body.find(".chart-container, .widget-chart-box, .flex.justify-center").addClass("sp-chart-replaced");
+		$body.find(".sp-empty-chart").remove();
 		$body.append(`
 			<div class="sp-empty-chart">
 				${empty_state_card({
@@ -2926,21 +3753,44 @@ function install_dashboard_menu_filter() {
 	strip_hidden_dashboard_menu_items();
 }
 
+function hide_frappe_dashboard_chrome($root) {
+	if (!$root?.length) return;
+
+	$root.find(".page-head").addClass("hidden hide").hide();
+	$root.find(".widget-subtitle, .page-breadcrumbs, .breadcrumb").hide();
+	remove_chart_filter_buttons($root);
+
+	const page = frappe.dashboard?.page || frappe.container?.page;
+	const label = dashboard_menu_label(dashboard_name()) || dashboard_config().kicker;
+	if (page && typeof page.set_title === "function" && label) {
+		page.set_title(label);
+	}
+	if (page && typeof page.hide_menu === "function") {
+		page.hide_menu();
+	}
+}
+
 function enhance() {
 	inject_dash_css();
 	patch_list_view_meta();
 	document.body.classList.add("staff-pro-alive");
 	install_dashboard_menu_filter();
-	const route = frappe.get_route?.() || [];
 	const $root = page_root();
 
-	if ($root.length && (route[0] === "dashboard-view" || route[0] === "dashboard")) {
+	if (!is_dashboard_view_route()) {
+		close_kpi_period_menus();
+		$(".sp-kpi__period-menu").remove();
+	}
+
+	if ($root.length && is_dashboard_view_route()) {
+		hide_frappe_dashboard_chrome($root);
 		$root.find(".sp-dash-celebrations:not(.sp-dash-panel)").remove();
 		inject_quick_actions($root);
 		inject_celebrations($root);
 		reorder_hr_dashboard_layout($root);
 		filter_hr_charts($root);
 		format_pie_legend_percentages($root);
+		theme_charts($root);
 		inject_hours_board($root);
 		upgrade_native_selects($root);
 		$root.find(".sp-dash-start").remove();
@@ -2950,10 +3800,13 @@ function enhance() {
 	}
 
 	theme_number_cards($(document.body));
+	remove_chart_filter_buttons($(document.body));
+	theme_charts($(document.body));
 	enhance_page_empty();
 }
 
 function watch() {
+	patch_frappe_chart();
 	enhance();
 	const root = document.getElementById("body") || document.body;
 	if (!root || root._staff_pro_dash_watch) return;

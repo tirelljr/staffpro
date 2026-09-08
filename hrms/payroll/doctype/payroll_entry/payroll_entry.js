@@ -157,6 +157,7 @@ frappe.ui.form.on("Payroll Entry", {
 			frm.events.add_context_buttons(frm);
 		}
 
+		hide_payroll_entry_menu(frm);
 		setup_payroll_excel_views(frm);
 
 		if (frm.doc.status == "Failed" && frm.doc.error_message) {
@@ -622,44 +623,143 @@ const PAYROLL_EXCEL_MONEY_FIELDS = [
 	"net_pay",
 ];
 
+function inject_payroll_excel_styles() {
+	let style = document.getElementById("staff-pro-payroll-excel-styles");
+	if (!style) {
+		style = document.createElement("style");
+		style.id = "staff-pro-payroll-excel-styles";
+		document.head.appendChild(style);
+	}
+	style.textContent = `
+		body.payroll-excel-fs-open {
+			overflow: hidden;
+		}
+		.payroll-excel-wrap .dt-cell__content--header {
+			white-space: nowrap;
+		}
+		.payroll-excel-wrap .dt-freeze {
+			display: none !important;
+		}
+		.payroll-excel-wrap:not(.is-fullscreen) .dt-scrollable {
+			max-height: 480px;
+			overflow: auto !important;
+		}
+		.payroll-excel-wrap.is-fullscreen {
+			position: fixed;
+			inset: 0;
+			z-index: 1050;
+			box-sizing: border-box;
+			background: var(--bg-color, #f5f7fa);
+			padding: 16px 20px;
+			display: flex;
+			flex-direction: column;
+			overflow: hidden;
+		}
+		.payroll-excel-wrap.is-fullscreen > :first-child {
+			flex: 0 0 auto;
+		}
+		.payroll-excel-wrap.is-fullscreen .payroll-excel-grid {
+			flex: 1 1 auto;
+			min-height: 0;
+			min-width: 0;
+			width: 100%;
+			overflow: auto;
+			background: var(--fg-color, #fff);
+		}
+		.payroll-excel-wrap.is-fullscreen .datatable {
+			position: relative;
+			width: max-content;
+			min-width: 100%;
+			min-height: 100%;
+			background: var(--fg-color, #fff);
+		}
+		.payroll-excel-wrap.is-fullscreen .dt-header,
+		.payroll-excel-wrap.is-fullscreen .dt-footer {
+			overflow: visible;
+			transform: none !important;
+			width: max-content;
+			min-width: 100%;
+			background: transparent;
+		}
+		.payroll-excel-wrap.is-fullscreen .dt-scrollable {
+			width: max-content !important;
+			min-width: 100%;
+			height: auto !important;
+			max-height: none !important;
+			overflow: visible !important;
+			background: var(--fg-color, #fff);
+		}
+	`;
+}
+
+function payroll_excel_header_width(label) {
+	const text = String(label || "");
+	const canvas = payroll_excel_header_width._canvas || (payroll_excel_header_width._canvas = document.createElement("canvas"));
+	const ctx = canvas.getContext("2d");
+	ctx.font = "600 12px Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+	return Math.ceil(ctx.measureText(text).width);
+}
+
+function payroll_excel_column_width(col) {
+	const id = col.id;
+	const labelWidth = payroll_excel_header_width(col.name) + 48;
+	const valueMin = {
+		agent_name: 180,
+		pay_period: 210,
+		regular_hours: 128,
+		overtime_hours: 140,
+		holiday_pay: 120,
+		hourly_rate: 120,
+		bonus: 90,
+		gross_pay: 110,
+		income_tax_wh: 140,
+		wage_band: 110,
+		weekly_insurable_earnings: 220,
+		employee_social_security: 210,
+		employer_social_security: 210,
+		pay_period_ee_social: 180,
+		pay_period_er_social: 180,
+		net_pay: 110,
+	};
+	return Math.max(valueMin[id] || 120, labelWidth);
+}
+
+function hide_payroll_entry_menu(frm) {
+	const page = frm?.page;
+	if (!page) return;
+	if (typeof page.hide_menu === "function") {
+		page.hide_menu();
+	}
+	page.menu_btn_group?.addClass("hidden hide").hide();
+	page.wrapper?.find(".menu-btn-group, .menu-more-button").addClass("hidden hide").hide();
+}
+
 function setup_payroll_excel_views(frm) {
-	render_agents_view_toggle(frm);
-	set_agents_view_mode(frm, frm._payroll_excel_view || "table");
-	if (frm._payroll_excel_view === "excel") load_payroll_excel_grid(frm);
+	frm._payroll_excel_view = "excel";
+	const $wrapper = frm.get_field("payroll_excel_html")?.$wrapper;
+	$wrapper?.show();
+	$wrapper?.find(".control-label, .grid-heading-level").hide();
+	place_payroll_excel_under_overview(frm);
+	load_payroll_excel_grid(frm);
 }
 
-function render_agents_view_toggle(frm) {
-	const grid_wrapper = frm.get_field("employees")?.grid?.wrapper;
-	if (!grid_wrapper?.length || grid_wrapper.find(".payroll-view-toggle").length) return;
+function place_payroll_excel_under_overview(frm) {
+	const $excel = frm.get_field("payroll_excel_html")?.$wrapper;
+	const $overview = frm.fields_dict.status?.$wrapper?.closest(".form-section");
+	if (!$excel?.length || !$overview?.length) return;
+	if ($overview.next().find("[data-fieldname='payroll_excel_html']").length) return;
 
-	const $toggle = $(`
-		<div class="payroll-view-toggle" style="margin-bottom: 12px;">
-			<div class="btn-group">
-				<button type="button" class="btn btn-xs btn-default payroll-view-table">${__("Table")}</button>
-				<button type="button" class="btn btn-xs btn-default payroll-view-excel">${__("Excel")}</button>
-			</div>
-		</div>
-	`);
-	grid_wrapper.prepend($toggle);
-	$toggle.find(".payroll-view-table").on("click", () => set_agents_view_mode(frm, "table"));
-	$toggle.find(".payroll-view-excel").on("click", () => {
-		set_agents_view_mode(frm, "excel");
-		load_payroll_excel_grid(frm);
-	});
-}
+	const $section = $excel.closest(".form-section");
+	const onlyExcelInSection =
+		$section?.length &&
+		$section[0] !== $overview[0] &&
+		$section.find(".frappe-control[data-fieldname]").length <= 1;
 
-function set_agents_view_mode(frm, mode) {
-	frm._payroll_excel_view = mode;
-	const grid_wrapper = frm.get_field("employees")?.grid?.wrapper;
-	if (!grid_wrapper?.length) return;
-
-	grid_wrapper.find(".payroll-view-table").toggleClass("btn-primary", mode === "table");
-	grid_wrapper.find(".payroll-view-excel").toggleClass("btn-primary", mode === "excel");
-	// Grid markup differs across Frappe versions, so cover both container variants.
-	grid_wrapper
-		.find(".form-grid-container, .form-grid, .grid-empty, .grid-footer")
-		.toggle(mode === "table");
-	frm.get_field("payroll_excel_html")?.$wrapper.toggle(mode === "excel");
+	if (onlyExcelInSection) {
+		$section.insertAfter($overview);
+		return;
+	}
+	$excel.insertAfter($overview);
 }
 
 function load_payroll_excel_grid(frm) {
@@ -688,6 +788,11 @@ function mount_payroll_spreadsheet(frm, payload) {
 	const $wrapper = frm.get_field("payroll_excel_html")?.$wrapper;
 	if (!$wrapper?.length) return;
 
+	inject_payroll_excel_styles();
+	$("body > .payroll-excel-wrap").remove();
+	$(document.body).removeClass("payroll-excel-fs-open");
+	frm._payroll_excel_payload = payload;
+
 	const period = payload.meta?.pay_period || "";
 	const currency = payload.meta?.currency;
 	$wrapper.empty().append(
@@ -710,6 +815,8 @@ function mount_payroll_spreadsheet(frm, payload) {
 						</div>
 					</div>
 					<button type="button" class="btn btn-xs btn-default payroll-excel-copy">${__("Copy")}</button>
+					<button type="button" class="btn btn-xs btn-primary payroll-excel-bank">${__("Bank Payroll")}</button>
+					<button type="button" class="btn btn-xs btn-default payroll-excel-fullscreen">${__("Full Screen")}</button>
 				</div>
 			</div>
 			<div class="payroll-excel-grid"></div>
@@ -718,6 +825,8 @@ function mount_payroll_spreadsheet(frm, payload) {
 	);
 	$wrapper.find(".text-muted").text([period, currency].filter(Boolean).join(" · "));
 	$wrapper.find(".payroll-excel-copy").on("click", () => copy_payroll_excel(payload));
+	$wrapper.find(".payroll-excel-bank").on("click", () => download_bank_payroll(frm));
+	$wrapper.find(".payroll-excel-fullscreen").on("click", () => toggle_payroll_excel_fullscreen(frm));
 	bind_payroll_excel_export($wrapper.find(".payroll-excel-export"), frm);
 
 	const container = $wrapper.find(".payroll-excel-grid").get(0);
@@ -726,25 +835,111 @@ function mount_payroll_spreadsheet(frm, payload) {
 		return;
 	}
 
+	const row_data = payload.rows || [];
 	const columns = (payload.columns || []).map((col) => ({
 		id: col.id,
 		name: col.name,
-		editable: false,
+		editable: !!col.editable,
 		align: col.align || "left",
-		width: ["last_name", "first_name", "pay_period"].includes(col.id) ? 160 : 140,
+		width: payroll_excel_column_width(col),
+		resizable: true,
 		format: (value) => format_payroll_excel_cell(col.id, value, payload.meta),
 	}));
 
-	new frappe.DataTable(container, {
+	frm._payroll_excel_datatable = new frappe.DataTable(container, {
 		columns,
-		data: (payload.rows || []).map((row) => columns.map((col) => row[col.id] ?? "")),
+		data: row_data.map((row) => columns.map((col) => row[col.id] ?? "")),
 		layout: "fixed",
 		serialNoColumn: false,
 		checkboxColumn: false,
-		inlineFilters: true,
+		inlineFilters: false,
 		disableReorderColumn: true,
 		cellHeight: 32,
 		noDataMessage: __("No payroll rows yet. Create salary slips to populate this view."),
+		getEditor: (colIndex, rowIndex, value, parent, column) =>
+			payroll_excel_cell_editor(frm, payload, row_data, column, rowIndex, value, parent),
+	});
+	if ($wrapper.find(".payroll-excel-wrap").hasClass("is-fullscreen")) {
+		size_payroll_excel_fullscreen(frm);
+	}
+}
+
+function get_payroll_excel_wrap(frm) {
+	const $on_body = $("body > .payroll-excel-wrap");
+	if ($on_body.length) return $on_body;
+	return frm.get_field("payroll_excel_html")?.$wrapper?.find(".payroll-excel-wrap") || $();
+}
+
+function toggle_payroll_excel_fullscreen(frm, force) {
+	const $wrap = get_payroll_excel_wrap(frm);
+	if (!$wrap?.length) return;
+	const fullscreen = force == null ? !$wrap.hasClass("is-fullscreen") : !!force;
+	if (fullscreen) {
+		if (!$wrap.data("payroll-excel-home")) {
+			$wrap.data("payroll-excel-home", $wrap.parent()[0]);
+		}
+		$wrap.appendTo(document.body);
+		$(document)
+			.off("keydown.payroll-excel-fs")
+			.on("keydown.payroll-excel-fs", (event) => {
+				if (event.key === "Escape") {
+					event.preventDefault();
+					event.stopPropagation();
+					toggle_payroll_excel_fullscreen(frm, false);
+				}
+			});
+	} else {
+		const home = $wrap.data("payroll-excel-home");
+		if (home) {
+			$wrap.appendTo(home);
+		}
+		$(document).off("keydown.payroll-excel-fs");
+	}
+	$wrap.toggleClass("is-fullscreen", fullscreen);
+	$(document.body).toggleClass("payroll-excel-fs-open", fullscreen);
+	$wrap.find(".payroll-excel-fullscreen").text(fullscreen ? __("Exit Full Screen") : __("Full Screen"));
+	size_payroll_excel_fullscreen(frm);
+}
+
+function refresh_payroll_excel_dimensions(frm) {
+	const dt = frm._payroll_excel_datatable;
+	if (!dt) return;
+	dt.unfreeze?.();
+	if (typeof dt.setDimensions === "function") {
+		dt.setDimensions();
+	} else {
+		dt.style?.setDimensions?.();
+		dt.datatable?.setDimensions?.();
+	}
+}
+
+function size_payroll_excel_fullscreen(frm) {
+	const $wrap = get_payroll_excel_wrap(frm);
+	if (!$wrap?.length) return;
+
+	const $grid = $wrap.find(".payroll-excel-grid");
+	const $scrollable = $wrap.find(".dt-scrollable");
+	const $header = $wrap.find(".dt-header, .dt-footer");
+	const dt = frm._payroll_excel_datatable;
+
+	$(window).off("resize.payroll-excel-fs");
+	if ($wrap.hasClass("is-fullscreen")) {
+		$header.css("transform", "none");
+		$scrollable.css({ width: "", height: "", maxHeight: "none", overflow: "visible" });
+		$(window).on("resize.payroll-excel-fs", () => size_payroll_excel_fullscreen(frm));
+	} else {
+		$grid.css({ height: "", width: "" });
+		$scrollable.css({ height: "", maxHeight: "", width: "", overflow: "" });
+		$header.css("transform", "");
+	}
+
+	requestAnimationFrame(() => {
+		refresh_payroll_excel_dimensions(frm);
+		if ($wrap.hasClass("is-fullscreen")) {
+			$header.css("transform", "none");
+			$scrollable.css({ width: "", height: "", maxHeight: "none", overflow: "visible" });
+			dt?.unfreeze?.();
+		}
 	});
 }
 
@@ -758,6 +953,47 @@ function format_payroll_excel_cell(field, value, meta) {
 		return format_number(value, null, 2);
 	}
 	return frappe.utils.escape_html(String(value));
+}
+
+function payroll_excel_cell_editor(frm, payload, row_data, column, rowIndex, value, parent) {
+	if (!column?.editable) return false;
+
+	const $input = $('<input class="dt-input" type="text">').appendTo(parent);
+	return {
+		initValue(initial) {
+			$input.val(initial ?? value ?? "").focus().select();
+		},
+		getValue() {
+			return $input.val();
+		},
+		setValue(nextValue) {
+			const row = row_data[rowIndex];
+			if (!row?.employee || nextValue === value) return;
+
+			return frappe
+				.call({
+					method: "hrms.payroll.doctype.payroll_entry.payroll_entry.save_payroll_excel_cell",
+					args: {
+						name: frm.doc.name,
+						employee: row.employee,
+						field: column.id,
+						value: nextValue,
+					},
+					freeze: true,
+					freeze_message: __("Saving..."),
+				})
+				.then((r) => {
+					const updated = r.message || payload;
+					const $wrap = frm.get_field("payroll_excel_html")?.$wrapper;
+					const wasFullscreen = $wrap?.find(".payroll-excel-wrap").hasClass("is-fullscreen");
+					frm._payroll_excel_payload = updated;
+					mount_payroll_spreadsheet(frm, updated);
+					if (wasFullscreen) {
+						toggle_payroll_excel_fullscreen(frm, true);
+					}
+				});
+		},
+	};
 }
 
 function render_payroll_excel_fallback_table(payload) {
@@ -818,6 +1054,16 @@ function bind_payroll_excel_export($wrap, frm) {
 			if (!$wrap.hasClass("is-open")) return;
 			if (!$.contains($wrap.get(0), event.target)) close();
 		});
+}
+
+function download_bank_payroll(frm) {
+	if (!frm?.doc?.name || frm.is_new()) {
+		frappe.msgprint(__("Save this payroll entry before downloading bank payroll."));
+		return;
+	}
+	open_url_post("/api/method/hrms.payroll.doctype.payroll_entry.payroll_entry.download_bank_payroll", {
+		name: frm.doc.name,
+	});
 }
 
 function export_payroll_excel(frm, format) {

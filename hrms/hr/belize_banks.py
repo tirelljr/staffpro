@@ -11,12 +11,33 @@ from hrms.hr.bpo_employee_labels import BELIZE_EMPLOYEE_BANKS
 
 BELIZE_BANKS = BELIZE_EMPLOYEE_BANKS
 
+BELIZE_BANK_CODES = {
+	"Heritage Bank": "HBL",
+	"Belize Bank": "BBL",
+	"Atlantic Bank": "ABL",
+	"National Bank of Belize": "NBB",
+}
+
 COMPANY_BANK_ACCOUNT_NOS = {
 	"Heritage Bank": "1001002847",
 	"Belize Bank": "2002003948",
 	"Atlantic Bank": "3003004859",
 	"National Bank of Belize": "4004005760",
 }
+
+
+def bank_code_for(bank_name: str | None) -> str:
+	"""Three-letter remittance code used on the bank payroll sheet."""
+	if not bank_name:
+		return ""
+	if bank_name in BELIZE_BANK_CODES:
+		return BELIZE_BANK_CODES[bank_name]
+	words = [part for part in str(bank_name).split() if part]
+	if not words:
+		return ""
+	if len(words) == 1:
+		return words[0][:3].upper()
+	return "".join(word[0] for word in words)[:3].upper()
 
 
 def bank_label_for_account(bank_account: str | None) -> str:
@@ -111,6 +132,8 @@ def _ensure_company_bank_accounts(company: str) -> list[dict]:
 		if name:
 			_stamp_company_account_no(name, bank_name)
 			created.append({"name": name, "bank": bank_name, "account": gl_account})
+	if created:
+		_set_company_default_bank(company, created[0]["account"])
 	return created
 
 
@@ -279,8 +302,17 @@ def _get_or_create_company_bank_account(company: str, bank_name: str, gl_account
 		"account": gl_account,
 	}
 	meta = frappe.get_meta("Bank Account")
-	if meta.has_field("account_type"):
-		doc["account_type"] = "Bank"
+	account_type_field = meta.get_field("account_type")
+	if account_type_field:
+		account_type = "Bank"
+		if account_type_field.fieldtype == "Link":
+			account_type = (
+				account_type
+				if frappe.db.exists(account_type_field.options, account_type)
+				else None
+			)
+		if account_type:
+			doc["account_type"] = account_type
 	account_no = COMPANY_BANK_ACCOUNT_NOS.get(bank_name)
 	if meta.has_field("bank_account_no") and account_no:
 		doc["bank_account_no"] = account_no
@@ -322,13 +354,84 @@ def _stamp_company_account_no(name: str, bank_name: str):
 	frappe.db.set_value("Bank Account", name, "bank_account_no", account_no, update_modified=False)
 
 
+def ensure_company_default_bank_account(company: str | None = None) -> str | None:
+	"""Return a Bank GL for payroll, creating the Belize chart defaults if needed."""
+	if not company:
+		return None
+	ensure_belize_company_bank_accounts(company)
+	return _company_bank_gl(company)
+
+
 def _company_bank_gl(company: str) -> str | None:
 	gl = frappe.db.get_value("Company", company, "default_bank_account")
-	if gl:
+	if gl and frappe.db.exists("Account", gl):
 		return gl
-	return frappe.db.get_value(
+	existing = frappe.db.get_value(
 		"Account",
 		{"company": company, "account_type": "Bank", "is_group": 0, "disabled": 0},
 		"name",
 		order_by="creation",
 	)
+	if existing:
+		_set_company_default_bank(company, existing)
+		return existing
+	created = _create_default_bank_gl(company)
+	if created:
+		_set_company_default_bank(company, created)
+	return created
+
+
+def _create_default_bank_gl(company: str) -> str | None:
+	if not frappe.db.exists("DocType", "Account"):
+		return None
+	parent = frappe.db.get_value(
+		"Account",
+		{"company": company, "is_group": 1, "account_type": "Bank"},
+		"name",
+	) or frappe.db.get_value(
+		"Account",
+		{"company": company, "is_group": 1, "root_type": "Asset"},
+		"name",
+	)
+	if not parent:
+		return None
+
+	account_name = BELIZE_BANKS[0] if BELIZE_BANKS else "Bank Account"
+	existing = frappe.db.get_value(
+		"Account",
+		{"account_name": account_name, "company": company, "is_group": 0},
+		"name",
+	)
+	if existing:
+		return existing
+
+	try:
+		return (
+			frappe.get_doc(
+				{
+					"doctype": "Account",
+					"account_name": account_name,
+					"parent_account": parent,
+					"company": company,
+					"account_type": "Bank",
+					"is_group": 0,
+				}
+			)
+			.insert(ignore_permissions=True)
+			.name
+		)
+	except Exception:
+		frappe.log_error(title=f"Could not create default bank GL for {company}")
+		return frappe.db.get_value(
+			"Account",
+			{"account_name": account_name, "company": company, "is_group": 0},
+			"name",
+		)
+
+
+def _set_company_default_bank(company: str, gl: str | None):
+	if not company or not gl:
+		return
+	if frappe.db.get_value("Company", company, "default_bank_account"):
+		return
+	frappe.db.set_value("Company", company, "default_bank_account", gl, update_modified=False)

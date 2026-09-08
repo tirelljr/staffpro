@@ -85,7 +85,7 @@ bench set-redis-socketio-host redis://redis:6379
 
 # Redis runs in a separate container; keep `watch` so frontend edits reload
 sed -i '/redis/d' ./Procfile
-sed -i 's/bench serve --port 8000/bench serve --host 0.0.0.0 --port 8000/' ./Procfile
+sed -i 's/bench serve[[:space:]]*/bench serve --host 0.0.0.0 /' ./Procfile
 
 bench get-app erpnext
 

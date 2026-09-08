@@ -17,15 +17,37 @@
 	-webkit-font-smoothing: antialiased;
 }
 
+html,
+body {
+	min-height: 100%;
+	min-height: 100vh;
+	min-height: 100dvh;
+}
+
 /* —— Workspace dock (icon + label rail) —— */
-.workspace-dock {
+.workspace-dock,
+.dock {
+	align-self: stretch;
+	position: sticky;
+	top: 0;
+	bottom: 0;
 	flex: 0 0 var(--sp-dock-width) !important;
 	width: var(--sp-dock-width) !important;
+	height: 100% !important;
+	min-height: 100vh !important;
+	min-height: 100dvh !important;
+	max-height: none !important;
 	display: flex;
 	flex-direction: column;
 	background: #ffffff !important;
 	border-right-color: var(--sp-sidebar-border) !important;
 	padding: 8px 0 12px !important;
+}
+
+body.staff-pro-has-topbar .workspace-dock,
+body.staff-pro-has-topbar .dock {
+	min-height: calc(100vh - var(--staff-pro-topbar-height, 56px)) !important;
+	min-height: calc(100dvh - var(--staff-pro-topbar-height, 56px)) !important;
 }
 
 .workspace-dock .workspace-dock-logo {
@@ -198,15 +220,65 @@
 	margin: 8px auto;
 }
 
+/* Pin workspace submenus next to the dock. Frappe's expanded sidebar is an
+   absolute overlay over a 100vh placeholder; keeping the panel in-flow inside
+   a column flex stacked that placeholder above the menu. */
+.body-sidebar-container {
+	align-self: stretch;
+	position: sticky;
+	top: 0;
+	bottom: 0;
+	display: flex;
+	flex-direction: row;
+	flex-wrap: nowrap;
+	align-items: stretch;
+	height: 100% !important;
+	min-height: 100vh !important;
+	min-height: 100dvh !important;
+	max-height: none !important;
+	overflow: hidden;
+}
+
+body.staff-pro-has-topbar .body-sidebar-container {
+	min-height: calc(100vh - var(--staff-pro-topbar-height, 56px)) !important;
+	min-height: calc(100dvh - var(--staff-pro-topbar-height, 56px)) !important;
+}
+
+.body-sidebar-container.expanded .body-sidebar-placeholder {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+	flex: 0 0 0 !important;
+}
+
 /* —— Body sidebar (menus + submenus) —— */
 .body-sidebar {
+	position: relative;
+	top: 0;
+	bottom: 0;
+	align-self: stretch;
+	height: 100% !important;
+	min-height: 100% !important;
+	max-height: none !important;
+	overflow-x: hidden;
+	overflow-y: auto;
 	background: #ffffff;
 	border-right-color: var(--sp-sidebar-border) !important;
 }
 
+.body-sidebar-container.expanded .body-sidebar {
+	width: var(--sidebar-width, 260px);
+}
+
 .body-sidebar .sidebar-header {
-	padding: 14px 8px 10px !important;
+	display: flex;
+	align-items: center;
+	padding: 14px 36px 10px 8px !important;
 	margin-bottom: 2px;
+}
+
+.body-sidebar .sidebar-header .drop-icon {
+	display: none !important;
 }
 
 .body-sidebar .sidebar-header .header-icon,
@@ -487,18 +559,55 @@
 	font-size: 14px;
 }
 
-.body-sidebar .collapse-sidebar-link,
 .body-sidebar .promotional-banner-title {
 	font-size: 13px;
 	font-weight: 500;
 	color: var(--sp-sidebar-muted);
 }
 
-/* List pages: hide view switcher + overflow menu on every doctype */
+.body-sidebar .collapse-sidebar-link,
+.body-sidebar .collapse-sidebar-link.sidebar-toggle-btn {
+	position: absolute;
+	top: 12px;
+	right: 6px;
+	z-index: 3;
+	display: inline-flex !important;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	margin: 0;
+	padding: 0;
+	color: #000000;
+	background: transparent;
+	border: 0;
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.body-sidebar .collapse-sidebar-link svg,
+.body-sidebar .collapse-sidebar-link .icon,
+.body-sidebar .collapse-sidebar-link svg * {
+	width: 16px;
+	height: 16px;
+	color: #000000;
+	stroke: #000000 !important;
+	fill: none;
+}
+
+/* Every Desk page: hide the page-head overflow Menu button */
+.page-head .menu-btn-group,
+.page-head .menu-more-button {
+	display: none !important;
+}
+
+.frappe-menu.context-menu .dropdown-menu-item.staff-pro-hide-help {
+	display: none !important;
+}
+
+/* List pages: hide view switcher on every doctype */
 [id^="page-List/"] .view-switcher,
 [id^="page-List/"] .views-switcher,
-[id^="page-List/"] .menu-btn-group,
-[id^="page-List/"] .menu-more-button,
 [id^="page-List/"] .page-actions .custom-actions:not(:has(> :not(.view-switcher, .views-switcher))) {
 	display: none !important;
 }
@@ -625,21 +734,35 @@
 
 /* Collapsed submenu — let Frappe hide the panel instead of leaving a white strip */
 .body-sidebar-container:not(.expanded) {
+	width: 0 !important;
+	height: 0 !important;
+	min-height: 0 !important;
+	max-height: none !important;
+	overflow: visible !important;
+
 	.body-sidebar-placeholder {
 		width: 0 !important;
+		height: 0 !important;
 	}
 
 	.body-sidebar {
+		width: 0 !important;
+		height: 0 !important;
 		background: transparent !important;
 		border-right-color: transparent !important;
 		pointer-events: none;
+	}
+
+	.body-sidebar .collapse-sidebar-link {
+		pointer-events: auto !important;
 	}
 }
 
 /* Form Assign / Attachments sidebar + toggle: only Employee and User profiles */
 body.staff-pro-hide-form-sidebar {
 	.layout-side-section.right,
-	.sidebar-toggle-btn {
+	.page-head .sidebar-toggle-btn,
+	.layout-main .sidebar-toggle-btn:not(.collapse-sidebar-link) {
 		display: none !important;
 	}
 
@@ -660,17 +783,6 @@ body.staff-pro-hide-form-sidebar {
 	.timeline-actions,
 	.timeline-item.timeline-action,
 	.document-email-link-container {
-		display: none !important;
-	}
-}
-
-/* Employee, User, and payroll forms: hide overflow menu */
-[id="page-Employee"],
-[id="page-User"],
-[id="page-Salary Structure Assignment"],
-[id="page-Salary Slip"] {
-	.menu-btn-group,
-	.menu-more-button {
 		display: none !important;
 	}
 }

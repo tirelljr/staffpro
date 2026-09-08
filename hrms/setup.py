@@ -683,6 +683,36 @@ def make_fixtures():
 			"request_type_name": _("General Inquiry"),
 			"description": _("Send a general question or request to the HR team."),
 		},
+		{
+			"doctype": "Bonus Type",
+			"name": _("Performance Bonus"),
+			"bonus_type_name": _("Performance Bonus"),
+			"description": _("Awarded for meeting or exceeding performance targets."),
+		},
+		{
+			"doctype": "Bonus Type",
+			"name": _("Attendance Bonus"),
+			"bonus_type_name": _("Attendance Bonus"),
+			"description": _("Awarded for meeting attendance or punctuality goals."),
+		},
+		{
+			"doctype": "Bonus Type",
+			"name": _("Referral Bonus"),
+			"bonus_type_name": _("Referral Bonus"),
+			"description": _("Awarded for referring a hired candidate."),
+		},
+		{
+			"doctype": "Bonus Type",
+			"name": _("Holiday Bonus"),
+			"bonus_type_name": _("Holiday Bonus"),
+			"description": _("Seasonal or holiday bonus paid with regular wages."),
+		},
+		{
+			"doctype": "Bonus Type",
+			"name": _("Other"),
+			"bonus_type_name": _("Other"),
+			"description": _("Any other one-time bonus added to gross pay."),
+		},
 		# vehicle service item
 		{"doctype": "Vehicle Service Item", "service_item": "Brake Oil"},
 		{"doctype": "Vehicle Service Item", "service_item": "Brake Pad"},

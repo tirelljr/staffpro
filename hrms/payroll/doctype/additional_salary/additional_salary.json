@@ -20,6 +20,7 @@
   "payroll_date",
   "amended_from",
   "salary_details_section",
+  "bonus_type",
   "salary_component",
   "type",
   "currency",
@@ -53,14 +54,22 @@
    "search_index": 1
   },
   {
-   "default": "Bonus",
-   "fieldname": "salary_component",
+   "depends_on": "eval:!doc.ref_doctype",
+   "fieldname": "bonus_type",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
+   "label": "Bonus Type",
+   "options": "Bonus Type"
+  },
+  {
+   "default": "Bonus",
+   "depends_on": "eval:doc.ref_doctype",
+   "fieldname": "salary_component",
+   "fieldtype": "Link",
+   "hidden": 1,
    "label": "Salary Component",
    "options": "Salary Component",
-   "reqd": 1,
    "search_index": 1
   },
   {
@@ -72,9 +81,10 @@
    "reqd": 1
   },
   {
-   "default": "1",
+   "default": "0",
    "fieldname": "overwrite_salary_structure_amount",
    "fieldtype": "Check",
+   "hidden": 1,
    "label": "Overwrite Salary Structure Amount"
   },
   {
@@ -98,7 +108,7 @@
   },
   {
    "depends_on": "eval:(doc.is_recurring==0)",
-   "description": "The date on which Salary Component with Amount will contribute for Earnings/Deduction in Salary Slip. ",
+   "description": "This bonus is added to gross pay for the pay period that includes this date.",
    "fieldname": "payroll_date",
    "fieldtype": "Date",
    "in_list_view": 1,
@@ -134,6 +144,7 @@
    "fetch_from": "salary_component.type",
    "fieldname": "type",
    "fieldtype": "Data",
+   "hidden": 1,
    "label": "Salary Component Type",
    "read_only": 1
   },
@@ -194,9 +205,10 @@
   {
    "fieldname": "salary_details_section",
    "fieldtype": "Section Break",
-   "label": "Salary"
+   "label": "Bonus"
   },
   {
+   "depends_on": "eval:doc.ref_doctype",
    "fieldname": "properties_and_references_section",
    "fieldtype": "Section Break",
    "label": "References"
@@ -217,7 +229,7 @@
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-09-03 10:30:00.000000",
+ "modified": "2026-09-04 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Payroll",
  "name": "Additional Salary",

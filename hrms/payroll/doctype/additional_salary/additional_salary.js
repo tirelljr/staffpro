@@ -3,18 +3,16 @@
 
 frappe.ui.form.on("Additional Salary", {
 	setup: function (frm) {
-		frm.add_fetch(
-			"salary_component",
-			"deduct_full_tax_on_selected_payroll_date",
-			"deduct_full_tax_on_selected_payroll_date",
-		);
-
 		frm.set_query("employee", function () {
 			const filters = { status: ["!=", "Inactive"] };
 			if (frm.doc.company) {
 				filters.company = frm.doc.company;
 			}
 			return { filters };
+		});
+
+		frm.set_query("bonus_type", function () {
+			return { filters: { disabled: 0 } };
 		});
 	},
 
@@ -23,19 +21,56 @@ frappe.ui.form.on("Additional Salary", {
 			if (!frm.doc.company) {
 				frm.set_value("company", frappe.defaults.get_user_default("Company"));
 			}
-			if (!frm.doc.salary_component) {
-				frm.set_value("salary_component", "Bonus");
-			}
 			if (!frm.doc.naming_series) {
 				frm.set_value("naming_series", "HR-ADS-.YY.-.MM.-");
 			}
 		}
-		frm.trigger("set_component_query");
+		frm.trigger("toggle_bonus_fields");
 	},
 
 	refresh: function (frm) {
 		frm.set_df_property("naming_series", "hidden", 1);
 		frm.set_df_property("company", "hidden", 1);
+		frm.trigger("toggle_bonus_fields");
+		frm.trigger("relabel_bonus_form");
+		frm.trigger("hide_templates_button");
+	},
+
+	toggle_bonus_fields: function (frm) {
+		const system_entry = Boolean(frm.doc.ref_doctype);
+		frm.set_df_property("salary_component", "hidden", !system_entry);
+		frm.set_df_property("type", "hidden", 1);
+		frm.set_df_property("overwrite_salary_structure_amount", "hidden", 1);
+		frm.set_df_property("bonus_type", "hidden", system_entry);
+		frm.toggle_reqd("bonus_type", !system_entry);
+	},
+
+	relabel_bonus_form: function (frm) {
+		if (!frm.page) return;
+		if (frm.is_new()) {
+			frm.page.set_title(__("New Bonus"));
+		}
+	},
+
+	hide_templates_button: function (frm) {
+		const hide = () => {
+			frm.remove_custom_button(__("Templates"));
+			frm.page?.remove_inner_button?.(__("Templates"));
+			if (frm.page?.btn_secondary && (frm.page.btn_secondary.text() || "").trim() === __("Templates")) {
+				frm.page.clear_secondary_action();
+			}
+			const $page = frm.page?.wrapper;
+			if (!$page?.length) return;
+			$page
+				.find("button")
+				.filter(function () {
+					return ($(this).text() || "").trim() === __("Templates");
+				})
+				.hide();
+		};
+		hide();
+		setTimeout(hide, 50);
+		setTimeout(hide, 300);
 	},
 
 	employee: function (frm) {
@@ -67,20 +102,6 @@ frappe.ui.form.on("Additional Salary", {
 		});
 	},
 
-	company: function (frm) {
-		frm.trigger("set_component_query");
-	},
-
-	set_component_query: function (frm) {
-		frm.set_query("salary_component", function () {
-			return {
-				filters: {
-					disabled: 0,
-				},
-			};
-		});
-	},
-
 	get_employee_currency: function (frm) {
 		frappe.call({
 			method: "hrms.payroll.doctype.salary_structure_assignment.salary_structure_assignment.get_employee_currency",
@@ -100,29 +121,5 @@ frappe.ui.form.on("Additional Salary", {
 		if (frm.doc.exclude_from_tax) {
 			frm.set_value("deduct_full_tax_on_selected_payroll_date", 0);
 		}
-	},
-
-	salary_component: function (frm) {
-		if (!frm.doc.ref_doctype) {
-			frm.trigger("get_salary_component_amount");
-		}
-	},
-
-	get_salary_component_amount: function (frm) {
-		frappe.call({
-			method: "frappe.client.get_value",
-			args: {
-				doctype: "Salary Component",
-				fieldname: "amount",
-				filters: {
-					name: frm.doc.salary_component,
-				},
-			},
-			callback: function (data) {
-				if (data.message) {
-					frm.set_value("amount", data.message.amount);
-				}
-			},
-		});
 	},
 });

@@ -1,8 +1,9 @@
 {
  "chart_name": "Agents by Team",
  "chart_type": "Group By",
+ "color": "#7c5cfc",
  "creation": "2020-07-22 11:56:32.760730",
- "custom_options": "",
+ "custom_options": "{\n\t\"colors\": [\"#7c5cfc\", \"#3ddc97\", \"#ff6b8a\", \"#ff9f43\", \"#5b9fff\"]\n}",
  "docstatus": 0,
  "doctype": "Dashboard Chart",
  "document_type": "Employee",

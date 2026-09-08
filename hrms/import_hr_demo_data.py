@@ -136,19 +136,36 @@ CLIENT_ASSIGNMENTS = {
 
 # Paid-to bank on each demo employee (Belize banks + unique account numbers).
 DEMO_BANK_ACCOUNTS = {
-	"maria.santos@staffpro.local": {"bank": "Heritage Bank", "account_no": "1500284739"},
-	"james.rivera@staffpro.local": {"bank": "Belize Bank", "account_no": "2201847562"},
-	"ana.cruz@staffpro.local": {"bank": "Atlantic Bank", "account_no": "3109472158"},
-	"carlos.mendoza@staffpro.local": {"bank": "National Bank of Belize", "account_no": "4001839462"},
-	"sofia.reyes@staffpro.local": {"bank": "Heritage Bank", "account_no": "1501938472"},
-	"miguel.torres@staffpro.local": {"bank": "Belize Bank", "account_no": "2203948571"},
-	"elena.garcia@staffpro.local": {"bank": "Atlantic Bank", "account_no": "3102847561"},
-	"diego.lopez@staffpro.local": {"bank": "National Bank of Belize", "account_no": "4009182736"},
-	"laura.fernandez@staffpro.local": {"bank": "Heritage Bank", "account_no": "1508473629"},
-	"pedro.ramirez@staffpro.local": {"bank": "Belize Bank", "account_no": "2205748193"},
-	"isabella.morales@staffpro.local": {"bank": "Atlantic Bank", "account_no": "3106582947"},
-	"luis.herrera@staffpro.local": {"bank": "National Bank of Belize", "account_no": "4003728194"},
+	"maria.santos@staffpro.local": {"bank": "Heritage Bank", "account_no": "1500284739", "account_type": "Checking"},
+	"james.rivera@staffpro.local": {"bank": "Belize Bank", "account_no": "2201847562", "account_type": "Checking"},
+	"ana.cruz@staffpro.local": {"bank": "Atlantic Bank", "account_no": "3109472158", "account_type": "Checking"},
+	"carlos.mendoza@staffpro.local": {"bank": "National Bank of Belize", "account_no": "4001839462", "account_type": "Savings"},
+	"sofia.reyes@staffpro.local": {"bank": "Heritage Bank", "account_no": "1501938472", "account_type": "Savings"},
+	"miguel.torres@staffpro.local": {"bank": "Belize Bank", "account_no": "2203948571", "account_type": "Checking"},
+	"elena.garcia@staffpro.local": {"bank": "Atlantic Bank", "account_no": "3102847561", "account_type": "Checking"},
+	"diego.lopez@staffpro.local": {"bank": "National Bank of Belize", "account_no": "4009182736", "account_type": "Checking"},
+	"laura.fernandez@staffpro.local": {"bank": "Heritage Bank", "account_no": "1508473629", "account_type": "Savings"},
+	"pedro.ramirez@staffpro.local": {"bank": "Belize Bank", "account_no": "2205748193", "account_type": "Checking"},
+	"isabella.morales@staffpro.local": {"bank": "Atlantic Bank", "account_no": "3106582947", "account_type": "Savings"},
+	"luis.herrera@staffpro.local": {"bank": "National Bank of Belize", "account_no": "4003728194", "account_type": "Savings"},
 }
+
+
+def _ensure_demo_masters():
+	"""Create HR master records needed before demo employees can be inserted."""
+	for gender in ("Male", "Female"):
+		if not frappe.db.exists("Gender", gender):
+			frappe.get_doc({"doctype": "Gender", "gender": gender}).insert(ignore_permissions=True)
+	for employment_type in ("Full-time", "Part-time"):
+		if not frappe.db.exists("Employment Type", employment_type):
+			frappe.get_doc(
+				{"doctype": "Employment Type", "employee_type_name": employment_type}
+			).insert(ignore_permissions=True)
+	for leave_type in LEAVE_TYPES + ["Leave Without Pay"]:
+		if not frappe.db.exists("Leave Type", leave_type):
+			frappe.get_doc({"doctype": "Leave Type", "leave_type_name": leave_type}).insert(
+				ignore_permissions=True
+			)
 
 
 def run(company=None):
@@ -161,6 +178,7 @@ def run(company=None):
 	frappe.flags.in_import = True
 
 	try:
+		_ensure_demo_masters()
 		if not _has_hr_demo_data(company):
 			departments = _create_departments(company)
 			designations = _create_designations()
@@ -548,6 +566,8 @@ def _apply_employee_bank_fields(employee_map):
 			values["bank_name"] = bank["bank"]
 		if meta.has_field("bank_ac_no"):
 			values["bank_ac_no"] = bank["account_no"]
+		if meta.has_field("bank_account_type"):
+			values["bank_account_type"] = bank.get("account_type") or "Checking"
 		if not values:
 			continue
 		frappe.db.set_value("Employee", employee, values, update_modified=False)

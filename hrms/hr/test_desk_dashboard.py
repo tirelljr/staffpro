@@ -7,7 +7,14 @@ from frappe.utils import add_days, add_years, getdate
 
 from erpnext.setup.doctype.employee.test_employee import make_employee
 
-from hrms.hr.desk_dashboard import get_upcoming_absences, get_upcoming_celebrations
+from hrms.hr.desk_dashboard import (
+	_normalize_kpi_period,
+	_percent_change,
+	_period_bounds,
+	_prepare_card_period_filters,
+	get_upcoming_absences,
+	get_upcoming_celebrations,
+)
 from hrms.tests.utils import HRMSTestSuite
 
 
@@ -64,3 +71,55 @@ class TestDeskDashboardAbsences(HRMSTestSuite):
 
 		types = {row["leave_type"] for row in payload["rows"]}
 		self.assertEqual(types, {"_Test Leave Type"})
+
+
+class TestDeskDashboardKpiPeriod(HRMSTestSuite):
+	def setUp(self):
+		frappe.flags.current_date = getdate("2026-09-03")
+
+	def tearDown(self):
+		frappe.flags.current_date = None
+
+	def test_normalize_kpi_period(self):
+		self.assertEqual(_normalize_kpi_period("today"), "day")
+		self.assertEqual(_normalize_kpi_period("This Week"), "week")
+		self.assertEqual(_normalize_kpi_period("monthly"), "month")
+		self.assertEqual(_normalize_kpi_period("unknown"), "month")
+
+	def test_period_bounds(self):
+		self.assertEqual(_period_bounds("Daily", 0), (getdate("2026-09-03"), getdate("2026-09-03")))
+		self.assertEqual(_period_bounds("Weekly", 0), (getdate("2026-08-31"), getdate("2026-09-06")))
+		self.assertEqual(_period_bounds("Monthly", 0), (getdate("2026-09-01"), getdate("2026-09-30")))
+		self.assertEqual(_period_bounds("Yearly", 0), (getdate("2026-01-01"), getdate("2026-12-31")))
+		self.assertEqual(_period_bounds("Weekly", 1), (getdate("2026-08-24"), getdate("2026-08-30")))
+
+	def test_timespan_filter_is_replaced(self):
+		doc = frappe._dict(
+			document_type="Attendance",
+			filters_json='[["Attendance","status","=","Present"],["Attendance","attendance_date","Timespan","this month"]]',
+			dynamic_filters_json="[]",
+		)
+		prepared = _prepare_card_period_filters(doc, "week")
+		self.assertEqual(prepared["date_field"], "attendance_date")
+		self.assertIn(["Attendance", "status", "=", "Present"], prepared["current"])
+		self.assertIn(
+			["Attendance", "attendance_date", "between", ["2026-08-31", "2026-09-06"]],
+			prepared["current"],
+		)
+		self.assertFalse(any(row[2] == "Timespan" for row in prepared["current"]))
+
+	def test_leave_overlap_filters(self):
+		doc = frappe._dict(
+			document_type="Leave Application",
+			filters_json='[["Leave Application","status","=","Approved"]]',
+			dynamic_filters_json='[["Leave Application","from_date","<=","2026-09-03"],["Leave Application","to_date",">=","2026-09-03"]]',
+		)
+		prepared = _prepare_card_period_filters(doc, "month")
+		self.assertEqual(prepared["overlap"], ("from_date", "to_date"))
+		self.assertIn(["Leave Application", "from_date", "<=", "2026-09-30"], prepared["current"])
+		self.assertIn(["Leave Application", "to_date", ">=", "2026-09-01"], prepared["current"])
+
+	def test_percent_change(self):
+		self.assertEqual(_percent_change(12, 10), 20.0)
+		self.assertEqual(_percent_change(5, 0), 100.0)
+		self.assertEqual(_percent_change(0, 0), 0.0)

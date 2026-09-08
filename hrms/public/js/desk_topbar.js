@@ -860,9 +860,6 @@ hrms.ui.TopBar = class {
 							</div>
 							<div class="staff-pro-topbar__notifications-panel hidden" role="dialog" aria-label="${__("Notifications")}"></div>
 						</div>
-						<div class="staff-pro-topbar__icon-btn" data-action="settings" role="button" tabindex="0" title="${__("Settings")}">
-							${frappe.utils.icon("setting", "sm")}
-						</div>
 						<div class="staff-pro-topbar__lang-wrap">
 							<div class="staff-pro-topbar__icon-btn staff-pro-topbar__lang" data-action="language" role="button" tabindex="0" title="${__("Language")}" aria-haspopup="listbox" aria-expanded="false" aria-label="${__("Change language")}">
 								${frappe.utils.escape_html(lang)}
@@ -902,7 +899,6 @@ hrms.ui.TopBar = class {
 				e.stopPropagation();
 				this.toggle_notifications_panel();
 			});
-			this.$wrapper.on("click", "[data-action='settings']", () => this.open_settings());
 			this.$wrapper.on("click", "[data-action='profile']", () => this.open_profile());
 			this.$wrapper.on("click", "[data-action='language']", (e) => {
 				e.stopPropagation();
@@ -1005,8 +1001,17 @@ hrms.ui.TopBar = class {
 		}
 
 		if (route[0] === "dashboard-view" || route[0] === "dashboard") {
+			const labels = {
+				"Human Resource": "People",
+				Attendance: "Time",
+				Recruitment: "Talent",
+				Payroll: "Pay",
+				"SS and Taxes": "SS and Taxes",
+				"Data Analytics": "Analytics",
+			};
+			const name = labels[route[1]] || route[1] || __("Dashboard");
 			return {
-				id: String(route[1] || __("Dashboard")).toUpperCase(),
+				id: String(name).toUpperCase(),
 				status: __("Live"),
 			};
 		}
@@ -1722,10 +1727,6 @@ hrms.ui.TopBar = class {
 		this.$wrapper?.find(".staff-pro-topbar__notifications-panel").addClass("hidden");
 		$(".staff-pro-topbar__notifications-backdrop").addClass("hidden");
 		this.$wrapper?.find("[data-action='notifications']").removeClass("is-open").attr("aria-expanded", "false");
-	}
-
-	open_settings() {
-		frappe.set_route("Form", "User", frappe.session.user);
 	}
 
 	open_profile() {

@@ -7,17 +7,36 @@ const SIDEBAR_CSS = `
 	-webkit-font-smoothing: antialiased !important;
 }
 
+html, body {
+	min-height: 100% !important;
+	min-height: 100vh !important;
+	min-height: 100dvh !important;
+}
+
 /* Dock — Frappe v17 uses .dock; older builds used .workspace-dock */
 .workspace-dock,
 .dock {
+	align-self: stretch !important;
+	position: sticky !important;
+	top: 0 !important;
+	bottom: 0 !important;
 	flex: 0 0 72px !important;
 	width: 72px !important;
+	height: 100% !important;
+	min-height: 100vh !important;
+	min-height: 100dvh !important;
+	max-height: none !important;
 	display: flex !important;
 	flex-direction: column !important;
 	align-items: center !important;
 	background: #ffffff !important;
 	border-right: 1px solid #ececec !important;
 	padding: 10px 0 12px !important;
+}
+body.staff-pro-has-topbar .workspace-dock,
+body.staff-pro-has-topbar .dock {
+	min-height: calc(100vh - var(--staff-pro-topbar-height, 56px)) !important;
+	min-height: calc(100dvh - var(--staff-pro-topbar-height, 56px)) !important;
 }
 .workspace-dock .workspace-dock-logo,
 .dock .dock-logo {
@@ -232,15 +251,62 @@ const SIDEBAR_CSS = `
 	--sidebar-width: 260px;
 }
 
+/* Pin workspace submenus next to the dock — Frappe overlays .body-sidebar
+   (position: absolute) over a 100vh placeholder. Forcing relative put the
+   panel back in a column flex, so the placeholder stacked above it and the
+   submenu landed at the bottom of the page. */
+.body-sidebar-container {
+	align-self: stretch !important;
+	position: sticky !important;
+	top: 0 !important;
+	bottom: 0 !important;
+	display: flex !important;
+	flex-direction: row !important;
+	flex-wrap: nowrap !important;
+	align-items: stretch !important;
+	height: 100% !important;
+	min-height: 100vh !important;
+	min-height: 100dvh !important;
+	max-height: none !important;
+	overflow: hidden !important;
+}
+body.staff-pro-has-topbar .body-sidebar-container {
+	min-height: calc(100vh - var(--staff-pro-topbar-height, 56px)) !important;
+	min-height: calc(100dvh - var(--staff-pro-topbar-height, 56px)) !important;
+}
+
 /* Body sidebar */
 .body-sidebar {
+	position: relative !important;
+	top: 0 !important;
+	bottom: 0 !important;
+	align-self: stretch !important;
+	height: 100% !important;
+	min-height: 100% !important;
+	max-height: none !important;
+	overflow-x: hidden !important;
+	overflow-y: auto !important;
 	background: #ffffff !important;
 	border-right: 1px solid #ececec !important;
 	padding: 8px 8px 10px !important;
 }
+.body-sidebar-container.expanded .body-sidebar {
+	width: var(--sidebar-width, 260px) !important;
+}
+.body-sidebar-container.expanded .body-sidebar-placeholder {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+	flex: 0 0 0 !important;
+}
 .body-sidebar .sidebar-header {
-	padding: 14px 8px 10px !important;
+	display: flex !important;
+	align-items: center !important;
+	padding: 14px 36px 10px 8px !important;
 	margin: 0 0 2px !important;
+}
+.body-sidebar .sidebar-header .drop-icon {
+	display: none !important;
 }
 .body-sidebar .sidebar-header .header-icon,
 .body-sidebar .sidebar-header > img,
@@ -477,17 +543,60 @@ const SIDEBAR_CSS = `
 .body-sidebar .nested-container .standard-sidebar-item:hover .sidebar-item-icon svg * {
 	stroke: #2c2c2c !important;
 }
+.body-sidebar .collapse-sidebar-link,
+.body-sidebar .collapse-sidebar-link.sidebar-toggle-btn {
+	position: absolute !important;
+	top: 12px !important;
+	right: 6px !important;
+	z-index: 3 !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	width: 24px !important;
+	height: 24px !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	color: #000000 !important;
+	background: transparent !important;
+	border: 0 !important;
+	box-shadow: none !important;
+	cursor: pointer !important;
+}
+.body-sidebar .collapse-sidebar-link svg,
+.body-sidebar .collapse-sidebar-link .icon,
+.body-sidebar .collapse-sidebar-link svg * {
+	width: 16px !important;
+	height: 16px !important;
+	color: #000000 !important;
+	stroke: #000000 !important;
+	fill: none !important;
+}
+.body-sidebar-container:not(.expanded) {
+	width: 0 !important;
+	height: 0 !important;
+	min-height: 0 !important;
+	max-height: none !important;
+	overflow: visible !important;
+}
 .body-sidebar-container:not(.expanded) .body-sidebar-placeholder {
 	width: 0 !important;
+	height: 0 !important;
 }
 .body-sidebar-container:not(.expanded) .body-sidebar {
+	width: 0 !important;
+	height: 0 !important;
+	min-height: 0 !important;
 	background: transparent !important;
 	border-right-color: transparent !important;
 	pointer-events: none;
 }
+.body-sidebar-container:not(.expanded) .body-sidebar .collapse-sidebar-link {
+	pointer-events: auto !important;
+}
 
 body.staff-pro-hide-form-sidebar .layout-side-section.right,
-body.staff-pro-hide-form-sidebar .sidebar-toggle-btn {
+body.staff-pro-hide-form-sidebar .page-head .sidebar-toggle-btn,
+body.staff-pro-hide-form-sidebar .layout-main .sidebar-toggle-btn:not(.collapse-sidebar-link) {
 	display: none !important;
 }
 body.staff-pro-hide-form-sidebar .layout-main.layout-two-column {
@@ -504,20 +613,15 @@ body.staff-pro-hide-form-sidebar .layout-main-section-wrapper {
 .form-footer .document-email-link-container {
 	display: none !important;
 }
-[id="page-Employee"] .menu-btn-group,
-[id="page-Employee"] .menu-more-button,
-[id="page-User"] .menu-btn-group,
-[id="page-User"] .menu-more-button,
-[id="page-Salary Structure Assignment"] .menu-btn-group,
-[id="page-Salary Structure Assignment"] .menu-more-button,
-[id="page-Salary Slip"] .menu-btn-group,
-[id="page-Salary Slip"] .menu-more-button {
+.page-head .menu-btn-group,
+.page-head .menu-more-button {
+	display: none !important;
+}
+.frappe-menu.context-menu .dropdown-menu-item.staff-pro-hide-help {
 	display: none !important;
 }
 [id^="page-List/"] .view-switcher,
 [id^="page-List/"] .views-switcher,
-[id^="page-List/"] .menu-btn-group,
-[id^="page-List/"] .menu-more-button,
 [id^="page-List/"] .page-actions .custom-actions:not(:has(> :not(.view-switcher, .views-switcher))) {
 	display: none !important;
 }
@@ -961,7 +1065,31 @@ function is_hidden_sidebar_item($item) {
 	return /\/query-report\/(General Ledger|Accounts Payable)\/?$/i.test(path);
 }
 
+const SIDEBAR_COLLAPSE_ICON = `<svg class="icon icon-sm" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5" stroke="#000000" stroke-width="1.5"/><path d="M6.25 2.5v11" stroke="#000000" stroke-width="1.5"/><path d="M11.2 6.15 8.7 8l2.5 1.85" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const SIDEBAR_EXPAND_ICON = `<svg class="icon icon-sm" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5" stroke="#000000" stroke-width="1.5"/><path d="M6.25 2.5v11" stroke="#000000" stroke-width="1.5"/><path d="M8.7 6.15 11.2 8l-2.5 1.85" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+function style_sidebar_collapse_toggle() {
+	const sidebar = document.querySelector(".body-sidebar");
+	if (!sidebar) return;
+
+	const expanded = document.querySelector(".body-sidebar-container")?.classList.contains("expanded") !== false;
+	const icon = expanded ? SIDEBAR_COLLAPSE_ICON : SIDEBAR_EXPAND_ICON;
+	const state = expanded ? "expanded" : "collapsed";
+
+	sidebar.querySelectorAll(".collapse-sidebar-link").forEach((btn) => {
+		if (btn.getAttribute("data-sp-collapse") !== state || !btn.querySelector("svg")) {
+			btn.setAttribute("data-sp-collapse", state);
+			btn.innerHTML = icon;
+		}
+		if (!btn.dataset.spCollapseBound) {
+			btn.dataset.spCollapseBound = "1";
+			btn.addEventListener("click", (event) => event.stopPropagation());
+		}
+	});
+}
+
 function enhance_sidebar_menus() {
+	style_sidebar_collapse_toggle();
 	$(".body-sidebar .standard-sidebar-item").each(function () {
 		const $item = $(this);
 		if (is_hidden_sidebar_item($item)) {
@@ -1824,9 +1952,91 @@ function disable_app_onboarding() {
 	});
 }
 
+function is_help_menu_label(label) {
+	const text = String(label || "").trim();
+	if (!text) return false;
+	if (/^help$/i.test(text)) return true;
+	try {
+		return text === __("Help");
+	} catch (e) {
+		return false;
+	}
+}
+
+function is_help_menu_item(item) {
+	if (!item || item.is_divider) return false;
+	if (item.name === "help") return true;
+	return is_help_menu_label(item.label);
+}
+
+function hide_help_context_menu_items() {
+	document.querySelectorAll(".frappe-menu.context-menu .dropdown-menu-item").forEach((item) => {
+		const title = item.querySelector(".menu-item-title");
+		const text = (title?.textContent || item.querySelector("a")?.textContent || "").trim();
+		if (!is_help_menu_label(text)) return;
+		item.classList.add("staff-pro-hide-help");
+		item.remove();
+	});
+}
+
+function disable_sidebar_help() {
+	if (frappe.boot?.navbar_settings) {
+		frappe.boot.navbar_settings.help_dropdown = [];
+	}
+	if (frappe.help) {
+		frappe.help.help_links = {};
+	}
+
+	const Header = frappe.ui && frappe.ui.SidebarHeader;
+	if (Header && !Header.prototype._staff_pro_help_disabled) {
+		Header.prototype._staff_pro_help_disabled = true;
+		Header.prototype.get_help_siblings = function () {
+			return [];
+		};
+		const original_system_items = Header.prototype.system_items;
+		if (original_system_items) {
+			Header.prototype.system_items = function () {
+				return (original_system_items.call(this) || []).filter((item) => !is_help_menu_item(item));
+			};
+		}
+	}
+
+	const Menu = frappe.ui && frappe.ui.menu;
+	if (Menu && !Menu.prototype._staff_pro_help_disabled) {
+		Menu.prototype._staff_pro_help_disabled = true;
+		const original_add = Menu.prototype.add_menu_item;
+		Menu.prototype.add_menu_item = function (item) {
+			if (is_help_menu_item(item)) return;
+			return original_add.call(this, item);
+		};
+	}
+
+	if (frappe.ui?.create_menu && !frappe.ui.create_menu._staff_pro_help_disabled) {
+		const original_create = frappe.ui.create_menu;
+		frappe.ui.create_menu = function (opts) {
+			if (opts?.menu_items) {
+				opts = Object.assign({}, opts, {
+					menu_items: opts.menu_items.filter((item) => !is_help_menu_item(item)),
+				});
+			}
+			return original_create(opts);
+		};
+		frappe.ui.create_menu._staff_pro_help_disabled = true;
+	}
+
+	const header = frappe.app?.sidebar?.header;
+	if (header?.refresh_menu) header.refresh_menu();
+	if (header?.menu?.menu_items) {
+		header.menu.menu_items = (header.menu.menu_items || []).filter((item) => !is_help_menu_item(item));
+	}
+
+	hide_help_context_menu_items();
+}
+
 function watch_workspace_dock() {
 	inject_sidebar_css();
 	disable_app_onboarding();
+	disable_sidebar_help();
 	patch_workspace_dock();
 	patch_form_sidebar_policy();
 	apply_form_sidebar_policy();
@@ -1835,6 +2045,7 @@ function watch_workspace_dock() {
 	render_staff_pro_dock_integrations();
 	remove_sidebar_search();
 	enhance_sidebar_menus();
+	style_sidebar_collapse_toggle();
 
 	const dock = document.querySelector(".dock, .workspace-dock");
 	const sidebar = document.querySelector(".body-sidebar");
@@ -1851,19 +2062,24 @@ function watch_workspace_dock() {
 		render_staff_pro_dock_integrations();
 		remove_sidebar_search();
 		enhance_sidebar_menus();
+		style_sidebar_collapse_toggle();
 		disable_app_onboarding();
+		disable_sidebar_help();
 	});
 	if (dock) observer.observe(dock, { childList: true, subtree: true });
-	if (container) observer.observe(container, { childList: true, subtree: true });
+	if (container) observer.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
 	else if (sidebar) observer.observe(sidebar, { childList: true, subtree: true });
 }
 
 $(document).on("app_ready", watch_workspace_dock);
 $(document).on("app_ready", disable_app_onboarding);
+$(document).on("app_ready", disable_sidebar_help);
 $(document).on("page-change", disable_app_onboarding);
+$(document).on("page-change", disable_sidebar_help);
 
 if (typeof frappe !== "undefined") {
 	disable_app_onboarding();
+	disable_sidebar_help();
 	if ($(".dock, .workspace-dock, .body-sidebar").length) {
 		watch_workspace_dock();
 	}
@@ -1903,17 +2119,42 @@ function is_already_on_staff_pro_desk_home(route = frappe.get_route?.() || []) {
 	return false;
 }
 
+const STAFF_PRO_WORKSPACE_DASHBOARDS = {
+	workforce: ["dashboard-view", "Human Resource"],
+	people: ["dashboard-view", "Human Resource"],
+	hr: ["dashboard-view", "Human Resource"],
+	"human resource": ["dashboard-view", "Human Resource"],
+	time: ["dashboard-view", "Attendance"],
+	attendance: ["dashboard-view", "Attendance"],
+	pay: ["dashboard-view", "Payroll"],
+	payroll: ["dashboard-view", "Payroll"],
+	talent: ["dashboard-view", "Recruitment"],
+	recruitment: ["dashboard-view", "Recruitment"],
+	"ss and taxes": ["dashboard-view", "SS and Taxes"],
+};
+
+function staff_pro_workspace_dashboard_route(route = []) {
+	const raw = route[0] === "Workspaces" ? route[1] : route[0];
+	const key = String(raw || "")
+		.toLowerCase()
+		.replace(/-/g, " ")
+		.trim();
+	return STAFF_PRO_WORKSPACE_DASHBOARDS[key] || null;
+}
+
 function is_staff_pro_desktop_route(route = frappe.get_route?.() || [], options = {}) {
 	if (is_already_on_staff_pro_desk_home(route)) return false;
 
 	const path = (window.location.pathname || "").replace(/\/$/, "") || "/";
-	const on_apps = route[0] === "apps" || path === "/apps" || path.endsWith("/apps");
-	const on_desktop_page = route[0] === "desktop";
-	const on_empty_desk_route = !route[0] && (path === "/desk" || path === "/");
+	const on_apps = route[0] === "apps" || path === "/apps" || path.endsWith("/apps") || path === "/app/apps";
+	const on_desktop_page = route[0] === "desktop" || path.endsWith("/desktop");
+	const on_empty_desk_route = !route[0] && (path === "/desk" || path === "/app" || path === "/");
+	const on_bare_dashboard = (route[0] === "dashboard-view" || route[0] === "dashboard") && !route[1];
+	const on_workspace_home = Boolean(staff_pro_workspace_dashboard_route(route));
 	const on_workforce_bootstrap =
 		options.includeWorkforceBootstrap &&
 		(route[0]?.toLowerCase() === "workforce" || /\/desk\/workforce\/?$/.test(path));
-	return on_apps || on_desktop_page || on_empty_desk_route || on_workforce_bootstrap;
+	return on_apps || on_desktop_page || on_empty_desk_route || on_bare_dashboard || on_workspace_home || on_workforce_bootstrap;
 }
 
 function redirect_staff_pro_desk_home(options = {}) {
@@ -1922,8 +2163,9 @@ function redirect_staff_pro_desk_home(options = {}) {
 	const route = frappe.get_route?.() || [];
 	if (!is_staff_pro_desktop_route(route, options)) return;
 
+	const target = staff_pro_workspace_dashboard_route(route) || staff_pro_desk_home_route();
 	window._staff_pro_desk_redirecting = true;
-	Promise.resolve(frappe.set_route(...staff_pro_desk_home_route())).finally(() => {
+	Promise.resolve(frappe.set_route(...target)).finally(() => {
 		window._staff_pro_desk_redirecting = false;
 	});
 }
@@ -1935,8 +2177,16 @@ function patch_staff_pro_desktop_redirect() {
 
 	const original_show = pageview.show.bind(pageview);
 	pageview.show = function (name) {
-		if (should_use_staff_pro_desk_home() && (!name || name === "desktop")) {
+		if (should_use_staff_pro_desk_home() && (!name || name === "desktop" || name === "apps")) {
 			redirect_staff_pro_desk_home();
+			return;
+		}
+		const workspace_home = staff_pro_workspace_dashboard_route([name]);
+		if (should_use_staff_pro_desk_home() && workspace_home) {
+			window._staff_pro_desk_redirecting = true;
+			Promise.resolve(frappe.set_route(...workspace_home)).finally(() => {
+				window._staff_pro_desk_redirecting = false;
+			});
 			return;
 		}
 		return original_show(name);
@@ -1979,23 +2229,46 @@ function prefer_employee_image_view() {
 	});
 }
 
+function staff_pro_page_hide_menu(page) {
+	if (typeof page?.hide_menu === "function") {
+		page.hide_menu();
+	}
+}
+
+function hide_page_menu() {
+	document.querySelectorAll(".page-head .menu-btn-group, .page-head .menu-more-button").forEach((el) => {
+		el.classList.add("hidden", "hide");
+		el.style.display = "none";
+	});
+
+	staff_pro_page_hide_menu(window.cur_frm?.page);
+	staff_pro_page_hide_menu(window.cur_list?.page);
+
+	const current = frappe.container?.page;
+	if (current) {
+		staff_pro_page_hide_menu(current);
+	}
+
+	const pages = frappe.ui?.pages;
+	if (pages && typeof pages === "object") {
+		Object.values(pages).forEach((page) => staff_pro_page_hide_menu(page));
+	}
+}
+
 function hide_list_page_chrome() {
 	const route = frappe.get_route?.() || [];
 	if (route[0] !== "List") return;
 
 	document
 		.querySelectorAll(
-			'[id^="page-List/"] .menu-btn-group, [id^="page-List/"] .menu-more-button, [id^="page-List/"] .view-switcher, [id^="page-List/"] .views-switcher, [id^="page-List/"] .match-type-dropdown-btn',
+			'[id^="page-List/"] .view-switcher, [id^="page-List/"] .views-switcher, [id^="page-List/"] .match-type-dropdown-btn',
 		)
 		.forEach((el) => {
 			el.classList.add("hidden", "hide");
 			el.style.display = "none";
 		});
 
-	const page = window.cur_list?.page;
-	if (typeof page?.hide_menu === "function") {
-		page.hide_menu();
-	}
+	hide_page_menu();
 }
 
 const PROFILE_FORM_DOCTYPES = new Set(["Employee", "User"]);
@@ -2038,6 +2311,7 @@ function patch_form_sidebar_policy() {
 	Form.prototype.refresh = function (...args) {
 		const result = original.apply(this, args);
 		apply_form_sidebar_policy();
+		hide_page_menu();
 		return result;
 	};
 }
@@ -2061,10 +2335,12 @@ $(document).on("app_ready", prefer_employee_image_view);
 $(document).on("app_ready", patch_form_sidebar_policy);
 $(document).on("app_ready", patch_list_page_chrome);
 $(document).on("app_ready", apply_form_sidebar_policy);
+$(document).on("app_ready", hide_page_menu);
 $(document).on("app_ready", hide_list_page_chrome);
 $(document).on("page-change", () => redirect_staff_pro_desk_home());
 $(document).on("page-change", refresh_staff_pro_dock_shortcuts);
 $(document).on("page-change", enhance_sidebar_menus);
 $(document).on("page-change", prefer_employee_image_view);
+$(document).on("page-change", hide_page_menu);
 $(document).on("page-change", hide_list_page_chrome);
 $(document).on("page-change", apply_form_sidebar_policy);

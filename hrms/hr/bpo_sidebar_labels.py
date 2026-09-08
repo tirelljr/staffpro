@@ -60,7 +60,8 @@ LINK_LABELS: dict[str, str] = {
 	"Payroll Entry": "Run Payroll",
 	"Salary Structure Assignment": "Pay Rate Setup",
 	"Salary Slip": "Current Pay Stubs",
-	"Additional Salary": "Bonuses & Adjustments",
+	"Additional Salary": "Bonuses",
+	"Bonus Type": "Bonus Types",
 	"Salary Withholding": "Pay Holds",
 	"Expense Claim": "Reimbursements",
 	"Employee Advance": "Cash Advances",
@@ -123,6 +124,7 @@ LABEL_LABELS: dict[str, str] = {
 	"Customer": "Clients",
 	"Sales Invoice": "Posted Invoices",
 	"Pay Stubs": "Current Pay Stubs",
+	"Bonuses & Adjustments": "Bonuses",
 }
 
 

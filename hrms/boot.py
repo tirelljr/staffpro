@@ -10,6 +10,10 @@ BPO_DOCTYPE_UI_MESSAGES = {
 	"Employee Grades": "Campaigns",
 	"Add Employee Grade": "Add Campaign",
 	"New Employee Grade": "New Campaign",
+	"Additional Salary": "Bonuses",
+	"Additional Salaries": "Bonuses",
+	"Add Additional Salary": "Add Bonus",
+	"New Additional Salary": "New Bonus",
 }
 
 STAFF_PRO_DESK_HOME_DASHBOARD = "Human Resource"

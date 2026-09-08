@@ -8,6 +8,7 @@ from frappe.model.document import Document
 from frappe.utils import comma_and, date_diff, flt, fmt_money, formatdate, get_link_to_form, getdate
 
 from hrms.hr.utils import validate_active_employee
+from hrms.payroll.doctype.bonus_type.bonus_type import ensure_bonus_salary_component
 
 
 class AdditionalSalary(Document):
@@ -21,6 +22,7 @@ class AdditionalSalary(Document):
 
 		amended_from: DF.Link | None
 		amount: DF.Currency
+		bonus_type: DF.Link | None
 		company: DF.Link
 		currency: DF.Link
 		deduct_full_tax_on_selected_payroll_date: DF.Check
@@ -36,7 +38,7 @@ class AdditionalSalary(Document):
 		payroll_date: DF.Date | None
 		ref_docname: DF.DynamicLink | None
 		ref_doctype: DF.Link | None
-		salary_component: DF.Link
+		salary_component: DF.Link | None
 		to_date: DF.Date | None
 		type: DF.Data | None
 	# end: auto-generated types
@@ -52,8 +54,11 @@ class AdditionalSalary(Document):
 				or frappe.defaults.get_global_default("company")
 			)
 
-		if not self.salary_component and frappe.db.exists("Salary Component", "Bonus"):
-			self.salary_component = "Bonus"
+		if not self.salary_component:
+			self.salary_component = ensure_bonus_salary_component()
+
+		if not self.type and self.salary_component:
+			self.type = frappe.db.get_value("Salary Component", self.salary_component, "type") or "Earning"
 
 		if not self.naming_series:
 			self.naming_series = "HR-ADS-.YY.-.MM.-"
@@ -124,7 +129,7 @@ class AdditionalSalary(Document):
 		if self.is_recurring:
 			AdditionalSalary = frappe.qb.DocType("Additional Salary")
 
-			additional_salaries = (
+			overlap = (
 				frappe.qb.from_(AdditionalSalary)
 				.select(AdditionalSalary.name)
 				.where(
@@ -137,7 +142,10 @@ class AdditionalSalary(Document):
 					& (AdditionalSalary.from_date <= self.to_date)
 					& (AdditionalSalary.disabled == 0)
 				)
-			).run(pluck=True)
+			)
+			if self.bonus_type:
+				overlap = overlap.where(AdditionalSalary.bonus_type == self.bonus_type)
+			additional_salaries = overlap.run(pluck=True)
 
 			if additional_salaries and len(additional_salaries):
 				frappe.throw(

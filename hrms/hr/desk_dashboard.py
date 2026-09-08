@@ -8,6 +8,7 @@ from frappe.query_builder.functions import Sum
 from frappe.utils import (
 	add_days,
 	add_to_date,
+	cint,
 	flt,
 	formatdate,
 	get_first_day,
@@ -27,6 +28,28 @@ FALLBACK_LIMIT = 5
 PAYROLL_LIMIT = 8
 RELATIVE_FILTER_OPS = {"Timespan"}
 SPARKLINE_POINTS = 6
+KPI_PERIODS = {
+	"day": {"interval": "Daily", "label": "Today"},
+	"week": {"interval": "Weekly", "label": "This Week"},
+	"month": {"interval": "Monthly", "label": "This Month"},
+	"year": {"interval": "Yearly", "label": "This Year"},
+}
+DATE_FIELD_CANDIDATES = (
+	"attendance_date",
+	"posting_date",
+	"offer_date",
+	"date_of_joining",
+	"relieving_date",
+	"boarding_begins_on",
+	"transfer_date",
+	"promotion_date",
+	"from_date",
+	"start_date",
+	"start_time",
+	"holiday_date",
+)
+OVERLAP_START_FIELDS = {"from_date", "start_date", "start_time"}
+OVERLAP_END_FIELDS = {"to_date", "end_date", "end_time"}
 
 
 @frappe.whitelist()
@@ -48,6 +71,168 @@ def get_number_card_sparklines(card_names: str | list | None = None, points: int
 			frappe.log_error(title=f"KPI sparkline failed: {name}")
 			out[name] = {"values": [], "kind": "bars"}
 	return out
+
+
+@frappe.whitelist()
+def get_number_card_period(card_name: str, period: str = "month") -> dict:
+	"""Recalculate a dashboard KPI for day, week, month, or year."""
+	period = _normalize_kpi_period(period)
+	spec = KPI_PERIODS[period]
+	if not card_name or not frappe.db.exists("Number Card", card_name):
+		return {"supported": False, "period": period, "label": _(spec["label"])}
+
+	doc = frappe.get_cached_doc("Number Card", card_name)
+
+	if doc.type == "Custom" and (doc.method or "").endswith("get_upcoming_holidays"):
+		start, end = _period_bounds(spec["interval"], 0)
+		prev_start, prev_end = _period_bounds(spec["interval"], 1)
+		current = _holiday_count(start, end)
+		previous = _holiday_count(prev_start, prev_end)
+		return _kpi_period_payload(doc, period, current, previous)
+
+	if doc.type != "Document Type" or not doc.document_type:
+		return {"supported": False, "period": period, "label": _(spec["label"])}
+
+	prepared = _prepare_card_period_filters(doc, period)
+	current = _aggregate_card_value(doc, prepared["current"])
+	previous = _aggregate_card_value(doc, prepared["previous"])
+	values = [
+		_aggregate_card_value(doc, prepared["for_offset"](offset))
+		for offset in range(SPARKLINE_POINTS - 1, -1, -1)
+	]
+	payload = _kpi_period_payload(doc, period, current, previous)
+	payload["sparkline"] = {"values": values, "kind": "bars", "interval": spec["interval"]}
+	return payload
+
+
+def _normalize_kpi_period(period: str) -> str:
+	key = str(period or "month").strip().lower()
+	aliases = {
+		"today": "day",
+		"this day": "day",
+		"daily": "day",
+		"this week": "week",
+		"weekly": "week",
+		"this month": "month",
+		"monthly": "month",
+		"this year": "year",
+		"yearly": "year",
+	}
+	key = aliases.get(key, key)
+	return key if key in KPI_PERIODS else "month"
+
+
+def _kpi_period_payload(doc, period: str, current: float, previous: float) -> dict:
+	spec = KPI_PERIODS[period]
+	return {
+		"supported": True,
+		"period": period,
+		"label": _(spec["label"]),
+		"value": current,
+		"previous": previous,
+		"percent": _percent_change(current, previous),
+		"formatted_value": _format_kpi_value(doc, current),
+	}
+
+
+def _percent_change(current: float, previous: float) -> float:
+	if not previous:
+		return 100.0 if current else 0.0
+	return flt(((current - previous) / abs(previous)) * 100, 1)
+
+
+def _format_kpi_value(doc, value) -> str:
+	amount = flt(value)
+	if (doc.function or "Count") == "Count":
+		return frappe.format_value(cint(amount), {"fieldtype": "Int"})
+	return frappe.format_value(amount, {"fieldtype": "Float", "precision": 2})
+
+
+def _prepare_card_period_filters(doc, period: str) -> dict:
+	spec = KPI_PERIODS[_normalize_kpi_period(period)]
+	doctype = doc.document_type
+	base, date_field, overlap = _split_card_filters(doc)
+
+	def filters_for(offset: int):
+		start, end = _period_bounds(spec["interval"], offset)
+		rows = list(base)
+		if overlap:
+			start_field, end_field = overlap
+			rows.append([doctype, start_field, "<=", str(end)])
+			rows.append([doctype, end_field, ">=", str(start)])
+		else:
+			rows.append([doctype, date_field, "between", [str(start), str(end)]])
+		return rows
+
+	return {
+		"current": filters_for(0),
+		"previous": filters_for(1),
+		"for_offset": filters_for,
+		"date_field": date_field,
+		"overlap": overlap,
+	}
+
+
+def _split_card_filters(doc):
+	raw_filters = frappe.parse_json(doc.filters_json or "[]") or []
+	if isinstance(raw_filters, dict):
+		raw_filters = []
+	dynamic_filters = _resolve_dynamic_filters(doc.dynamic_filters_json)
+	base = []
+	date_field = None
+	overlap_start = None
+	overlap_end = None
+
+	for row in list(raw_filters) + list(dynamic_filters):
+		if not isinstance(row, (list, tuple)) or len(row) < 4:
+			continue
+		_doctype, field, op, value = row[0], row[1], row[2], row[3]
+		op_name = str(op or "")
+		if op_name in RELATIVE_FILTER_OPS or _looks_like_timespan(value):
+			date_field = field or date_field
+			continue
+		if op_name.lower() == "between":
+			date_field = field or date_field
+			continue
+		if field in OVERLAP_START_FIELDS and op_name in {"<=", "<"}:
+			overlap_start = field
+			continue
+		if field in OVERLAP_END_FIELDS and op_name in {">=", ">"}:
+			overlap_end = field
+			continue
+		base.append(list(row))
+
+	overlap = (overlap_start, overlap_end) if overlap_start and overlap_end else None
+	if not overlap and not date_field:
+		date_field = _infer_date_field(doc.document_type)
+	return base, date_field or "creation", overlap
+
+
+def _infer_date_field(doctype: str) -> str:
+	try:
+		meta = frappe.get_meta(doctype)
+	except Exception:
+		return "creation"
+	for name in DATE_FIELD_CANDIDATES:
+		if meta.has_field(name):
+			return name
+	return "creation"
+
+
+def _holiday_count(start, end) -> float:
+	from erpnext import get_default_company
+	from erpnext.setup.doctype.employee.employee import get_holiday_list_for_employee
+
+	from hrms.utils.holiday_list import get_assigned_holiday_list
+
+	employee = frappe.get_value("Employee", {"user_id": frappe.session.user}, "name")
+	if employee:
+		holiday_list = get_holiday_list_for_employee(employee, raise_exception=False, as_on=getdate())
+	else:
+		holiday_list = get_assigned_holiday_list(get_default_company(), as_on=getdate())
+	if not holiday_list:
+		return 0.0
+	return flt(frappe.db.count("Holiday", {"parent": holiday_list, "holiday_date": ("between", (start, end))}))
 
 
 @frappe.whitelist()

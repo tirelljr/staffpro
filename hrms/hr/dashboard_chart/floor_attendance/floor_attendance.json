@@ -1,9 +1,9 @@
 {
  "chart_name": "Floor Attendance",
  "chart_type": "Group By",
- "color": "#0f766e",
+ "color": "#3ddc97",
  "creation": "2026-08-20 12:00:00.000000",
- "custom_options": "",
+ "custom_options": "{\n\t\"colors\": [\"#3ddc97\", \"#ff6b8a\", \"#ff9f43\", \"#7c5cfc\"]\n}",
  "docstatus": 0,
  "doctype": "Dashboard Chart",
  "document_type": "Attendance",

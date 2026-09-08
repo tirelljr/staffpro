@@ -138,6 +138,7 @@ after_migrate = [
 	"hrms.patches.v16_0.disable_app_onboarding.execute",
 	"hrms.patches.v16_0.split_finance_and_admin.execute",
 	"hrms.hr.staff_pro_sidebars.sync_staff_pro_sidebars",
+	"hrms.payroll.doctype.bonus_type.bonus_type.seed_bonus_types",
 	"hrms.hr.staff_pro_holiday_list.ensure_staff_pro_holiday_list",
 	"hrms.hr.staff_pro_shift_locations.ensure_staff_pro_shift_locations",
 	"hrms.boot.hide_unused_erpnext_workspaces",

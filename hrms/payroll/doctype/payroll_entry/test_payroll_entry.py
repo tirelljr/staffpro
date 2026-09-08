@@ -1601,16 +1601,50 @@ class TestPayrollEntry(HRMSTestSuite):
 		)
 		payload = get_payroll_excel_data(payroll_entry.name)
 		column_ids = [col["id"] for col in payload["columns"]]
-		self.assertIn("last_name", column_ids)
-		self.assertIn("first_name", column_ids)
-		self.assertNotIn("employee_name", column_ids)
+		self.assertIn("agent_name", column_ids)
+		self.assertNotIn("last_name", column_ids)
+		self.assertNotIn("first_name", column_ids)
 		self.assertIn("regular_hours", column_ids)
 		self.assertIn("holiday_pay", column_ids)
 		self.assertIn("pay_period_ee_social", column_ids)
 		self.assertIn("net_pay", column_ids)
 		self.assertTrue(any(row["employee"] == employee for row in payload["rows"]))
 		agent_row = next(row for row in payload["rows"] if row["employee"] == employee)
-		self.assertTrue(agent_row["first_name"] or agent_row["last_name"])
+		self.assertTrue(agent_row["agent_name"])
+
+	def test_payroll_excel_hours_come_from_attendance(self):
+		from hrms.payroll.doctype.payroll_entry.payroll_entry import get_payroll_excel_data
+
+		company = frappe.get_doc("Company", "_Test Company")
+		employee = make_employee("payroll.excel.hours@example.com", company=company.name)
+		setup_salary_structure(employee, company)
+		dates = get_start_end_dates("Monthly", nowdate())
+		attendance = frappe.get_doc(
+			{
+				"doctype": "Attendance",
+				"employee": employee,
+				"company": company.name,
+				"attendance_date": dates.start_date,
+				"status": "Present",
+				"working_hours": 10,
+				"actual_overtime_duration": 2,
+			}
+		)
+		attendance.flags.ignore_validate = True
+		attendance.insert()
+		attendance.submit()
+
+		payroll_entry = get_payroll_entry(
+			start_date=dates.start_date,
+			end_date=dates.end_date,
+			currency=company.default_currency,
+			company=company.name,
+			cost_center="Main - _TC",
+		)
+		payload = get_payroll_excel_data(payroll_entry.name)
+		agent_row = next(row for row in payload["rows"] if row["employee"] == employee)
+		self.assertEqual(flt(agent_row["regular_hours"]), 8)
+		self.assertEqual(flt(agent_row["overtime_hours"]), 2)
 
 	def test_split_full_name_into_first_and_last(self):
 		from hrms.payroll.doctype.payroll_entry.payroll_entry import _split_full_name
@@ -1618,6 +1652,64 @@ class TestPayrollEntry(HRMSTestSuite):
 		self.assertEqual(_split_full_name("Ana Cruz"), ("Ana", "Cruz"))
 		self.assertEqual(_split_full_name("Mary Ann Cruz"), ("Mary Ann", "Cruz"))
 		self.assertEqual(_split_full_name("Ana"), ("Ana", ""))
+
+	def test_bank_payroll_sheet_uses_name_account_sav_and_bank_code(self):
+		from hrms.hr.bpo_employee_labels import apply_belize_employee_bank_fields
+		from hrms.hr.belize_banks import bank_code_for
+		from hrms.payroll.doctype.payroll_entry.payroll_entry import get_bank_payroll_data
+
+		self.assertEqual(bank_code_for("Heritage Bank"), "HBL")
+		self.assertEqual(bank_code_for("Belize Bank"), "BBL")
+		self.assertEqual(bank_code_for("Atlantic Bank"), "ABL")
+
+		apply_belize_employee_bank_fields()
+		frappe.clear_cache(doctype="Employee")
+		company = frappe.get_doc("Company", "_Test Company")
+		employee = make_employee("payroll.bank.sheet@example.com", company=company.name)
+		values = {"bank_name": "Heritage Bank", "bank_ac_no": "1500284739"}
+		if frappe.get_meta("Employee").has_field("bank_account_type"):
+			values["bank_account_type"] = "Savings"
+		frappe.db.set_value("Employee", employee, values)
+		setup_salary_structure(employee, company)
+		dates = get_start_end_dates("Monthly", nowdate())
+		payroll_entry = get_payroll_entry(
+			start_date=dates.start_date,
+			end_date=dates.end_date,
+			currency=company.default_currency,
+			company=company.name,
+			cost_center="Main - _TC",
+		)
+		payload = get_bank_payroll_data(payroll_entry.name)
+		row = next(item for item in payload["rows"] if item["employee"] == employee)
+		self.assertEqual(row["bank_account_no"], "1500284739")
+		self.assertEqual(row["payment_type"], "SALARY")
+		self.assertEqual(row["bank_code"], "HBL")
+		if frappe.get_meta("Employee").has_field("bank_account_type"):
+			self.assertEqual(row["account_type"], "SAV")
+		self.assertTrue(row["first_name"] or row["last_name"])
+
+	def test_bank_payroll_column_e_is_two_decimal_number(self):
+		from hrms.payroll.doctype.payroll_entry.payroll_entry import _bank_payroll_xlsx
+		from openpyxl import load_workbook
+
+		xlsx_file = _bank_payroll_xlsx(
+			[
+				{
+					"first_name": "Ana",
+					"last_name": "Cruz",
+					"bank_account_no": "3109472158",
+					"account_type": "",
+					"net_pay": 488.6,
+					"payment_type": "SALARY",
+					"bank_code": "ABL",
+				}
+			]
+		)
+		wb = load_workbook(xlsx_file)
+		cell = wb.active["E1"]
+		self.assertIsInstance(cell.value, float)
+		self.assertEqual(cell.value, 488.60)
+		self.assertEqual(cell.number_format, "0.00")
 
 
 def _ensure_customer(name: str) -> str:
