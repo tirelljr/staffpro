@@ -117,6 +117,94 @@ def get_staff_pro_home_page(user):
 	return None
 
 
+def staff_pro_desk_home_path():
+	return f"/{STAFF_PRO_DESK_HOME}"
+
+
+def on_staff_pro_login(login_manager=None):
+	"""Skip the apps/desktop picker and open the custom BPO desk after login."""
+	_patch_get_default_path()
+	_patch_get_home_page()
+	user = getattr(login_manager, "user", None) or frappe.session.user
+	if not is_staff_pro_desk_admin(user):
+		return
+
+	frappe.local.flags.home_page = STAFF_PRO_DESK_HOME
+	home = staff_pro_desk_home_path()
+	frappe.local.response["home_page"] = home
+	frappe.local.response["redirect_to"] = home
+	_set_user_default_app(user)
+	_clear_staff_pro_default_workspace(user)
+
+
+def _set_user_default_app(user):
+	if not user or user == "Guest":
+		return
+	if not frappe.db.exists("User", user):
+		return
+	meta = frappe.get_meta("User")
+	if meta.has_field("default_app"):
+		current = frappe.db.get_value("User", user, "default_app")
+		if current != "hrms":
+			frappe.db.set_value("User", user, "default_app", "hrms", update_modified=False)
+
+
+def _clear_staff_pro_default_workspace(user):
+	"""Default workspace overrides the desk home hook on login."""
+	meta = frappe.get_meta("User")
+	if not meta.has_field("default_workspace"):
+		return
+	if frappe.db.get_value("User", user, "default_workspace"):
+		frappe.db.set_value("User", user, "default_workspace", None, update_modified=False)
+		frappe.cache.hdel("home_page", user)
+
+
+def prepare_staff_pro_first_login():
+	"""After setup or migrate, make the next desk load the custom BPO home."""
+	from hrms.branding import apply_branding, ensure_desk_bundles
+	from hrms.patches.v16_0.disable_app_onboarding import execute as disable_onboarding
+
+	ensure_desk_bundles()
+	apply_branding()
+	hide_unused_erpnext_workspaces()
+	try:
+		disable_onboarding()
+	except Exception:
+		frappe.log_error(title="Staff Pro disable onboarding")
+
+	if frappe.db.exists("Desktop Icon", "Staff Pro BPO"):
+		frappe.db.set_value(
+			"Desktop Icon",
+			"Staff Pro BPO",
+			"link",
+			staff_pro_desk_home_path(),
+			update_modified=False,
+		)
+
+	if frappe.session.user and frappe.session.user != "Guest":
+		_set_user_default_app(frappe.session.user)
+		_clear_staff_pro_default_workspace(frappe.session.user)
+
+
+def _patch_get_home_page():
+	import frappe.website.utils as website_utils
+
+	if getattr(website_utils, "_staff_pro_patched_home_page", False):
+		return
+
+	website_utils._staff_pro_patched_home_page = True
+	original = website_utils.get_home_page
+
+	def get_home_page():
+		if frappe.local.flags.home_page and not frappe.in_test:
+			return frappe.local.flags.home_page
+		if is_staff_pro_desk_admin():
+			return STAFF_PRO_DESK_HOME
+		return original()
+
+	website_utils.get_home_page = get_home_page
+
+
 def _patch_get_default_path():
 	import frappe.apps as apps_module
 
@@ -130,13 +218,14 @@ def _patch_get_default_path():
 	@apps_module.request_cache
 	def get_default_path():
 		if is_staff_pro_desk_admin():
-			return f"/{STAFF_PRO_DESK_HOME}"
+			return staff_pro_desk_home_path()
 		return original()
 
 	apps_module.get_default_path = get_default_path
 
 
 _patch_get_default_path()
+_patch_get_home_page()
 
 
 def extend_bootinfo(bootinfo):
@@ -147,8 +236,12 @@ def extend_bootinfo(bootinfo):
 		bootinfo["apps"] = filtered
 
 	if is_staff_pro_desk_admin():
+		from hrms.branding import ensure_desk_bundles
+
+		ensure_desk_bundles()
 		bootinfo["staff_pro_skip_desktop"] = True
 		bootinfo["staff_pro_desk_home"] = STAFF_PRO_DESK_HOME_ROUTE
+		bootinfo["staff_pro_home_path"] = staff_pro_desk_home_path()
 		bootinfo["staff_pro_portal_routes"] = STAFF_PRO_PORTAL_ROUTES
 		bootinfo["staff_pro_brand"] = STAFF_PRO_BRAND
 		bootinfo["staff_pro_integrations"] = STAFF_PRO_INTEGRATIONS

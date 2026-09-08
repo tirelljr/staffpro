@@ -29,7 +29,7 @@ def staff_pro_logo_url() -> str:
 
 def apply_branding():
 	"""Apply Staff Pro BPO name, logo, and favicon to site settings."""
-	ensure_ltr_bundle_css()
+	ensure_desk_bundles()
 	_set_if_field("Website Settings", "app_name", APP_TITLE)
 	_set_if_field("Website Settings", "app_logo", APP_LOGO)
 	_set_if_field("Website Settings", "splash_image", APP_LOGO)
@@ -45,36 +45,93 @@ def update_website_context(context):
 	context["footer_powered"] = FOOTER_POWERED
 
 
+def ensure_desk_bundles():
+	"""Publish hashed desk CSS/JS so first login can load the custom BPO UI."""
+	ensure_hashed_bundle("hrms.bundle.css", ("css", "css-rtl"))
+	ensure_hashed_bundle("hrms.bundle.js", ("js", "js-rtl"))
+
+
 def ensure_ltr_bundle_css():
 	"""Copy the RTL bundle to the LTR path when Docker/Windows skips dist/css."""
+	ensure_hashed_bundle("hrms.bundle.css", ("css", "css-rtl"))
+
+
+def ensure_hashed_bundle(manifest_key: str, folders: tuple[str, ...]):
+	"""Copy the newest built bundle onto the hashed name assets.json expects."""
+	try:
+		bench = Path(frappe.utils.get_bench_path())
+	except Exception:
+		return None
+
+	app_dist = bench / "apps/hrms/hrms/public/dist"
+	manifest = bench / "sites/assets/assets.json"
+	dest = publish_hashed_bundle(app_dist, manifest, manifest_key, folders)
+	if dest:
+		_publish_sites_asset_copy(dest)
+	return dest
+
+
+def publish_hashed_bundle(
+	app_dist: Path,
+	manifest: Path,
+	manifest_key: str,
+	folders: tuple[str, ...],
+):
+	"""If the hashed bundle is missing, copy the newest matching file onto that name."""
+	sources = []
+	for folder in folders:
+		directory = app_dist / folder
+		if directory.exists():
+			pattern = f"{Path(manifest_key).stem}.*{Path(manifest_key).suffix}"
+			sources.extend(
+				path
+				for path in directory.glob(pattern)
+				if path.is_file() and path.stat().st_size and not path.name.endswith(".map")
+			)
+
+	if not sources:
+		return None
+
+	newest = max(sources, key=lambda path: path.stat().st_mtime)
+	wanted = _wanted_bundle_name(manifest, manifest_key) or newest.name
+	dest_dir = app_dist / folders[0]
+	dest_dir.mkdir(parents=True, exist_ok=True)
+	dest = dest_dir / wanted
+	if dest.resolve() != newest.resolve():
+		if not dest.exists() or dest.stat().st_size != newest.stat().st_size:
+			shutil.copy2(newest, dest)
+			map_src = newest.with_name(newest.name + ".map")
+			if not map_src.exists():
+				map_src = newest.with_suffix(newest.suffix + ".map")
+			if map_src.exists():
+				shutil.copy2(map_src, dest.with_name(dest.name + ".map"))
+
+	return dest
+
+
+def _wanted_bundle_name(manifest: Path, manifest_key: str) -> str:
+	if not manifest.exists():
+		return ""
+	try:
+		return Path(json.loads(manifest.read_text(encoding="utf-8")).get(manifest_key) or "").name
+	except (OSError, json.JSONDecodeError, TypeError):
+		return ""
+
+
+def _publish_sites_asset_copy(source: Path):
+	"""Windows/Docker often fail to symlink sites/assets/hrms -> the app dist folder."""
 	try:
 		bench = Path(frappe.utils.get_bench_path())
 	except Exception:
 		return
 
-	css_dir = bench / "apps/hrms/hrms/public/dist/css"
-	rtl_dir = bench / "apps/hrms/hrms/public/dist/css-rtl"
-	manifest = bench / "sites/assets/assets.json"
-	if not rtl_dir.exists() or not manifest.exists():
+	relative = Path("hrms") / "dist" / source.parent.name / source.name
+	dest = bench / "sites/assets" / relative
+	dest.parent.mkdir(parents=True, exist_ok=True)
+	try:
+		shutil.copy2(source, dest)
+	except OSError:
 		return
-
-	rtl = sorted(rtl_dir.glob("hrms.bundle.*.css"), key=lambda p: p.stat().st_mtime, reverse=True)
-	if not rtl:
-		return
-
-	wanted = Path(json.loads(manifest.read_text()).get("hrms.bundle.css") or "").name
-	if not wanted:
-		return
-
-	css_dir.mkdir(parents=True, exist_ok=True)
-	dest = css_dir / wanted
-	if dest.exists() and dest.stat().st_size:
-		return
-
-	shutil.copy2(rtl[0], dest)
-	map_src = rtl[0].with_suffix(".css.map")
-	if map_src.exists():
-		shutil.copy2(map_src, dest.with_suffix(".css.map"))
 
 
 def hide_system_settings_app_tab() -> None:

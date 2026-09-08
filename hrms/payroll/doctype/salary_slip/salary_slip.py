@@ -52,6 +52,12 @@ from hrms.payroll.doctype.salary_slip.salary_slip_loan_utils import (
 	process_loan_interest_accrual_and_demand,
 	set_loan_repayment,
 )
+from hrms.payroll.hourly_gross import (
+	HOURLY_BASIC_COMPONENT,
+	compute_hourly_gross_pay,
+	is_hourly_basic_component,
+	slip_uses_hourly_wages,
+)
 from hrms.payroll.utils import (
 	COMPONENT_EVAL_GLOBALS,
 	_safe_eval,
@@ -1000,9 +1006,12 @@ class SalarySlip(TransactionBase):
 				relieving_date=self.relieving_date,
 			)[1]
 
+		self.ensure_hourly_hours_and_rate()
+
 		if self.salary_structure:
 			self.calculate_component_amounts("earnings")
 
+		self.apply_hourly_attendance_earnings()
 		set_gross_pay_and_base_gross_pay()
 
 		if self.salary_structure:
@@ -1030,6 +1039,45 @@ class SalarySlip(TransactionBase):
 		from hrms.payroll.social_security import apply_social_security
 
 		apply_social_security(self)
+
+	def ensure_hourly_hours_and_rate(self) -> None:
+		"""Fill hour_rate and worked hours from the agent clock / CTC for hourly structures."""
+		if not slip_uses_hourly_wages(self) or not self.employee:
+			return
+
+		from hrms.payroll.daily_pay import get_hour_rate
+
+		legacy = not flt(self.hour_rate)
+		agent_rate = get_hour_rate(self.employee, self.end_date or self.start_date)
+		slip_rate = flt(self.hour_rate)
+		structure_rate = 0.0
+		if self.salary_structure:
+			structure_rate = flt(frappe.db.get_value("Salary Structure", self.salary_structure, "hour_rate"))
+		# Keep a period override; replace the structure default with the agent's CTC.
+		if not (slip_rate and structure_rate and abs(slip_rate - structure_rate) > 0.0001):
+			if agent_rate:
+				self.hour_rate = agent_rate
+		if legacy or not flt(self.total_working_hours):
+			worked = _attendance_hours_for_slip(self)
+			if worked:
+				self.total_working_hours = worked
+
+	def apply_hourly_attendance_earnings(self) -> None:
+		"""Replace day-prorated weekly base with hours × rate + overtime + extras."""
+		if not slip_uses_hourly_wages(self):
+			return
+
+		regular_hours, overtime_hours, holiday_pay, bonus = _hourly_inputs_for_slip(self)
+		basic = compute_hourly_gross_pay(
+			regular_hours=regular_hours,
+			overtime_hours=overtime_hours,
+			hourly_rate=self.hour_rate,
+		)
+		_set_hourly_earning_amount(self, HOURLY_BASIC_COMPONENT, basic)
+		if holiday_pay:
+			_set_hourly_earning_amount(self, None, holiday_pay, match="holiday")
+		if bonus:
+			_set_hourly_earning_amount(self, None, bonus, category="Bonus")
 
 	def set_net_pay(self):
 		self.total_deduction = self.get_component_totals("deductions")
@@ -2282,6 +2330,7 @@ class SalarySlip(TransactionBase):
 			and not (
 				row.additional_salary and row.default_amount
 			)  # to identify overwritten additional salary
+			and not is_hourly_basic_component(row.salary_component)
 			and (
 				row.salary_component != timesheet_component
 				or getdate(self.start_date) < self.joining_date
@@ -2303,6 +2352,7 @@ class SalarySlip(TransactionBase):
 		elif (
 			not self.payment_days
 			and row.salary_component != timesheet_component
+			and not is_hourly_basic_component(row.salary_component)
 			and cint(row.depends_on_payment_days)
 		):
 			amount, additional_amount = 0, 0
@@ -2737,6 +2787,115 @@ def get_lwp_or_ppl_for_date_range(employee, start_date, end_date):
 				leave_date_mapper[date] = leave
 
 	return leave_date_mapper
+
+
+def _attendance_hours_for_slip(slip) -> float:
+	from hrms.payroll.daily_pay import ensure_working_hours_from_times
+
+	hours = 0.0
+	for row in _slip_period_attendance(slip, ["working_hours", "status", "in_time", "out_time"]):
+		if (row.get("status") or "") == "Absent":
+			continue
+		hours += flt(row.working_hours) or flt(ensure_working_hours_from_times(row))
+	return flt(hours)
+
+
+def _hourly_inputs_for_slip(slip) -> tuple[float, float, float, float]:
+	from hrms.payroll.daily_pay import ensure_working_hours_from_times, get_public_holiday_pay_context
+
+	overtime_hours = 0.0
+	holiday_hours = 0.0
+	holiday_pay = 0.0
+	total_hours = 0.0
+	fields = ["working_hours", "status", "attendance_date", "daily_pay"]
+	if frappe.db.has_column("Attendance", "in_time"):
+		fields += ["in_time", "out_time"]
+	if frappe.db.has_column("Attendance", "actual_overtime_duration"):
+		fields.append("actual_overtime_duration")
+
+	for row in _slip_period_attendance(slip, fields):
+		if (row.get("status") or "") == "Absent":
+			continue
+		worked = flt(row.working_hours) or flt(ensure_working_hours_from_times(row))
+		overtime = flt(row.get("actual_overtime_duration"))
+		total_hours += worked
+		overtime_hours += overtime
+		if get_public_holiday_pay_context(slip.employee, row.attendance_date):
+			holiday_hours += worked
+			holiday_pay += flt(row.get("daily_pay")) or flt(flt(slip.hour_rate) * worked, 2)
+
+	if flt(slip.total_working_hours):
+		total_hours = flt(slip.total_working_hours)
+	regular_hours = max(total_hours - overtime_hours - holiday_hours, 0.0)
+	bonus = _earning_amount_on_slip(slip, category="Bonus")
+	holiday_on_slip = _earning_amount_on_slip(slip, match="holiday")
+	if holiday_on_slip:
+		holiday_pay = holiday_on_slip
+	return regular_hours, overtime_hours, holiday_pay, bonus
+
+
+def _slip_period_attendance(slip, fields: list[str]) -> list[dict]:
+	if not slip.employee or not slip.start_date or not slip.end_date:
+		return []
+	available = ["name", "employee"] + [
+		field for field in fields if field == "name" or frappe.db.has_column("Attendance", field)
+	]
+	return frappe.get_all(
+		"Attendance",
+		filters={
+			"employee": slip.employee,
+			"attendance_date": ("between", [slip.start_date, slip.end_date]),
+			"docstatus": ("<", 2),
+		},
+		fields=available,
+	)
+
+
+def _earning_amount_on_slip(slip, match: str | None = None, category: str | None = None) -> float:
+	total = 0.0
+	for row in slip.get("earnings") or []:
+		if match and match not in (row.salary_component or "").lower():
+			continue
+		if category:
+			if frappe.db.get_value("Salary Component", row.salary_component, "earning_category") != category:
+				continue
+		if match or category:
+			total += flt(row.amount)
+	return total
+
+
+def _set_hourly_earning_amount(slip, component_name, amount, match=None, category=None) -> None:
+	amount = flt(amount, 2)
+	for row in slip.get("earnings") or []:
+		matched = False
+		if component_name and row.salary_component == component_name:
+			matched = True
+		elif match and match in (row.salary_component or "").lower():
+			matched = True
+		elif category and frappe.db.get_value(
+			"Salary Component", row.salary_component, "earning_category"
+		) == category:
+			matched = True
+		if not matched:
+			continue
+		row.amount = amount
+		row.default_amount = amount
+		if hasattr(row, "depends_on_payment_days"):
+			row.depends_on_payment_days = 0
+		return
+
+	if not amount:
+		return
+	name = component_name
+	if not name and match:
+		name = frappe.db.get_value("Salary Component", {"name": ("like", f"%{match}%")}, "name")
+	if not name and category:
+		name = frappe.db.get_value("Salary Component", {"earning_category": category}, "name")
+	if name:
+		slip.append(
+			"earnings",
+			{"salary_component": name, "amount": amount, "default_amount": amount},
+		)
 
 
 @frappe.whitelist()

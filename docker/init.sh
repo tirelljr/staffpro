@@ -50,16 +50,31 @@ finish_customization_setup() {
     echo "Applying migrations and branding..."
     bench --site hrms.localhost migrate || true
     bench --site hrms.localhost execute hrms.branding.apply_branding
+    bench --site hrms.localhost execute hrms.boot.prepare_staff_pro_first_login
+    publish_employee_portal
     bench --site hrms.localhost clear-cache
+}
+
+publish_employee_portal() {
+    src="/workspace/hrms/hrms/public/frontend"
+    dest="/home/frappe/frappe-bench/sites/assets/hrms/frontend"
+    if [ -f /workspace/hrms/hrms/www/hrms.html ] && [ -d "$src" ]; then
+        mkdir -p "$dest"
+        cp -a "$src/." "$dest/"
+        echo "Published employee portal assets"
+    fi
 }
 
 if [ -d "/home/frappe/frappe-bench/apps/frappe" ]; then
     echo "Bench already exists, finishing setup if needed"
     finish_site_setup
-    if [ ! -d "$APP_PATH/hrms/public/dist" ] || [ -z "$(ls -A "$APP_PATH/hrms/public/dist" 2>/dev/null)" ]; then
-        finish_customization_setup
-    fi
+    # Always publish production desk bundles. `bench watch` rebuilds in dev mode
+    # and can overwrite the Staff Pro UI with incomplete assets on Windows mounts.
+    finish_customization_setup
     cd /home/frappe/frappe-bench
+    if [ -f ./Procfile ]; then
+        sed -i '/^watch:/d' ./Procfile
+    fi
     bench start
     exit 0
 fi
@@ -83,8 +98,9 @@ bench set-redis-cache-host redis://redis:6379
 bench set-redis-queue-host redis://redis:6379
 bench set-redis-socketio-host redis://redis:6379
 
-# Redis runs in a separate container; keep `watch` so frontend edits reload
+# Redis runs in a separate container. Skip `watch` — it overwrites production bundles.
 sed -i '/redis/d' ./Procfile
+sed -i '/^watch:/d' ./Procfile
 sed -i 's/bench serve[[:space:]]*/bench serve --host 0.0.0.0 /' ./Procfile
 
 bench get-app erpnext

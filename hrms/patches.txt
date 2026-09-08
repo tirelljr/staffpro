@@ -130,3 +130,5 @@ hrms.patches.v16_0.relabel_employee_username #2026-09-03-username-login
 hrms.patches.v16_0.ensure_social_security_accounts #2026-09-03
 hrms.patches.v16_0.add_bonus_types #2026-09-04
 hrms.patches.v16_0.add_employee_bank_account_type #2026-09-04
+hrms.patches.v16_0.ensure_staff_pro_first_login_home #2026-09-08
+hrms.patches.v16_0.fix_hourly_gross_pay_formula #2026-09-08

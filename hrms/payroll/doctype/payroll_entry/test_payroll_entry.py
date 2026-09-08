@@ -1646,6 +1646,73 @@ class TestPayrollEntry(HRMSTestSuite):
 		self.assertEqual(flt(agent_row["regular_hours"]), 8)
 		self.assertEqual(flt(agent_row["overtime_hours"]), 2)
 
+	def test_hourly_gross_formula_uses_hours_times_rate(self):
+		from hrms.payroll.hourly_gross import compute_hourly_gross_pay
+
+		self.assertEqual(compute_hourly_gross_pay(17, 0, 12.5), 212.50)
+		self.assertEqual(compute_hourly_gross_pay(17, 2, 12.5, holiday_pay=20, bonus=10), 280.00)
+
+	def test_payroll_excel_gross_is_hours_times_rate(self):
+		from hrms.payroll.doctype.payroll_entry.payroll_entry import get_payroll_excel_data
+		from hrms.payroll.hourly_gross import HOURLY_BASIC_COMPONENT, HOURLY_GROSS_FORMULA
+
+		company = frappe.get_doc("Company", "_Test Company")
+		employee = make_employee("payroll.excel.gross@example.com", company=company.name)
+		frappe.db.set_value("Employee", employee, "ctc", 12.5)
+		_ensure_basic_hourly_component()
+		make_salary_structure(
+			"Staff Pro Weekly Gross Test",
+			"Weekly",
+			employee=employee,
+			company=company.name,
+			from_date=add_days(nowdate(), -30),
+			base=500,
+			earnings=[
+				{
+					"salary_component": HOURLY_BASIC_COMPONENT,
+					"abbr": "BH",
+					"amount_based_on_formula": 1,
+					"formula": HOURLY_GROSS_FORMULA,
+					"depends_on_payment_days": 0,
+				}
+			],
+		)
+		dates = get_start_end_dates("Weekly", nowdate())
+		attendance = frappe.get_doc(
+			{
+				"doctype": "Attendance",
+				"employee": employee,
+				"company": company.name,
+				"attendance_date": dates.start_date,
+				"status": "Present",
+				"working_hours": 17,
+			}
+		)
+		attendance.flags.ignore_validate = True
+		attendance.insert()
+
+		payroll_entry = frappe.new_doc("Payroll Entry")
+		payroll_entry.company = company.name
+		payroll_entry.start_date = dates.start_date
+		payroll_entry.end_date = dates.end_date
+		payroll_entry.payroll_frequency = "Weekly"
+		payroll_entry.currency = company.default_currency
+		payroll_entry.exchange_rate = 1
+		payroll_entry.cost_center = "Main - _TC"
+		payroll_entry.payment_account = get_payment_account()
+		payroll_entry.append(
+			"employees",
+			{"employee": employee, "employee_name": frappe.db.get_value("Employee", employee, "employee_name")},
+		)
+		payroll_entry.insert()
+
+		payload = get_payroll_excel_data(payroll_entry.name)
+		agent_row = next(row for row in payload["rows"] if row["employee"] == employee)
+		self.assertEqual(flt(agent_row["regular_hours"]), 17)
+		self.assertAlmostEqual(flt(agent_row["hourly_rate"]), 12.5, places=2)
+		self.assertAlmostEqual(flt(agent_row["gross_pay"]), 212.50, places=2)
+		self.assertNotAlmostEqual(flt(agent_row["gross_pay"]), 500, places=2)
+
 	def test_split_full_name_into_first_and_last(self):
 		from hrms.payroll.doctype.payroll_entry.payroll_entry import _split_full_name
 
@@ -1727,6 +1794,24 @@ def _ensure_customer(name: str) -> str:
 		}
 	).insert(ignore_permissions=True)
 	return name
+
+
+def _ensure_basic_hourly_component():
+	from hrms.payroll.hourly_gross import HOURLY_BASIC_COMPONENT, HOURLY_GROSS_FORMULA
+
+	if not frappe.db.exists("Salary Component", HOURLY_BASIC_COMPONENT):
+		frappe.get_doc(
+			{
+				"doctype": "Salary Component",
+				"salary_component": HOURLY_BASIC_COMPONENT,
+				"salary_component_abbr": "BH",
+				"type": "Earning",
+				"depends_on_payment_days": 0,
+				"amount_based_on_formula": 1,
+				"formula": HOURLY_GROSS_FORMULA,
+			}
+		).insert()
+	set_salary_component_account(HOURLY_BASIC_COMPONENT)
 
 
 def get_payroll_entry(**args):

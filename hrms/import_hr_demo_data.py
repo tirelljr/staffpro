@@ -13,6 +13,8 @@ from frappe.utils import (
 	nowdate,
 )
 
+from hrms.payroll.hourly_gross import HOURLY_BASIC_COMPONENT, HOURLY_GROSS_FORMULA
+
 DEMO_HOUR_RATE = 12.5
 COMPANY = "Staff Pro BPO"
 
@@ -68,7 +70,7 @@ JOB_APPLICANTS = [
 
 SHIFT_NAME = "Day Shift"
 SALARY_STRUCTURE = "Staff Pro Weekly"
-BASIC_COMPONENT = "Basic Hourly"
+BASIC_COMPONENT = HOURLY_BASIC_COMPONENT
 LEAVE_OPEN_PAY_PERIODS = 1
 
 HOUR_RATES = {
@@ -1318,24 +1320,20 @@ def _ensure_basic_hourly_component(company):
 				"salary_component": BASIC_COMPONENT,
 				"salary_component_abbr": "BH",
 				"type": "Earning",
-				"depends_on_payment_days": 1,
+				"depends_on_payment_days": 0,
 				"is_tax_applicable": 0,
 				"amount_based_on_formula": 1,
-				"formula": "base",
+				"formula": HOURLY_GROSS_FORMULA,
 				"do_not_include_in_accounts": 0,
 			}
 		)
 		if account:
 			doc.append("accounts", {"company": company, "account": account})
 		doc.insert(ignore_permissions=True)
-		return
 
-	if account and not frappe.db.exists(
-		"Salary Component Account", {"parent": BASIC_COMPONENT, "company": company}
-	):
-		component = frappe.get_doc("Salary Component", BASIC_COMPONENT)
-		component.append("accounts", {"company": company, "account": account})
-		component.save(ignore_permissions=True)
+	from hrms.payroll.hourly_gross import sync_hourly_gross_formula
+
+	sync_hourly_gross_formula(company, account, SALARY_STRUCTURE)
 
 
 def _salary_expense_account(company):
@@ -1370,8 +1368,8 @@ def _get_or_create_weekly_structure(company, currency):
 						"salary_component": BASIC_COMPONENT,
 						"abbr": "BH",
 						"amount_based_on_formula": 1,
-						"formula": "base",
-						"depends_on_payment_days": 1,
+						"formula": HOURLY_GROSS_FORMULA,
+						"depends_on_payment_days": 0,
 					},
 				)
 			doc.company = company
@@ -1399,8 +1397,8 @@ def _get_or_create_weekly_structure(company, currency):
 					"salary_component": BASIC_COMPONENT,
 					"abbr": "BH",
 					"amount_based_on_formula": 1,
-					"formula": "base",
-					"depends_on_payment_days": 1,
+					"formula": HOURLY_GROSS_FORMULA,
+					"depends_on_payment_days": 0,
 				}
 			],
 		}

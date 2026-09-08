@@ -23,6 +23,7 @@ add_to_apps_screen = [
 
 extend_bootinfo = "hrms.boot.extend_bootinfo"
 get_website_user_home_page = "hrms.boot.get_staff_pro_home_page"
+on_login = "hrms.boot.on_staff_pro_login"
 
 website_context = {
 	"favicon": "/assets/hrms/images/staff-pro-bpo-icon.png",
@@ -142,6 +143,7 @@ after_migrate = [
 	"hrms.hr.staff_pro_holiday_list.ensure_staff_pro_holiday_list",
 	"hrms.hr.staff_pro_shift_locations.ensure_staff_pro_shift_locations",
 	"hrms.boot.hide_unused_erpnext_workspaces",
+	"hrms.boot.prepare_staff_pro_first_login",
 	"hrms.overrides.bpo_dashboards.hide_non_bpo_dashboard_records",
 ]
 

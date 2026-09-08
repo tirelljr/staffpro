@@ -2375,9 +2375,11 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 	slips = _get_excel_salary_slips(entry)
 	working_by_employee = _working_hours_by_employee(entry)
 	overtime_by_employee = _overtime_hours_by_employee(entry)
+	holiday_hours_by_employee = _holiday_hours_by_employee(entry)
 	holiday_pay_by_employee = _holiday_pay_by_employee(entry)
 	bonus_by_slip = _bonus_by_salary_slip([row.name for row in slips])
 	ytd_social_by_employee = _ytd_social_by_employee(entry)
+	rate_by_employee = _hourly_rate_by_employee(entry, slips)
 
 	employees = [slip.employee for slip in slips] + [
 		emp.employee for emp in (entry.employees or []) if emp.employee
@@ -2394,9 +2396,25 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 			slip.total_working_hours,
 			working_by_employee,
 			overtime_by_employee,
+			prefer_attendance=not flt(slip.hour_rate),
+		)
+		hourly_rate = _excel_hourly_rate(slip, rate_by_employee.get(slip.employee))
+		holiday_pay = flt(holiday_pay_by_employee.get(slip.employee))
+		holiday_hours = flt(holiday_hours_by_employee.get(slip.employee))
+		bonus = flt(bonus_by_slip.get(slip.name))
+		gross_pay = _excel_gross_pay(
+			slip,
+			regular_hours,
+			overtime_hours,
+			hourly_rate,
+			holiday_pay,
+			bonus,
+			employee=slip.employee,
+			holiday_hours=holiday_hours,
 		)
 		ee_period, er_period = _slip_social_amounts(slip)
 		ee_ytd, er_ytd = ytd_social_by_employee.get(slip.employee) or (ee_period, er_period)
+		net_pay = _excel_net_pay(slip, gross_pay)
 		rows.append(
 			{
 				"employee": slip.employee,
@@ -2405,10 +2423,10 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 				"pay_period": _format_pay_period(slip.start_date, slip.end_date) or period_label,
 				"regular_hours": regular_hours,
 				"overtime_hours": overtime_hours,
-				"holiday_pay": flt(holiday_pay_by_employee.get(slip.employee)),
-				"hourly_rate": flt(slip.hour_rate),
-				"bonus": flt(bonus_by_slip.get(slip.name)),
-				"gross_pay": flt(slip.gross_pay),
+				"holiday_pay": holiday_pay,
+				"hourly_rate": hourly_rate,
+				"bonus": bonus,
+				"gross_pay": gross_pay,
 				"income_tax_wh": _slip_income_tax(slip),
 				"wage_band": slip.ss_wage_band or "",
 				"weekly_insurable_earnings": flt(slip.ss_insurable_earnings),
@@ -2416,7 +2434,7 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 				"employer_social_security": er_ytd,
 				"pay_period_ee_social": ee_period,
 				"pay_period_er_social": er_period,
-				"net_pay": flt(slip.net_pay),
+				"net_pay": net_pay,
 			}
 		)
 
@@ -2431,6 +2449,20 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 			0,
 			working_by_employee,
 			overtime_by_employee,
+			prefer_attendance=True,
+		)
+		hourly_rate = flt(rate_by_employee.get(emp.employee))
+		holiday_pay = flt(holiday_pay_by_employee.get(emp.employee))
+		holiday_hours = flt(holiday_hours_by_employee.get(emp.employee))
+		gross_pay = _excel_gross_pay(
+			None,
+			regular_hours,
+			overtime_hours,
+			hourly_rate,
+			holiday_pay,
+			0,
+			employee=emp.employee,
+			holiday_hours=holiday_hours,
 		)
 		rows.append(
 			{
@@ -2440,10 +2472,10 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 				"pay_period": period_label,
 				"regular_hours": regular_hours,
 				"overtime_hours": overtime_hours,
-				"holiday_pay": flt(holiday_pay_by_employee.get(emp.employee)),
-				"hourly_rate": 0,
+				"holiday_pay": holiday_pay,
+				"hourly_rate": hourly_rate,
 				"bonus": 0,
-				"gross_pay": 0,
+				"gross_pay": gross_pay,
 				"income_tax_wh": 0,
 				"wage_band": "",
 				"weekly_insurable_earnings": 0,
@@ -2451,7 +2483,7 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 				"employer_social_security": er_ytd,
 				"pay_period_ee_social": 0,
 				"pay_period_er_social": 0,
-				"net_pay": 0,
+				"net_pay": gross_pay,
 			}
 		)
 
@@ -2537,10 +2569,9 @@ def save_payroll_excel_cell(
 		_set_slip_holiday_pay_amount(slip, numeric_value)
 
 	slip.flags.ignore_validate = True
-	slip.save(ignore_permissions=True)
 	if hasattr(slip, "calculate_net_pay"):
 		slip.calculate_net_pay()
-		slip.db_update()
+	slip.save(ignore_permissions=True)
 
 	return get_payroll_excel_data(name)
 
@@ -2813,27 +2844,33 @@ def _format_pay_period(start_date, end_date) -> str:
 
 
 def _get_excel_salary_slips(entry) -> list:
+	fields = [
+		"name",
+		"employee",
+		"employee_name",
+		"start_date",
+		"end_date",
+		"total_working_hours",
+		"hour_rate",
+		"gross_pay",
+		"net_pay",
+		"salary_structure",
+		"total_deduction",
+		"company",
+		"ss_wage_band",
+		"ss_insurable_earnings",
+		"ss_employee_amount",
+		"ss_employer_amount",
+		"current_month_income_tax",
+		"total_income_tax",
+	]
+	# Loan totals are custom fields added only when the Lending app is installed.
+	if frappe.db.has_column("Salary Slip", "total_loan_repayment"):
+		fields.append("total_loan_repayment")
 	return frappe.get_all(
 		"Salary Slip",
 		filters={"payroll_entry": entry.name, "docstatus": ("<", 2)},
-		fields=[
-			"name",
-			"employee",
-			"employee_name",
-			"start_date",
-			"end_date",
-			"total_working_hours",
-			"hour_rate",
-			"gross_pay",
-			"net_pay",
-			"company",
-			"ss_wage_band",
-			"ss_insurable_earnings",
-			"ss_employee_amount",
-			"ss_employer_amount",
-			"current_month_income_tax",
-			"total_income_tax",
-		],
+		fields=fields,
 		order_by="employee_name asc, employee asc",
 	)
 
@@ -2883,12 +2920,110 @@ def _excel_hours_for_employee(
 	slip_total_hours,
 	working_by_employee: dict[str, float],
 	overtime_by_employee: dict[str, float],
+	prefer_attendance: bool = False,
 ) -> tuple[float, float]:
 	"""Return (overtime_hours, regular_hours) for the spreadsheet row."""
 	overtime_hours = flt(overtime_by_employee.get(employee))
-	total_hours = flt(slip_total_hours) or flt(working_by_employee.get(employee))
+	attendance_hours = flt(working_by_employee.get(employee))
+	if prefer_attendance:
+		total_hours = attendance_hours or flt(slip_total_hours)
+	else:
+		total_hours = flt(slip_total_hours) or attendance_hours
 	regular_hours = max(total_hours - overtime_hours, 0.0) if total_hours else 0.0
 	return overtime_hours, regular_hours
+
+
+def _excel_hourly_rate(slip, agent_rate) -> float:
+	"""Prefer the agent's CTC over the structure default copied onto the slip."""
+	slip_rate = flt(getattr(slip, "hour_rate", 0) if slip else 0)
+	agent_rate = flt(agent_rate)
+	structure_rate = 0.0
+	structure = getattr(slip, "salary_structure", None) if slip else None
+	if structure:
+		structure_rate = flt(frappe.db.get_value("Salary Structure", structure, "hour_rate"))
+	if slip_rate and (not structure_rate or abs(slip_rate - structure_rate) > 0.0001):
+		return slip_rate
+	return agent_rate or slip_rate
+
+
+def _hourly_rate_by_employee(entry, slips) -> dict[str, float]:
+	from hrms.payroll.daily_pay import get_hour_rate
+
+	on_date = entry.end_date or entry.start_date
+	rates: dict[str, float] = {}
+	employees = {slip.employee for slip in slips}
+	for emp in entry.employees or []:
+		if emp.employee:
+			employees.add(emp.employee)
+	for employee in employees:
+		rates[employee] = flt(get_hour_rate(employee, on_date))
+	return rates
+
+
+def _excel_gross_pay(
+	slip,
+	regular_hours,
+	overtime_hours,
+	hourly_rate,
+	holiday_pay,
+	bonus,
+	employee: str | None = None,
+	holiday_hours: float = 0,
+) -> float:
+	from hrms.payroll.hourly_gross import (
+		compute_hourly_gross_pay,
+		slip_uses_hourly_wages,
+		structure_uses_hourly_wages,
+	)
+
+	structure = getattr(slip, "salary_structure", None) if slip else None
+	if not structure and employee:
+		structure = frappe.db.get_value(
+			"Salary Structure Assignment",
+			{"employee": employee, "docstatus": 1},
+			"salary_structure",
+			order_by="from_date desc",
+		)
+	hourly = bool(hourly_rate) and (
+		(slip and slip_uses_hourly_wages(slip)) or structure_uses_hourly_wages(structure)
+	)
+	if hourly:
+		# Holiday hours are already in regular hours; only add holiday premium / unworked statutory pay.
+		holiday_extra = flt(holiday_pay) - flt(holiday_hours) * flt(hourly_rate)
+		return compute_hourly_gross_pay(
+			regular_hours=regular_hours,
+			overtime_hours=overtime_hours,
+			hourly_rate=hourly_rate,
+			holiday_pay=max(holiday_extra, 0),
+			bonus=bonus,
+		)
+	return flt(getattr(slip, "gross_pay", 0) if slip else 0)
+
+
+def _excel_net_pay(slip, gross_pay) -> float:
+	if not slip:
+		return flt(gross_pay)
+	deductions = flt(getattr(slip, "total_deduction", 0))
+	if not deductions and flt(slip.gross_pay):
+		deductions = flt(slip.gross_pay) - flt(slip.net_pay)
+	return flt(flt(gross_pay) - deductions, 2)
+
+
+def _holiday_hours_by_employee(entry) -> dict[str, float]:
+	from hrms.payroll.daily_pay import ensure_working_hours_from_times, get_public_holiday_pay_context
+
+	hours: dict[str, float] = {}
+	fields = ["employee", "attendance_date", "working_hours", "status"]
+	if frappe.db.has_column("Attendance", "in_time"):
+		fields += ["in_time", "out_time"]
+	for row in _period_attendance(entry, fields, include_draft=True):
+		if (row.get("status") or "") == "Absent":
+			continue
+		if not get_public_holiday_pay_context(row.employee, row.attendance_date):
+			continue
+		worked = flt(row.working_hours) or flt(ensure_working_hours_from_times(row))
+		hours[row.employee] = hours.get(row.employee, 0) + worked
+	return hours
 
 
 def _working_hours_by_employee(entry) -> dict[str, float]:
