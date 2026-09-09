@@ -140,3 +140,5 @@ hrms.patches.v16_0.add_employee_default_ipv4 #2026-09-09-default-ipv4
 hrms.patches.v16_0.lock_employee_salary_currency #2026-09-09-bzd-salary
 hrms.patches.v16_0.resync_unpaid_lunch_hours #2026-09-09
 hrms.patches.v16_0.include_live_clockins_in_floor_charts #2026-09-09-live-clockins
+hrms.patches.v16_0.add_holiday_work_list_page #2026-09-09-holiday-work-list
+hrms.patches.v16_0.ensure_staff_pro_first_admins #2026-09-09-first-admins

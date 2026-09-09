@@ -158,23 +158,49 @@ def is_agent_access_exempt(user: str | None = None) -> bool:
 	return bool(is_staff_pro_desk_admin(user))
 
 
+def get_clockin_ip_status(
+	*,
+	ignore_session_exemption: bool = False,
+	client_ip: str | None = None,
+) -> dict:
+	"""Whether office-IP restriction is on and whether this request may punch."""
+	allowed_ips = get_allowed_office_ips()
+	if not allowed_ips:
+		return {"restricted": False, "allowed": True}
+
+	if not ignore_session_exemption:
+		user = getattr(frappe.session, "user", None)
+		if user and is_agent_access_exempt(user):
+			return {"restricted": True, "allowed": True}
+
+	current = best_client_ipv4(client_ip)
+	return {"restricted": True, "allowed": current in allowed_ips}
+
+
+def is_office_clockin_ip_allowed(
+	*,
+	ignore_session_exemption: bool = False,
+	client_ip: str | None = None,
+) -> bool:
+	return bool(
+		get_clockin_ip_status(
+			ignore_session_exemption=ignore_session_exemption,
+			client_ip=client_ip,
+		)["allowed"]
+	)
+
+
 def validate_agent_clockin_ip(
 	employee: str | None = None,
 	*,
 	ignore_session_exemption: bool = False,
 	client_ip: str | None = None,
 ):
-	allowed = get_allowed_office_ips()
-	if not allowed:
-		return
-
-	if not ignore_session_exemption:
-		user = getattr(frappe.session, "user", None)
-		if user and is_agent_access_exempt(user):
-			return
-
-	current = best_client_ipv4(client_ip)
-	if current in allowed:
+	status = get_clockin_ip_status(
+		ignore_session_exemption=ignore_session_exemption,
+		client_ip=client_ip,
+	)
+	if status["allowed"]:
 		return
 
 	frappe.throw(_("You can only clock in from the office network."))

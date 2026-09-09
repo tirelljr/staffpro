@@ -1,0 +1,76 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+# Staff Pro BPO — Frappe HRMS on Render.
+# Frappe needs MariaDB, Redis, and a persistent sites disk. Free instances
+# cannot run this stack (no disks, 512 MB RAM, spin-down after idle).
+
+previews:
+  generation: off
+
+services:
+  - type: pserv
+    name: staffpro-mariadb
+    runtime: image
+    plan: standard
+    region: oregon
+    image:
+      url: docker.io/library/mariadb:11.4
+    dockerCommand: docker-entrypoint.sh --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --skip-character-set-client-handshake
+    disk:
+      name: staffpro-mariadb-data
+      mountPath: /var/lib/mysql
+      sizeGB: 10
+    envVars:
+      - key: MYSQL_ROOT_PASSWORD
+        generateValue: true
+      - key: MYSQL_ROOT_HOST
+        value: "%"
+      - key: MARIADB_AUTO_UPGRADE
+        value: "1"
+
+  - type: keyvalue
+    name: staffpro-redis
+    plan: starter
+    region: oregon
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
+
+  - type: web
+    name: staffpro
+    runtime: docker
+    plan: standard
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeployTrigger: commit
+    healthCheckPath: /api/method/ping
+    maxShutdownDelaySeconds: 30
+    disk:
+      name: staffpro-sites
+      mountPath: /home/frappe/frappe-bench/sites
+      sizeGB: 10
+    envVars:
+      - key: DB_HOST
+        fromService:
+          name: staffpro-mariadb
+          type: pserv
+          property: host
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_ROOT_PASSWORD
+        fromService:
+          name: staffpro-mariadb
+          type: pserv
+          envVarKey: MYSQL_ROOT_PASSWORD
+      - key: REDIS_URL
+        fromService:
+          name: staffpro-redis
+          type: keyvalue
+          property: connectionString
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: GUNICORN_WORKERS
+        value: "2"
+      - key: GUNICORN_THREADS
+        value: "4"
+      - key: GUNICORN_TIMEOUT
+        value: "120"

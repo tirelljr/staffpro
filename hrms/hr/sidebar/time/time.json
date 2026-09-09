@@ -75,6 +75,22 @@
    "child": 0,
    "collapsible": 1,
    "hidden": 0,
+   "icon": "sun",
+   "indent": 0,
+   "is_default_module": 0,
+   "keep_closed": 0,
+   "label": "Holiday Work List",
+   "link_to": "holiday-work-list",
+   "link_type": "Page",
+   "open_in_new_tab": 0,
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "added": 0,
+   "child": 0,
+   "collapsible": 1,
+   "hidden": 0,
    "icon": "clipboard-pen",
    "indent": 0,
    "is_default_module": 0,
@@ -530,7 +546,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-08 23:09:50.975905",
+ "modified": "2026-09-09 14:59:14.851763",
  "modified_by": "Administrator",
  "module": "HR",
  "name": "Time",

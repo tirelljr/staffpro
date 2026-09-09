@@ -116,10 +116,50 @@
 							<td class="px-2 py-2 align-top whitespace-nowrap">{{ row.job || "" }}</td>
 							<td class="px-2 py-2 align-top whitespace-nowrap">{{ row.shift || "" }}</td>
 						</tr>
-						<tr v-if="row.comments?.length" class="bg-white">
-							<td :colspan="mode === 'list' ? 13 : 7" class="px-2 pb-2 pt-0 text-gray-500">
-								<div v-for="(comment, commentIndex) in row.comments" :key="commentIndex">
+						<tr v-if="row.comments?.length || canAddNote(row)" class="bg-white">
+							<td :colspan="mode === 'list' ? 13 : 7" class="px-2 pb-3 pt-0 text-gray-500">
+								<div
+									v-for="(comment, commentIndex) in row.comments || []"
+									:key="commentIndex"
+									class="text-xs leading-5"
+								>
 									{{ formatHoursNote(comment) }}
+								</div>
+								<div v-if="canAddNote(row)" class="mt-1.5">
+									<button
+										v-if="noteDraftKey !== rowKey(row, index)"
+										type="button"
+										class="text-xs font-medium text-sky-700 hover:text-sky-800"
+										@click="openNote(row, index)"
+									>
+										{{ __("Add note") }}
+									</button>
+									<div v-else class="flex flex-col gap-2 max-w-xl">
+										<textarea
+											v-model="noteText"
+											rows="3"
+											class="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-800"
+											:placeholder="__('Add a note to adjust time, missed punches, etc.')"
+										/>
+										<div class="flex flex-wrap gap-2">
+											<button
+												type="button"
+												class="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+												:disabled="savingNote || !noteText.trim()"
+												@click="saveNote(row)"
+											>
+												{{ savingNote ? __("Saving...") : __("Save note") }}
+											</button>
+											<button
+												type="button"
+												class="rounded-md px-3 py-1.5 text-xs font-medium text-gray-600"
+												:disabled="savingNote"
+												@click="cancelNote"
+											>
+												{{ __("Cancel") }}
+											</button>
+										</div>
+									</div>
 								</div>
 							</td>
 						</tr>
@@ -144,7 +184,8 @@
 </template>
 
 <script setup>
-import { computed, inject } from "vue"
+import { computed, inject, ref } from "vue"
+import { createResource, toast } from "frappe-ui"
 
 import { formatClock, formatHours, formatHoursNote } from "@/utils/formatters"
 
@@ -191,10 +232,41 @@ const props = defineProps({
 	},
 })
 
-defineEmits(["update:fromDate", "update:toDate", "update:preset", "update:jobFilter"])
+const emit = defineEmits(["update:fromDate", "update:toDate", "update:preset", "update:jobFilter", "note-added"])
 
 const dayjs = inject("$dayjs")
 const __ = inject("$translate")
+
+const noteDraftKey = ref("")
+const noteText = ref("")
+
+const addNote = createResource({
+	url: "hrms.api.add_employee_hours_note",
+	onSuccess() {
+		noteDraftKey.value = ""
+		noteText.value = ""
+		toast({
+			title: __("Success"),
+			text: __("Note added"),
+			icon: "check-circle",
+			position: "bottom-center",
+			iconClasses: "text-green-500",
+		})
+		emit("note-added")
+	},
+	onError(error) {
+		const message = error?.messages?.[0] || error?.message || __("Could not add note.")
+		toast({
+			title: __("Error"),
+			text: message,
+			icon: "alert-circle",
+			position: "bottom-center",
+			iconClasses: "text-red-500",
+		})
+	},
+})
+
+const savingNote = computed(() => Boolean(addNote.loading))
 
 const presetOptions = [
 	{ value: "custom", label: __("Custom") },
@@ -327,5 +399,25 @@ function clockOut(row) {
 
 function rowKey(row, index) {
 	return [row.name, row.kind, row.in_time, row.out_time, row.attendance_date, index].join(":")
+}
+
+function canAddNote(row) {
+	return Boolean(row?.name && !row.empty && row.kind !== "lunch")
+}
+
+function openNote(row, index) {
+	noteDraftKey.value = rowKey(row, index)
+	noteText.value = ""
+}
+
+function cancelNote() {
+	noteDraftKey.value = ""
+	noteText.value = ""
+}
+
+function saveNote(row) {
+	const comment = noteText.value.trim()
+	if (!row?.name || !comment || savingNote.value) return
+	addNote.submit({ name: row.name, comment })
 }
 </script>

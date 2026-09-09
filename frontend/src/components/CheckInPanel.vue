@@ -13,6 +13,7 @@
 				</router-link>
 			</div>
 			<Button
+				v-if="clockinAllowed"
 				class="mt-4 mb-1 drop-shadow-sm py-5 text-base"
 				id="open-checkin-modal"
 				:loading="checkins.list.loading"
@@ -26,6 +27,9 @@
 				</template>
 				{{ nextAction.label }}
 			</Button>
+			<div v-else-if="settings.data" class="font-medium text-sm text-red-600 mt-4">
+				{{ __("You can only clock in from the office network.") }}
+			</div>
 		</template>
 
 		<div v-else class="font-medium text-sm text-gray-500 mt-1.5">
@@ -60,7 +64,7 @@
 	</div>
 
 	<ion-modal
-		v-if="settings.data?.allow_employee_checkin_from_mobile_app"
+		v-if="settings.data?.allow_employee_checkin_from_mobile_app && clockinAllowed"
 		ref="modal"
 		trigger="open-checkin-modal"
 		:initial-breakpoint="1"
@@ -165,6 +169,11 @@ const nextAction = computed(() => {
 		: { action: "IN", label: __("Check In") }
 })
 
+const clockinAllowed = computed(() => {
+	if (!settings.data) return false
+	return settings.data.clockin_allowed !== false
+})
+
 function handleLocationSuccess(position) {
 	latitude.value = position.coords.latitude
 	longitude.value = position.coords.longitude
@@ -190,6 +199,7 @@ const fetchLocation = () => {
 }
 
 const handleEmployeeCheckin = () => {
+	if (!clockinAllowed.value) return
 	checkinTimestamp.value = dayjs().format("YYYY-MM-DD HH:mm:ss")
 
 	if (settings.data?.allow_geolocation_tracking) {
@@ -198,6 +208,7 @@ const handleEmployeeCheckin = () => {
 }
 
 const submitLog = (logType) => {
+	if (!clockinAllowed.value) return
 	const actionLabel = logType === "IN" ? __("Check-in") : __("Check-out")
 
 	checkins.insert.submit(

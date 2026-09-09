@@ -20,6 +20,7 @@ import { session } from "@/data/session"
 import { userResource } from "@/data/user"
 import { employeeResource } from "@/data/employee"
 import { syncNotificationResources } from "@/data/notifications"
+import { canOpenDesk } from "@/utils/deskAccess"
 
 import dayjs from "@/utils/dayjs"
 import getIonicConfig from "@/utils/ionicConfig"
@@ -115,6 +116,9 @@ router.isReady().then(async () => {
 	app.mount("#app")
 })
 
+const KIOSK_ROUTES = new Set(["Login", "ForgotPassword"])
+const KIOSK_HOME_ROUTES = new Set(["AttendanceDashboard"])
+
 router.beforeEach(async (to, _, next) => {
 	let isLoggedIn = session.isLoggedIn
 
@@ -131,26 +135,31 @@ router.beforeEach(async (to, _, next) => {
 		// password reset page is outside the PWA scope
 		if (to.path === "/update-password") {
 			return next(false)
-		} else if (!["Login", "ForgotPassword"].includes(to.name)) {
+		}
+		if (!KIOSK_ROUTES.has(to.name)) {
 			return next({ name: "Login" })
 		}
+		return next()
 	}
 
-	if (isLoggedIn && to.name !== "InvalidEmployee") {
-		await employeeResource.promise
-		// user should be an employee to access the app
-		// since all views are employee specific
-		if (
-			!employeeResource?.data ||
-			employeeResource?.data?.user_id !== userResource.data?.name
-		) {
-			next({ name: "InvalidEmployee" })
-		} else if (["Login", "ForgotPassword"].includes(to.name)) {
-			next({ name: "AttendanceDashboard" })
-		} else {
-			next()
-		}
-	} else {
-		next()
+	// Kiosk and password reset stay on-screen even if a desk session cookie exists.
+	if (KIOSK_ROUTES.has(to.name) || to.name === "InvalidEmployee") {
+		return next()
 	}
+
+	// Desk admins opening /agents land on the kiosk, not their employee dashboard.
+	if (canOpenDesk(userResource.data) && KIOSK_HOME_ROUTES.has(to.name)) {
+		return next({ name: "Login" })
+	}
+
+	await employeeResource.promise
+	// Portal views are employee-specific; the session user must match an Employee.
+	if (
+		!employeeResource?.data ||
+		employeeResource?.data?.user_id !== userResource.data?.name
+	) {
+		return next({ name: "InvalidEmployee" })
+	}
+
+	next()
 })

@@ -107,8 +107,14 @@ calendars = ["Leave Application"]
 website_generators = ["Job Opening"]
 
 website_route_rules = [
-	{"from_route": "/hrms/<path:app_path>", "to_route": "hrms"},
+	{"from_route": "/agents", "to_route": "hrms"},
+	{"from_route": "/agents/<path:app_path>", "to_route": "hrms"},
 	{"from_route": "/hr/<path:app_path>", "to_route": "roster"},
+]
+
+website_redirects = [
+	{"source": "/hrms", "target": "/agents"},
+	{"source": r"/hrms/(.*)", "target": r"/agents/\1"},
 ]
 # Jinja
 # ----------
@@ -194,6 +200,11 @@ permission_query_conditions = {
 	"Dashboard Chart": "hrms.overrides.bpo_dashboards.get_chart_permission_query_conditions",
 	"Number Card": "hrms.overrides.bpo_dashboards.get_card_permission_query_conditions",
 	"Dashboard": "hrms.overrides.bpo_dashboards.get_dashboard_permission_query_conditions",
+	"Holiday Work Election": "hrms.hr.doctype.holiday_work_election.holiday_work_election.get_permission_query_conditions",
+}
+
+has_permission = {
+	"Holiday Work Election": "hrms.hr.doctype.holiday_work_election.holiday_work_election.has_permission",
 }
 
 has_upload_permission = {"Employee": "erpnext.setup.doctype.employee.employee.has_upload_permission"}

@@ -202,8 +202,13 @@ const CHART_PERIOD_CSS = `
 `;
 
 const HOURS_TABLE_CSS = `
-.sp-dash-hours{grid-column:1/-1;width:100%;max-width:100%;min-width:0}
-body.staff-pro-alive #page-dashboard-view .dashboard-graph:has(.sp-dash-hours){display:flex;flex-direction:column;align-items:stretch}
+.sp-dash-hours{grid-column:1/-1;width:100%;max-width:100%;min-width:0;overflow:visible}
+body.staff-pro-alive #page-dashboard-view .dashboard-graph:has(.sp-dash-hours){display:flex;flex-direction:column;align-items:stretch;overflow:visible}
+.sp-hours__toolbar{position:relative;z-index:6;overflow:visible}
+.sp-hours__field{position:relative;min-width:188px}
+.sp-hours__field .sp-dash-select__btn{min-width:188px}
+.sp-hours__field .sp-dash-select__menu{left:0;right:auto;max-height:260px;overflow-y:auto}
+.sp-dash-select__search{display:block;width:100%;margin:0 0 4px;padding:8px 12px;border:0;border-bottom:1px solid rgba(22,103,140,.18);border-radius:8px 8px 0 0;background:#fff;color:#16678c;font:inherit;font-size:13px}
 .sp-hours__table-wrap{min-width:0;max-height:560px;overflow:auto}
 .sp-hours__list{max-height:none!important;overflow:visible!important}
 .sp-hours__table-head{position:sticky;top:0;z-index:2;background:#fff}
@@ -693,12 +698,16 @@ function bind_dash_selects($root) {
 			event.stopPropagation();
 			const willOpen = $menu.prop("hidden");
 			close_dash_selects(willOpen ? $wrap : null);
+			close_hours_quick_menus();
 			if (!willOpen) return;
 			sync_dash_select_menu($wrap);
+			bind_hours_select_search($wrap);
 			$wrap.addClass("is-open");
 			$menu.prop("hidden", false);
 			$btn.attr("aria-expanded", "true");
-			$menu.find(".sp-dash-select__option.is-selected").trigger("focus");
+			const $search = $menu.find(".sp-dash-select__search");
+			if ($search.length) $search.trigger("focus");
+			else $menu.find(".sp-dash-select__option.is-selected").trigger("focus");
 		});
 
 		$menu.on("click", ".sp-dash-select__option", function (event) {
@@ -2454,42 +2463,76 @@ function hide_attendance_charts($root) {
 }
 
 function hours_filter_state($panel) {
-	const controls = $panel.data("hours-controls") || {};
 	return {
 		from_date: $panel.find(".sp-hours__from").val() || frappe.datetime.get_today(),
 		to_date: $panel.find(".sp-hours__to").val() || frappe.datetime.get_today(),
-		employee: (controls.employee && controls.employee.get_value()) || "",
-		department: (controls.department && controls.department.get_value()) || "",
+		employee: $panel.find(".sp-hours__employee").val() || "",
+		department: $panel.find(".sp-hours__department").val() || "",
 	};
 }
 
-function attach_hours_link($host, options, onchange) {
-	if (!frappe.ui?.form?.make_control) {
-		$host.html(
-			`<input type="text" class="sp-hours__${escape_html(options.fieldname)} sp-dash-panel__select sp-dash-panel__select--outline" placeholder="${escape_html(options.placeholder)}" />`,
-		);
-		$host.find("input").on("change", onchange);
-		return null;
-	}
-	const control = frappe.ui.form.make_control({
-		parent: $host.get(0),
-		df: {
-			fieldtype: "Link",
-			options: options.doctype,
-			fieldname: options.fieldname,
-			placeholder: options.placeholder,
-			only_select: 1,
-			get_query: options.get_query,
-			change: onchange,
-			onchange,
-		},
-		render_input: true,
+function hours_employee_options($panel) {
+	const department = $panel.find(".sp-hours__department").val() || "";
+	return [
+		{ value: "", label: __("All Agents") },
+		...($panel.data("hours-employees") || [])
+			.filter((row) => !department || row.department === department)
+			.map((row) => ({
+				value: row.name,
+				label: row.employee_name || row.name,
+			})),
+	];
+}
+
+function hours_department_options($panel) {
+	return [
+		{ value: "", label: __("All Departments") },
+		...($panel.data("hours-departments") || []).map((row) => ({
+			value: row.name,
+			label: row.name,
+		})),
+	];
+}
+
+function paint_hours_filter_selects($panel) {
+	set_dash_select_options($panel.find(".sp-hours__department"), hours_department_options($panel));
+	set_dash_select_options($panel.find(".sp-hours__employee"), hours_employee_options($panel));
+}
+
+function close_hours_quick_menus() {
+	$(".sp-hours__quick-wrap").removeClass("is-open");
+	$(".sp-hours__quick-menu").prop("hidden", true);
+	$(".sp-hours__quick-btn").attr("aria-expanded", "false");
+}
+
+function bind_hours_select_search($wrap) {
+	const $select = $wrap.children("select");
+	const $menu = $wrap.children(".sp-dash-select__menu");
+	if (!$select.hasClass("sp-hours__employee") || !$menu.length) return;
+	if ($menu.find(".sp-dash-select__search").length) return;
+
+	const $search = $(
+		`<input type="search" class="sp-dash-select__search" placeholder="${escape_html(__("Search agents"))}" autocomplete="off" />`,
+	);
+	$menu.prepend($search);
+	$search.on("click", (event) => event.stopPropagation());
+	$search.on("keydown", (event) => {
+		if (event.key === "Escape") {
+			event.preventDefault();
+			close_dash_selects();
+			$wrap.children(".sp-dash-select__btn").trigger("focus");
+		} else if (event.key === "Enter") {
+			event.preventDefault();
+		}
 	});
-	control.refresh();
-	control.$input?.addClass("sp-hours__control sp-dash-panel__select sp-dash-panel__select--outline");
-	control.$input?.attr("placeholder", options.placeholder);
-	control.$input?.on("awesomplete-selectcomplete", onchange);
-	return control;
+	$search.on("input", function () {
+		const query = String(this.value || "").trim().toLowerCase();
+		$menu.find(".sp-dash-select__option").each(function () {
+			const value = String($(this).attr("data-value") || "");
+			const text = String($(this).text() || "").toLowerCase();
+			$(this).toggle(!query || !value || text.includes(query));
+		});
+	});
 }
 
 function local_hours_presets() {
@@ -2874,10 +2917,10 @@ function bind_hours_row_actions($panel, $list) {
 }
 
 function update_hours_title($panel) {
-	const controls = $panel.data("hours-controls") || {};
-	const employee = controls.employee?.get_value?.();
+	const $employee = $panel.find(".sp-hours__employee");
+	const employee = $employee.val();
 	const label = employee
-		? controls.employee.$input?.val() || employee
+		? $employee.find("option:selected").text() || employee
 		: __("All Agents");
 	$panel.find(".sp-dash-panel__title").text(label);
 }
@@ -2920,7 +2963,7 @@ function inject_hours_board($root) {
 		return $(this).find(".number-widget-box").length;
 	}).first();
 	const $existing = $root.find(".sp-dash-hours");
-	if ($existing.length && $existing.data("sp-hours-select-v7")) {
+	if ($existing.length && $existing.data("sp-hours-select-v9")) {
 		if ($kpiGroup.length && !$kpiGroup.next().is(".sp-dash-hours")) {
 			$kpiGroup.after($existing);
 		}
@@ -2960,8 +3003,24 @@ function inject_hours_board($root) {
 						<input type="date" class="sp-hours__to" value="${escape_html(today)}" />
 					</label>
 				</div>
-				<div class="sp-hours__field" data-field="employee"></div>
-				<div class="sp-hours__field" data-field="department"></div>
+				<div class="sp-hours__field" data-field="employee">
+					${dash_select_html({
+						className: "sp-hours__employee",
+						variant: "outline",
+						label: __("All Agents"),
+						options: [{ value: "", label: __("All Agents") }],
+						value: "",
+					})}
+				</div>
+				<div class="sp-hours__field" data-field="department">
+					${dash_select_html({
+						className: "sp-hours__department",
+						variant: "outline",
+						label: __("All Departments"),
+						options: [{ value: "", label: __("All Departments") }],
+						value: "",
+					})}
+				</div>
 				<label class="sp-hours__group">
 					<input type="checkbox" class="sp-hours__group-by" />
 					<span>${escape_html(__("Group by Date"))}</span>
@@ -2993,47 +3052,17 @@ function inject_hours_board($root) {
 	$panel.data("hours-presets", local_hours_presets());
 	$panel.data("hours-range", "today");
 	$panel.data("hours-sort", { ...HOURS_DEFAULT_SORT });
-	$panel.data("sp-hours-select-v7", true);
+	$panel.data("sp-hours-select-v9", true);
+	bind_dash_selects($panel);
 
 	const reload = () => load_hours($panel);
-	const controls = {
-		employee: attach_hours_link(
-			$panel.find('.sp-hours__field[data-field="employee"]'),
-			{
-				doctype: "Employee",
-				fieldname: "employee",
-				placeholder: __("All Agents"),
-				get_query() {
-					const department = controls.department?.get_value?.();
-					const filters = { status: "Active" };
-					if (department) filters.department = department;
-					return { filters };
-				},
-			},
-			reload,
-		),
-		department: attach_hours_link(
-			$panel.find('.sp-hours__field[data-field="department"]'),
-			{ doctype: "Department", fieldname: "department", placeholder: __("All Departments") },
-			() => {
-				if (controls.employee?.get_value?.()) {
-					const employees = $panel.data("hours-employees") || [];
-					const department = controls.department?.get_value?.();
-					const current = controls.employee.get_value();
-					const match = employees.find((row) => row.name === current);
-					if (department && match && match.department !== department) {
-						controls.employee.set_value("");
-					}
-				}
-				reload();
-			},
-		),
-	};
-	$panel.data("hours-controls", controls);
+	$panel.find(".sp-hours__employee").on("change", reload);
+	$panel.find(".sp-hours__department").on("change", () => {
+		set_dash_select_options($panel.find(".sp-hours__employee"), hours_employee_options($panel));
+		reload();
+	});
 	const close_hours_quick = () => {
-		$panel.find(".sp-hours__quick-menu").prop("hidden", true);
-		$panel.find(".sp-hours__quick-btn").attr("aria-expanded", "false");
-		$panel.find(".sp-hours__quick-wrap").removeClass("is-open");
+		close_hours_quick_menus();
 	};
 	const mark_hours_range = (key) => {
 		$panel.find(".sp-hours__quick-menu [data-range]").removeClass("is-selected");
@@ -3048,6 +3077,7 @@ function inject_hours_board($root) {
 	};
 	$panel.find(".sp-hours__quick-btn").on("click", function (event) {
 		event.stopPropagation();
+		close_dash_selects();
 		const $menu = $panel.find(".sp-hours__quick-menu");
 		const $wrap = $panel.find(".sp-hours__quick-wrap");
 		const willOpen = $menu.prop("hidden");
@@ -3113,6 +3143,8 @@ function inject_hours_board($root) {
 		method: "hrms.hr.doctype.attendance.attendance.get_hours_filter_options",
 		callback(r) {
 			$panel.data("hours-employees", r.message?.employees || []);
+			$panel.data("hours-departments", r.message?.departments || []);
+			paint_hours_filter_selects($panel);
 		},
 	});
 }

@@ -1799,7 +1799,19 @@ def _add_hours_comment(name: str, comment: str | None, doctype: str = "Attendanc
 	text = (comment or "").strip()
 	if not name or not text:
 		return
-	frappe.get_doc(doctype, name).add_comment("Comment", text)
+	# Employees can read their hours but cannot write Attendance, so insert the
+	# comment directly instead of going through get_doc + write permission.
+	frappe.get_doc(
+		{
+			"doctype": "Comment",
+			"comment_type": "Comment",
+			"comment_email": frappe.session.user,
+			"comment_by": getattr(frappe.session, "user_fullname", None) or frappe.session.user,
+			"reference_doctype": doctype,
+			"reference_name": name,
+			"content": text,
+		}
+	).insert(ignore_permissions=True)
 
 
 def _hours_comments_by_attendance(names: list[str]) -> dict[str, list[dict]]:

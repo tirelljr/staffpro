@@ -91,7 +91,7 @@ const routes = [
 ]
 
 const router = createRouter({
-	history: createWebHistory("/hrms"),
+	history: createWebHistory("/agents"),
 	routes,
 })
 

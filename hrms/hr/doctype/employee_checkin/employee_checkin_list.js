@@ -46,6 +46,7 @@ frappe.listview_settings["Employee Checkin"] = {
 	},
 	primary_action: function () {
 		const listview = cur_list;
+		if (listview?.clockin_allowed === false) return;
 		if (listview?.checkin_employee) {
 			start_checkin(listview, listview.next_checkin || get_next_checkin());
 		}
@@ -77,9 +78,22 @@ async function setup_checkin_action(listview) {
 		"HR Settings",
 		"allow_geolocation_tracking",
 	);
+	const hrSettings = await frappe.xcall("hrms.api.get_hr_settings");
+	listview.clockin_allowed = hrSettings?.clockin_allowed !== false;
 	listview.set_primary_action = () => {
 		const next = listview.next_checkin;
 		if (!next) return;
+
+		if (!listview.clockin_allowed) {
+			listview.painted_checkin = null;
+			if (listview.page.btn_primary) {
+				listview.page.btn_primary.addClass("hide");
+			}
+			if (listview.page.clear_primary_action) {
+				listview.page.clear_primary_action();
+			}
+			return;
+		}
 
 		const button = listview.page.btn_primary;
 		if (listview.painted_checkin === next.log_type && !button.hasClass("hide")) return;
@@ -100,6 +114,15 @@ async function setup_checkin_action(listview) {
 	listview.get_no_result_message = () => {
 		if (listview.filter_area?.get()?.length) {
 			return default_no_result_message();
+		}
+
+		if (!listview.clockin_allowed) {
+			return frappe.ui.empty_state.html({
+				icon: "clock",
+				title: __("No check-ins yet"),
+				description: __("You can only clock in from the office network."),
+				actions: [],
+			});
 		}
 
 		return frappe.ui.empty_state.html({
@@ -135,6 +158,7 @@ async function refresh_checkin_state(listview) {
 }
 
 async function start_checkin(listview, next) {
+	if (listview.clockin_allowed === false) return;
 	const time = frappe.datetime.now_datetime();
 
 	if (!listview.track_geolocation) {

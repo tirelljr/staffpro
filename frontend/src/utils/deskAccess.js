@@ -11,7 +11,7 @@ const DESK_ROLES = new Set([
 
 /**
  * True when the user should see the Desk bridge from the employee PWA.
- * Pure ESS / Website User employees stay in /hrms.
+ * Pure ESS / Website User employees stay in /agents.
  */
 export function canOpenDesk(user) {
 	if (!user) return false

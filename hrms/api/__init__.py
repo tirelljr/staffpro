@@ -102,11 +102,16 @@ def get_current_employee() -> str:
 # HR Settings
 @frappe.whitelist()
 def get_hr_settings() -> dict:
+	from hrms.hr.agent_access import get_clockin_ip_status
+
 	settings = frappe.db.get_singles_dict("HR Settings", cast=True)
+	status = get_clockin_ip_status()
 	return frappe._dict(
 		allow_employee_checkin_from_mobile_app=settings.allow_employee_checkin_from_mobile_app,
 		allow_geolocation_tracking=settings.allow_geolocation_tracking,
 		prevent_self_leave_approval=settings.prevent_self_leave_approval,
+		clockin_restricted=bool(status["restricted"]),
+		clockin_allowed=bool(status["allowed"]),
 	)
 
 
@@ -226,6 +231,30 @@ def get_employee_hours(
 ) -> dict:
 	"""Clock rows for the signed-in employee, matching desk Day View / List View."""
 	return _employee_hours_payload(from_date=from_date, to_date=to_date, preset=preset)
+
+
+@frappe.whitelist()
+def add_employee_hours_note(name: str, comment: str) -> dict:
+	"""Let the signed-in employee leave a note on their own hours row."""
+	from hrms.hr.doctype.attendance.attendance import _add_hours_comment
+
+	employee = get_current_employee()
+	text = strip_html(comment or "").strip()
+	if not (name or "").strip():
+		frappe.throw(_("Attendance is required."))
+	if not text:
+		frappe.throw(_("Note is required."))
+
+	attendance = frappe.db.get_value("Attendance", name, ["employee", "docstatus"], as_dict=True)
+	if not attendance:
+		frappe.throw(_("Attendance not found."))
+	if attendance.employee != employee:
+		frappe.throw(_("You can only add notes to your own hours."), frappe.PermissionError)
+	if int(attendance.docstatus or 0) == 2:
+		frappe.throw(_("You cannot add notes to cancelled hours."))
+
+	_add_hours_comment(name, text)
+	return {"ok": True}
 
 
 @frappe.whitelist()
@@ -508,24 +537,22 @@ def get_leave_balance_map() -> dict[str, dict[str, float]]:
 
 @frappe.whitelist()
 def get_holidays_for_employee(employee: str) -> list[dict]:
-	holiday_list = get_holiday_list_for_employee(employee, raise_exception=False)
-	if not holiday_list:
-		return []
+	from hrms.hr.doctype.holiday_work_election.holiday_work_election import (
+		assert_can_access_employee_holidays,
+		get_upcoming_holidays_for_employee,
+	)
 
-	frappe.has_permission("Holiday List", "read", holiday_list, throw=True)
+	assert_can_access_employee_holidays(employee)
+	return get_upcoming_holidays_for_employee(employee)
 
-	Holiday = frappe.qb.DocType("Holiday")
-	holidays = (
-		frappe.qb.from_(Holiday)
-		.select(Holiday.name, Holiday.holiday_date, Holiday.description)
-		.where((Holiday.parent == holiday_list) & (Holiday.weekly_off == 0))
-		.orderby(Holiday.holiday_date, order=Order.asc)
-	).run(as_dict=True)
 
-	for holiday in holidays:
-		holiday["description"] = strip_html(holiday["description"] or "").strip()
+@frappe.whitelist()
+def set_holiday_work_election(employee: str, holiday_date: str, will_work=0) -> dict:
+	from hrms.hr.doctype.holiday_work_election.holiday_work_election import (
+		set_holiday_work_election as upsert_election,
+	)
 
-	return holidays
+	return upsert_election(employee, holiday_date, will_work)
 
 
 @frappe.whitelist()

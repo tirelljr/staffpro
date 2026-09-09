@@ -26,9 +26,9 @@ export default defineConfig({
 				display: "standalone",
 				name: "Staff Pro BPO",
 				short_name: "Staff Pro",
-				start_url: "/hrms",
-				scope: "/hrms",
-				id: "/hrms",
+				start_url: "/agents",
+				scope: "/agents",
+				id: "/agents",
 				description: "HR & Payroll for Staff Pro BPO",
 				theme_color: "#16678C",
 				background_color: "#000000",
@@ -114,7 +114,7 @@ function getProxyOptions() {
 function getCommonSiteConfig() {
 	let currentDir = path.resolve(".")
 	// traverse up till we find frappe-bench with sites directory
-	while (currentDir !== "/") {
+	while (true) {
 		if (
 			fs.existsSync(path.join(currentDir, "sites")) &&
 			fs.existsSync(path.join(currentDir, "apps"))
@@ -125,7 +125,10 @@ function getCommonSiteConfig() {
 			}
 			return null
 		}
-		currentDir = path.resolve(currentDir, "..")
+		const parentDir = path.resolve(currentDir, "..")
+		if (parentDir === currentDir) {
+			return null
+		}
+		currentDir = parentDir
 	}
-	return null
 }

@@ -5,6 +5,7 @@ LINK_LABELS: dict[str, str] = {
 	"Employee": "Agents",
 	"Data Analytics": "Data Analytics",
 	"in-out-today": "Who Is In",
+	"holiday-work-list": "Holiday Work List",
 	"day-view": "Day View",
 	"organizational-chart": "Team Structure",
 	"paid-time-off": "Paid Time Off",

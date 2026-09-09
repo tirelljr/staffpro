@@ -38,6 +38,8 @@ class TestKioskLogin(HRMSTestSuite):
 		frappe.db.set_value("User", user, "username", "KioskResolve")
 		self.assertEqual(resolve_user_from_login("KioskResolve"), user)
 		self.assertEqual(resolve_login("KioskResolve"), user)
+		frappe.db.set_value("User", user, "full_name", "Kiosk Resolve")
+		self.assertEqual(resolve_user_from_login("Kiosk Resolve"), user)
 
 	def test_enable_username_login(self):
 		enable_username_login()
@@ -54,6 +56,33 @@ class TestKioskLogin(HRMSTestSuite):
 		self.assertEqual(result["employee"], employee)
 		self.assertEqual(result["next_action"], "OUT")
 		self.assertTrue(frappe.db.exists("Employee Checkin", result["checkin"]))
+
+	def test_kiosk_clock_out_flips_next_action_to_in(self):
+		employee = make_employee("kiosk.clock.out@example.com", company="_Test Company")
+		user = frappe.db.get_value("Employee", employee, "user_id")
+		frappe.db.set_value("User", user, "username", "KioskClockOut")
+		update_password(user, "KioskPass123")
+
+		clocked_in = clock("KioskClockOut", "KioskPass123", "IN")
+		self.assertEqual(clocked_in["next_action"], "OUT")
+		clocked_out = clock("KioskClockOut", "KioskPass123", "OUT")
+		self.assertEqual(clocked_out["log_type"], "OUT")
+		self.assertEqual(clocked_out["next_action"], "IN")
+		profile = get_kiosk_profile("KioskClockOut")
+		self.assertEqual(profile["next_action"], "IN")
+
+	def test_kiosk_clock_does_not_create_session(self):
+		employee = make_employee("kiosk.nosession@example.com", company="_Test Company")
+		user = frappe.db.get_value("Employee", employee, "user_id")
+		frappe.db.set_value("User", user, "username", "KioskNoSession")
+		update_password(user, "KioskPass123")
+
+		frappe.set_user("Guest")
+		self.assertEqual(frappe.session.user, "Guest")
+		result = clock("KioskNoSession", "KioskPass123", "IN")
+		self.assertEqual(result["log_type"], "IN")
+		self.assertEqual(result["employee"], employee)
+		self.assertEqual(frappe.session.user, "Guest")
 
 	def test_kiosk_rejects_bad_password(self):
 		employee = make_employee("kiosk.badpass@example.com", company="_Test Company")
@@ -101,6 +130,44 @@ class TestKioskLogin(HRMSTestSuite):
 		context = get_kiosk_context()
 		self.assertIn("company_name", context)
 		self.assertIn("ip", context)
+		self.assertIn("clockin_restricted", context)
+		self.assertIn("clockin_allowed", context)
+
+	def test_kiosk_context_clockin_allowed_when_restriction_off(self):
+		from hrms.hr.test_agent_access import _ensure_fields, _set_ip_restriction
+
+		_ensure_fields()
+		_set_ip_restriction(0, "")
+		frappe.local.request_ip = "198.51.100.20"
+		context = get_kiosk_context()
+		self.assertFalse(context["clockin_restricted"])
+		self.assertTrue(context["clockin_allowed"])
+
+	def test_kiosk_context_clockin_denied_off_office_ip(self):
+		from hrms.hr.test_agent_access import OTHER_IP, OFFICE_IP, _ensure_fields, _set_ip_restriction
+
+		_ensure_fields()
+		_set_ip_restriction(1, OFFICE_IP)
+		frappe.local.request_ip = OTHER_IP
+		try:
+			context = get_kiosk_context()
+			self.assertTrue(context["clockin_restricted"])
+			self.assertFalse(context["clockin_allowed"])
+		finally:
+			_set_ip_restriction(0, "")
+
+	def test_kiosk_context_clockin_allowed_on_office_ip(self):
+		from hrms.hr.test_agent_access import OFFICE_IP, _ensure_fields, _set_ip_restriction
+
+		_ensure_fields()
+		_set_ip_restriction(1, OFFICE_IP)
+		frappe.local.request_ip = OFFICE_IP
+		try:
+			context = get_kiosk_context()
+			self.assertTrue(context["clockin_restricted"])
+			self.assertTrue(context["clockin_allowed"])
+		finally:
+			_set_ip_restriction(0, "")
 
 	def test_kiosk_context_uses_scanned_client_ip(self):
 		from unittest.mock import patch

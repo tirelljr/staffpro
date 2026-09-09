@@ -22,6 +22,8 @@ ATTENDANCE_BONUS_DEFAULTS = {
 
 PREFERRED_EARNING_COMPONENTS = ("Basic Hourly", "Basic Salary", "Basic", "Salary")
 PREFERRED_DEDUCTION_COMPONENTS = ("Social Security",)
+BONUS_SALARY_COMPONENT = "Bonus"
+ATTENDANCE_DEDUCTION_COMPONENT = "Attendance Deduction"
 
 
 class BonusType(Document):

@@ -42,7 +42,7 @@
 					<form
 						v-if="!user_pass_login_disabled.data"
 						class="w-full mt-4 flex flex-col gap-3"
-						@submit.prevent="submitClock"
+						@submit.prevent
 					>
 						<div class="relative">
 							<input
@@ -55,6 +55,7 @@
 								@focus="showRemembered = true"
 								@blur="hideRememberedSoon"
 								@input="onUsernameInput"
+								@keydown.enter.prevent
 							/>
 							<datalist id="remembered-usernames">
 								<option v-for="user in rememberedUsers" :key="user.username" :value="user.username" />
@@ -82,6 +83,8 @@
 							autocomplete="current-password"
 							:placeholder="__('Password')"
 							class="w-full border border-gray-400 bg-white px-3 py-2 text-base text-gray-900"
+							@blur="onRememberPasswordChange"
+							@keydown.enter.prevent
 						/>
 
 						<ErrorMessage :message="errorMessage" />
@@ -93,31 +96,35 @@
 							</div>
 							<div class="flex-1 min-w-0">
 								<button
-									type="submit"
+									v-if="showClockAction"
+									type="button"
 									class="w-full py-3 text-white text-lg font-semibold disabled:opacity-60"
 									:class="clockAction === 'OUT' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
-									:disabled="clocking || session.login.loading"
+									:disabled="clocking || signingIn"
+									@click="submitClock"
 								>
 									{{ clocking ? __("Saving...") : clockAction === "OUT" ? __("CLOCK OUT") : __("CLOCK IN") }}
 								</button>
+								<div
+									v-else-if="clockinBlocked"
+									class="text-sm text-red-600 text-center sm:text-left"
+								>
+									{{ __("You can only clock in from the office network.") }}
+								</div>
 								<div v-if="activityLabels.length" class="mt-2 text-sm text-[#11a5dd] text-center sm:text-left">
 									<div v-for="(label, idx) in activityLabels" :key="idx">{{ label }}</div>
 								</div>
 							</div>
 						</div>
 
-						<button
-							type="button"
-							class="w-full py-3 text-white text-lg font-semibold bg-[#2f6fdb] hover:bg-[#2558b0] disabled:opacity-60"
-							:disabled="clocking || session.login.loading"
-							@click="submitLogin"
-						>
-							{{ session.login.loading ? __("Signing in...") : __("Login") }}
-						</button>
-
 						<div class="flex items-center justify-between text-sm mt-1">
-							<label class="inline-flex items-center gap-2 text-gray-700">
-								<input v-model="rememberPassword" type="checkbox" class="rounded border-gray-400" />
+							<label class="inline-flex items-center gap-2 text-gray-700 cursor-pointer">
+								<input
+									v-model="rememberPassword"
+									type="checkbox"
+									class="rounded border-gray-400"
+									@change="onRememberPasswordChange"
+								/>
 								{{ __("remember password") }}
 							</label>
 							<router-link
@@ -127,22 +134,21 @@
 								{{ __("forgot password") }}
 							</router-link>
 						</div>
-					</form>
 
-					<template v-if="authProviders.data?.length">
-						<div v-if="!user_pass_login_disabled.data" class="text-center text-sm text-gray-600 my-4">or</div>
-						<div class="space-y-4 w-full">
-							<a
-								v-for="provider in authProviders.data"
-								:key="provider.name"
-								class="flex items-center justify-center gap-2 transition-colors focus:outline-none text-gray-800 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 focus-visible:ring focus-visible:ring-gray-400 h-7 text-base p-2 rounded"
-								:href="provider.auth_url"
+						<div class="mt-4 flex flex-col items-center gap-2">
+							<button
+								type="button"
+								class="w-full py-3 text-white text-lg font-semibold bg-[#2f6fdb] hover:bg-[#2558b0] disabled:opacity-60 disabled:cursor-not-allowed"
+								:disabled="clocking || signingIn || portalBlocked"
+								@click="submitLogin"
 							>
-								<img class="h-4 w-4" :src="provider.icon" :alt="provider.provider_name" />
-								<span>Login with {{ provider.provider_name }}</span>
-							</a>
+								{{ signingIn ? __("Opening portal...") : __("Open my portal") }}
+							</button>
+							<p v-if="portalBlocked" class="text-xs text-gray-500 text-center">
+								{{ __("An admin is signed in on this computer. Use Clock In/Out only.") }}
+							</p>
 						</div>
-					</template>
+					</form>
 
 					<div v-else-if="user_pass_login_disabled.data" class="text-center text-gray-600 py-8">
 						{{ __("No login methods are available. Please contact your administrator.") }}
@@ -197,9 +203,10 @@
 
 <script setup>
 import { IonPage, IonContent } from "@ionic/vue"
-import { computed, inject, onBeforeUnmount, onMounted, reactive, ref } from "vue"
+import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { Input, Button, ErrorMessage, Dialog, createResource, call, debounce } from "frappe-ui"
 import { STAFF_PRO_LOGO_URL } from "@/utils/branding"
+import { canOpenDesk } from "@/utils/deskAccess"
 import { scanClientIpv4, isPlaceholderPeerIpv4 } from "@/utils/clientIp"
 import {
 	forgetPassword,
@@ -218,6 +225,7 @@ const rememberPassword = ref(false)
 const errorMessage = ref("")
 const successMessage = ref("")
 const clocking = ref(false)
+const signingIn = ref(false)
 const showRemembered = ref(false)
 const rememberedUsers = ref(getRememberedUsers())
 const localDeviceId = getDeviceId()
@@ -241,14 +249,20 @@ const otp = reactive({
 })
 
 const session = inject("$session")
+const userResource = inject("$user")
 const __ = inject("$translate")
 const dayjs = inject("$dayjs")
+const portalBlocked = computed(() => canOpenDesk(userResource?.data))
 
 const liveProfile = ref(null)
 const selectedRemembered = computed(() => getRememberedUser(username.value))
 const activeProfile = computed(() => liveProfile.value || selectedRemembered.value)
 const displayName = computed(() => activeProfile.value?.employee_name || "")
-const clockAction = computed(() => activeProfile.value?.next_action || "IN")
+function normalizeClockAction(value) {
+	return String(value || "IN").toUpperCase() === "OUT" ? "OUT" : "IN"
+}
+
+const clockAction = computed(() => normalizeClockAction(activeProfile.value?.next_action))
 const activityLabels = computed(() => {
 	const user = activeProfile.value
 	if (!user) return []
@@ -267,11 +281,6 @@ const user_pass_login_disabled = createResource({
 	url: "hrms.api.system_settings.get_user_pass_login_disabled",
 	method: "GET",
 	initialData: 1,
-	auto: true,
-})
-
-const authProviders = createResource({
-	url: "hrms.api.oauth.oauth_providers",
 	auto: true,
 })
 
@@ -296,6 +305,32 @@ const displayIp = computed(() => {
 	if (!ipScanDone.value) return __("scanning...")
 	return serverIp || "na"
 })
+
+const clockinRestricted = computed(() => Boolean(kioskContext.data?.clockin_restricted))
+const clockinLatchedAllowed = ref(false)
+const clockinBlocked = computed(() => {
+	if (clockinLatchedAllowed.value) return false
+	if (!kioskContext.data) return false
+	if (!clockinRestricted.value) return false
+	if (kioskContext.data.clockin_allowed) return false
+	return ipScanDone.value
+})
+const showClockAction = computed(() => {
+	if (clockinLatchedAllowed.value) return true
+	if (!kioskContext.data) return false
+	if (!clockinRestricted.value) return true
+	return Boolean(kioskContext.data.clockin_allowed)
+})
+
+watch(
+	() => kioskContext.data,
+	(data) => {
+		if (data && (!data.clockin_restricted || data.clockin_allowed)) {
+			clockinLatchedAllowed.value = true
+		}
+	},
+	{ immediate: true }
+)
 
 function tickClock() {
 	clockLabel.value = dayjs().format("hh:mm:ss A")
@@ -373,6 +408,24 @@ function persistProfile(profile) {
 	rememberedUsers.value = getRememberedUsers()
 }
 
+function persistCurrentCredentials() {
+	const login = (username.value || "").trim()
+	if (!login) return
+	persistProfile({
+		username: login,
+		employee_name: activeProfile.value?.employee_name || "",
+		last_in_label: activeProfile.value?.last_in_label || "",
+		last_pair_label: activeProfile.value?.last_pair_label || "",
+		today_labels: activeProfile.value?.today_labels || [],
+		next_action: activeProfile.value?.next_action || "IN",
+		device_id: activeProfile.value?.device_id || "",
+	})
+}
+
+function onRememberPasswordChange() {
+	persistCurrentCredentials()
+}
+
 function readFieldValue(selector) {
 	const el = document.querySelector(selector)
 	return (el?.value || "").trim()
@@ -391,6 +444,7 @@ function requireCredentials() {
 }
 
 async function submitClock() {
+	if (!showClockAction.value) return
 	const login = requireCredentials()
 	if (!login) return
 
@@ -407,8 +461,10 @@ async function submitClock() {
 			device_id: localDeviceId,
 			client_ip: scannedIp.value || undefined,
 		})
-		persistProfile(profile)
-		applyLiveProfile(profile)
+		const nextAction = profile.log_type === "IN" ? "OUT" : "IN"
+		const updated = { ...profile, next_action: nextAction }
+		persistProfile(updated)
+		applyLiveProfile(updated)
 		const actionLabel = profile.log_type === "OUT" ? __("Clocked out") : __("Clocked in")
 		successMessage.value = __("{0} at {1}", [actionLabel, profile.time_label || clockLabel.value])
 	} catch (error) {
@@ -418,7 +474,12 @@ async function submitClock() {
 	}
 }
 
-async function submitLogin(e) {
+async function submitLogin() {
+	if (portalBlocked.value && !otp.showDialog) return
+
+	signingIn.value = true
+	errorMessage.value = ""
+	successMessage.value = ""
 	try {
 		let response
 		if (otp.showDialog) {
@@ -457,6 +518,8 @@ async function submitLogin(e) {
 	} catch (error) {
 		errorMessage.value =
 			error.messages?.join("\n") || error.message || __("Invalid login credentials")
+	} finally {
+		signingIn.value = false
 	}
 }
 

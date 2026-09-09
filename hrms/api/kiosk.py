@@ -9,7 +9,12 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt, get_datetime, getdate, now_datetime, time_diff_in_hours
 
-from hrms.hr.agent_access import best_client_ipv4, normalize_ipv4, validate_agent_clockin_ip
+from hrms.hr.agent_access import (
+	best_client_ipv4,
+	get_clockin_ip_status,
+	normalize_ipv4,
+	validate_agent_clockin_ip,
+)
 from hrms.overrides.employee_master import resolve_user_from_login
 
 
@@ -93,6 +98,7 @@ def _default_company() -> dict:
 def get_kiosk_context(client_ip: str | None = None) -> dict:
 	company = _default_company()
 	ip = _request_ip(client_ip)
+	status = get_clockin_ip_status(ignore_session_exemption=True, client_ip=client_ip)
 	return {
 		"ip": ip,
 		"device_id": resolve_workstation_device(client_ip=ip),
@@ -101,6 +107,8 @@ def get_kiosk_context(client_ip: str | None = None) -> dict:
 		"allow_geolocation_tracking": cint(
 			frappe.db.get_single_value("HR Settings", "allow_geolocation_tracking")
 		),
+		"clockin_restricted": bool(status["restricted"]),
+		"clockin_allowed": bool(status["allowed"]),
 	}
 
 
@@ -205,8 +213,9 @@ def _checkin_summary(employee: str) -> dict:
 		if label:
 			today_labels.append(label)
 
-	last = logs[-1] if logs else None
-	next_action = "OUT" if last and last.log_type == "IN" else "IN"
+	today_logs = [row for row in logs if getdate(row.time) == today]
+	last_today = today_logs[-1] if today_logs else None
+	next_action = "OUT" if last_today and last_today.log_type == "IN" else "IN"
 	open_pair = next((pair for pair in reversed(today_pairs) if pair.get("open")), None)
 	completed = [pair for pair in reversed(today_pairs) if not pair.get("open")]
 	last_in = next((row for row in reversed(logs) if row.log_type == "IN"), None)

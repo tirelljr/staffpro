@@ -42,4 +42,4 @@ def get_boot():
 
 
 def get_default_route():
-	return "/hrms"
+	return "/agents"

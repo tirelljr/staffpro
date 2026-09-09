@@ -50,7 +50,7 @@ class PWANotification(Document):
 			self.log_error(f"Error sending push notification: {self.name}")
 
 	def get_notification_link(self):
-		base_url = f"{frappe.utils.get_url()}/hrms"
+		base_url = f"{frappe.utils.get_url()}/agents"
 
 		if self.reference_document_type == "Leave Application":
 			return f"{base_url}/leave-applications/{self.reference_document_name}"

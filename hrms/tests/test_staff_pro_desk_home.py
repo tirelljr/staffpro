@@ -14,6 +14,11 @@ from hrms.boot import (
 	prepare_staff_pro_first_login,
 	staff_pro_desk_home_path,
 )
+from hrms.first_admins import (
+	STAFF_PRO_FIRST_ADMINS,
+	ensure_staff_pro_first_admins,
+)
+from hrms.overrides.employee_master import resolve_user_from_login
 from hrms.branding import publish_hashed_bundle
 from hrms.tests.utils import HRMSTestSuite
 
@@ -27,6 +32,16 @@ class TestStaffProDeskHome(HRMSTestSuite):
 		on_staff_pro_login()
 		self.assertEqual(frappe.local.response.get("home_page"), staff_pro_desk_home_path())
 		self.assertEqual(frappe.local.response.get("redirect_to"), staff_pro_desk_home_path())
+
+	def test_first_login_creates_named_system_managers(self):
+		ensure_staff_pro_first_admins()
+		for spec in STAFF_PRO_FIRST_ADMINS:
+			user = resolve_user_from_login(spec["username"])
+			self.assertTrue(user)
+			self.assertEqual(frappe.db.get_value("User", user, "username"), spec["username"])
+			self.assertEqual(frappe.db.get_value("User", user, "user_type"), "System User")
+			self.assertTrue(frappe.db.exists("Has Role", {"parent": user, "role": "System Manager"}))
+		self.assertEqual(frappe.db.get_single_value("System Settings", "allow_login_using_user_name"), 1)
 
 	def test_first_login_setup_points_staff_pro_icon_at_bpo_home(self):
 		prepare_staff_pro_first_login()

@@ -7,14 +7,17 @@ from frappe.utils.password import update_password
 
 from erpnext.setup.doctype.employee.test_employee import make_employee
 
+from hrms.api import get_hr_settings
 from hrms.api.kiosk import clock
 from hrms.hr.agent_access import (
 	_ping_command,
 	_scan_live_hosts,
 	apply_office_ipv4_defaults,
 	best_client_ipv4,
+	get_clockin_ip_status,
 	is_agent_access_exempt,
 	is_container_peer_ipv4,
+	is_office_clockin_ip_allowed,
 	is_scannable_private_ipv4,
 	normalize_ipv4,
 	parse_office_ipv4s,
@@ -157,6 +160,61 @@ class TestAgentAccess(HRMSTestSuite):
 		frappe.local.request_ip = OTHER_IP
 		with self.assertRaises(frappe.ValidationError):
 			validate_agent_clockin_ip("EMP-0001", ignore_session_exemption=True)
+
+	def test_clockin_ip_status_restriction_off(self):
+		_set_ip_restriction(0, "")
+		frappe.local.request_ip = OTHER_IP
+		status = get_clockin_ip_status(ignore_session_exemption=True)
+		self.assertFalse(status["restricted"])
+		self.assertTrue(status["allowed"])
+		self.assertTrue(is_office_clockin_ip_allowed(ignore_session_exemption=True))
+
+	def test_clockin_ip_status_allows_office_ip(self):
+		_set_ip_restriction(1, OFFICE_IP)
+		frappe.local.request_ip = OFFICE_IP
+		status = get_clockin_ip_status(ignore_session_exemption=True)
+		self.assertTrue(status["restricted"])
+		self.assertTrue(status["allowed"])
+		self.assertTrue(is_office_clockin_ip_allowed(ignore_session_exemption=True))
+
+	def test_clockin_ip_status_denies_other_ip(self):
+		_set_ip_restriction(1, OFFICE_IP)
+		frappe.local.request_ip = OTHER_IP
+		status = get_clockin_ip_status(ignore_session_exemption=True)
+		self.assertTrue(status["restricted"])
+		self.assertFalse(status["allowed"])
+		self.assertFalse(is_office_clockin_ip_allowed(ignore_session_exemption=True))
+
+	def test_clockin_ip_status_exempts_desk_admin(self):
+		_set_ip_restriction(1, OFFICE_IP)
+		frappe.local.request_ip = OTHER_IP
+		frappe.set_user("Administrator")
+		status = get_clockin_ip_status()
+		self.assertTrue(status["restricted"])
+		self.assertTrue(status["allowed"])
+		self.assertTrue(is_office_clockin_ip_allowed())
+
+	def test_hr_settings_exposes_clockin_ip_status(self):
+		_set_ip_restriction(0, "")
+		settings = get_hr_settings()
+		self.assertFalse(settings.clockin_restricted)
+		self.assertTrue(settings.clockin_allowed)
+
+		_set_ip_restriction(1, OFFICE_IP)
+		frappe.local.request_ip = OTHER_IP
+		frappe.set_user("Administrator")
+		settings = get_hr_settings()
+		self.assertTrue(settings.clockin_restricted)
+		self.assertTrue(settings.clockin_allowed)
+
+	def test_hr_settings_denies_agent_off_office_ip(self):
+		_set_ip_restriction(1, OFFICE_IP)
+		_employee, user = _make_agent_user("kiosk.ip.settings@example.com", "KioskIpSettings")
+		frappe.local.request_ip = OTHER_IP
+		frappe.set_user(user)
+		settings = get_hr_settings()
+		self.assertTrue(settings.clockin_restricted)
+		self.assertFalse(settings.clockin_allowed)
 
 	def test_login_device_binds_on_first_use(self):
 		_set_device_restriction(1)

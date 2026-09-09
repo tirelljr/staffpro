@@ -93,6 +93,7 @@
 				@update:to-date="onToDate"
 				@update:preset="onPreset"
 				@update:job-filter="jobFilter = $event"
+				@note-added="fetchHours"
 			/>
 		</div>
 	</div>
@@ -109,7 +110,7 @@ const dayjs = inject("$dayjs")
 const __ = inject("$translate")
 const socket = inject("$socket")
 const firstOfMonth = ref(dayjs().date(1).startOf("D"))
-const activeView = ref("calendar")
+const activeView = ref("day")
 const fromDate = ref(dayjs().format("YYYY-MM-DD"))
 const toDate = ref(dayjs().format("YYYY-MM-DD"))
 const preset = ref("current_pay_period")
@@ -229,11 +230,15 @@ function onPreset(value) {
 	if (value !== "custom") fetchHours()
 }
 
-watch(activeView, (view) => {
-	if (view !== "calendar" && !hoursBoard.data) {
-		fetchHours()
-	}
-})
+watch(
+	activeView,
+	(view) => {
+		if (view !== "calendar" && !hoursBoard.data) {
+			fetchHours()
+		}
+	},
+	{ immediate: true }
+)
 
 function onHoursListUpdate(data) {
 	if (data.doctype === "Attendance" || data.doctype === "Employee Checkin") {

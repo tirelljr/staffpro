@@ -185,6 +185,13 @@ def prepare_staff_pro_first_login():
 			update_modified=False,
 		)
 
+	from hrms.first_admins import ensure_staff_pro_first_admins
+
+	try:
+		ensure_staff_pro_first_admins()
+	except Exception:
+		frappe.log_error(title="Staff Pro first admin users")
+
 	if frappe.session.user and frappe.session.user != "Guest":
 		_set_user_default_app(frappe.session.user)
 		_clear_staff_pro_default_workspace(frappe.session.user)

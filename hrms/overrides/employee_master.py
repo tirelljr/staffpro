@@ -199,13 +199,31 @@ def unique_username(base: str, ignore_user: str | None = None) -> str:
 
 
 def resolve_user_from_login(login: str | None) -> str | None:
-	"""Resolve a username or email to the User document name."""
+	"""Resolve a username, email, or full name to the User document name."""
 	value = (login or "").strip()
 	if not value:
 		return None
 	if frappe.db.exists("User", value):
 		return value
-	return frappe.db.get_value("User", {"username": value}, "name")
+	by_username = frappe.db.get_value("User", {"username": value}, "name")
+	if by_username:
+		return by_username
+	by_full_name = frappe.db.get_value("User", {"full_name": value}, "name")
+	if by_full_name:
+		return by_full_name
+	rows = frappe.db.sql(
+		"""
+		select name from `tabUser`
+		where enabled = 1
+		  and (
+			lower(ifnull(username, '')) = %(login)s
+			or lower(ifnull(full_name, '')) = %(login)s
+		  )
+		limit 1
+		""",
+		{"login": value.lower()},
+	)
+	return rows[0][0] if rows else None
 
 
 def clean_username(value: str | None) -> str:
