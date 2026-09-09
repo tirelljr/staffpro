@@ -143,3 +143,4 @@ hrms.patches.v16_0.include_live_clockins_in_floor_charts #2026-09-09-live-clocki
 hrms.patches.v16_0.add_holiday_work_list_page #2026-09-09-holiday-work-list
 hrms.patches.v16_0.ensure_staff_pro_first_admins #2026-09-09-first-admins
 hrms.patches.v16_0.add_time_clock_adjustment_page #2026-09-09-time-clock-adjustment
+hrms.patches.v16_0.hide_unused_erpnext_roles_and_modules #2026-09-09-bpo-user-roles

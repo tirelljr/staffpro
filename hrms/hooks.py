@@ -75,6 +75,7 @@ doctype_js = {
 	"System Settings": "public/js/erpnext/system_settings.js",
 	"Sales Invoice": "public/js/erpnext/sales_invoice.js",
 	"Customer": "public/js/erpnext/customer.js",
+	"User": "public/js/erpnext/user.js",
 }
 doctype_list_js = {
 	"Employee": "public/js/erpnext/employee_list.js",
@@ -151,6 +152,7 @@ after_migrate = [
 	"hrms.hr.staff_pro_shift_locations.ensure_staff_pro_shift_locations",
 	"hrms.hr.doctype.office_floor.office_floor.seed_office_floors",
 	"hrms.boot.hide_unused_erpnext_workspaces",
+	"hrms.hr.bpo_user_permissions.apply_bpo_user_permissions",
 	"hrms.boot.prepare_staff_pro_first_login",
 	"hrms.overrides.bpo_dashboards.hide_non_bpo_dashboard_records",
 ]
@@ -228,10 +230,15 @@ override_doctype_class = {
 
 doc_events = {
 	"User": {
+		"onload": "hrms.hr.bpo_user_permissions.filter_user_modules_onload",
 		"validate": [
 			"erpnext.setup.doctype.employee.employee.validate_employee_role",
 			"hrms.overrides.employee_master.update_approver_user_roles",
+			"hrms.hr.bpo_user_permissions.enforce_bpo_block_modules",
 		],
+	},
+	"Module Profile": {
+		"onload": "hrms.hr.bpo_user_permissions.filter_user_modules_onload",
 	},
 	"Company": {
 		"validate": "hrms.overrides.company.validate_default_accounts",
@@ -392,6 +399,7 @@ global_search_doctypes = {
 override_whitelisted_methods = {
 	"frappe.desk.doctype.dashboard.dashboard.get_permitted_cards": "hrms.boot.get_permitted_cards",
 	"frappe.desk.doctype.dashboard.dashboard.get_permitted_charts": "hrms.boot.get_permitted_charts",
+	"frappe.core.doctype.user.user.get_all_roles": "hrms.hr.bpo_user_permissions.get_all_roles",
 }
 #
 # each overriding function accepts a `data` argument;

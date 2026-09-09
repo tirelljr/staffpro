@@ -268,6 +268,10 @@ def extend_bootinfo(bootinfo):
 			first_name = full_name.split()[0] if full_name else ""
 	bootinfo["staff_pro_user"] = {"first_name": first_name}
 	bootinfo["staff_pro_bpo_sidebar_labels"] = get_sidebar_label_maps()
+	from hrms.hr.bpo_user_permissions import BPO_ROLES, sidebar_module_boot_list
+
+	bootinfo["staff_pro_bpo_roles"] = sorted(BPO_ROLES)
+	bootinfo["staff_pro_bpo_modules"] = sidebar_module_boot_list()
 	apply_payroll_frequency_translations(bootinfo)
 	_filter_bpo_workspace_sidebars(bootinfo)
 	_filter_bpo_module_sidebars(bootinfo)
@@ -289,6 +293,9 @@ def apply_payroll_frequency_translations(bootinfo):
 	messages["New Sales Invoice"] = "New Client Invoice"
 	messages["Sales Invoice"] = "Client Invoice"
 	messages.update(BPO_DOCTYPE_UI_MESSAGES)
+	from hrms.hr.bpo_user_permissions import BPO_MODULE_LABELS
+
+	messages.update(BPO_MODULE_LABELS)
 
 
 def _normalize_workspace_key(name) -> str:
@@ -301,15 +308,32 @@ def _is_bpo_workspace_name(name) -> bool:
 	return _normalize_workspace_key(name) in BPO_WORKSPACE_SIDEBARS
 
 
+def _allowed_sidebar_keys():
+	from hrms.hr.bpo_user_permissions import get_allowed_bpo_sidebar_keys
+
+	return get_allowed_bpo_sidebar_keys()
+
+
+def _is_allowed_bpo_workspace(name, allowed_keys=None) -> bool:
+	if not _is_bpo_workspace_name(name):
+		return False
+	if allowed_keys is None:
+		return True
+	from hrms.hr.bpo_user_permissions import canonical_sidebar_key
+
+	return canonical_sidebar_key(name) in allowed_keys
+
+
 def _filter_bpo_workspace_sidebars(bootinfo):
 	"""Drop Stock/Buying/Selling/etc. from the Desk workspace switcher payload."""
 	sidebars = bootinfo.get("workspace_sidebar_item")
 	if not isinstance(sidebars, dict):
 		return
+	allowed = _allowed_sidebar_keys()
 	bootinfo["workspace_sidebar_item"] = {
 		key: value
 		for key, value in sidebars.items()
-		if _normalize_workspace_key(key) in BPO_WORKSPACE_SIDEBARS
+		if _is_allowed_bpo_workspace(key, allowed)
 	}
 
 
@@ -323,13 +347,17 @@ def _is_bpo_dock_entry(entry) -> bool:
 
 def _filter_bpo_module_sidebars(bootinfo):
 	"""Keep Frappe v17 shells and the hrms dock on Staff Pro portals only."""
+	allowed = _allowed_sidebar_keys()
 	sidebars = bootinfo.get("module_sidebars")
 	if isinstance(sidebars, dict):
 		bootinfo["module_sidebars"] = {
 			key: value
 			for key, value in sidebars.items()
-			if _is_bpo_workspace_name(key)
-			or (isinstance(value, dict) and _is_bpo_workspace_name(value.get("title")))
+			if _is_allowed_bpo_workspace(key, allowed)
+			or (
+				isinstance(value, dict)
+				and _is_allowed_bpo_workspace(value.get("title"), allowed)
+			)
 		}
 
 	dock = bootinfo.get("dock")
@@ -337,7 +365,9 @@ def _filter_bpo_module_sidebars(bootinfo):
 		hrms_dock = dock.get("hrms")
 		bootinfo["dock"] = {"hrms": hrms_dock} if isinstance(hrms_dock, list) else {}
 		if isinstance(hrms_dock, list):
-			bootinfo["dock"]["hrms"] = [entry for entry in hrms_dock if _is_bpo_dock_entry(entry)]
+			bootinfo["dock"]["hrms"] = [
+				entry for entry in hrms_dock if _is_allowed_bpo_dock_entry(entry, allowed)
+			]
 
 	app_data = bootinfo.get("app_data")
 	if not isinstance(app_data, list):
@@ -348,14 +378,26 @@ def _filter_bpo_module_sidebars(bootinfo):
 		if app.get("app_name") == "hrms":
 			entries = app.get("dock")
 			if isinstance(entries, list):
-				app["dock"] = [entry for entry in entries if _is_bpo_dock_entry(entry)]
+				app["dock"] = [entry for entry in entries if _is_allowed_bpo_dock_entry(entry, allowed)]
 		else:
 			app["dock"] = []
 			app["on_apps_screen"] = False
 
 
+def _is_allowed_bpo_dock_entry(entry, allowed_keys=None) -> bool:
+	if not _is_bpo_dock_entry(entry):
+		return False
+	if isinstance(entry, dict):
+		return _is_allowed_bpo_workspace(
+			entry.get("link_to") or entry.get("title") or entry.get("name") or entry.get("label"),
+			allowed_keys,
+		)
+	return _is_allowed_bpo_workspace(entry, allowed_keys)
+
+
 def _filter_bpo_app_workspaces(bootinfo):
 	"""Keep dock / apps-screen workspace lists on call-center HR and payroll."""
+	allowed = _allowed_sidebar_keys()
 	app_data = bootinfo.get("app_data")
 	if isinstance(app_data, list):
 		for app in app_data:
@@ -363,13 +405,15 @@ def _filter_bpo_app_workspaces(bootinfo):
 				continue
 			workspaces = app.get("workspaces")
 			if isinstance(workspaces, list):
-				app["workspaces"] = [name for name in workspaces if _is_bpo_workspace_name(name)]
+				app["workspaces"] = [
+					name for name in workspaces if _is_allowed_bpo_workspace(name, allowed)
+				]
 
 	workspaces = bootinfo.get("workspaces")
 	if isinstance(workspaces, dict):
 		pages = workspaces.get("pages")
 		if isinstance(pages, list):
-			workspaces["pages"] = [page for page in pages if _is_bpo_workspace_name(page)]
+			workspaces["pages"] = [page for page in pages if _is_allowed_bpo_workspace(page, allowed)]
 
 
 def _disable_app_onboarding_bootinfo(bootinfo):

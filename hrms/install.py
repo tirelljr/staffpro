@@ -10,6 +10,7 @@ def after_install():
 		from hrms.branding import apply_branding
 		from hrms.hr.bpo_bank_account import apply_bank_account_layout
 		from hrms.hr.bpo_employee_labels import apply_bpo_employee_labels
+		from hrms.hr.bpo_user_permissions import apply_bpo_user_permissions
 		from hrms.patches.v16_0.disable_app_onboarding import execute as disable_app_onboarding
 		from hrms.patches.v16_0.hide_cost_center import hide_cost_center_fields
 		from hrms.payroll.bpo_client_accounts import setup_usd_client_billing
@@ -21,6 +22,7 @@ def after_install():
 
 		apply_branding()
 		apply_bpo_employee_labels()
+		apply_bpo_user_permissions()
 		apply_bank_account_layout()
 		apply_bpo_customer_layout()
 		apply_bpo_sales_invoice_layout()
