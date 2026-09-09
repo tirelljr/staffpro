@@ -2405,19 +2405,22 @@ function render_inout_rows($widget) {
 		rows
 			.map(
 				(row) => `
-			<button type="button" class="sp-inout-dash__row" data-employee="${escape_html(row.employee)}">
-				<span class="sp-inout-dash__agent">
-					<span class="sp-inout-dash__avatar">${celebration_avatar(row)}</span>
-					<span class="sp-inout-dash__agent-meta">
-						<span class="sp-inout-dash__name">${escape_html(row.employee_name || row.employee || "")}</span>
-						${row.department ? `<span class="sp-inout-dash__dept">${escape_html(row.department)}</span>` : ""}
+			<div class="sp-inout-dash__item">
+				<button type="button" class="sp-inout-dash__row" data-employee="${escape_html(row.employee)}">
+					<span class="sp-inout-dash__agent">
+						<span class="sp-inout-dash__avatar">${celebration_avatar(row)}</span>
+						<span class="sp-inout-dash__agent-meta">
+							<span class="sp-inout-dash__name">${escape_html(row.employee_name || row.employee || "")}</span>
+							${row.department ? `<span class="sp-inout-dash__dept">${escape_html(row.department)}</span>` : ""}
+						</span>
 					</span>
-				</span>
-				<span class="sp-inout-dash__status-pill ${inout_status_class(row)}">${escape_html(inout_status_label(row))}</span>
-				<span class="sp-inout-dash__time">${escape_html(row.time || "—")}</span>
-				<span class="sp-inout-dash__pto">${escape_html(row.pto_code || "—")}</span>
-				<span class="sp-inout-dash__device">${escape_html(row.device_id || "—")}</span>
-			</button>
+					<span class="sp-inout-dash__status-pill ${inout_status_class(row)}">${escape_html(inout_status_label(row))}</span>
+					<span class="sp-inout-dash__time">${escape_html(row.time || "—")}</span>
+					<span class="sp-inout-dash__pto">${escape_html(row.pto_code || "—")}</span>
+					<span class="sp-inout-dash__device">${escape_html(row.device_id || "—")}</span>
+				</button>
+				${render_inout_notes(row)}
+			</div>
 		`
 			)
 			.join("")
@@ -2427,6 +2430,26 @@ function render_inout_rows($widget) {
 		const employee = $(this).data("employee");
 		if (employee) frappe.set_route("Form", "Employee", employee);
 	});
+	if (hrms.time && typeof hrms.time.bind_adjustment_actions === "function") {
+		hrms.time.bind_adjustment_actions($widget, () => load_inout($widget));
+	}
+}
+
+function render_inout_notes(row) {
+	const comments = (row.comments || [])
+		.slice(0, 2)
+		.map((comment) => {
+			const text = hrms.time?.format_hours_comment
+				? hrms.time.format_hours_comment(comment)
+				: comment.content || "";
+			return `<div class="sp-inout-dash__comment">${escape_html(text)}</div>`;
+		})
+		.join("");
+	const adjustment = hrms.time?.render_adjustment_html ? hrms.time.render_adjustment_html(row.adjustment) : "";
+	if (!comments && !adjustment) {
+		return "";
+	}
+	return `<div class="sp-inout-dash__notes">${comments}${adjustment}</div>`;
 }
 
 function load_inout($widget) {
@@ -2453,6 +2476,15 @@ function load_inout($widget) {
 		},
 	});
 }
+
+$(document).off("sp:hours-refresh.sp-dash").on("sp:hours-refresh.sp-dash", () => {
+	$(".sp-dash-hours").each(function () {
+		load_hours($(this));
+	});
+	$(".sp-dash-home .sp-dash-inout").each(function () {
+		load_inout($(this));
+	});
+});
 
 function hide_attendance_charts($root) {
 	if (dashboard_name() !== "Attendance") {
@@ -2733,6 +2765,9 @@ function render_hours_totals_text(totals) {
 }
 
 function format_hours_comment(comment) {
+	if (hrms.time?.format_hours_comment) {
+		return hrms.time.format_hours_comment(comment);
+	}
 	const when = moment(comment.creation);
 	const time = when.isValid() ? when.format("hh:mm A") : "";
 	const date = when.isValid() ? when.format("MM/DD/YYYY") : "";
@@ -2779,6 +2814,7 @@ function render_hours_row(row) {
 				${actions || "<span class=\"sp-hours__row-actions\"></span>"}
 			</div>
 			${render_hours_comments(row.comments)}
+			${hrms.time?.render_adjustment_html ? hrms.time.render_adjustment_html(row.adjustment) : ""}
 		</div>`;
 }
 
@@ -2914,6 +2950,9 @@ function bind_hours_row_actions($panel, $list) {
 			});
 		});
 	});
+	if (hrms.time && typeof hrms.time.bind_adjustment_actions === "function") {
+		hrms.time.bind_adjustment_actions($panel, () => load_hours($panel));
+	}
 }
 
 function update_hours_title($panel) {
