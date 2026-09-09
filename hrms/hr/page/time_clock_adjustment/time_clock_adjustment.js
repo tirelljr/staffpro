@@ -120,7 +120,7 @@ frappe.time_clock_adjustment = {
 		});
 		this.$body.on("change", ".sp-tca__department", function () {
 			me.department = $(this).val() || "";
-			me.render_rows();
+			me.refresh();
 		});
 		if (hrms.time && typeof hrms.time.bind_adjustment_actions === "function") {
 			hrms.time.bind_adjustment_actions(this.$body, () => me.refresh());

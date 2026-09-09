@@ -227,7 +227,46 @@
 }
 
 .sp-dayview .sp-tca-banner {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 8px 12px;
 	margin-top: 6px;
+	padding: 8px 10px;
+	border: 1px solid #f3d19e;
+	border-radius: 8px;
+	background: #fff7ed;
+	color: #9a3412;
+	font-size: 12px;
+	line-height: 1.4;
+}
+
+.sp-dayview .sp-tca-banner__actions {
+	display: inline-flex;
+	gap: 8px;
+}
+
+.sp-dayview .sp-tca-btn {
+	height: 26px;
+	padding: 0 10px;
+	border: 0;
+	border-radius: 4px;
+	font-family: inherit;
+	font-size: 12px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.sp-dayview .sp-tca-btn.is-approve {
+	background: #16678c;
+	color: #fff;
+}
+
+.sp-dayview .sp-tca-btn.is-reject {
+	background: #fff;
+	color: #9a3412;
+	border: 1px solid #f3d19e;
 }
 
 .sp-dayview__actions {
