@@ -1047,11 +1047,14 @@ body.staff-pro-alive #page-Workspaces .layout-main-section {
 	opacity: 0.55;
 }
 
+.sp-inout-dash__item {
+	border-bottom: 1px solid #eef1f4;
+}
+
 .sp-inout-dash__row {
 	width: 100%;
 	padding: 12px 4px;
 	border: 0;
-	border-bottom: 1px solid #eef1f4;
 	background: transparent;
 	text-align: left;
 	cursor: pointer;

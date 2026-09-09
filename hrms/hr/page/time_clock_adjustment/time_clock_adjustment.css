@@ -116,6 +116,34 @@ body.staff-pro-alive .page-container[data-page-route="time-clock-adjustment"] .p
 	color: var(--sp-muted, #6b7280);
 }
 
+.sp-tca-page .sp-tca-banner__actions,
+.sp-tca__actions .sp-tca-banner__actions {
+	display: inline-flex;
+	gap: 8px;
+}
+
+.sp-tca-page .sp-tca-btn {
+	height: 26px;
+	padding: 0 10px;
+	border: 0;
+	border-radius: 4px;
+	font-family: inherit;
+	font-size: 12px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.sp-tca-page .sp-tca-btn.is-approve {
+	background: #16678c;
+	color: #fff;
+}
+
+.sp-tca-page .sp-tca-btn.is-reject {
+	background: #fff;
+	color: #9a3412;
+	border: 1px solid #f3d19e;
+}
+
 @media (max-width: 860px) {
 	.sp-tca__table-head {
 		display: none;
