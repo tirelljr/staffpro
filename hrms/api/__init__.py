@@ -166,10 +166,10 @@ def get_attendance_calendar_events(from_date: str, to_date: str) -> dict[str, st
 
 def _employee_hours_payload(from_date: str | None = None, to_date: str | None = None, preset: str | None = None) -> dict:
 	from hrms.hr.doctype.attendance.attendance import (
+		_attach_hours_row_notes,
 		_decorate_hours_rows,
 		_expand_attendance_to_hour_rows,
 		_hours_approval_status,
-		_hours_comments_by_attendance,
 		_hours_filters,
 		_hours_list_fields,
 		_sum_hour_buckets,
@@ -196,16 +196,8 @@ def _employee_hours_payload(from_date: str | None = None, to_date: str | None = 
 		limit=500,
 	)
 	expanded = _expand_attendance_to_hour_rows(rows)
-	comments = _hours_comments_by_attendance([row.name for row in rows])
 	decorated = _decorate_hours_rows(expanded)
-	seen_comments = set()
-	for row in decorated:
-		name = row.get("name")
-		if name and name not in seen_comments and row.get("kind") != "lunch":
-			row["comments"] = comments.get(name, [])
-			seen_comments.add(name)
-		else:
-			row["comments"] = []
+	_attach_hours_row_notes(decorated, [row.name for row in rows])
 
 	jobs = sorted({(row.get("job") or "").strip() for row in decorated if (row.get("job") or "").strip()})
 	company = employee_info.get("company")
@@ -234,9 +226,17 @@ def get_employee_hours(
 
 
 @frappe.whitelist()
-def add_employee_hours_note(name: str, comment: str) -> dict:
+def add_employee_hours_note(
+	name: str,
+	comment: str,
+	requested_in_time: str | None = None,
+	requested_out_time: str | None = None,
+	in_log: str | None = None,
+	out_log: str | None = None,
+) -> dict:
 	"""Let the signed-in employee leave a note on their own hours row."""
 	from hrms.hr.doctype.attendance.attendance import _add_hours_comment
+	from hrms.hr.doctype.time_clock_adjustment.time_clock_adjustment import create_from_hours_note
 
 	employee = get_current_employee()
 	text = strip_html(comment or "").strip()
@@ -254,7 +254,15 @@ def add_employee_hours_note(name: str, comment: str) -> dict:
 		frappe.throw(_("You cannot add notes to cancelled hours."))
 
 	_add_hours_comment(name, text)
-	return {"ok": True}
+	adjustment = create_from_hours_note(
+		name,
+		text,
+		requested_in_time=requested_in_time,
+		requested_out_time=requested_out_time,
+		in_log=in_log,
+		out_log=out_log,
+	)
+	return {"ok": True, "adjustment": adjustment}
 
 
 @frappe.whitelist()

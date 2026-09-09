@@ -1778,16 +1778,8 @@ def get_hours_rows(
 		limit=500,
 	)
 	expanded = _expand_attendance_to_hour_rows(rows)
-	comments = _hours_comments_by_attendance([row.name for row in rows])
 	decorated = _decorate_hours_rows(expanded)
-	seen_comments = set()
-	for row in decorated:
-		name = row.get("name")
-		if name and name not in seen_comments and row.get("kind") != "lunch":
-			row["comments"] = comments.get(name, [])
-			seen_comments.add(name)
-		else:
-			row["comments"] = []
+	_attach_hours_row_notes(decorated, [row.name for row in rows])
 	return {
 		"rows": decorated,
 		"totals": _sum_hour_buckets(decorated),
@@ -1812,6 +1804,25 @@ def _add_hours_comment(name: str, comment: str | None, doctype: str = "Attendanc
 			"content": text,
 		}
 	).insert(ignore_permissions=True)
+
+
+def _attach_hours_row_notes(decorated: list, attendance_names: list[str]) -> None:
+	comments = _hours_comments_by_attendance(attendance_names)
+	adjustments = {}
+	if frappe.db.table_exists("Time Clock Adjustment"):
+		from hrms.hr.doctype.time_clock_adjustment.time_clock_adjustment import pending_adjustments_for_rows
+
+		adjustments = pending_adjustments_for_rows(decorated)
+	seen = set()
+	for row in decorated:
+		name = row.get("name")
+		if name and name not in seen and row.get("kind") != "lunch":
+			row["comments"] = comments.get(name, [])
+			row["adjustment"] = adjustments.get(name)
+			seen.add(name)
+		else:
+			row["comments"] = []
+			row["adjustment"] = None
 
 
 def _hours_comments_by_attendance(names: list[str]) -> dict[str, list[dict]]:
