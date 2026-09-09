@@ -29,11 +29,21 @@ COPY --chown=frappe:frappe . /home/frappe/frappe-bench/apps/hrms
 
 WORKDIR /home/frappe/frappe-bench
 
-RUN ./env/bin/pip install -e apps/hrms --quiet && \
-	grep -qx "hrms" sites/apps.txt || echo hrms >> sites/apps.txt && \
-	yarn --cwd apps/hrms install && \
-	yarn --cwd apps/hrms build && \
-	bench build --app hrms
+# bench init may write apps.txt without a trailing newline, so "echo hrms >>"
+# would glue it onto the last app ("paymentshrms") and break bench build.
+RUN <<'EOF'
+set -eu
+./env/bin/pip install -e apps/hrms
+python3 -c 'from pathlib import Path
+p = Path("sites/apps.txt")
+apps = [a.strip() for a in p.read_text().splitlines() if a.strip()]
+if "hrms" not in apps:
+    apps.append("hrms")
+p.write_text("\n".join(apps) + "\n")'
+yarn --cwd apps/hrms install
+yarn --cwd apps/hrms build
+bench build --app hrms
+EOF
 
 FROM ${FRAPPE_IMAGE_PREFIX}/base:${FRAPPE_BRANCH} AS backend
 
