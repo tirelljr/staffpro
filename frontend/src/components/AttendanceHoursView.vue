@@ -116,7 +116,7 @@
 							<td class="px-2 py-2 align-top whitespace-nowrap">{{ row.job || "" }}</td>
 							<td class="px-2 py-2 align-top whitespace-nowrap">{{ row.shift || "" }}</td>
 						</tr>
-						<tr v-if="row.comments?.length || canAddNote(row)" class="bg-white">
+						<tr v-if="row.comments?.length || row.adjustment || canAddNote(row)" class="bg-white">
 							<td :colspan="mode === 'list' ? 13 : 7" class="px-2 pb-3 pt-0 text-gray-500">
 								<div
 									v-for="(comment, commentIndex) in row.comments || []"
@@ -124,6 +124,17 @@
 									class="text-xs leading-5"
 								>
 									{{ formatHoursNote(comment) }}
+								</div>
+								<div
+									v-if="row.adjustment && row.adjustment.status === 'Pending'"
+									class="mt-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-900"
+								>
+									<strong>{{ __("Pending time change") }}</strong>
+									{{ formatTimeOnly(row.adjustment.current_in_time) }} –
+									{{ formatTimeOnly(row.adjustment.current_out_time) }}
+									→
+									{{ formatTimeOnly(row.adjustment.requested_in_time) }} –
+									{{ formatTimeOnly(row.adjustment.requested_out_time) }}
 								</div>
 								<div v-if="canAddNote(row)" class="mt-1.5">
 									<button
@@ -141,6 +152,24 @@
 											class="w-full rounded-md border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-800"
 											:placeholder="__('Add a note to adjust time, missed punches, etc.')"
 										/>
+										<div class="flex flex-wrap gap-2">
+											<label class="flex flex-col gap-1 text-xs text-gray-500 font-medium">
+												{{ __("Requested In") }}
+												<input
+													v-model="noteInTime"
+													type="time"
+													class="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-800"
+												/>
+											</label>
+											<label class="flex flex-col gap-1 text-xs text-gray-500 font-medium">
+												{{ __("Requested Out") }}
+												<input
+													v-model="noteOutTime"
+													type="time"
+													class="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-800"
+												/>
+											</label>
+										</div>
 										<div class="flex flex-wrap gap-2">
 											<button
 												type="button"
@@ -239,12 +268,16 @@ const __ = inject("$translate")
 
 const noteDraftKey = ref("")
 const noteText = ref("")
+const noteInTime = ref("")
+const noteOutTime = ref("")
 
 const addNote = createResource({
 	url: "hrms.api.add_employee_hours_note",
 	onSuccess() {
 		noteDraftKey.value = ""
 		noteText.value = ""
+		noteInTime.value = ""
+		noteOutTime.value = ""
 		toast({
 			title: __("Success"),
 			text: __("Note added"),
@@ -408,16 +441,40 @@ function canAddNote(row) {
 function openNote(row, index) {
 	noteDraftKey.value = rowKey(row, index)
 	noteText.value = ""
+	noteInTime.value = ""
+	noteOutTime.value = ""
 }
 
 function cancelNote() {
 	noteDraftKey.value = ""
 	noteText.value = ""
+	noteInTime.value = ""
+	noteOutTime.value = ""
+}
+
+function toClock(value) {
+	if (!value) return undefined
+	return value.length === 5 ? `${value}:00` : value
+}
+
+function formatTimeOnly(value) {
+	if (!value) return "—"
+	const clock = formatClock(value)
+	if (clock) return clock
+	const parsed = dayjs(`2000-01-01 ${value}`)
+	return parsed.isValid() ? parsed.format("hh:mm a") : String(value)
 }
 
 function saveNote(row) {
 	const comment = noteText.value.trim()
 	if (!row?.name || !comment || savingNote.value) return
-	addNote.submit({ name: row.name, comment })
+	addNote.submit({
+		name: row.name,
+		comment,
+		requested_in_time: toClock(noteInTime.value),
+		requested_out_time: toClock(noteOutTime.value),
+		in_log: row.in_log || undefined,
+		out_log: row.out_log || undefined,
+	})
 }
 </script>
