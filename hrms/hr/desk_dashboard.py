@@ -11,9 +11,11 @@ from frappe.utils import (
 	cint,
 	flt,
 	formatdate,
+	get_datetime,
 	get_first_day,
 	get_last_day,
 	getdate,
+	now_datetime,
 )
 
 from erpnext.accounts.utils import build_qb_match_conditions
@@ -46,8 +48,17 @@ DATE_FIELD_CANDIDATES = (
 	"from_date",
 	"start_date",
 	"start_time",
+	"end_date",
+	"time",
 	"holiday_date",
 )
+SNAPSHOT_DATE_FIELDS = {"date_of_joining"}
+CHART_PERIODS = {
+	"day": {"interval": "Daily", "label": "Today"},
+	"week": {"interval": "Weekly", "label": "This Week"},
+	"month": {"interval": "Monthly", "label": "This Month"},
+	"custom": {"interval": "Daily", "label": "Custom"},
+}
 OVERLAP_START_FIELDS = {"from_date", "start_date", "start_time"}
 OVERLAP_END_FIELDS = {"to_date", "end_date", "end_time"}
 
@@ -103,6 +114,47 @@ def get_number_card_period(card_name: str, period: str = "month") -> dict:
 	payload = _kpi_period_payload(doc, period, current, previous)
 	payload["sparkline"] = {"values": values, "kind": "bars", "interval": spec["interval"]}
 	return payload
+
+
+@frappe.whitelist()
+def get_dashboard_chart_period(
+	chart_name: str,
+	period: str = "month",
+	from_date: str | None = None,
+	to_date: str | None = None,
+) -> dict:
+	"""Return live dashboard chart data for today, this week, this month, or a custom range."""
+	period = _normalize_chart_period(period)
+	start, end = _chart_period_bounds(period, from_date, to_date)
+	label = _chart_period_label(period, start, end)
+	if not chart_name:
+		return {"supported": False, "period": period, "label": label}
+
+	try:
+		doc = _resolve_dashboard_chart(chart_name)
+	except Exception:
+		return {"supported": False, "period": period, "label": label}
+
+	if not doc:
+		return {"supported": False, "period": period, "label": label}
+
+	time_interval = _chart_time_interval(period, start, end, doc)
+	filters = _prepare_chart_period_filters(doc, start, end, time_interval)
+	data = _fetch_dashboard_chart_data(doc, filters, start, end, time_interval)
+	data = _merge_live_floor_attendance(doc, data, start, end)
+	return {
+		"supported": True,
+		"chart_name": doc.name,
+		"period": period,
+		"label": label,
+		"from_date": str(start),
+		"to_date": str(end),
+		"time_interval": time_interval,
+		"chart_type": doc.type,
+		"custom_options": _chart_custom_options(doc),
+		"data": data,
+		"empty": _chart_is_empty(data),
+	}
 
 
 def _normalize_kpi_period(period: str) -> str:
@@ -199,6 +251,8 @@ def _split_card_filters(doc):
 			continue
 		if field in OVERLAP_END_FIELDS and op_name in {">=", ">"}:
 			overlap_end = field
+			continue
+		if field == "company" and (value is None or value == ""):
 			continue
 		base.append(list(row))
 
@@ -891,6 +945,270 @@ def _infer_interval(timespan_value, stats_interval: str | None) -> str:
 	if stats_interval in {"Daily", "Weekly", "Monthly", "Yearly"}:
 		return stats_interval
 	return "Monthly"
+
+
+def _normalize_chart_period(period: str) -> str:
+	key = str(period or "month").strip().lower()
+	aliases = {
+		"today": "day",
+		"this day": "day",
+		"daily": "day",
+		"this week": "week",
+		"weekly": "week",
+		"this month": "month",
+		"monthly": "month",
+		"select date range": "custom",
+		"date range": "custom",
+	}
+	key = aliases.get(key, key)
+	return key if key in CHART_PERIODS else "month"
+
+
+def _chart_period_bounds(period: str, from_date: str | None = None, to_date: str | None = None):
+	period = _normalize_chart_period(period)
+	if period == "custom":
+		start = getdate(from_date) if from_date else getdate()
+		end = getdate(to_date) if to_date else getdate()
+		if start > end:
+			start, end = end, start
+		return start, end
+	return _period_bounds(CHART_PERIODS[period]["interval"], 0)
+
+
+def _chart_period_label(period: str, start, end) -> str:
+	period = _normalize_chart_period(period)
+	if period == "custom":
+		return f"{formatdate(start)} – {formatdate(end)}"
+	return _(CHART_PERIODS[period]["label"])
+
+
+def _chart_time_interval(period: str, start, end, doc) -> str:
+	preferred = (getattr(doc, "time_interval", None) or "Daily").strip()
+	period = _normalize_chart_period(period)
+	if period in {"day", "week"}:
+		return "Daily"
+	if period == "month":
+		return "Daily" if preferred == "Daily" else "Monthly"
+	days = (getdate(end) - getdate(start)).days + 1
+	if days <= 45:
+		return "Daily"
+	if days <= 180:
+		return "Weekly" if preferred != "Daily" else "Daily"
+	return "Monthly" if preferred in {"Monthly", "Quarterly", "Yearly"} else "Weekly"
+
+
+def _resolve_dashboard_chart(chart_name: str):
+	name = (chart_name or "").strip()
+	if not name:
+		return None
+	if frappe.db.exists("Dashboard Chart", name):
+		return frappe.get_cached_doc("Dashboard Chart", name)
+	resolved = frappe.db.get_value("Dashboard Chart", {"chart_name": name}, "name")
+	if resolved:
+		return frappe.get_cached_doc("Dashboard Chart", resolved)
+	return None
+
+
+def _chart_custom_options(doc) -> dict:
+	raw = getattr(doc, "custom_options", None)
+	if isinstance(raw, dict):
+		return raw
+	if not raw or not str(raw).strip():
+		return {}
+	try:
+		parsed = frappe.parse_json(raw)
+	except Exception:
+		return {}
+	return parsed if isinstance(parsed, dict) else {}
+
+
+def _chart_is_empty(data) -> bool:
+	if not data or not isinstance(data, dict):
+		return True
+	datasets = data.get("datasets") or []
+	for dataset in datasets:
+		if not isinstance(dataset, dict):
+			continue
+		if any(flt(value) for value in dataset.get("values") or []):
+			return False
+	return not any(flt(value) for value in (data.get("values") or []))
+
+
+def _is_floor_attendance_chart(doc) -> bool:
+	names = {str(getattr(doc, "name", "") or ""), str(getattr(doc, "chart_name", "") or "")}
+	return "Floor Attendance" in names
+
+
+def _merge_live_floor_attendance(doc, data, start, end) -> dict:
+	"""Count today's clock-ins on Floor Attendance even before attendance is submitted."""
+	if not _is_floor_attendance_chart(doc):
+		return data if isinstance(data, dict) else {"labels": [], "datasets": []}
+
+	payload = data if isinstance(data, dict) else {"labels": [], "datasets": []}
+	counts = _counts_from_chart_data(payload)
+	today = getdate()
+	if getdate(start) <= today <= getdate(end):
+		clocked_in = _todays_clocked_in_employees()
+		already_present = _present_employees(start, end)
+		extra = len(clocked_in - already_present)
+		if extra:
+			counts["Present"] = cint(counts.get("Present") or 0) + extra
+
+	if not any(flt(value) for value in counts.values()):
+		return payload
+	return _chart_data_from_counts(counts)
+
+
+def _counts_from_chart_data(data) -> dict:
+	labels = data.get("labels") or []
+	values = []
+	datasets = data.get("datasets") or []
+	if datasets and isinstance(datasets[0], dict):
+		values = datasets[0].get("values") or []
+	counts = {}
+	for index, label in enumerate(labels):
+		key = str(label or "").strip()
+		if not key:
+			continue
+		counts[key] = flt(values[index] if index < len(values) else 0)
+	return counts
+
+
+def _chart_data_from_counts(counts: dict) -> dict:
+	items = [(label, flt(value)) for label, value in counts.items() if flt(value)]
+	items.sort(key=lambda row: (-row[1], row[0]))
+	return {
+		"labels": [label for label, _value in items],
+		"datasets": [{"name": _("Floor Attendance"), "values": [value for _label, value in items]}],
+	}
+
+
+def _todays_clocked_in_employees() -> set[str]:
+	from hrms.hr.page.in_out_today.in_out_today import _clocks_as_of_now, _get_todays_punches
+
+	today = getdate()
+	employee_ids = list(
+		{
+			name
+			for name in frappe.get_all(
+				"Employee Checkin",
+				filters=[
+					["time", ">=", get_datetime(today)],
+					["time", "<", get_datetime(add_days(today, 1))],
+				],
+				pluck="employee",
+			)
+			if name
+		}
+	)
+	if not employee_ids:
+		return set()
+
+	punches_by_employee = _get_todays_punches(employee_ids, today)
+	as_of = now_datetime()
+	in_employees = set()
+	for employee, punches in punches_by_employee.items():
+		clocks = _clocks_as_of_now(punches, None, as_of)
+		if clocks and (clocks[-1].log_type or "IN") != "OUT":
+			in_employees.add(employee)
+	return in_employees
+
+
+def _present_employees(start, end) -> set[str]:
+	return set(
+		frappe.get_all(
+			"Attendance",
+			filters={
+				"attendance_date": ["between", [getdate(start), getdate(end)]],
+				"status": ["in", ["Present", "Half Day", "Work From Home"]],
+				"docstatus": ["<", 2],
+			},
+			pluck="employee",
+		)
+	)
+
+
+def _prepare_chart_period_filters(doc, start, end, time_interval: str):
+	if doc.chart_type == "Custom":
+		filters = _custom_chart_filters(doc)
+		filters["from_date"] = str(start)
+		filters["to_date"] = str(end)
+		filters["time_interval"] = time_interval
+		return filters
+
+	base, date_field, overlap = _split_card_filters(doc)
+	if cint(doc.timeseries) and doc.chart_type != "Group By":
+		return base
+
+	doctype = doc.document_type
+	rows = list(base)
+	if overlap:
+		start_field, end_field = overlap
+		rows.append([doctype, start_field, "<=", str(end)])
+		rows.append([doctype, end_field, ">=", str(start)])
+	elif date_field in SNAPSHOT_DATE_FIELDS:
+		rows.append([doctype, date_field, "<=", str(end)])
+	else:
+		rows.append([doctype, date_field, "between", [str(start), str(end)]])
+	return rows
+
+
+def _custom_chart_filters(doc) -> dict:
+	filters = frappe.parse_json(doc.filters_json or "{}") or {}
+	if not isinstance(filters, dict):
+		filters = {}
+	dynamic = frappe.parse_json(doc.dynamic_filters_json or "{}") or {}
+	if isinstance(dynamic, dict):
+		for key, expr in dynamic.items():
+			value = _eval_dynamic_expr(expr)
+			if value is not None:
+				filters[key] = value
+	return filters
+
+
+def _eval_dynamic_expr(expr):
+	if not isinstance(expr, str):
+		return expr
+	try:
+		return frappe.safe_eval(
+			expr,
+			eval_globals={"frappe": frappe},
+			eval_locals={"frappe": frappe},
+		)
+	except Exception:
+		if "Company" in expr:
+			return frappe.defaults.get_user_default("Company")
+		if "year_start_date" in expr:
+			return str(_period_bounds("Yearly", 0)[0])
+		if "year_end_date" in expr:
+			return str(_period_bounds("Yearly", 0)[1])
+		return None
+
+
+def _fetch_dashboard_chart_data(doc, filters, start, end, time_interval: str) -> dict:
+	from frappe.desk.doctype.dashboard_chart.dashboard_chart import get as get_chart
+
+	args = {
+		"chart_name": doc.name,
+		"filters": filters,
+		"from_date": str(start),
+		"to_date": str(end),
+		"timespan": "Select Date Range",
+		"time_interval": time_interval,
+		"refresh": 1,
+		"no_cache": 1,
+	}
+	try:
+		data = get_chart(**args)
+	except Exception:
+		args.pop("timespan", None)
+		args.pop("no_cache", None)
+		try:
+			data = get_chart(**args)
+		except Exception:
+			frappe.log_error(title=f"Dashboard chart period failed: {doc.name}")
+			return {"labels": [], "datasets": []}
+	return data if isinstance(data, dict) else {"labels": [], "datasets": []}
 
 
 def _period_bounds(interval: str, offset: int):

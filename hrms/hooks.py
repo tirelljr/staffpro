@@ -42,6 +42,7 @@ update_website_context = ["hrms.branding.update_website_context"]
 # app_include_css = "/assets/hrms/css/hrms.css"
 app_include_js = [
 	"/assets/hrms/js/staff_pro_home_redirect.js",
+	"/assets/hrms/js/client_ip.js",
 	"hrms.bundle.js",
 ]
 app_include_css = "hrms.bundle.css"
@@ -275,6 +276,7 @@ doc_events = {
 		"on_update": [
 			"hrms.overrides.employee_master.update_approver_role",
 			"hrms.overrides.employee_master.publish_update",
+			"hrms.payroll.doctype.salary_structure_assignment.salary_structure_assignment.assign_structure_from_agent_hourly",
 		],
 		"after_insert": "hrms.overrides.employee_master.update_job_applicant_and_offer",
 		"on_trash": "hrms.overrides.employee_master.update_employee_transfer",

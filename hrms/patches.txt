@@ -137,3 +137,6 @@ hrms.patches.v16_0.update_user_bonus_plan_fields #2026-09-09-plan
 hrms.patches.v16_0.add_floor_module #2026-09-08-floor
 hrms.patches.v16_0.add_agent_access_settings #2026-09-09-agent-access
 hrms.patches.v16_0.add_employee_default_ipv4 #2026-09-09-default-ipv4
+hrms.patches.v16_0.lock_employee_salary_currency #2026-09-09-bzd-salary
+hrms.patches.v16_0.resync_unpaid_lunch_hours #2026-09-09
+hrms.patches.v16_0.include_live_clockins_in_floor_charts #2026-09-09-live-clockins

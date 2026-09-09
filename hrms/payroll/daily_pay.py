@@ -495,9 +495,6 @@ def on_attendance_update(doc, method=None):
 	)
 
 
-PAID_LUNCH_HOURS = 1.0
-
-
 def _log_type(log) -> str:
 	value = getattr(log, "log_type", None) if not isinstance(log, dict) else log.get("log_type")
 	return (value or "IN").upper()
@@ -567,14 +564,13 @@ def ensure_working_hours_from_times(doc) -> float:
 
 
 def pair_checkin_logs(logs: list) -> dict:
-	"""Pair consecutive IN/OUT punches and add 1h lunch when they clocked out and back in.
+	"""Pair consecutive IN/OUT punches. Break time between OUT and the next IN is unpaid.
 
 	Returns:
 	  pairs: list of {in_time, out_time, hours, in_log, out_log, open}
-	  lunch_hours: 1.0 when a completed pair is followed by a later IN, else 0
 	  in_time / out_time: first IN and last OUT (or None while still clocked in)
 	  pair_hours: sum of completed pair durations
-	  working_hours: pair_hours + lunch_hours
+	  working_hours: pair_hours (lunch/break gaps are excluded)
 	"""
 	ordered = sorted(
 		[log for log in (logs or []) if _log_time(log)],
@@ -619,11 +615,8 @@ def pair_checkin_logs(logs: list) -> dict:
 		)
 
 	completed = [pair for pair in pairs if not pair["open"]]
-	# Lunch: at least one completed pair AND a later IN (they left and returned).
-	has_return_in = any(pair["open"] for pair in pairs) or len(completed) >= 2
-	lunch_hours = PAID_LUNCH_HOURS if (completed and has_return_in) else 0.0
 	pair_hours = flt(sum(flt(pair["hours"]) for pair in completed), 2)
-	working_hours = flt(pair_hours + lunch_hours, 2)
+	working_hours = pair_hours
 
 	ins = [row for row in ordered if _log_type(row) == "IN" and _log_time(row)]
 	outs = [row for row in ordered if _log_type(row) == "OUT" and _log_time(row)]
@@ -633,7 +626,6 @@ def pair_checkin_logs(logs: list) -> dict:
 
 	return {
 		"pairs": pairs,
-		"lunch_hours": flt(lunch_hours, 2),
 		"in_time": in_time,
 		"out_time": out_time,
 		"pair_hours": pair_hours,
@@ -642,7 +634,7 @@ def pair_checkin_logs(logs: list) -> dict:
 
 
 def _hours_from_logs(logs: list[dict]) -> tuple:
-	"""Compatibility wrapper: first IN, last OUT (blank if open), pair-sum + lunch hours."""
+	"""Compatibility wrapper: first IN, last OUT (blank if open), pair-sum hours."""
 	result = pair_checkin_logs(logs)
 	return result["in_time"], result["out_time"], result["working_hours"]
 
@@ -658,7 +650,7 @@ def get_day_checkins(employee: str, day) -> list[dict]:
 
 
 def resync_attendance_from_day_logs(employee: str, day, attendance_name: str | None = None) -> str | None:
-	"""Recompute Attendance times/hours from the day's checkins (pair sum + lunch)."""
+	"""Recompute Attendance times/hours from the day's checkins (completed pair sum)."""
 	day = getdate(day)
 	logs = get_day_checkins(employee, day)
 	result = pair_checkin_logs(logs)

@@ -9,6 +9,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint
 
+from hrms.api.kiosk import resolve_workstation_device
 from hrms.hr.agent_access import office_default_ipv4
 
 
@@ -93,6 +94,25 @@ def get_floor_map(office_floor: str | None = None):
 			"occupied": occupied,
 			"vacant": len(cubicles) - occupied,
 		},
+	}
+
+
+@frappe.whitelist()
+def get_employee_workstation(employee: str | None = None):
+	_require_floor_access()
+	name = (employee or "").strip()
+	if not name or not frappe.db.exists("Employee", name):
+		return {"device_id": "", "ip_address": ""}
+
+	fields = ["name"]
+	if frappe.get_meta("Employee").has_field("default_ipv4"):
+		fields.append("default_ipv4")
+	if frappe.get_meta("Employee").has_field("login_device_id"):
+		fields.append("login_device_id")
+	row = frappe.db.get_value("Employee", name, fields, as_dict=True) or {}
+	return {
+		"device_id": resolve_workstation_device(name),
+		"ip_address": (getattr(row, "default_ipv4", None) or "").strip(),
 	}
 
 

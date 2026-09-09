@@ -13,6 +13,15 @@ from frappe import _
 from frappe.utils import cint
 
 _SPLIT_IPS = re.compile(r"[\s,;]+")
+_FORWARD_HEADERS = (
+	"CF-Connecting-IP",
+	"True-Client-IP",
+	"X-Real-IP",
+	"X-Forwarded-For",
+	"X-Client-IP",
+	"Fastly-Client-IP",
+	"Forwarded",
+)
 
 
 def request_ipv4() -> str:
@@ -26,11 +35,17 @@ def request_ipv4() -> str:
 def normalize_ipv4(value: str | None) -> str:
 	if not value:
 		return ""
-	text = str(value).strip()
+	text = str(value).strip().strip('"').strip("[]")
+	if text.lower().startswith("for="):
+		text = text[4:].strip().strip('"').strip("[]")
 	if "," in text:
 		text = text.split(",", 1)[0].strip()
 	if text.startswith("::ffff:"):
 		text = text[7:]
+	if ":" in text and text.count(":") == 1:
+		host, port = text.rsplit(":", 1)
+		if port.isdigit():
+			text = host
 	try:
 		ip = ipaddress.ip_address(text)
 	except ValueError:
@@ -38,6 +53,69 @@ def normalize_ipv4(value: str | None) -> str:
 	if ip.version != 4:
 		return ""
 	return str(ip)
+
+
+def is_container_peer_ipv4(value: str | None) -> bool:
+	"""True when the TCP peer is Docker/loopback, not the browser's address."""
+	ip = normalize_ipv4(value)
+	if not ip:
+		return True
+	addr = ipaddress.ip_address(ip)
+	if addr.is_loopback or addr.is_link_local or addr.is_unspecified:
+		return True
+	parts = [int(part) for part in ip.split(".")]
+	# docker0 (172.17.0.0/16) and default compose networks (172.18-31.x).
+	return parts[0] == 172 and 17 <= parts[1] <= 31
+
+
+def _header_value(name: str) -> str:
+	try:
+		value = frappe.get_request_header(name)
+	except Exception:
+		value = None
+	if value:
+		return str(value)
+	try:
+		headers = getattr(getattr(frappe.local, "request", None), "headers", None) or {}
+		return str(headers.get(name) or headers.get(name.lower()) or "")
+	except Exception:
+		return ""
+
+
+def _header_ipv4s() -> list[str]:
+	found: list[str] = []
+	for name in _FORWARD_HEADERS:
+		raw = _header_value(name)
+		if not raw:
+			continue
+		for token in raw.split(","):
+			ip = normalize_ipv4(token)
+			if ip and ip not in found:
+				found.append(ip)
+	return found
+
+
+def request_ipv4s() -> list[str]:
+	found = _header_ipv4s()
+	peer = request_ipv4()
+	if peer and peer not in found:
+		found.append(peer)
+	return found
+
+
+def best_client_ipv4(reported: str | None = None) -> str:
+	"""Browser IPv4: public forwarded address, then LAN, then a scanned client IP."""
+	candidates = request_ipv4s()
+	reported_ip = normalize_ipv4(reported)
+	public = [ip for ip in candidates if not ipaddress.ip_address(ip).is_private]
+	if public:
+		return public[0]
+	lan = [ip for ip in candidates if not is_container_peer_ipv4(ip)]
+	if lan:
+		return lan[0]
+	if reported_ip:
+		return reported_ip
+	return candidates[0] if candidates else ""
 
 
 def parse_office_ipv4s(raw: str | None) -> list[str]:
@@ -80,7 +158,12 @@ def is_agent_access_exempt(user: str | None = None) -> bool:
 	return bool(is_staff_pro_desk_admin(user))
 
 
-def validate_agent_clockin_ip(employee: str | None = None, *, ignore_session_exemption: bool = False):
+def validate_agent_clockin_ip(
+	employee: str | None = None,
+	*,
+	ignore_session_exemption: bool = False,
+	client_ip: str | None = None,
+):
 	allowed = get_allowed_office_ips()
 	if not allowed:
 		return
@@ -90,7 +173,7 @@ def validate_agent_clockin_ip(employee: str | None = None, *, ignore_session_exe
 		if user and is_agent_access_exempt(user):
 			return
 
-	current = request_ipv4()
+	current = best_client_ipv4(client_ip)
 	if current in allowed:
 		return
 
@@ -203,8 +286,10 @@ def _local_ipv4s() -> list[str]:
 	return [ip for ip in _unique_ips(found) if is_scannable_private_ipv4(ip)]
 
 
-def _arp_ipv4s() -> list[str]:
+def _arp_cache_ipv4s() -> list[str]:
 	import os
+	import subprocess
+	import sys
 
 	found: list[str] = []
 	arp_path = "/proc/net/arp"
@@ -218,16 +303,144 @@ def _arp_ipv4s() -> list[str]:
 						found.append(token)
 		except OSError:
 			pass
+
+	try:
+		completed = subprocess.run(
+			["arp", "-a"] if sys.platform == "win32" else ["ip", "neigh"],
+			capture_output=True,
+			text=True,
+			timeout=5,
+			check=False,
+		)
+		for token in re.findall(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", completed.stdout or ""):
+			if is_scannable_private_ipv4(token):
+				found.append(token)
+	except (OSError, subprocess.TimeoutExpired):
+		pass
 	return _unique_ips(found)
+
+
+def _ping_command(ip: str) -> list[str]:
+	import sys
+
+	if sys.platform == "win32":
+		return ["ping", "-n", "1", "-w", "200", str(ip)]
+	return ["ping", "-c", "1", "-W", "1", str(ip)]
+
+
+def _scapy_iface_for_network(network):
+	try:
+		from scapy.all import get_if_addr, get_if_list
+	except ImportError:
+		return None
+
+	for iface in get_if_list():
+		try:
+			addr = get_if_addr(iface)
+		except Exception:
+			continue
+		try:
+			if addr and ipaddress.ip_address(addr) in network:
+				return iface
+		except ValueError:
+			continue
+	return None
+
+
+def _scapy_arp_scan(network) -> list[str]:
+	"""Layer-2 ARP who-has sweep of a local /24. Requires raw sockets / Npcap."""
+	try:
+		from scapy.all import ARP, Ether, srp
+	except ImportError:
+		return []
+
+	kwargs = {"timeout": 3, "verbose": False, "retry": 1}
+	iface = _scapy_iface_for_network(network)
+	if iface:
+		kwargs["iface"] = iface
+
+	try:
+		packet = Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=str(network))
+		answered, _ = srp(packet, **kwargs)
+	except Exception:
+		frappe.logger("hrms").warning("BPO IPv4 ARP scan failed on %s", network)
+		return []
+
+	found = []
+	for _sent, received in answered:
+		try:
+			ip = received[ARP].psrc
+		except (IndexError, AttributeError):
+			continue
+		if is_scannable_private_ipv4(ip):
+			found.append(ip)
+	return _unique_ips(found)
+
+
+def _scapy_icmp_sweep(network) -> list[str]:
+	"""ICMP echo sweep for live hosts on a private /24."""
+	try:
+		from scapy.all import ICMP, IP, sr
+	except ImportError:
+		return []
+
+	targets = [str(host) for host in network.hosts()]
+	kwargs = {"timeout": 2, "verbose": False}
+	iface = _scapy_iface_for_network(network)
+	if iface:
+		kwargs["iface"] = iface
+
+	try:
+		packets = [IP(dst=ip) / ICMP() for ip in targets]
+		answered, _ = sr(packets, **kwargs)
+	except Exception:
+		frappe.logger("hrms").warning("BPO IPv4 ICMP sweep failed on %s", network)
+		return []
+
+	found = []
+	for _sent, received in answered:
+		try:
+			if ICMP not in received or received[ICMP].type != 0:
+				continue
+			ip = received[IP].src
+		except (IndexError, AttributeError):
+			continue
+		if is_scannable_private_ipv4(ip):
+			found.append(ip)
+	return _unique_ips(found)
+
+
+def _scan_live_hosts(network) -> tuple[list[str], list[str]]:
+	"""Discover live private hosts: ARP, then ICMP, then TCP/ping fallback."""
+	methods: list[str] = []
+	found: list[str] = []
+
+	arp_hosts = _scapy_arp_scan(network)
+	if arp_hosts:
+		found.extend(arp_hosts)
+		methods.append("arp")
+
+	icmp_hosts = _scapy_icmp_sweep(network)
+	if icmp_hosts:
+		found.extend(icmp_hosts)
+		methods.append("icmp")
+
+	if found:
+		return _unique_ips(found), methods
+
+	fallback = _sweep_private_subnet(network)
+	if fallback:
+		return fallback, ["tcp-ping"]
+	return [], methods
 
 
 def _subnets_to_scan(seed_ip: str | None) -> list:
 	networks = []
 	seen = set()
 	candidates = []
-	if is_scannable_private_ipv4(seed_ip):
+	if is_scannable_private_ipv4(seed_ip) and not is_container_peer_ipv4(seed_ip):
 		candidates.append(seed_ip)
-	candidates.extend(_local_ipv4s())
+	candidates.extend(ip for ip in _local_ipv4s() if not is_container_peer_ipv4(ip))
 	for ip in candidates:
 		network = ipaddress.ip_network(f"{ip}/24", strict=False)
 		key = str(network)
@@ -255,7 +468,7 @@ def _host_is_reachable(ip: str, timeout: float = 0.2) -> bool:
 
 	try:
 		completed = subprocess.run(
-			["ping", "-c", "1", "-W", "1", str(ip)],
+			_ping_command(ip),
 			capture_output=True,
 			timeout=2,
 			check=False,
@@ -282,28 +495,77 @@ def _sweep_private_subnet(network) -> list[str]:
 	return sorted(live, key=lambda value: ipaddress.ip_address(value))
 
 
-def discover_office_ipv4s(seed_ip: str | None = None) -> list[str]:
-	"""Discover live private IPv4 hosts on the office LAN the server can see."""
-	seed = normalize_ipv4(seed_ip) or request_ipv4()
-	found = []
-	if seed:
+def rank_office_ipv4s(values) -> list[str]:
+	"""Public client IPs first, then real LAN hosts. Drop Docker/loopback peers."""
+	public: list[str] = []
+	private: list[str] = []
+	for ip in _unique_ips(values):
+		if is_container_peer_ipv4(ip):
+			continue
+		if ipaddress.ip_address(ip).is_private:
+			private.append(ip)
+		else:
+			public.append(ip)
+	return public + private
+
+
+def _parse_client_ips(client_ip: str | None = None, client_ips=None) -> list[str]:
+	values: list[str] = []
+	if isinstance(client_ips, (list, tuple)):
+		values.extend(client_ips)
+	elif client_ips:
+		values.extend(parse_office_ipv4s(str(client_ips)))
+	if client_ip:
+		values.insert(0, client_ip)
+	return rank_office_ipv4s(values)
+
+
+def discover_office_network(seed_ip: str | None = None, client_ips: list[str] | None = None) -> dict:
+	"""Discover the browser's real network IPv4, then live hosts on a reachable office LAN."""
+	scanned = rank_office_ipv4s(client_ips or [])
+	methods: list[str] = []
+	if scanned:
+		methods.append("client")
+
+	seed = scanned[0] if scanned else normalize_ipv4(seed_ip) or best_client_ipv4()
+	found = list(scanned)
+	if seed and seed not in found and not is_container_peer_ipv4(seed):
 		found.append(seed)
-	found.extend(_local_ipv4s())
-	found.extend(_arp_ipv4s())
 
+	found.extend(ip for ip in _local_ipv4s() if not is_container_peer_ipv4(ip))
+	cache_ips = [ip for ip in _arp_cache_ipv4s() if not is_container_peer_ipv4(ip)]
+	if cache_ips:
+		found.extend(cache_ips)
+		methods.append("arp-cache")
+
+	networks = []
 	if not getattr(frappe.flags, "in_test", False):
-		for network in _subnets_to_scan(seed):
-			found.extend(_sweep_private_subnet(network))
+		lan_seed = seed if is_scannable_private_ipv4(seed) and not is_container_peer_ipv4(seed) else None
+		for network in _subnets_to_scan(lan_seed):
+			networks.append(str(network))
+			hosts, used = _scan_live_hosts(network)
+			found.extend(ip for ip in hosts if not is_container_peer_ipv4(ip))
+			methods.extend(used)
 
-	return _unique_ips(found)
+	return {
+		"ips": rank_office_ipv4s(found),
+		"methods": list(dict.fromkeys(methods)),
+		"networks": networks,
+	}
+
+
+def discover_office_ipv4s(seed_ip: str | None = None) -> list[str]:
+	return discover_office_network(seed_ip)["ips"]
 
 
 @frappe.whitelist()
-def scan_office_ipv4() -> dict:
+def scan_office_ipv4(client_ip: str | None = None, client_ips: str | list | None = None) -> dict:
 	frappe.only_for(["System Manager", "Administrator", "HR Manager"])
-	ips = discover_office_ipv4s()
+	scanned = _parse_client_ips(client_ip, client_ips)
+	discovery = discover_office_network(client_ips=scanned)
+	ips = discovery["ips"]
 	if not ips:
-		frappe.throw(_("Could not detect IPv4 addresses on the office network."))
+		frappe.throw(_("Could not detect a real network IPv4 address."))
 
 	applied = apply_office_ipv4_defaults("\n".join(ips))
 	return {
@@ -313,4 +575,6 @@ def scan_office_ipv4() -> dict:
 		"default_ip": applied["default_ip"],
 		"employees": applied["employees"],
 		"cubicles": applied["cubicles"],
+		"methods": discovery["methods"],
+		"networks": discovery["networks"],
 	}

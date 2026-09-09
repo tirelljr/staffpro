@@ -111,7 +111,7 @@ class TestDailyPay(HRMSTestSuite):
 		self.assertEqual(flt(one_day["totals"]["daily_pay"]), 100)
 		self.assertEqual(flt(one_day["totals"]["net_daily_pay"]), 94.06)
 
-	def test_lunch_punch_adds_paid_hour_and_extra_row(self):
+	def test_lunch_punch_excludes_unpaid_break(self):
 		employee = make_employee("test_lunch_pairs@example.com", company="_Test Company")
 		make_salary_structure(
 			"Lunch Pair Structure",
@@ -128,20 +128,16 @@ class TestDailyPay(HRMSTestSuite):
 		self.assertEqual(first, second)
 
 		doc = frappe.get_doc("Attendance", first)
-		self.assertEqual(flt(doc.working_hours), 8)  # 3 + 4 + 1 lunch
-		self.assertEqual(flt(doc.daily_pay), 100)
+		self.assertEqual(flt(doc.working_hours), 7)  # 3 + 4; lunch gap unpaid
+		self.assertEqual(flt(doc.daily_pay), 87.5)
 
 		payload = get_hours_rows(from_date=day, to_date=day, employee=employee)
 		kinds = [row["kind"] for row in payload["rows"]]
-		self.assertEqual(len(payload["rows"]), 3)
+		self.assertEqual(len(payload["rows"]), 2)
 		self.assertEqual(kinds.count("pair"), 2)
-		self.assertEqual(kinds.count("lunch"), 1)
-		self.assertEqual(flt(payload["totals"]["total"]), 8)
-		self.assertEqual(flt(payload["totals"]["daily_pay"]), 100)
-		lunch = next(row for row in payload["rows"] if row["kind"] == "lunch")
-		self.assertEqual(flt(lunch["working_hours"]), 1)
-		self.assertEqual(lunch["status"], "Lunch")
-		self.assertFalse(lunch.get("in_log"))
+		self.assertEqual(kinds.count("lunch"), 0)
+		self.assertEqual(flt(payload["totals"]["total"]), 7)
+		self.assertEqual(flt(payload["totals"]["daily_pay"]), 87.5)
 
 	def test_open_in_pair_has_no_lunch(self):
 		employee = make_employee("test_open_in_pair@example.com", company="_Test Company")
@@ -169,11 +165,10 @@ class TestDailyPay(HRMSTestSuite):
 		result = pair_checkin_logs(logs)
 		self.assertEqual(len(result["pairs"]), 2)
 		self.assertEqual(flt(result["pair_hours"]), 7)
-		self.assertEqual(flt(result["lunch_hours"]), 1)
-		self.assertEqual(flt(result["working_hours"]), 8)
+		self.assertEqual(flt(result["working_hours"]), 7)
+		self.assertNotIn("lunch_hours", result)
 
 		single = pair_checkin_logs(logs[:2])
-		self.assertEqual(flt(single["lunch_hours"]), 0)
 		self.assertEqual(flt(single["working_hours"]), 3)
 
 	def test_hours_between_from_in_and_out_clocks(self):
@@ -199,7 +194,7 @@ class TestDailyPay(HRMSTestSuite):
 		self.assertEqual(flt(ensure_working_hours_from_times(doc)), 4)
 		self.assertEqual(flt(doc.working_hours), 4)
 
-	def test_seed_day_hours_creates_lunch_rows_and_ss(self):
+	def test_seed_day_hours_creates_pair_rows_and_ss(self):
 		from hrms.import_hr_demo_data import _seed_day_hours
 		from hrms.payroll.social_security import seed_belize_ssb_2022_table
 
@@ -224,11 +219,11 @@ class TestDailyPay(HRMSTestSuite):
 		payload = get_hours_rows(from_date=nowdate(), to_date=nowdate(), employee=employee)
 		kinds = [row["kind"] for row in payload["rows"]]
 		self.assertEqual(kinds.count("pair"), 2)
-		self.assertEqual(kinds.count("lunch"), 1)
-		self.assertEqual(flt(payload["totals"]["total"]), 8)
-		self.assertEqual(flt(payload["totals"]["daily_pay"]), 100)
+		self.assertEqual(kinds.count("lunch"), 0)
+		self.assertEqual(flt(payload["totals"]["total"]), 7)
+		self.assertEqual(flt(payload["totals"]["daily_pay"]), 87.5)
 		self.assertEqual(flt(payload["totals"]["ss_deduction"]), 1.69)
-		self.assertEqual(flt(payload["totals"]["net_daily_pay"]), 98.31)
+		self.assertEqual(flt(payload["totals"]["net_daily_pay"]), 85.81)
 
 	def test_hours_rows_keep_pay_when_hour_rate_missing(self):
 		employee = make_employee("test_dayview_missing_rate@example.com", company="_Test Company")

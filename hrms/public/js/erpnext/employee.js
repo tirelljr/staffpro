@@ -198,6 +198,7 @@ frappe.ui.form.on("Employee", {
 			frm.set_df_property(fieldname, "hidden", 1);
 		}
 		frm.set_df_property("grade", "label", __("Campaign"));
+		lock_employee_salary_currency(frm);
 		setup_employee_username_field(frm);
 		setup_belize_bank_picker(frm);
 
@@ -229,6 +230,14 @@ frappe.ui.form.on("Employee", {
 
 	user_bonus_if_below: function (frm) {
 		refresh_user_bonus_status(frm);
+	},
+
+	company: function (frm) {
+		lock_employee_salary_currency(frm);
+	},
+
+	salary_currency: function (frm) {
+		lock_employee_salary_currency(frm);
 	},
 
 	add_hourly_rate_action: function (frm) {
@@ -417,11 +426,21 @@ function suggested_username(frm) {
 	return first || last || "";
 }
 
+function lock_employee_salary_currency(frm) {
+	if (!frm.fields_dict.salary_currency) return;
+	frm.set_df_property("salary_currency", "read_only", 1);
+	frm.set_df_property(
+		"salary_currency",
+		"description",
+		__("Agent salary is always Belize dollars (BZD)."),
+	);
+	if (frm.doc.salary_currency === "BZD") return;
+	frm.set_value("salary_currency", "BZD");
+}
+
 function set_employee_salary_defaults(frm) {
+	lock_employee_salary_currency(frm);
 	if (!frm.is_new()) return;
-	if (!frm.doc.salary_currency) {
-		frm.set_value("salary_currency", "BZD");
-	}
 	if (!frm.doc.salary_mode) {
 		frm.set_value("salary_mode", "Bank");
 	}

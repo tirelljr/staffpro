@@ -9,15 +9,75 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt, get_datetime, getdate, now_datetime, time_diff_in_hours
 
-from hrms.hr.agent_access import validate_agent_clockin_ip
+from hrms.hr.agent_access import best_client_ipv4, normalize_ipv4, validate_agent_clockin_ip
 from hrms.overrides.employee_master import resolve_user_from_login
 
 
-def _request_ip() -> str:
-	try:
-		return frappe.local.request_ip or ""
-	except Exception:
+def _request_ip(reported: str | None = None) -> str:
+	return best_client_ipv4(reported)
+
+
+def _employee_cubicle(employee: str | None) -> dict | None:
+	if not employee or not frappe.db.table_exists("Cubicle"):
+		return None
+	return frappe.db.get_value(
+		"Cubicle",
+		{"employee": employee},
+		["name", "device_id", "ip_address"],
+		as_dict=True,
+	)
+
+
+def _cubicle_for_ip(ip: str | None) -> dict | None:
+	address = normalize_ipv4(ip)
+	if not address or not frappe.db.table_exists("Cubicle"):
+		return None
+	return frappe.db.get_value(
+		"Cubicle",
+		{"ip_address": address},
+		["name", "device_id", "employee"],
+		as_dict=True,
+	)
+
+
+def _login_device_id(employee: str | None) -> str:
+	if not employee or not frappe.get_meta("Employee").has_field("login_device_id"):
 		return ""
+	return (frappe.db.get_value("Employee", employee, "login_device_id") or "").strip()
+
+
+def resolve_workstation_device(
+	employee: str | None = None,
+	client_ip: str | None = None,
+	fallback: str | None = None,
+) -> str:
+	"""Prefer the cubicle Device ID, then the registered login device, then a fallback."""
+	if employee:
+		cubicle = _employee_cubicle(employee)
+		if cubicle and (cubicle.device_id or "").strip():
+			return cubicle.device_id.strip()[:140]
+		registered = _login_device_id(employee)
+		if registered:
+			return registered[:140]
+	cubicle = _cubicle_for_ip(client_ip)
+	if cubicle and (cubicle.device_id or "").strip():
+		return cubicle.device_id.strip()[:140]
+	return (fallback or "").strip()[:140]
+
+
+def bind_cubicle_device(employee: str | None, device_id: str | None) -> str:
+	"""Write the real device ID onto the agent's assigned cubicle when it is empty."""
+	device = (device_id or "").strip()[:140]
+	if not employee or not device:
+		return ""
+	cubicle = _employee_cubicle(employee)
+	if not cubicle:
+		return ""
+	current = (cubicle.device_id or "").strip()
+	if current:
+		return current
+	frappe.db.set_value("Cubicle", cubicle.name, "device_id", device, update_modified=False)
+	return device
 
 
 def _default_company() -> dict:
@@ -30,10 +90,12 @@ def _default_company() -> dict:
 
 
 @frappe.whitelist(allow_guest=True)
-def get_kiosk_context() -> dict:
+def get_kiosk_context(client_ip: str | None = None) -> dict:
 	company = _default_company()
+	ip = _request_ip(client_ip)
 	return {
-		"ip": _request_ip(),
+		"ip": ip,
+		"device_id": resolve_workstation_device(client_ip=ip),
 		"company_id": company["company_id"],
 		"company_name": company["company_name"] or "Staff Pro",
 		"allow_geolocation_tracking": cint(
@@ -165,7 +227,7 @@ def _checkin_summary(employee: str) -> dict:
 	}
 
 
-def _profile(employee: dict, username: str) -> dict:
+def _profile(employee: dict, username: str, client_ip: str | None = None) -> dict:
 	summary = _checkin_summary(employee.name)
 	summary.update(
 		{
@@ -173,13 +235,14 @@ def _profile(employee: dict, username: str) -> dict:
 			"employee": employee.name,
 			"employee_name": employee.employee_name or "",
 			"company": employee.company or "",
+			"device_id": resolve_workstation_device(employee.name, client_ip),
 		}
 	)
 	return summary
 
 
 @frappe.whitelist(allow_guest=True)
-def get_kiosk_profile(username: str | None = None) -> dict:
+def get_kiosk_profile(username: str | None = None, client_ip: str | None = None) -> dict:
 	"""Return an employee's name and last punch times without starting a session."""
 	login = (username or "").strip()
 	if not login:
@@ -200,7 +263,7 @@ def get_kiosk_profile(username: str | None = None) -> dict:
 	if not employee:
 		return {}
 
-	return _profile(employee, frappe.db.get_value("User", user, "username") or login)
+	return _profile(employee, frappe.db.get_value("User", user, "username") or login, _request_ip(client_ip))
 
 
 @frappe.whitelist(allow_guest=True)
@@ -211,6 +274,7 @@ def clock(
 	latitude: str | float | None = None,
 	longitude: str | float | None = None,
 	device_id: str | None = None,
+	client_ip: str | None = None,
 ) -> dict:
 	"""Authenticate with a username and create an Employee Checkin without keeping a session."""
 	if not (username or "").strip() or not password:
@@ -218,18 +282,25 @@ def clock(
 
 	user = _authenticate(username, password)
 	employee = _employee_for_user(user)
-	validate_agent_clockin_ip(employee.name, ignore_session_exemption=True)
+	validate_agent_clockin_ip(employee.name, ignore_session_exemption=True, client_ip=client_ip)
 	summary = _checkin_summary(employee.name)
 	action = (log_type or "").strip().upper() or summary["next_action"]
 	if action not in {"IN", "OUT"}:
 		frappe.throw(_("Invalid clock action."))
+
+	ip = _request_ip(client_ip)
+	workstation_id = resolve_workstation_device(employee.name, ip, device_id)
+	if not workstation_id:
+		workstation_id = (device_id or "").strip()[:140]
+	bound = bind_cubicle_device(employee.name, workstation_id)
+	workstation_id = bound or workstation_id
 
 	doc = frappe.new_doc("Employee Checkin")
 	doc.employee = employee.name
 	doc.employee_name = employee.employee_name
 	doc.time = now_datetime().replace(microsecond=0)
 	doc.log_type = action
-	doc.device_id = (device_id or "")[:140] or None
+	doc.device_id = workstation_id or None
 	if latitude not in (None, ""):
 		doc.latitude = flt(latitude)
 	if longitude not in (None, ""):
@@ -237,13 +308,14 @@ def clock(
 	doc.flags.ignore_permissions = True
 	doc.insert(ignore_permissions=True)
 
-	profile = _profile(employee, frappe.db.get_value("User", user, "username") or username)
+	profile = _profile(employee, frappe.db.get_value("User", user, "username") or username, ip)
 	profile.update(
 		{
 			"log_type": action,
 			"time": doc.time,
 			"time_label": _format_clock(doc.time),
 			"checkin": doc.name,
+			"device_id": workstation_id or profile.get("device_id") or "",
 		}
 	)
 	return profile

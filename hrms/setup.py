@@ -155,6 +155,8 @@ def get_customizations():
 				{"doc_type": "Employee", "field_name": fieldname, "property": "default"}
 				for fieldname in EMPLOYEE_FIELD_DEFAULTS
 			],
+			{"doc_type": "Employee", "field_name": "salary_currency", "property": "read_only"},
+			{"doc_type": "Employee", "field_name": "salary_currency", "property": "description"},
 			{"doc_type": "Employee", "field_name": "ctc", "property": "description"},
 			*[
 				{"doc_type": doctype, "field_name": fieldname, "property": "label"}
@@ -742,7 +744,7 @@ def get_custom_fields():
 			{
 				"depends_on": "restrict_agent_clockin_to_office_ip",
 				"description": _(
-					"Agents can clock in only from these IPv4 addresses. Enter one per line. Scan BPO IPv4 probes the office LAN; the first address becomes every agent's default IP."
+					"Agents can clock in only from these IPv4 addresses. Enter one per line. Scan BPO IPv4 uses the same real-network scan as the kiosk (STUN/public IPv4), then ARP/ICMP on a reachable office LAN. The first address becomes every agent's default IP."
 				),
 				"fieldname": "office_clockin_ipv4",
 				"fieldtype": "Small Text",

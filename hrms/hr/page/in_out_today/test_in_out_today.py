@@ -242,6 +242,25 @@ class TestInOutToday(HRMSTestSuite):
 		self.assertIn(leave_type.name, row["pto_code"])
 		self.assertEqual(row["leave_type"], leave_type.name)
 
+	def test_same_day_in_counts_when_time_looks_future(self):
+		employee = make_employee(
+			"inout.today.tzskew@example.com",
+			company=self.company,
+			department=self.dept_a,
+			first_name="TzSkew",
+			last_name="Today",
+		)
+		now = now_datetime()
+		skewed_in = now + timedelta(hours=6)
+		if getdate(skewed_in) != getdate(now):
+			skewed_in = now.replace(hour=23, minute=45, second=0, microsecond=0)
+		make_checkin(employee, time=skewed_in, log_type="IN")
+
+		payload = get_in_out_today(department=self.dept_a)
+		row = next(item for item in payload["details"] if item["employee"] == employee)
+		self.assertEqual(row["status"], "IN")
+		self.assertTrue(row["in_time"])
+
 	def test_status_ignores_future_out_punch(self):
 		employee = make_employee(
 			"inout.today.future@example.com",

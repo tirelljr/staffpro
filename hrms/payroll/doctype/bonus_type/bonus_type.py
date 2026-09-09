@@ -20,8 +20,8 @@ ATTENDANCE_BONUS_DEFAULTS = {
 	"if_below": "No Bonus",
 }
 
-BONUS_SALARY_COMPONENT = "Bonus"
-ATTENDANCE_DEDUCTION_COMPONENT = "Attendance Deduction"
+PREFERRED_EARNING_COMPONENTS = ("Basic Hourly", "Basic Salary", "Basic", "Salary")
+PREFERRED_DEDUCTION_COMPONENTS = ("Social Security",)
 
 
 class BonusType(Document):
@@ -98,49 +98,128 @@ def configure_attendance_bonus_defaults() -> None:
 
 def ensure_bonus_salary_component() -> str:
 	"""Payroll still posts bonuses through the Bonus earning so they hit gross pay."""
-	if frappe.db.exists("Salary Component", BONUS_SALARY_COMPONENT):
-		return BONUS_SALARY_COMPONENT
+	if not frappe.db.exists("Salary Component", BONUS_SALARY_COMPONENT):
+		if frappe.db.table_exists("Salary Component"):
+			doc = frappe.get_doc(
+				{
+					"doctype": "Salary Component",
+					"salary_component": BONUS_SALARY_COMPONENT,
+					"salary_component_abbr": "BNS",
+					"type": "Earning",
+					"is_tax_applicable": 1,
+					"earning_category": "Bonus",
+					"depends_on_payment_days": 0,
+					"do_not_include_in_total": 0,
+					"description": "Bonus added to gross pay for the payroll period.",
+				}
+			)
+			doc.flags.ignore_permissions = True
+			doc.insert()
 
-	if not frappe.db.table_exists("Salary Component"):
-		return BONUS_SALARY_COMPONENT
-
-	doc = frappe.get_doc(
-		{
-			"doctype": "Salary Component",
-			"salary_component": BONUS_SALARY_COMPONENT,
-			"salary_component_abbr": "BNS",
-			"type": "Earning",
-			"is_tax_applicable": 1,
-			"earning_category": "Bonus",
-			"depends_on_payment_days": 0,
-			"do_not_include_in_total": 0,
-			"description": "Bonus added to gross pay for the payroll period.",
-		}
-	)
-	doc.flags.ignore_permissions = True
-	doc.insert()
+	_ensure_accounts_for_default_company()
 	return BONUS_SALARY_COMPONENT
 
 
 def ensure_attendance_deduction_component() -> str:
-	if frappe.db.exists("Salary Component", ATTENDANCE_DEDUCTION_COMPONENT):
-		return ATTENDANCE_DEDUCTION_COMPONENT
+	if not frappe.db.exists("Salary Component", ATTENDANCE_DEDUCTION_COMPONENT):
+		if frappe.db.table_exists("Salary Component"):
+			doc = frappe.get_doc(
+				{
+					"doctype": "Salary Component",
+					"salary_component": ATTENDANCE_DEDUCTION_COMPONENT,
+					"salary_component_abbr": "ATD",
+					"type": "Deduction",
+					"is_tax_applicable": 0,
+					"depends_on_payment_days": 0,
+					"do_not_include_in_total": 0,
+					"description": "Attendance shortfall taken from pay when the agent is below their user bonus target.",
+				}
+			)
+			doc.flags.ignore_permissions = True
+			doc.insert()
 
-	if not frappe.db.table_exists("Salary Component"):
-		return ATTENDANCE_DEDUCTION_COMPONENT
-
-	doc = frappe.get_doc(
-		{
-			"doctype": "Salary Component",
-			"salary_component": ATTENDANCE_DEDUCTION_COMPONENT,
-			"salary_component_abbr": "ATD",
-			"type": "Deduction",
-			"is_tax_applicable": 0,
-			"depends_on_payment_days": 0,
-			"do_not_include_in_total": 0,
-			"description": "Attendance shortfall taken from pay when the agent is below their user bonus target.",
-		}
-	)
-	doc.flags.ignore_permissions = True
-	doc.insert()
+	_ensure_accounts_for_default_company()
 	return ATTENDANCE_DEDUCTION_COMPONENT
+
+
+def ensure_bonus_component_accounts(company: str | None = None) -> dict[str, str]:
+	"""Map Bonus and Attendance Deduction to a GL account so payroll JVs can post."""
+	mapped = {}
+	companies = [company] if company else frappe.get_all("Company", pluck="name")
+	for company_name in companies:
+		if not company_name:
+			continue
+		for component, component_type in (
+			(BONUS_SALARY_COMPONENT, "Earning"),
+			(ATTENDANCE_DEDUCTION_COMPONENT, "Deduction"),
+		):
+			if not frappe.db.exists("Salary Component", component):
+				continue
+			account = _account_for_component_type(company_name, component_type)
+			if not account:
+				continue
+			_append_component_account(component, company_name, account)
+			mapped[f"{component}:{company_name}"] = account
+	return mapped
+
+
+def _account_for_component_type(company: str, component_type: str) -> str | None:
+	preferred = (
+		PREFERRED_EARNING_COMPONENTS if component_type == "Earning" else PREFERRED_DEDUCTION_COMPONENTS
+	)
+	skip = {BONUS_SALARY_COMPONENT, ATTENDANCE_DEDUCTION_COMPONENT, *preferred}
+	candidates = list(preferred) + [
+		name
+		for name in frappe.get_all("Salary Component", filters={"type": component_type}, pluck="name")
+		if name not in skip
+	]
+	for name in candidates:
+		account = frappe.db.get_value(
+			"Salary Component Account",
+			{"parent": name, "company": company},
+			"account",
+		)
+		if account:
+			return account
+
+	if component_type == "Earning":
+		return (
+			frappe.get_cached_value("Company", company, "default_expense_account")
+			or frappe.db.get_value(
+				"Account",
+				{"company": company, "root_type": "Expense", "is_group": 0, "disabled": 0},
+				"name",
+				order_by="creation",
+			)
+		)
+
+	return (
+		frappe.get_cached_value("Company", company, "default_payroll_payable_account")
+		or frappe.db.get_value(
+			"Account",
+			{"company": company, "root_type": "Liability", "is_group": 0, "disabled": 0},
+			"name",
+			order_by="creation",
+		)
+	)
+
+
+def _append_component_account(component_name: str, company: str, account: str) -> None:
+	if frappe.db.exists("Salary Component Account", {"parent": component_name, "company": company}):
+		return
+	component = frappe.get_doc("Salary Component", component_name)
+	component.append("accounts", {"company": company, "account": account})
+	component.flags.ignore_permissions = True
+	component.save()
+
+
+def _ensure_accounts_for_default_company() -> None:
+	if (
+		getattr(frappe.flags, "in_install", False)
+		or getattr(frappe.flags, "in_patch", False)
+		or getattr(frappe.flags, "in_migrate", False)
+	):
+		return
+	company = frappe.defaults.get_global_default("company")
+	if company:
+		ensure_bonus_component_accounts(company)

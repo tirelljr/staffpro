@@ -25,12 +25,16 @@ def get_data(
 ) -> dict[str, list]:
 	if filters:
 		filters = frappe.parse_json(filters)
+	if not isinstance(filters, dict):
+		filters = {}
 
-	from_date = filters.get("from_date")
-	to_date = filters.get("to_date")
+	from_date = filters.get("from_date") or from_date
+	to_date = filters.get("to_date") or to_date
 
 	if not to_date:
 		to_date = getdate()
+	if not from_date:
+		from_date = getdate().replace(month=1, day=1)
 
 	permitted_fields = frappe.model.get_permitted_fields("Employee", user=frappe.session.user)
 

@@ -175,6 +175,8 @@ frappe.ui.form.on("Payroll Entry", {
 				e.preventDefault();
 				frm.scroll_to_field("error_message");
 			});
+		} else if (frm.doc.error_message) {
+			frm.dashboard.set_headline(frappe.utils.escape_html(frm.doc.error_message));
 		}
 	},
 
@@ -293,7 +295,10 @@ frappe.ui.form.on("Payroll Entry", {
 			frm.add_custom_button(__("Submit Salary Slip"), function () {
 				submit_salary_slip(frm);
 			}).addClass("btn-primary");
-		} else if (!frm.doc.salary_slips_created && frm.doc.status === "Failed") {
+		} else if (
+			!frm.doc.salary_slips_created &&
+			(frm.doc.status === "Failed" || frm.doc.status === "Submitted")
+		) {
 			frm.add_custom_button(__("Create Salary Slips"), function () {
 				frm.trigger("create_salary_slip");
 			}).addClass("btn-primary");

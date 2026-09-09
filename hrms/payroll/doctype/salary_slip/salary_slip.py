@@ -587,7 +587,7 @@ class SalarySlip(TransactionBase):
 
 		else:
 			self.salary_structure = None
-			frappe.msgprint(
+			frappe.throw(
 				_("No active or default Salary Structure found for employee {0} for the given dates").format(
 					self.employee
 				),

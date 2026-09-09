@@ -25,13 +25,20 @@ def get_data(
 ) -> dict[str, list]:
 	if filters:
 		filters = frappe.parse_json(filters)
+	if not isinstance(filters, dict):
+		filters = {}
+
+	as_of = getdate(filters.get("to_date") or to_date or getdate())
+	emp_filters = {"company": filters.get("company"), "status": "Active"}
+	if as_of:
+		emp_filters["date_of_joining"] = ["<=", as_of]
 
 	employees = frappe.db.get_list(
 		"Employee",
-		filters={"company": filters.get("company"), "status": "Active"},
+		filters=emp_filters,
 		pluck="date_of_birth",
 	)
-	age_list = get_age_list(employees)
+	age_list = get_age_list(employees, as_of)
 	ranges = get_ranges()
 
 	age_range, values = get_employees_by_age(age_list, ranges)
@@ -55,12 +62,13 @@ def get_ranges() -> list[tuple[int, int]]:
 	return ranges
 
 
-def get_age_list(employees) -> list[int]:
+def get_age_list(employees, as_of=None) -> list[int]:
 	age_list = []
+	as_of = getdate(as_of or getdate())
 	for dob in employees:
 		if not dob:
 			continue
-		age = relativedelta(getdate(), getdate(dob)).years
+		age = relativedelta(as_of, getdate(dob)).years
 		age_list.append(age)
 
 	return age_list

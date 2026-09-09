@@ -1503,7 +1503,7 @@ def _ensure_hours_row_pay(row: dict, holiday_ctx: dict | None = None) -> None:
 
 
 def _expand_attendance_to_hour_rows(rows: list) -> list:
-	"""Turn each Present Attendance into one UI row per IN/OUT pair (+ Lunch when applicable)."""
+	"""Turn each Present Attendance into one UI row per IN/OUT pair."""
 	from hrms.payroll.daily_pay import _hours_between, get_public_holiday_pay_context, pair_checkin_logs
 
 	if not rows:
@@ -1572,27 +1572,6 @@ def _expand_attendance_to_hour_rows(rows: list) -> list:
 			)
 			day_parts.append(pair_row)
 
-		if flt(result.get("lunch_hours")):
-			lunch_hours = flt(result["lunch_hours"], 2)
-			lunch_row = dict(base)
-			lunch_row.update(
-				{
-					"kind": "lunch",
-					"in_time": None,
-					"out_time": None,
-					"working_hours": lunch_hours,
-					"in_log": None,
-					"out_log": None,
-					"daily_pay": flt(rate * lunch_hours, 2),
-					"ss_deduction": 0,
-					"tax_deduction": 0,
-					"net_daily_pay": flt(rate * lunch_hours, 2),
-					"status": "Lunch",
-					"pair_index": None,
-				}
-			)
-			day_parts.append(lunch_row)
-
 		# Never drop the day's stored/looked-up gross when splitting into pairs.
 		if attendance_pay:
 			_redistribute_day_pay(day_parts, attendance_pay, attendance_net)
@@ -1602,7 +1581,7 @@ def _expand_attendance_to_hour_rows(rows: list) -> list:
 
 
 def _redistribute_day_pay(parts: list, attendance_pay: float, attendance_net: float | None = None) -> None:
-	"""Scale pair/lunch daily_pay so the day totals match Attendance.daily_pay."""
+	"""Scale pair daily_pay so the day totals match Attendance.daily_pay."""
 	net_total = flt(attendance_net) if attendance_net is not None else flt(attendance_pay)
 	hours_total = sum(flt(p.get("working_hours")) for p in parts)
 	if hours_total <= 0:

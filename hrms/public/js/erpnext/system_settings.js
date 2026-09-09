@@ -27,39 +27,68 @@ function hide_system_settings_app_tab(frm) {
 		});
 }
 
-function scan_bpo_ipv4(frm) {
+async function scan_bpo_ipv4(frm) {
+	frappe.dom.freeze(__("Scanning your real network IPv4..."));
+	let scanned = [];
+	try {
+		if (hrms.scanClientNetworkIpv4s) {
+			scanned = await hrms.scanClientNetworkIpv4s();
+		}
+	} catch {
+		scanned = [];
+	}
+
 	frappe.call({
 		method: "hrms.hr.agent_access.scan_office_ipv4",
-		freeze: true,
-		freeze_message: __("Scanning the office network for IPv4 hosts..."),
-		callback(r) {
-			const ips = (r.message?.ips || []).filter(Boolean);
-			const fallback = r.message?.ip;
-			if (fallback && !ips.includes(fallback)) {
-				ips.unshift(fallback);
-			}
-			if (!ips.length) {
-				return;
-			}
-
-			const current = (frm.doc.office_clockin_ipv4 || "").trim();
-			const parts = current ? current.split(/[\s,;]+/).filter(Boolean) : [];
-			ips.forEach((ip) => {
-				if (!parts.includes(ip)) {
-					parts.push(ip);
-				}
-			});
-
-			frm.set_value("restrict_agent_clockin_to_office_ip", 1);
-			frm.set_value("office_clockin_ipv4", parts.join("\n"));
-			const applied = r.message?.employees || 0;
-			frappe.show_alert({
-				message: __(
-					"Found {0} office IPv4 address(es). Default agent IP is {1}. Updated {2} agent(s).",
-					[ips.length, r.message?.default_ip || ips[0], applied],
-				),
-				indicator: "green",
-			});
+		args: {
+			client_ip: scanned[0] || "",
+			client_ips: scanned.join("\n"),
 		},
+		callback(r) {
+			frappe.dom.unfreeze();
+			apply_scanned_office_ipv4s(frm, r.message || {}, scanned);
+		},
+		error() {
+			frappe.dom.unfreeze();
+		},
+	});
+}
+
+function apply_scanned_office_ipv4s(frm, result, scanned) {
+	const ips = [];
+	const add = (ip) => {
+		if (ip && !ips.includes(ip)) {
+			ips.push(ip);
+		}
+	};
+	(result.ips || []).forEach(add);
+	add(result.ip);
+	(scanned || []).forEach(add);
+	const current = (frm.doc.office_clockin_ipv4 || "").trim();
+	if (current) {
+		current.split(/[\s,;]+/).filter(Boolean).forEach(add);
+	}
+
+	if (!ips.length) {
+		frappe.msgprint({
+			title: __("No office hosts found"),
+			indicator: "orange",
+			message: __(
+				"Could not detect a real network IPv4 address. Open System Settings from the office network and try again.",
+			),
+		});
+		return;
+	}
+
+	frm.set_value("restrict_agent_clockin_to_office_ip", 1);
+	frm.set_value("office_clockin_ipv4", ips.join("\n"));
+	const applied = result.employees || 0;
+	const methods = (result.methods || []).join(", ") || "client";
+	frappe.show_alert({
+		message: __(
+			"Found {0} office IPv4 address(es) via {1}. Default agent IP is {2}. Updated {3} agent(s).",
+			[ips.length, methods, result.default_ip || ips[0], applied],
+		),
+		indicator: "green",
 	});
 }

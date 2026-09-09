@@ -18,12 +18,24 @@ function writeStore(store) {
 	localStorage.setItem(STORAGE_KEY, JSON.stringify(store))
 }
 
+function createDeviceId() {
+	if (typeof crypto !== "undefined" && crypto.randomUUID) {
+		return crypto.randomUUID()
+	}
+	return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+}
+
+function isPlaceholderDeviceId(id) {
+	const value = String(id || "").trim()
+	if (!value) return true
+	// Short numeric leftovers like "6506" are not a real browser device id.
+	return /^\d{1,8}$/.test(value)
+}
+
 export function getDeviceId() {
 	let id = localStorage.getItem(DEVICE_KEY)
-	if (!id) {
-		id =
-			(typeof crypto !== "undefined" && crypto.randomUUID && crypto.randomUUID()) ||
-			`${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+	if (isPlaceholderDeviceId(id)) {
+		id = createDeviceId()
 		localStorage.setItem(DEVICE_KEY, id)
 	}
 	return id
@@ -55,6 +67,7 @@ export function rememberUser(profile, { password, rememberPassword } = {}) {
 		last_pair_label: profile.last_pair_label || "",
 		today_labels: Array.isArray(profile.today_labels) ? profile.today_labels : [],
 		next_action: profile.next_action || "IN",
+		device_id: profile.device_id || "",
 		password: rememberPassword ? password || "" : "",
 	}
 	store.users = [next, ...store.users.filter((user) => user.username.toLowerCase() !== username.toLowerCase())].slice(

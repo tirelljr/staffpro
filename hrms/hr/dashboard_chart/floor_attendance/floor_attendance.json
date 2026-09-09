@@ -8,7 +8,7 @@
  "doctype": "Dashboard Chart",
  "document_type": "Attendance",
  "dynamic_filters_json": "[[\"Attendance\",\"company\",\"=\",\"frappe.defaults.get_user_default(\\\"Company\\\")\"]]",
- "filters_json": "[[\"Attendance\",\"docstatus\",\"=\",\"1\"],[\"Attendance\",\"attendance_date\",\"Timespan\",\"this month\"]]",
+ "filters_json": "[[\"Attendance\",\"docstatus\",\"<\",\"2\"],[\"Attendance\",\"attendance_date\",\"Timespan\",\"this month\"]]",
  "group_by_based_on": "status",
  "group_by_type": "Count",
  "idx": 0,

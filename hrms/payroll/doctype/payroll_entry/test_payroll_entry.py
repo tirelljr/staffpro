@@ -424,6 +424,136 @@ class TestPayrollEntry(HRMSTestSuite):
 		self.assertEqual(payroll_entry.status, "Submitted")
 		self.assertEqual(payroll_entry.error_message, "")
 
+	def test_missing_salary_structure_error_detection(self):
+		from hrms.payroll.doctype.payroll_entry.payroll_entry import _is_missing_salary_structure_error
+
+		self.assertTrue(
+			_is_missing_salary_structure_error(
+				"No active or default Salary Structure found for employee Matt Chavez for the given dates"
+			)
+		)
+		self.assertTrue(
+			_is_missing_salary_structure_error(
+				"Please assign a Salary Structure for Employee Matt Chavez applicable from or before 11-08-2026 first"
+			)
+		)
+		self.assertTrue(
+			_is_missing_salary_structure_error(
+				"There is no Salary Structure assigned to HR-EMP-00001. First assign a Salary Structure."
+			)
+		)
+		self.assertFalse(_is_missing_salary_structure_error("Net Pay cannot be less than 0"))
+		self.assertFalse(
+			_is_missing_salary_structure_error("Please set account in Salary Component Bonus")
+		)
+
+	def test_missing_salary_structure_skips_employee_and_keeps_payroll_entry(self):
+		company_doc = frappe.get_doc("Company", "_Test Company")
+		employee = make_employee("test_pe_has_structure@payroll.com", company=company_doc.name)
+		setup_salary_structure(employee, company_doc)
+		missing = make_employee("test_pe_no_structure@payroll.com", company=company_doc.name)
+
+		dates = get_start_end_dates("Monthly", nowdate())
+		payroll_entry = get_payroll_entry(
+			start_date=dates.start_date,
+			end_date=dates.end_date,
+			payable_account=company_doc.default_payroll_payable_account,
+			currency=company_doc.default_currency,
+			company=company_doc.name,
+			cost_center="Main - _TC",
+		)
+		payroll_entry.append("employees", {"employee": missing})
+		payroll_entry.number_of_employees = len(payroll_entry.employees)
+		payroll_entry.save()
+		payroll_entry.submit()
+		payroll_entry.reload()
+
+		self.assertTrue(frappe.db.exists("Payroll Entry", payroll_entry.name))
+		self.assertEqual(payroll_entry.status, "Submitted")
+		self.assertTrue(
+			frappe.db.exists("Salary Slip", {"payroll_entry": payroll_entry.name, "employee": employee})
+		)
+		self.assertFalse(
+			frappe.db.exists("Salary Slip", {"payroll_entry": payroll_entry.name, "employee": missing})
+		)
+		self.assertIn("skipped", (payroll_entry.error_message or "").lower())
+
+	def test_missing_salary_structure_skips_all_employees_without_failing(self):
+		company_doc = frappe.get_doc("Company", "_Test Company")
+		missing = make_employee("test_pe_all_no_structure@payroll.com", company=company_doc.name)
+		missing_name = frappe.db.get_value("Employee", missing, "employee_name") or missing
+
+		dates = get_start_end_dates("Monthly", nowdate())
+		payroll_entry = get_payroll_entry(
+			start_date=dates.start_date,
+			end_date=dates.end_date,
+			payable_account=company_doc.default_payroll_payable_account,
+			currency=company_doc.default_currency,
+			company=company_doc.name,
+			cost_center="Main - _TC",
+		)
+		payroll_entry.set("employees", [])
+		payroll_entry.append("employees", {"employee": missing})
+		payroll_entry.number_of_employees = 1
+		payroll_entry.save()
+		payroll_entry.submit()
+		payroll_entry.reload()
+
+		self.assertTrue(frappe.db.exists("Payroll Entry", payroll_entry.name))
+		self.assertEqual(payroll_entry.status, "Submitted")
+		self.assertFalse(payroll_entry.salary_slips_created)
+		self.assertIn(cstr(missing_name), payroll_entry.error_message or "")
+		self.assertIn("skipped", (payroll_entry.error_message or "").lower())
+		self.assertFalse(frappe.db.exists("Salary Slip", {"payroll_entry": payroll_entry.name}))
+
+	def test_bonus_without_account_does_not_fail_payroll_submission(self):
+		company_doc = frappe.get_doc("Company", "_Test Company")
+		employee = make_employee("test_pe_bonus_no_account@payroll.com", company=company_doc.name)
+		setup_salary_structure(employee, company_doc)
+		create_salary_component("Bonus")
+		frappe.db.delete("Salary Component Account", {"parent": "Bonus", "company": company_doc.name})
+
+		dates = get_start_end_dates("Monthly", nowdate())
+		bonus = frappe.get_doc(
+			{
+				"doctype": "Additional Salary",
+				"employee": employee,
+				"company": company_doc.name,
+				"salary_component": "Bonus",
+				"amount": 50,
+				"payroll_date": dates.start_date,
+				"overwrite_salary_structure_amount": 0,
+			}
+		)
+		bonus.insert()
+		bonus.submit()
+
+		payroll_entry = get_payroll_entry(
+			start_date=dates.start_date,
+			end_date=dates.end_date,
+			payable_account=company_doc.default_payroll_payable_account,
+			currency=company_doc.default_currency,
+			company=company_doc.name,
+			cost_center="Main - _TC",
+			payment_account="Cash - _TC",
+		)
+		payroll_entry.set("employees", [])
+		payroll_entry.append("employees", {"employee": employee})
+		payroll_entry.number_of_employees = 1
+		payroll_entry.save()
+		payroll_entry.submit()
+		payroll_entry.submit_salary_slips()
+		payroll_entry.reload()
+
+		self.assertEqual(payroll_entry.status, "Submitted")
+		self.assertTrue(
+			frappe.db.get_value(
+				"Salary Component Account",
+				{"parent": "Bonus", "company": company_doc.name},
+				"account",
+			)
+		)
+
 	def test_payroll_entry_cancellation(self):
 		company_doc = frappe.get_doc("Company", "_Test Company")
 		employee = make_employee("test_employee@payroll.com", company=company_doc.name)

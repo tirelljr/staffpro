@@ -61,7 +61,7 @@ def get_in_out_today(department: str | None = None, attendance_date: str | None 
 
 
 def _get_active_employees(today):
-	employees = frappe.get_list(
+	employees = frappe.get_all(
 		"Employee",
 		fields=["name", "employee_name", "department", "default_shift", "date_of_joining", "relieving_date", "image"],
 		filters={"status": "Active"},
@@ -208,13 +208,35 @@ def _last_out_datetime(punches, attendance, as_of):
 def _clocks_as_of_now(punches, attendance, now):
 	"""Use punches that have already happened; fall back to Attendance in/out times."""
 	occurred = [punch for punch in punches if punch.time and get_datetime(punch.time) <= now]
-	if punches:
+	if occurred:
 		return occurred
+
+	# Employee Checkin.time can come back as UTC-naive while now_datetime() is local.
+	# A real clock-in then looks "in the future" and would hide the agent as OUT.
+	same_day_ins = [
+		punch
+		for punch in punches
+		if punch.time
+		and getdate(punch.time) == getdate(now)
+		and (punch.log_type or "IN") == "IN"
+	]
+	if same_day_ins:
+		latest_in = get_datetime(same_day_ins[-1].time)
+		return [
+			punch
+			for punch in punches
+			if punch.time
+			and getdate(punch.time) == getdate(now)
+			and get_datetime(punch.time) <= latest_in
+		]
+
 	if not attendance:
 		return []
 
 	synthetic = []
-	if attendance.in_time and get_datetime(attendance.in_time) <= now:
+	if attendance.in_time and (
+		get_datetime(attendance.in_time) <= now or getdate(attendance.in_time) == getdate(now)
+	):
 		synthetic.append(
 			frappe._dict(
 				log_type="IN",

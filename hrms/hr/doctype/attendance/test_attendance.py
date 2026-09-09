@@ -492,12 +492,12 @@ class TestAttendance(HRMSTestSuite):
 			order_by="time",
 		)
 		self.assertEqual([row.log_type for row in checkins], ["IN", "OUT", "IN", "OUT"])
-		self.assertEqual(flt(frappe.db.get_value("Attendance", first, "working_hours")), 8)
+		self.assertEqual(flt(frappe.db.get_value("Attendance", first, "working_hours")), 7)
 
 		payload = get_hours_rows(from_date=date, to_date=date, employee=employee)
-		self.assertEqual(len(payload["rows"]), 3)
+		self.assertEqual(len(payload["rows"]), 2)
 		self.assertEqual(sum(1 for row in payload["rows"] if row["kind"] == "pair"), 2)
-		self.assertEqual(sum(1 for row in payload["rows"] if row["kind"] == "lunch"), 1)
+		self.assertEqual(sum(1 for row in payload["rows"] if row["kind"] == "lunch"), 0)
 
 	def test_update_hours_entry_changes_times(self):
 		employee = make_employee("test_hours_edit@example.com", company="_Test Company")

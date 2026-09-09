@@ -434,7 +434,8 @@ class PayrollEntry(Document):
 			else:
 				create_salary_slips_for_employees(employees, args, publish_progress=False)
 				# since this method is called via frm.call this doc needs to be updated manually
-				self.reload()
+				if frappe.db.exists(self.doctype, self.name):
+					self.reload()
 
 	def get_sal_slip_list(self, ss_status, as_dict=False):
 		"""
@@ -507,15 +508,23 @@ class PayrollEntry(Document):
 		return account
 
 	def _ensure_salary_component_account(self, salary_component: str) -> str | None:
+		from hrms.payroll.doctype.bonus_type.bonus_type import (
+			ATTENDANCE_DEDUCTION_COMPONENT,
+			BONUS_SALARY_COMPONENT,
+			ensure_bonus_component_accounts,
+		)
 		from hrms.payroll.social_security import (
 			SS_EMPLOYEE_COMPONENT,
 			SS_EMPLOYER_COMPONENT,
 			ensure_ss_component_accounts,
 		)
 
-		if salary_component not in {SS_EMPLOYEE_COMPONENT, SS_EMPLOYER_COMPONENT}:
+		if salary_component in {SS_EMPLOYEE_COMPONENT, SS_EMPLOYER_COMPONENT}:
+			ensure_ss_component_accounts(self.company)
+		elif salary_component in {BONUS_SALARY_COMPONENT, ATTENDANCE_DEDUCTION_COMPONENT}:
+			ensure_bonus_component_accounts(self.company)
+		else:
 			return None
-		ensure_ss_component_accounts(self.company)
 		return frappe.db.get_value(
 			"Salary Component Account",
 			{"parent": salary_component, "company": self.company},
@@ -1991,12 +2000,60 @@ def log_payroll_failure(process, payroll_entry, error):
 	payroll_entry.db_set({"error_message": error_message, "status": "Failed"})
 
 
+def _is_missing_salary_structure_error(error) -> bool:
+	message = str(error).lower()
+	if "salary structure" not in message:
+		return False
+	return any(
+		phrase in message
+		for phrase in (
+			"not found",
+			"found for employee",
+			"assign",
+			"missing",
+			"applicable from",
+		)
+	)
+
+
+def _employee_skip_labels(employees) -> list[str]:
+	labels = []
+	for emp in employees:
+		details = frappe.db.get_value("Employee", emp, ["employee_name", "name"], as_dict=True) or {}
+		labels.append(details.get("employee_name") or details.get("name") or emp)
+	return labels
+
+
+def _skipped_salary_structure_message(employees) -> str:
+	return _("No Salary Structure for {0}. They were skipped and salary slips were not created.").format(
+		comma_and(_employee_skip_labels(employees))
+	)
+
+
+def _notify_skipped_salary_structures(payroll_entry, skipped):
+	message = _skipped_salary_structure_message(skipped)
+	frappe.msgprint(
+		_("No Salary Structure for {0}. They were skipped and salary slips were not created.").format(
+			comma_and([frappe.bold(label) for label in _employee_skip_labels(skipped)])
+		),
+		title=_("Salary Structure Missing"),
+		indicator="orange",
+	)
+	try:
+		payroll_entry.add_comment("Comment", text=message)
+	except Exception:
+		frappe.log_error(title=_("Payroll skip notice failed"))
+
+
 def create_salary_slips_for_employees(employees, args, publish_progress=True):
 	payroll_entry = frappe.get_cached_doc("Payroll Entry", args.payroll_entry)
+	savepoint = "payroll_salary_slip_creation"
 
 	try:
+		frappe.db.savepoint(savepoint)
 		salary_slips_exist_for = get_existing_salary_slips(employees, args)
 		count = 0
+		skipped = []
 
 		employees = list(set(employees) - set(salary_slips_exist_for))
 		for emp in employees:
@@ -2016,16 +2073,36 @@ def create_salary_slips_for_employees(employees, args, publish_progress=True):
 				"exchange_rate": args.get("exchange_rate"),
 				"currency": args.get("currency"),
 			}
-			frappe.get_doc(slip_args).insert()
+			frappe.db.savepoint("before_salary_slip")
+			try:
+				frappe.get_doc(slip_args).insert()
+			except Exception as e:
+				frappe.db.rollback(save_point="before_salary_slip")
+				if _is_missing_salary_structure_error(e):
+					if frappe.message_log:
+						frappe.message_log.pop()
+					skipped.append(emp)
+					continue
+				raise
 
 			count += 1
-			if publish_progress:
+			if publish_progress and employees:
 				frappe.publish_progress(
 					count * 100 / len(employees),
 					title=_("Creating Salary Slips..."),
 				)
 
-		payroll_entry.db_set({"status": "Submitted", "salary_slips_created": 1, "error_message": ""})
+		skip_message = _skipped_salary_structure_message(skipped) if skipped else ""
+		payroll_entry.db_set(
+			{
+				"status": "Submitted",
+				"salary_slips_created": 1 if count or salary_slips_exist_for else 0,
+				"error_message": skip_message,
+			}
+		)
+
+		if skipped:
+			_notify_skipped_salary_structures(payroll_entry, skipped)
 
 		if salary_slips_exist_for:
 			frappe.msgprint(
@@ -2037,8 +2114,7 @@ def create_salary_slips_for_employees(employees, args, publish_progress=True):
 			)
 
 	except Exception as e:
-		if not frappe.in_test:
-			frappe.db.rollback()
+		frappe.db.rollback(save_point=savepoint)
 		log_payroll_failure("creation", payroll_entry, e)
 
 	finally:
@@ -2091,7 +2167,9 @@ def get_existing_salary_slips(employees, args):
 
 
 def submit_salary_slips_for_employees(payroll_entry, salary_slips, publish_progress=True):
+	savepoint = "payroll_salary_slip_submission"
 	try:
+		frappe.db.savepoint(savepoint)
 		submitted = []
 		unsubmitted = []
 		frappe.flags.via_payroll_entry = True
@@ -2122,8 +2200,7 @@ def submit_salary_slips_for_employees(payroll_entry, salary_slips, publish_progr
 		show_payroll_submission_status(submitted, unsubmitted, payroll_entry)
 
 	except Exception as e:
-		if not frappe.in_test:
-			frappe.db.rollback()
+		frappe.db.rollback(save_point=savepoint)
 		log_payroll_failure("submission", payroll_entry, e)
 
 	finally:

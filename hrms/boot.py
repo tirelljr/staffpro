@@ -124,9 +124,12 @@ def staff_pro_desk_home_path():
 
 def on_staff_pro_login(login_manager=None):
 	"""Skip the apps/desktop picker and open the custom BPO desk after login."""
+	from hrms.hr.agent_access import validate_or_bind_login_device
+
 	_patch_get_default_path()
 	_patch_get_home_page()
 	user = getattr(login_manager, "user", None) or frappe.session.user
+	validate_or_bind_login_device(user)
 	if not is_staff_pro_desk_admin(user):
 		return
 

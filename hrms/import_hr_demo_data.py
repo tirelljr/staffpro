@@ -793,10 +793,10 @@ def _demo_employee_ids(company):
 
 
 def _demo_punches_for(employee_index: int, day) -> list[tuple[str, str]]:
-	"""Standard 8h with lunch; mix start times so Who Is In reflects a live floor."""
+	"""Standard 7h worked (1h unpaid lunch); mix start times so Who Is In reflects a live floor."""
 	weekday = getdate(day).weekday()
 	if employee_index == 1 and weekday == 2:
-		# James on Wednesday: 8–12, 1–6 (10h with lunch)
+		# James on Wednesday: 8–12, 1–6 (9h worked, 1h unpaid lunch)
 		return [("08:00:00", "IN"), ("12:00:00", "OUT"), ("13:00:00", "IN"), ("18:00:00", "OUT")]
 	if employee_index == 3 and weekday == 4:
 		# Carlos on Friday: single 9–5 block, no lunch row

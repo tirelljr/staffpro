@@ -302,7 +302,7 @@ def _process_template(
 	interval = template["interval"]
 	last_end = get_last_invoice_end(company, frequency=frequency)
 
-	for _ in range(MAX_PERIODS_PER_RUN):
+	for _period in range(MAX_PERIODS_PER_RUN):
 		start_date, end_date = get_pay_period(
 			interval=interval,
 			as_of=as_of,

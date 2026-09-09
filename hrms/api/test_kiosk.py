@@ -9,7 +9,7 @@ from frappe.utils.password import update_password
 
 from erpnext.setup.doctype.employee.test_employee import make_employee
 
-from hrms.api.kiosk import clock, get_kiosk_context, get_kiosk_profile, resolve_login
+from hrms.api.kiosk import clock, get_kiosk_context, get_kiosk_profile, resolve_login, resolve_workstation_device
 from hrms.hr.doctype.employee_checkin.test_employee_checkin import make_checkin
 from hrms.hr.bpo_employee_labels import enable_username_login
 from hrms.overrides.employee_master import (
@@ -102,6 +102,50 @@ class TestKioskLogin(HRMSTestSuite):
 		self.assertIn("company_name", context)
 		self.assertIn("ip", context)
 
+	def test_kiosk_context_uses_scanned_client_ip(self):
+		from unittest.mock import patch
+
+		frappe.local.request_ip = "172.19.0.1"
+		with patch("hrms.hr.agent_access._header_ipv4s", return_value=[]):
+			context = get_kiosk_context(client_ip="203.0.113.10")
+		self.assertEqual(context["ip"], "203.0.113.10")
+
+	def test_kiosk_clock_sets_cubicle_device_id(self):
+		employee = make_employee("kiosk.device.bind@example.com", company="_Test Company")
+		user = frappe.db.get_value("Employee", employee, "user_id")
+		frappe.db.set_value("User", user, "username", "KioskDeviceBind")
+		update_password(user, "KioskPass123")
+		cubicle = _make_cubicle(employee)
+
+		result = clock("KioskDeviceBind", "KioskPass123", "IN", device_id="browser-uuid-alpha")
+		self.assertEqual(result["device_id"], "browser-uuid-alpha")
+		self.assertEqual(frappe.db.get_value("Cubicle", cubicle, "device_id"), "browser-uuid-alpha")
+		self.assertEqual(
+			frappe.db.get_value("Employee Checkin", result["checkin"], "device_id"),
+			"browser-uuid-alpha",
+		)
+
+	def test_kiosk_uses_existing_cubicle_device_id(self):
+		employee = make_employee("kiosk.device.keep@example.com", company="_Test Company")
+		user = frappe.db.get_value("Employee", employee, "user_id")
+		frappe.db.set_value("User", user, "username", "KioskDeviceKeep")
+		update_password(user, "KioskPass123")
+		cubicle = _make_cubicle(employee, device_id="seat-device-77", ip_address="203.0.113.77")
+
+		result = clock("KioskDeviceKeep", "KioskPass123", "IN", device_id="6506")
+		self.assertEqual(result["device_id"], "seat-device-77")
+		self.assertEqual(frappe.db.get_value("Cubicle", cubicle, "device_id"), "seat-device-77")
+		profile = get_kiosk_profile("KioskDeviceKeep")
+		self.assertEqual(profile["device_id"], "seat-device-77")
+		self.assertEqual(resolve_workstation_device(employee), "seat-device-77")
+
+		from unittest.mock import patch
+
+		frappe.local.request_ip = "172.19.0.1"
+		with patch("hrms.hr.agent_access._header_ipv4s", return_value=[]):
+			context = get_kiosk_context(client_ip="203.0.113.77")
+		self.assertEqual(context["device_id"], "seat-device-77")
+
 	def test_typing_username_updates_user(self):
 		employee = make_employee("kiosk.rename@example.com", company="_Test Company")
 		user = frappe.db.get_value("Employee", employee, "user_id")
@@ -109,3 +153,22 @@ class TestKioskLogin(HRMSTestSuite):
 		self.assertEqual(result["username"], "KioskRename")
 		self.assertEqual(frappe.db.get_value("Employee", employee, "user_id"), user)
 		self.assertEqual(frappe.db.get_value("User", user, "username"), "KioskRename")
+
+
+def _make_cubicle(employee=None, device_id=None, ip_address=None):
+	floor_name = f"Kiosk Floor {frappe.generate_hash(length=8)}"
+	if not frappe.db.exists("Office Floor", floor_name):
+		frappe.get_doc({"doctype": "Office Floor", "floor_name": floor_name}).insert()
+	doc = frappe.get_doc(
+		{
+			"doctype": "Cubicle",
+			"office_floor": floor_name,
+			"row": "A",
+			"seat_number": 1,
+			"employee": employee,
+			"device_id": device_id,
+			"ip_address": ip_address,
+		}
+	)
+	doc.insert()
+	return doc.name

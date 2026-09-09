@@ -14,3 +14,4 @@ import "./desk_dashboard.js";
 import "./time_hours.js";
 import "./invoice_export.js";
 import "./attendance_calendar_ui.js";
+import "./client_ip.js";

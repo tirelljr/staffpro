@@ -278,13 +278,13 @@
   {
    "collapsible": 1,
    "collapsible_depends_on": "error_message",
-   "depends_on": "eval:doc.status=='Failed';",
+   "depends_on": "eval:doc.error_message",
    "fieldname": "failure_details_section",
    "fieldtype": "Tab Break",
    "label": "Failure Details"
   },
   {
-   "depends_on": "eval:doc.status=='Failed';",
+   "depends_on": "eval:doc.error_message",
    "fieldname": "error_message",
    "fieldtype": "Small Text",
    "label": "Error Message",

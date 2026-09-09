@@ -498,6 +498,9 @@ frappe.floor_map = {
 					get_query() {
 						return { filters: { status: "Active" } };
 					},
+					onchange() {
+						me.fill_workstation_defaults(dialog, cubicle);
+					},
 				},
 				{
 					fieldname: "device_id",
@@ -546,12 +549,33 @@ frappe.floor_map = {
 			});
 		}
 		dialog.show();
+		this.fill_workstation_defaults(dialog, cubicle);
 		dialog.$wrapper.find(".modal-footer").prepend(
 			$(`<button type="button" class="btn btn-danger btn-sm">${__("Delete seat")}</button>`).on("click", () => {
 				dialog.hide();
 				me.delete_seat(cubicle.name);
 			}),
 		);
+	},
+
+	fill_workstation_defaults(dialog, cubicle) {
+		const employee = dialog.get_value("employee");
+		if (!employee) {
+			return;
+		}
+		frappe.call({
+			method: "hrms.hr.page.floor_map.floor_map.get_employee_workstation",
+			args: { employee },
+			callback(r) {
+				const data = r.message || {};
+				if (data.device_id && !(dialog.get_value("device_id") || cubicle.device_id)) {
+					dialog.set_value("device_id", data.device_id);
+				}
+				if (data.ip_address && !(dialog.get_value("ip_address") || cubicle.ip_address)) {
+					dialog.set_value("ip_address", data.ip_address);
+				}
+			},
+		});
 	},
 
 	add_seat(row) {

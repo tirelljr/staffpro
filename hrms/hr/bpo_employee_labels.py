@@ -16,8 +16,10 @@ EMPLOYEE_FIELD_LABELS = {
 	"user_id": "Username",
 }
 
+STAFF_PRO_SALARY_CURRENCY = "BZD"
+
 EMPLOYEE_FIELD_DEFAULTS = {
-	"salary_currency": "BZD",
+	"salary_currency": STAFF_PRO_SALARY_CURRENCY,
 	"salary_mode": "Bank",
 }
 
@@ -86,8 +88,50 @@ def apply_employee_salary_defaults():
 			validate_fields_for_doctype=False,
 		)
 
+	lock_employee_salary_currency()
 	apply_employee_username_field()
 	enable_username_login()
+
+
+def lock_employee_salary_currency():
+	"""Agent pay is always Belize dollars. Keep the field visible but not editable."""
+	if not frappe.db.exists("DocType", "Employee"):
+		return
+
+	meta = frappe.get_meta("Employee")
+	if not meta.has_field("salary_currency"):
+		return
+
+	make_property_setter(
+		"Employee",
+		"salary_currency",
+		"read_only",
+		1,
+		"Check",
+		validate_fields_for_doctype=False,
+	)
+	make_property_setter(
+		"Employee",
+		"salary_currency",
+		"description",
+		"Agent salary is always Belize dollars (BZD).",
+		"Small Text",
+		validate_fields_for_doctype=False,
+	)
+
+	if not frappe.db.has_column("Employee", "salary_currency"):
+		return
+	if not frappe.db.exists("Currency", STAFF_PRO_SALARY_CURRENCY):
+		return
+
+	frappe.db.sql(
+		"""
+		UPDATE `tabEmployee`
+		SET salary_currency = %(currency)s
+		WHERE IFNULL(salary_currency, '') != %(currency)s
+		""",
+		{"currency": STAFF_PRO_SALARY_CURRENCY},
+	)
 
 
 def enable_username_login():

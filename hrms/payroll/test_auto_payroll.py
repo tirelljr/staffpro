@@ -291,3 +291,31 @@ class TestAutoPayroll(HRMSTestSuite):
 		self.assertFalse(preview["entries"][0]["customer"])
 		self.assertEqual(preview["entries"][0]["customer_label"], "All Agents")
 		self.assertIn(frappe.db.get_value("Employee", employee, "employee_name"), preview["entries"][0]["agent_names"])
+
+	def test_automatic_payroll_logs_submit_errors_without_crashing(self):
+		from unittest.mock import patch
+
+		from hrms.payroll.auto_payroll import _process_template_for_every_agent
+
+		settings = frappe.get_single("Payroll Settings")
+		template = {"frequency": "Weekly", "interval": 5, "label": "Weekly"}
+		with (
+			patch("hrms.payroll.auto_payroll.count_active_agents", return_value=1),
+			patch("hrms.payroll.auto_payroll.find_existing_entry", return_value=None),
+			patch(
+				"hrms.payroll.auto_payroll.create_or_submit_payroll_entry",
+				side_effect=Exception("slip failed"),
+			),
+		):
+			result = _process_template_for_every_agent(
+				settings,
+				"_Test Company",
+				template,
+				[{"customer": None, "customer_is_unassigned": 0}],
+				date(2026, 9, 9),
+				force=True,
+				start_date="2026-08-11",
+				end_date="2026-09-09",
+			)
+		self.assertTrue(result.get("blocked"))
+		self.assertIn("Error Log", result["blocked"])

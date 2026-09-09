@@ -42,7 +42,7 @@
 					<form
 						v-if="!user_pass_login_disabled.data"
 						class="w-full mt-4 flex flex-col gap-3"
-						@submit.prevent="submitLogin"
+						@submit.prevent="submitClock"
 					>
 						<div class="relative">
 							<input
@@ -93,11 +93,10 @@
 							</div>
 							<div class="flex-1 min-w-0">
 								<button
-									type="button"
+									type="submit"
 									class="w-full py-3 text-white text-lg font-semibold disabled:opacity-60"
 									:class="clockAction === 'OUT' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
 									:disabled="clocking || session.login.loading"
-									@click="submitClock"
 								>
 									{{ clocking ? __("Saving...") : clockAction === "OUT" ? __("CLOCK OUT") : __("CLOCK IN") }}
 								</button>
@@ -108,9 +107,10 @@
 						</div>
 
 						<button
-							type="submit"
+							type="button"
 							class="w-full py-3 text-white text-lg font-semibold bg-[#2f6fdb] hover:bg-[#2558b0] disabled:opacity-60"
 							:disabled="clocking || session.login.loading"
+							@click="submitLogin"
 						>
 							{{ session.login.loading ? __("Signing in...") : __("Login") }}
 						</button>
@@ -149,8 +149,8 @@
 					</div>
 
 					<div class="w-full mt-8 bg-gray-200 text-gray-700 text-xs leading-5 px-3 py-2">
-						<div>{{ __("IP:") }} {{ kioskContext.data?.ip || "na" }}</div>
-						<div>{{ __("Device ID:") }} {{ deviceId }}</div>
+						<div>{{ __("IP:") }} {{ displayIp }}</div>
+						<div>{{ __("Device ID:") }} {{ displayDeviceId }}</div>
 						<div>{{ __("WIFI:") }} {{ wifiLabel }}</div>
 						<div>{{ __("GPS:") }} {{ gpsLabel }}</div>
 						<div>{{ __("Company ID:") }} {{ kioskContext.data?.company_id || "na" }}</div>
@@ -200,6 +200,7 @@ import { IonPage, IonContent } from "@ionic/vue"
 import { computed, inject, onBeforeUnmount, onMounted, reactive, ref } from "vue"
 import { Input, Button, ErrorMessage, Dialog, createResource, call, debounce } from "frappe-ui"
 import { STAFF_PRO_LOGO_URL } from "@/utils/branding"
+import { scanClientIpv4, isPlaceholderPeerIpv4 } from "@/utils/clientIp"
 import {
 	forgetPassword,
 	getDeviceId,
@@ -219,8 +220,10 @@ const successMessage = ref("")
 const clocking = ref(false)
 const showRemembered = ref(false)
 const rememberedUsers = ref(getRememberedUsers())
-const deviceId = getDeviceId()
+const localDeviceId = getDeviceId()
 const clockLabel = ref("")
+const scannedIp = ref("")
+const ipScanDone = ref(false)
 const latitude = ref(null)
 const longitude = ref(null)
 let clockTimer = null
@@ -277,6 +280,23 @@ const kioskContext = createResource({
 	auto: true,
 })
 
+const displayDeviceId = computed(() => {
+	return (
+		activeProfile.value?.device_id ||
+		kioskContext.data?.device_id ||
+		localDeviceId ||
+		"na"
+	)
+})
+
+const displayIp = computed(() => {
+	if (scannedIp.value) return scannedIp.value
+	const serverIp = kioskContext.data?.ip || ""
+	if (serverIp && !isPlaceholderPeerIpv4(serverIp)) return serverIp
+	if (!ipScanDone.value) return __("scanning...")
+	return serverIp || "na"
+})
+
 function tickClock() {
 	clockLabel.value = dayjs().format("hh:mm:ss A")
 }
@@ -310,7 +330,10 @@ const fetchKioskProfile = debounce(async (login) => {
 		return
 	}
 	try {
-		const profile = await call("hrms.api.kiosk.get_kiosk_profile", { username: value })
+		const profile = await call("hrms.api.kiosk.get_kiosk_profile", {
+			username: value,
+			client_ip: scannedIp.value || undefined,
+		})
 		if ((username.value || "").trim().toLowerCase() !== value.toLowerCase()) return
 		applyLiveProfile(profile)
 	} catch {
@@ -350,9 +373,17 @@ function persistProfile(profile) {
 	rememberedUsers.value = getRememberedUsers()
 }
 
+function readFieldValue(selector) {
+	const el = document.querySelector(selector)
+	return (el?.value || "").trim()
+}
+
 function requireCredentials() {
-	const login = (username.value || "").trim()
-	if (!login || !password.value) {
+	const login = (username.value || "").trim() || readFieldValue('input[autocomplete="username"]')
+	const pass = password.value || readFieldValue('input[autocomplete="current-password"]')
+	if (login && login !== username.value) username.value = login
+	if (pass && pass !== password.value) password.value = pass
+	if (!login || !pass) {
 		errorMessage.value = __("Enter your username and password")
 		return null
 	}
@@ -373,7 +404,8 @@ async function submitClock() {
 			log_type: clockAction.value,
 			latitude: latitude.value,
 			longitude: longitude.value,
-			device_id: deviceId,
+			device_id: localDeviceId,
+			client_ip: scannedIp.value || undefined,
 		})
 		persistProfile(profile)
 		applyLiveProfile(profile)
@@ -443,11 +475,26 @@ function fetchLocation() {
 	)
 }
 
+async function scanKioskIp() {
+	try {
+		const ip = await scanClientIpv4()
+		if (ip) {
+			scannedIp.value = ip
+			kioskContext.submit?.({ client_ip: ip })
+		}
+	} catch {
+		/* keep the server-reported IP */
+	} finally {
+		ipScanDone.value = true
+	}
+}
+
 onMounted(() => {
 	tickClock()
 	clockTimer = setInterval(tickClock, 1000)
 	applyRememberedUser()
 	if (username.value) fetchKioskProfile(username.value)
+	scanKioskIp()
 	if (kioskContext.data?.allow_geolocation_tracking) {
 		fetchLocation()
 	} else {

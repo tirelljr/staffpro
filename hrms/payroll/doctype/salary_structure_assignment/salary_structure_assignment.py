@@ -5,7 +5,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cint, date_diff, flt, get_link_to_form, getdate
+from frappe.utils import cint, date_diff, flt, get_link_to_form, getdate, nowdate
 
 from hrms.payroll.doctype.payroll_period.payroll_period import get_payroll_period
 from hrms.payroll.doctype.salary_structure.salary_structure import validate_max_benefit_for_flexible_benefit
@@ -467,3 +467,189 @@ def get_tax_component(salary_structure: str) -> str | None:
 		if cint(d.variable_based_on_taxable_salary) and not d.formula and not flt(d.amount):
 			return d.salary_component
 	return None
+
+
+def assign_structure_from_agent_hourly(doc, method=None):
+	"""Employee on_update: creating/changing Agent Hourly assigns a salary structure."""
+	if flt(doc.get("ctc")) <= 0:
+		return
+	if hasattr(doc, "has_value_changed") and not doc.has_value_changed("ctc"):
+		return
+	ensure_salary_structure_assignment(doc)
+
+
+def ensure_salary_structure_assignment(employee):
+	"""Create or refresh the Salary Structure Assignment when Agent Hourly is set."""
+	if (
+		getattr(frappe.flags, "in_install", False)
+		or getattr(frappe.flags, "in_patch", False)
+		or getattr(frappe.flags, "in_migrate", False)
+		or getattr(frappe.flags, "in_import", False)
+		or getattr(frappe.flags, "skip_auto_salary_structure_assignment", False)
+	):
+		return None
+
+	doc = _employee_doc(employee)
+	if not doc or doc.status == "Inactive" or flt(doc.get("ctc")) <= 0:
+		return None
+	if not frappe.db.table_exists("Salary Structure Assignment"):
+		return None
+
+	existing = _latest_submitted_assignment(doc.name)
+	if existing:
+		existing.db_set("ctc", flt(doc.ctc, existing.precision("ctc")), update_modified=False)
+		return existing.name
+
+	structure = _salary_structure_for_employee(doc)
+	if not structure:
+		if not frappe.flags.in_test:
+			frappe.msgprint(
+				_("Set an active Salary Structure for {0} before Agent Hourly can assign pay.").format(
+					frappe.bold(doc.company)
+				),
+				title=_("Salary Structure Missing"),
+				indicator="orange",
+			)
+		return None
+
+	from_date = _assignment_from_date(doc, structure)
+	assignment = frappe.new_doc("Salary Structure Assignment")
+	assignment.employee = doc.name
+	assignment.company = doc.company
+	assignment.salary_structure = structure
+	assignment.from_date = from_date
+	assignment.ctc = flt(doc.ctc)
+	assignment.currency = frappe.db.get_value("Salary Structure", structure, "currency")
+	assignment.base = _assignment_base(doc, structure)
+	assignment.income_tax_slab = _income_tax_slab_for_structure(structure, doc)
+	assignment.flags.ignore_permissions = True
+	try:
+		assignment.insert(ignore_permissions=True)
+		assignment.submit()
+	except DuplicateAssignment:
+		existing = _latest_submitted_assignment(doc.name)
+		return existing.name if existing else None
+	except Exception:
+		frappe.log_error(title=_("Auto salary structure assignment failed"))
+		if not frappe.flags.in_test:
+			frappe.msgprint(
+				_("Could not assign a Salary Structure for {0}. Check Error Log.").format(
+					frappe.bold(doc.employee_name or doc.name)
+				),
+				indicator="orange",
+			)
+		return None
+
+	if not frappe.flags.in_test:
+		frappe.msgprint(
+			_("Assigned Salary Structure {0} from {1}.").format(
+				get_link_to_form("Salary Structure Assignment", assignment.name),
+				frappe.format(assignment.from_date, {"fieldtype": "Date"}),
+			),
+			alert=True,
+			indicator="green",
+		)
+	return assignment.name
+
+
+def _employee_doc(employee):
+	if hasattr(employee, "doctype"):
+		return employee
+	if not employee:
+		return None
+	return frappe.get_doc("Employee", employee)
+
+
+def _latest_submitted_assignment(employee: str):
+	name = frappe.db.get_value(
+		"Salary Structure Assignment",
+		{"employee": employee, "docstatus": 1},
+		"name",
+		order_by="from_date desc, creation desc",
+	)
+	return frappe.get_doc("Salary Structure Assignment", name) if name else None
+
+
+def _salary_structure_for_employee(employee) -> str | None:
+	company = employee.company
+	if not company:
+		return None
+	filters = {"company": company, "docstatus": 1, "is_active": "Yes"}
+	if employee.grade:
+		grade_structure = frappe.db.get_value("Employee Grade", employee.grade, "default_salary_structure")
+		if grade_structure and frappe.db.exists("Salary Structure", {**filters, "name": grade_structure}):
+			return grade_structure
+
+	currency = employee.get("salary_currency")
+	if currency:
+		match = frappe.db.get_value(
+			"Salary Structure",
+			{**filters, "is_default": "Yes", "currency": currency},
+			"name",
+		)
+		if match:
+			return match
+
+	default = frappe.db.get_value("Salary Structure", {**filters, "is_default": "Yes"}, "name")
+	if default:
+		return default
+
+	from hrms.payroll.auto_payroll import get_enabled_templates
+
+	for template in get_enabled_templates():
+		match = frappe.db.get_value(
+			"Salary Structure",
+			{**filters, "payroll_frequency": template["frequency"]},
+			"name",
+			order_by="modified desc",
+		)
+		if match:
+			return match
+
+	return frappe.db.get_value("Salary Structure", filters, "name", order_by="is_default desc, modified desc")
+
+
+def _assignment_from_date(employee, structure: str):
+	joining = getdate(employee.get("date_of_joining") or employee.get("creation") or nowdate())
+	frequency = frappe.db.get_value("Salary Structure", structure, "payroll_frequency") or "Weekly"
+	period_start = _next_unpaid_period_start(employee.company, frequency)
+	if period_start:
+		return max(joining, getdate(period_start))
+	return joining
+
+
+def _next_unpaid_period_start(company: str, frequency: str):
+	from hrms.payroll.auto_payroll import days_for_frequency, get_last_payroll_end, get_pay_period
+
+	last_end = get_last_payroll_end(company, frequency=frequency)
+	period_start, _period_end = get_pay_period(
+		interval=days_for_frequency(frequency),
+		as_of=getdate(nowdate()),
+		company=company,
+		last_end=last_end if last_end is not None else "",
+	)
+	return getdate(period_start) if period_start else None
+
+
+def _assignment_base(employee, structure: str) -> float:
+	from hrms.payroll.daily_pay import HOURS_PER_PERIOD
+
+	frequency = frappe.db.get_value("Salary Structure", structure, "payroll_frequency") or "Weekly"
+	hours = flt(HOURS_PER_PERIOD.get(frequency) or 40)
+	return flt(flt(employee.ctc) * hours, 2)
+
+
+def _income_tax_slab_for_structure(structure: str, employee) -> str | None:
+	if not get_tax_component(structure):
+		return None
+	currency = (
+		frappe.db.get_value("Salary Structure", structure, "currency")
+		or employee.get("salary_currency")
+		or frappe.get_cached_value("Company", employee.company, "default_currency")
+	)
+	filters = {"docstatus": 1, "disabled": 0, "currency": currency}
+	if frappe.get_meta("Income Tax Slab").has_field("company"):
+		name = frappe.db.get_value("Income Tax Slab", {**filters, "company": employee.company}, "name")
+		if name:
+			return name
+	return frappe.db.get_value("Income Tax Slab", filters, "name")

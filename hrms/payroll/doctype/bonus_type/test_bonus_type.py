@@ -7,7 +7,12 @@ from frappe.utils import add_days, getdate
 from erpnext.setup.doctype.employee.test_employee import make_employee
 
 from hrms.hr.doctype.attendance.attendance import mark_attendance
-from hrms.payroll.doctype.bonus_type.bonus_type import seed_bonus_types
+from hrms.payroll.doctype.bonus_type.bonus_type import (
+	BONUS_SALARY_COMPONENT,
+	ensure_bonus_component_accounts,
+	ensure_bonus_salary_component,
+	seed_bonus_types,
+)
 from hrms.payroll.user_bonus import calculate_user_bonus
 from hrms.tests.utils import HRMSTestSuite
 
@@ -63,3 +68,16 @@ class TestBonusType(HRMSTestSuite):
 		self.assertEqual(result["eligible"], 0)
 		self.assertEqual(result["amount"], 0)
 		self.assertIn("below target", result["status"].lower())
+
+	def test_bonus_component_account_is_auto_assigned(self):
+		ensure_bonus_salary_component()
+		frappe.db.delete("Salary Component Account", {"parent": BONUS_SALARY_COMPONENT, "company": "_Test Company"})
+		mapped = ensure_bonus_component_accounts("_Test Company")
+		self.assertTrue(mapped.get(f"{BONUS_SALARY_COMPONENT}:_Test Company"))
+		self.assertTrue(
+			frappe.db.get_value(
+				"Salary Component Account",
+				{"parent": BONUS_SALARY_COMPONENT, "company": "_Test Company"},
+				"account",
+			)
+		)

@@ -127,12 +127,20 @@ def apply_hourly_rate(
 	if not targets:
 		frappe.throw(_("Select this agent or other agents, a branch, campaign, or team."))
 
+	from hrms.payroll.doctype.salary_structure_assignment.salary_structure_assignment import (
+		ensure_salary_structure_assignment,
+	)
+
 	updated = 0
+	assigned = []
 	for name in targets:
 		if not frappe.has_permission("Employee", "write", name):
 			continue
 		frappe.db.set_value("Employee", name, "ctc", rate, update_modified=True)
+		assignment = ensure_salary_structure_assignment(name)
+		if assignment:
+			assigned.append(assignment)
 		updated += 1
 
 	frappe.flags.hour_rate_cache = {}
-	return {"updated": updated, "rate": rate}
+	return {"updated": updated, "rate": rate, "assignments": assigned}

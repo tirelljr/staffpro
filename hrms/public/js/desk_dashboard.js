@@ -186,6 +186,21 @@ body.staff-pro-alive .sp-kpi .card-stats,body.staff-pro-alive .sp-kpi .percentag
 .sp-kpi-icon,.sp-kpi-hint,.sp-kpi__arrow,.sp-kpi__viz,.sp-kpi__more,.sp-kpi__trend{display:none!important}
 `;
 
+const CHART_PERIOD_CSS = `
+.sp-chart__period{position:relative;z-index:3;display:inline-flex;align-items:center;flex-shrink:0}
+.sp-chart__period-btn{display:inline-flex;align-items:center;gap:4px;height:28px;max-width:220px;padding:0 10px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;color:#6b7280;font:inherit;font-size:12px;font-weight:500;line-height:26px;cursor:pointer}
+.sp-chart__period-btn:hover,.sp-chart__period.is-open .sp-chart__period-btn{border-color:#d1d5db;background:#fafafa;color:#374151}
+.sp-chart__period-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-chart__period-caret{display:inline-flex;align-items:center;opacity:.7;transition:transform .15s ease}
+.sp-chart__period-caret svg{width:10px;height:10px}
+.sp-chart__period.is-open .sp-chart__period-caret{transform:rotate(180deg)}
+.sp-chart__period-menu{position:fixed;z-index:1080;min-width:168px;padding:4px;border:1px solid #eceef2;border-radius:12px;background:#fff;box-shadow:0 8px 24px rgba(16,24,40,.16)}
+.sp-chart__period-menu[hidden]{display:none}
+.sp-chart__period-option{display:block;width:100%;padding:8px 12px;border:0;border-radius:8px;background:transparent;color:#374151;font:inherit;font-size:13px;font-weight:500;line-height:1.2;text-align:left;cursor:pointer}
+.sp-chart__period-option:hover,.sp-chart__period-option.is-selected{background:#f3f4f6;color:#111}
+.widget.sp-chart.is-period-loading .widget-body,.widget.dashboard-widget-box.is-period-loading .widget-body{opacity:.45;pointer-events:none}
+`;
+
 const HOURS_TABLE_CSS = `
 .sp-dash-hours{grid-column:1/-1;width:100%;max-width:100%;min-width:0}
 body.staff-pro-alive #page-dashboard-view .dashboard-graph:has(.sp-dash-hours){display:flex;flex-direction:column;align-items:stretch}
@@ -250,6 +265,15 @@ function inject_dash_css() {
 	}
 	if (kpiStyle.textContent !== KPI_CARD_CSS) {
 		kpiStyle.textContent = KPI_CARD_CSS;
+	}
+	let chartPeriodStyle = document.getElementById("staff-pro-chart-period-css");
+	if (!chartPeriodStyle) {
+		chartPeriodStyle = document.createElement("style");
+		chartPeriodStyle.id = "staff-pro-chart-period-css";
+		document.head.appendChild(chartPeriodStyle);
+	}
+	if (chartPeriodStyle.textContent !== CHART_PERIOD_CSS) {
+		chartPeriodStyle.textContent = CHART_PERIOD_CSS;
 	}
 	let hoursStyle = document.getElementById("staff-pro-hours-css");
 	if (!hoursStyle) {
@@ -1473,8 +1497,23 @@ function bubble_slots(count) {
 	return [{ x: 34, y: 42 }, { x: 58, y: 32 }, { x: 72, y: 56 }, { x: 52, y: 74 }, { x: 28, y: 68 }, { x: 78, y: 78 }];
 }
 
-function render_composition_chart($widget, $chart) {
-	const items = parse_legend_items($widget);
+function composition_items_from_data(data) {
+	const labels = data?.labels || [];
+	const values = data?.datasets?.[0]?.values || [];
+	return labels
+		.map((label, index) => {
+			const value = Number(values[index]) || 0;
+			return {
+				label: String(label || ""),
+				raw: String(values[index] ?? 0),
+				value,
+			};
+		})
+		.filter((item) => item.label || item.value);
+}
+
+function render_composition_chart($widget, $chart, items) {
+	items = Array.isArray(items) && items.length ? items : parse_legend_items($widget);
 	if (!items.length) return false;
 
 	const percents = format_legend_percentages(items.map((item) => item.value));
@@ -1620,6 +1659,299 @@ function theme_charts($root) {
 			}
 		}
 		polish_axis_chart($chart);
+	});
+}
+
+const CHART_PERIODS = [
+	{ value: "day", label: __("Today") },
+	{ value: "week", label: __("This Week") },
+	{ value: "month", label: __("This Month") },
+	{ value: "custom", label: __("Custom") },
+];
+
+function chart_period_label(period, fallback) {
+	const match = CHART_PERIODS.find((opt) => opt.value === period);
+	return match ? match.label : fallback || __("This Month");
+}
+
+function dashboard_chart_name($widget) {
+	return (
+		$widget.data("sp-chart-doc") ||
+		$widget.attr("data-chart-name") ||
+		chart_widget_label($widget)
+	);
+}
+
+function is_dashboard_chart_widget($widget) {
+	if (!$widget?.length) return false;
+	if ($widget.hasClass("number-widget-box") || $widget.hasClass("sp-kpi")) return false;
+	if ($widget.closest(".sp-dash-home, .sp-dash-hours, .sp-dash-celebrations, .sp-dash-payroll, .sp-dash-inout").length) {
+		return false;
+	}
+	if (!$widget.closest(".dashboard-graph").length) return false;
+	return Boolean(
+		$widget.find(".frappe-chart, .chart-container, .sp-bubbles, .sp-gauge, .sp-empty-chart").length ||
+			$widget.hasClass("sp-chart")
+	);
+}
+
+function chart_period_menu_html(selected) {
+	return `<div class="sp-chart__period-menu" hidden role="listbox" aria-label="${escape_html(__("Period"))}">
+		${CHART_PERIODS.map((opt) => {
+			const isSelected = opt.value === selected;
+			return `<button type="button" class="sp-chart__period-option${isSelected ? " is-selected" : ""}" role="option" data-value="${escape_html(opt.value)}" aria-selected="${isSelected ? "true" : "false"}">${escape_html(opt.label)}</button>`;
+		}).join("")}
+	</div>`;
+}
+
+function open_chart_period_menu($widget, $period) {
+	let $menu = $widget.data("sp-chart-period-menu");
+	if (!$menu || !$menu.length || !document.body.contains($menu[0])) {
+		$menu = $(chart_period_menu_html($widget.data("sp-chart-period") || "month"));
+		$(document.body).append($menu);
+		$widget.data("sp-chart-period-menu", $menu);
+		$menu.on("click", ".sp-chart__period-option", function (event) {
+			event.preventDefault();
+			event.stopPropagation();
+			const value = String($(this).data("value"));
+			if (value === "custom") {
+				close_kpi_period_menus();
+				open_chart_custom_dates($widget);
+				return;
+			}
+			set_chart_period($widget, value);
+		});
+		$menu.on("click", (event) => event.stopPropagation());
+	}
+
+	const selected = $widget.data("sp-chart-period") || "month";
+	$menu.find(".sp-chart__period-option").each(function () {
+		const isSelected = String($(this).data("value")) === selected;
+		$(this).toggleClass("is-selected", isSelected).attr("aria-selected", isSelected ? "true" : "false");
+	});
+
+	$period.addClass("is-open");
+	$period.find(".sp-chart__period-btn").attr("aria-expanded", "true");
+	$menu.prop("hidden", false);
+	position_kpi_period_menu($period.find(".sp-chart__period-btn"), $menu);
+}
+
+function bind_chart_period_dropdown($widget, $period) {
+	if ($period.data("sp-chart-period-bound")) return;
+	$period.data("sp-chart-period-bound", true);
+
+	$period.on("click mousedown", (event) => {
+		event.preventDefault();
+		event.stopPropagation();
+	});
+
+	$period.find(".sp-chart__period-btn").on("click", function (event) {
+		event.preventDefault();
+		event.stopPropagation();
+		const willOpen = !$period.hasClass("is-open");
+		close_kpi_period_menus();
+		if (willOpen) open_chart_period_menu($widget, $period);
+	});
+}
+
+function open_chart_custom_dates($widget) {
+	const from =
+		$widget.data("sp-chart-from") ||
+		(frappe.datetime.month_start && frappe.datetime.month_start(frappe.datetime.get_today())) ||
+		frappe.datetime.get_today();
+	const to = $widget.data("sp-chart-to") || frappe.datetime.get_today();
+	const dialog = new frappe.ui.Dialog({
+		title: __("Custom dates"),
+		fields: [
+			{ fieldtype: "Date", fieldname: "from_date", label: __("From"), default: from, reqd: 1 },
+			{ fieldtype: "Date", fieldname: "to_date", label: __("To"), default: to, reqd: 1 },
+		],
+		primary_action_label: __("Apply"),
+		primary_action(values) {
+			if (values.from_date && values.to_date && values.from_date > values.to_date) {
+				frappe.show_alert({ message: __("From date cannot be after To date."), indicator: "orange" });
+				return;
+			}
+			dialog.hide();
+			set_chart_period($widget, "custom", values.from_date, values.to_date);
+		},
+	});
+	dialog.show();
+}
+
+function set_chart_period($widget, period, from_date, to_date) {
+	close_kpi_period_menus();
+	if (!period) return;
+	$widget.data("sp-chart-period", period);
+	$widget.data("sp-chart-period-user", 1);
+	if (from_date) $widget.data("sp-chart-from", from_date);
+	if (to_date) $widget.data("sp-chart-to", to_date);
+	$widget.find(".sp-chart__period-label").text(chart_period_display($widget));
+	load_chart_period($widget, period, from_date, to_date);
+}
+
+function chart_period_display($widget) {
+	const period = $widget.data("sp-chart-period") || "month";
+	if (period === "custom") {
+		const from = $widget.data("sp-chart-from");
+		const to = $widget.data("sp-chart-to");
+		if (from && to && frappe.datetime.str_to_user) {
+			return `${frappe.datetime.str_to_user(from)} – ${frappe.datetime.str_to_user(to)}`;
+		}
+	}
+	return chart_period_label(period);
+}
+
+function load_chart_period($widget, period, from_date, to_date) {
+	const name = dashboard_chart_name($widget);
+	if (!name) return;
+	$widget.addClass("is-period-loading");
+	const args = { chart_name: name, period };
+	if (period === "custom") {
+		args.from_date = from_date || $widget.data("sp-chart-from");
+		args.to_date = to_date || $widget.data("sp-chart-to");
+	}
+	frappe
+		.xcall("hrms.hr.desk_dashboard.get_dashboard_chart_period", args)
+		.then((res) => {
+			if (!res || res.supported === false) {
+				frappe.show_alert({
+					message: __("This chart cannot change period."),
+					indicator: "orange",
+				});
+				return;
+			}
+			apply_chart_period_result($widget, res);
+		})
+		.catch(() => {
+			frappe.show_alert({
+				message: __("Could not update this chart."),
+				indicator: "red",
+			});
+		})
+		.finally(() => $widget.removeClass("is-period-loading"));
+}
+
+function apply_chart_period_result($widget, result) {
+	if (result.chart_name) $widget.data("sp-chart-doc", result.chart_name);
+	$widget.data("sp-chart-period", result.period);
+	if (result.from_date) $widget.data("sp-chart-from", result.from_date);
+	if (result.to_date) $widget.data("sp-chart-to", result.to_date);
+	$widget.find(".sp-chart__period-label").text(result.label || chart_period_display($widget));
+
+	if (result.empty) {
+		show_chart_empty_state($widget);
+		return;
+	}
+
+	replace_widget_chart($widget, result);
+}
+
+function show_chart_empty_state($widget) {
+	clear_empty_chart_overlay($widget);
+	freeze_charts_in($widget);
+	$widget.find(".sp-bubbles, .sp-gauge").remove();
+	$widget.removeData("sp-bubbles");
+	const $body = $widget.find(".widget-body").first();
+	if (!$body.length) return;
+	$body.find(".chart-container, .widget-chart-box, .flex.justify-center").addClass("sp-chart-replaced");
+	$body.find(".sp-empty-chart").remove();
+	const cfg = dashboard_config();
+	$body.append(`
+		<div class="sp-empty-chart">
+			${empty_state_card({
+				title: __("Nothing to plot yet"),
+				text: __("No records in this date range. Try another period."),
+				button: cfg.create_label,
+				size: "embed",
+			})}
+		</div>
+	`);
+	$widget.data("sp-empty", 1);
+	$body.find(".sp-empty-list__btn").on("click", () => start_action(cfg));
+}
+
+function replace_widget_chart($widget, result) {
+	clear_empty_chart_overlay($widget);
+	freeze_charts_in($widget);
+	$widget.removeData("sp-chart");
+	$widget.find(".sp-bubbles, .sp-gauge").remove();
+	$widget.removeData("sp-bubbles");
+
+	const $body = $widget.find(".widget-body").first();
+	if (!$body.length) return;
+	let $container = $body.find(".chart-container").first();
+	if (!$container.length) {
+		$container = $('<div class="chart-container"></div>');
+		$body.prepend($container);
+	}
+	$container.removeClass("sp-chart-replaced").empty().show();
+
+	const custom = result.custom_options || {};
+	const type = String(custom.type || result.chart_type || "bar").toLowerCase();
+	const items = composition_items_from_data(result.data);
+	const isComposition =
+		COMPOSITION_CHARTS.has(chart_widget_label($widget)) || ["pie", "donut"].includes(type);
+	if (isComposition && render_composition_chart($widget, $container, items)) {
+		return;
+	}
+
+	if (typeof frappe.Chart !== "function") return;
+	new frappe.Chart(
+		$container[0],
+		apply_sp_chart_args(
+			Object.assign(
+				{
+					data: result.data,
+					type: type === "percentage" && !custom.type ? "bar" : type,
+					height: Math.max(220, $container.height() || 240),
+				},
+				custom,
+			),
+		),
+	);
+	polish_axis_chart($container.find(".frappe-chart").add($container));
+}
+
+function ensure_chart_period_dropdown($widget) {
+	if (!is_dashboard_chart_widget($widget)) return;
+	if (!chart_widget_label($widget)) return;
+
+	let $head = $widget.find(".widget-head").first();
+	if (!$head.length) return;
+	let $control = $head.find(".widget-control").first();
+	if (!$control.length) {
+		$control = $('<div class="widget-control"></div>');
+		$head.append($control);
+	}
+
+	let $period = $widget.find(".sp-chart__period").first();
+	if (!$period.length) {
+		$period = $(`
+			<div class="sp-chart__period">
+				<button type="button" class="sp-chart__period-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="${escape_html(__("Change period"))}">
+					<span class="sp-chart__period-label"></span>
+					<span class="sp-chart__period-caret" aria-hidden="true">${ICONS.chevron}</span>
+				</button>
+			</div>
+		`);
+		$control.prepend($period);
+		if (!$widget.data("sp-chart-period")) $widget.data("sp-chart-period", "month");
+		bind_chart_period_dropdown($widget, $period);
+	}
+
+	$period.find(".sp-chart__period-label").text(chart_period_display($widget));
+
+	if (!$widget.data("sp-chart-period-loaded")) {
+		$widget.data("sp-chart-period-loaded", 1);
+		load_chart_period($widget, $widget.data("sp-chart-period") || "month");
+	}
+}
+
+function bind_chart_period_filters($root) {
+	if (!$root?.length || !is_dashboard_view_route()) return;
+	$root.find(".dashboard-graph .widget.dashboard-widget-box, .dashboard-graph .chart-widget").each(function () {
+		ensure_chart_period_dropdown($(this).closest(".widget"));
 	});
 }
 
@@ -2926,9 +3258,9 @@ function kpi_period_label(period, fallback) {
 }
 
 function close_kpi_period_menus() {
-	$(".sp-kpi__period").removeClass("is-open");
-	$(".sp-kpi__period-btn").attr("aria-expanded", "false");
-	$(".sp-kpi__period-menu").prop("hidden", true);
+	$(".sp-kpi__period, .sp-chart__period").removeClass("is-open");
+	$(".sp-kpi__period-btn, .sp-chart__period-btn").attr("aria-expanded", "false");
+	$(".sp-kpi__period-menu, .sp-chart__period-menu").prop("hidden", true);
 }
 
 function position_kpi_period_menu($btn, $menu) {
@@ -3779,7 +4111,7 @@ function enhance() {
 
 	if (!is_dashboard_view_route()) {
 		close_kpi_period_menus();
-		$(".sp-kpi__period-menu").remove();
+		$(".sp-kpi__period-menu, .sp-chart__period-menu").remove();
 	}
 
 	if ($root.length && is_dashboard_view_route()) {
@@ -3797,6 +4129,7 @@ function enhance() {
 		if (dashboard_name() !== "Attendance") {
 			enhance_empty_charts($root);
 		}
+		bind_chart_period_filters($root);
 	}
 
 	theme_number_cards($(document.body));

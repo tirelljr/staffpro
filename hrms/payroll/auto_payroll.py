@@ -641,7 +641,7 @@ def _process_template(
 	last_end = get_last_payroll_end(company, settings.get("automatic_payroll_branch"), frequency=frequency)
 	customers = get_payroll_customers(company) or [None]
 
-	for _ in range(1 if custom_period else MAX_PERIODS_PER_RUN):
+	for _period in range(1 if custom_period else MAX_PERIODS_PER_RUN):
 		if custom_period:
 			period_start, period_end = resolve_custom_pay_period(template, start_date, end_date)
 		else:
@@ -738,7 +738,7 @@ def _process_template_for_every_agent(
 	last_end = get_last_payroll_end(company, settings.get("automatic_payroll_branch"), frequency=frequency)
 	customers = buckets
 
-	for _ in range(1 if custom_period else MAX_PERIODS_PER_RUN):
+	for _period in range(1 if custom_period else MAX_PERIODS_PER_RUN):
 		if custom_period:
 			period_start, period_end = resolve_custom_pay_period(template, start_date, end_date)
 		else:
@@ -1065,7 +1065,14 @@ def create_or_submit_payroll_entry(
 		if entry.docstatus == 0:
 			entry.flags.ignore_permissions = True
 			entry.submit()
+		if not frappe.db.exists(entry.doctype, entry.name):
+			frappe.throw(_("Payroll Entry {0} was not saved.").format(entry.name))
 		entry.reload()
+		if entry.status == "Failed":
+			frappe.throw(
+				entry.error_message
+				or _("Salary slip creation failed for Payroll Entry {0}.").format(entry.name)
+			)
 		if cint(settings.get("automatic_payroll_submit_slips")) and entry.docstatus == 1:
 			if not cint(entry.salary_slips_submitted):
 				entry.submit_salary_slips()
