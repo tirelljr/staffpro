@@ -87,6 +87,13 @@ def _build_details(employees, today):
 	leave_by_employee = _get_todays_leave(employee_ids, today)
 	shift_map = _get_shift_map(employees, punches_by_employee, attendance_by_employee)
 	as_of = _as_of_datetime(today)
+	from hrms.hr.doctype.attendance.attendance import _hours_comments_by_attendance
+	from hrms.hr.doctype.time_clock_adjustment.time_clock_adjustment import pending_by_employee_date
+
+	comments = _hours_comments_by_attendance(
+		[row.name for row in attendance_by_employee.values() if row and row.name]
+	)
+	adjustments = pending_by_employee_date(employee_ids, today)
 
 	details = []
 	for employee in employees:
@@ -133,6 +140,8 @@ def _build_details(employees, today):
 				"leave_type": (leave.leave_type or "").strip() if leave else "",
 				"pto_code": _pto_code(leave),
 				"device_id": (latest.device_id or "") if latest else "",
+				"comments": comments.get(attendance.name, []) if attendance else [],
+				"adjustment": adjustments.get(employee.name),
 			}
 		)
 
