@@ -226,6 +226,10 @@
 	white-space: normal;
 }
 
+.sp-dayview .sp-tca-banner {
+	margin-top: 6px;
+}
+
 .sp-dayview__actions {
 	white-space: nowrap;
 }

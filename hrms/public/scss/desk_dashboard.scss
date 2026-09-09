@@ -1058,12 +1058,81 @@ body.staff-pro-alive #page-Workspaces .layout-main-section {
 	transition: background 0.15s ease;
 }
 
-.sp-inout-dash__row:last-child {
+.sp-inout-dash__item:last-child .sp-inout-dash__row {
+	border-bottom: 0;
+}
+
+.sp-inout-dash__item:last-child {
 	border-bottom: 0;
 }
 
 .sp-inout-dash__row:hover {
 	background: #fafbfc;
+}
+
+.sp-inout-dash__notes {
+	padding: 0 4px 10px;
+}
+
+.sp-inout-dash__comment {
+	font-size: 12px;
+	line-height: 1.35;
+	color: var(--sp-muted, #6b7280);
+	white-space: normal;
+}
+
+.sp-tca-banner {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 8px 12px;
+	margin-top: 6px;
+	padding: 8px 10px;
+	border: 1px solid #f3d19e;
+	border-radius: 8px;
+	background: #fff7ed;
+	color: #9a3412;
+	font-size: 12px;
+	line-height: 1.4;
+}
+
+.sp-tca-banner__text {
+	min-width: 0;
+	flex: 1;
+}
+
+.sp-tca-banner__note {
+	margin-top: 4px;
+	color: #7c2d12;
+}
+
+.sp-tca-banner__actions {
+	display: inline-flex;
+	gap: 8px;
+	flex-shrink: 0;
+}
+
+.sp-tca-btn {
+	height: 26px;
+	padding: 0 10px;
+	border: 0;
+	border-radius: 4px;
+	font-family: inherit;
+	font-size: 12px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.sp-tca-btn.is-approve {
+	background: #16678c;
+	color: #fff;
+}
+
+.sp-tca-btn.is-reject {
+	background: #fff;
+	color: #9a3412;
+	border: 1px solid #f3d19e;
 }
 
 .sp-inout-dash__agent {
