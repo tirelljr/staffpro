@@ -201,10 +201,12 @@ permission_query_conditions = {
 	"Number Card": "hrms.overrides.bpo_dashboards.get_card_permission_query_conditions",
 	"Dashboard": "hrms.overrides.bpo_dashboards.get_dashboard_permission_query_conditions",
 	"Holiday Work Election": "hrms.hr.doctype.holiday_work_election.holiday_work_election.get_permission_query_conditions",
+	"Time Clock Adjustment": "hrms.hr.doctype.time_clock_adjustment.time_clock_adjustment.get_permission_query_conditions",
 }
 
 has_permission = {
 	"Holiday Work Election": "hrms.hr.doctype.holiday_work_election.holiday_work_election.has_permission",
+	"Time Clock Adjustment": "hrms.hr.doctype.time_clock_adjustment.time_clock_adjustment.has_permission",
 }
 
 has_upload_permission = {"Employee": "erpnext.setup.doctype.employee.employee.has_upload_permission"}

@@ -292,6 +292,107 @@ hrms.time.refresh_hours_views = function (listview) {
 	if (hrms.day_view?.$body?.length && listview?.refresh !== hrms.day_view.refresh) {
 		hrms.day_view.refresh();
 	}
+	if (hrms.in_out_today?.$body?.length) {
+		hrms.in_out_today.refresh();
+	}
+	if (frappe.time_clock_adjustment?.$body?.length) {
+		frappe.time_clock_adjustment.refresh();
+	}
+	$(document).trigger("sp:hours-refresh");
+};
+
+hrms.time.format_hours_comment = function (comment) {
+	if (!comment) {
+		return "";
+	}
+	const when = moment(comment.creation);
+	const time = when.isValid() ? when.format("hh:mm A") : "";
+	const date = when.isValid() ? when.format("MM/DD/YYYY") : "";
+	return __("Comment ({0}, {1}, {2}): {3}", [
+		comment.comment_by || __("Admin"),
+		time,
+		date,
+		comment.content || "",
+	]);
+};
+
+hrms.time.format_adjustment_clock = function (value) {
+	if (!value) {
+		return "—";
+	}
+	if (hrms.time.format_clock) {
+		const formatted = hrms.time.format_clock(value);
+		if (formatted) {
+			return formatted;
+		}
+	}
+	const parsed = moment(String(value), ["HH:mm:ss", "HH:mm", "hh:mm a", "hh:mm A"], true);
+	return parsed.isValid() ? parsed.format("hh:mm a") : String(value);
+};
+
+hrms.time.adjustment_range = function (in_time, out_time) {
+	return `${hrms.time.format_adjustment_clock(in_time)} – ${hrms.time.format_adjustment_clock(out_time)}`;
+};
+
+hrms.time.render_adjustment_actions = function (adjustment) {
+	if (!adjustment?.name || adjustment.status !== "Pending") {
+		return "";
+	}
+	const name = escape_html(adjustment.name);
+	return `
+		<span class="sp-tca-banner__actions">
+			<button type="button" class="sp-tca-btn is-approve" data-act="approve" data-adjustment="${name}">${escape_html(__("Approve"))}</button>
+			<button type="button" class="sp-tca-btn is-reject" data-act="reject" data-adjustment="${name}">${escape_html(__("Reject"))}</button>
+		</span>`;
+};
+
+hrms.time.render_adjustment_html = function (adjustment) {
+	if (!adjustment?.name || adjustment.status !== "Pending") {
+		return "";
+	}
+	const note = adjustment.note ? `<div class="sp-tca-banner__note">${escape_html(adjustment.note)}</div>` : "";
+	return `
+		<div class="sp-tca-banner" data-adjustment="${escape_html(adjustment.name)}">
+			<div class="sp-tca-banner__text">
+				<strong>${escape_html(__("Pending time change"))}</strong>
+				${escape_html(hrms.time.adjustment_range(adjustment.current_in_time, adjustment.current_out_time))}
+				→
+				${escape_html(hrms.time.adjustment_range(adjustment.requested_in_time, adjustment.requested_out_time))}
+				${note}
+			</div>
+			${hrms.time.render_adjustment_actions(adjustment)}
+		</div>`;
+};
+
+hrms.time.bind_adjustment_actions = function ($root, on_done) {
+	if (!$root || !$root.length) {
+		return;
+	}
+	$root.off("click.sp-tca").on("click.sp-tca", ".sp-tca-btn", function (event) {
+		event.preventDefault();
+		event.stopPropagation();
+		const name = $(this).data("adjustment");
+		const act = $(this).data("act");
+		if (!name || !act) {
+			return;
+		}
+		const message =
+			act === "approve"
+				? __("Apply this time change like a Day View add or edit?")
+				: __("Reject this time change request?");
+		frappe.confirm(message, () => {
+			frappe.call({
+				method: "hrms.hr.doctype.time_clock_adjustment.time_clock_adjustment.review_time_clock_adjustment",
+				args: { name, action: act },
+				callback() {
+					if (typeof on_done === "function") {
+						on_done();
+					}
+					hrms.time.refresh_hours_views();
+				},
+			});
+		});
+	});
 };
 
 hrms.time.to_hhmm = function (value) {
