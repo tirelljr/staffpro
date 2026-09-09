@@ -78,10 +78,53 @@ frappe.ui.form.on("Additional Salary", {
 			frappe.run_serially([
 				() => frm.trigger("get_employee_currency"),
 				() => frm.trigger("set_company"),
+				() => frm.trigger("apply_auto_bonus"),
 			]);
 		} else {
 			frm.set_value("company", null);
+			frm.set_value("auto_bonus_note", "");
 		}
+	},
+
+	bonus_type: function (frm) {
+		frm.trigger("apply_auto_bonus");
+	},
+
+	payroll_date: function (frm) {
+		frm.trigger("apply_auto_bonus");
+	},
+
+	from_date: function (frm) {
+		frm.trigger("apply_auto_bonus");
+	},
+
+	apply_auto_bonus: function (frm) {
+		if (frm.doc.docstatus !== 0 || !frm.doc.employee || !frm.doc.bonus_type) {
+			frm.set_value("auto_bonus_note", "");
+			return;
+		}
+		frappe.call({
+			method: "hrms.payroll.user_bonus.get_user_bonus",
+			args: {
+				employee: frm.doc.employee,
+				bonus_type: frm.doc.bonus_type,
+				as_of_date: frm.doc.payroll_date || frm.doc.from_date,
+			},
+			callback: function (r) {
+				const result = r.message || {};
+				if (!result.auto_calculate) {
+					frm.set_value("auto_bonus_note", "");
+					return;
+				}
+				frm.set_value("auto_bonus_note", result.status || "");
+				if (result.amount || result.amount === 0) {
+					frm.set_value("amount", result.amount);
+				}
+				if (result.salary_component) {
+					frm.set_value("salary_component", result.salary_component);
+				}
+			},
+		});
 	},
 
 	set_company: function (frm) {

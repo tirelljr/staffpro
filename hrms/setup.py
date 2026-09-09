@@ -427,6 +427,65 @@ def get_custom_fields():
 				"insert_after": "employee_advance_account",
 			},
 			{
+				"description": _(
+					"Amount this agent can earn, for example 500. Paid over the months below if they keep the attendance target."
+				),
+				"fieldname": "user_bonus",
+				"fieldtype": "Currency",
+				"label": _("User Bonus"),
+				"options": "salary_currency",
+				"insert_after": "salary_cb",
+			},
+			{
+				"default": "3",
+				"description": _("Pay the user bonus over this many months."),
+				"fieldname": "user_bonus_period_months",
+				"fieldtype": "Int",
+				"label": _("Over Months"),
+				"insert_after": "user_bonus",
+			},
+			{
+				"default": "90",
+				"description": _("Minimum attendance percent to earn the bonus, for example 90."),
+				"fieldname": "user_bonus_attendance_target",
+				"fieldtype": "Percent",
+				"label": _("Attendance Target"),
+				"insert_after": "user_bonus_period_months",
+			},
+			{
+				"default": "No Bonus",
+				"description": _(
+					"No Bonus withholds the period share. Deduct takes that share off their pay."
+				),
+				"fieldname": "user_bonus_if_below",
+				"fieldtype": "Select",
+				"label": _("If Below Target"),
+				"options": "No Bonus\nDeduct",
+				"insert_after": "user_bonus_attendance_target",
+			},
+			{
+				"fieldname": "user_bonus_attendance",
+				"fieldtype": "Percent",
+				"label": _("Current Attendance"),
+				"read_only": 1,
+				"insert_after": "user_bonus_if_below",
+			},
+			{
+				"fieldname": "user_bonus_missed_days",
+				"fieldtype": "Float",
+				"label": _("Missed Days"),
+				"precision": "1",
+				"read_only": 1,
+				"insert_after": "user_bonus_attendance",
+			},
+			{
+				"fieldname": "user_bonus_status",
+				"fieldtype": "Small Text",
+				"label": _("Bonus Status"),
+				"read_only": 1,
+				"insert_after": "user_bonus_missed_days",
+			},
+			{
 				"fetch_from": "department.payroll_cost_center",
 				"fetch_if_empty": 1,
 				"fieldname": "payroll_cost_center",
@@ -434,7 +493,7 @@ def get_custom_fields():
 				"hidden": 1,
 				"label": _("Payroll Cost Center"),
 				"options": "Cost Center",
-				"insert_after": "salary_cb",
+				"insert_after": "user_bonus_status",
 			},
 			{
 				"fieldname": "billing_section",
@@ -468,6 +527,24 @@ def get_custom_fields():
 				"label": _("Billing Rate (Hourly)"),
 				"options": "billing_currency",
 				"insert_after": "billing_currency",
+			},
+			{
+				"description": _(
+					"Bound on first login when device lock is enabled in System Settings. Clear this to allow a new device."
+				),
+				"fieldname": "login_device_id",
+				"fieldtype": "Data",
+				"label": _("Registered Device ID"),
+				"insert_after": "user_id",
+			},
+			{
+				"description": _(
+					"Default workstation IPv4 from System Settings Office IPv4. Used on the floor map when a cubicle has no IP."
+				),
+				"fieldname": "default_ipv4",
+				"fieldtype": "Data",
+				"label": _("Default IPv4"),
+				"insert_after": "login_device_id",
 			},
 		],
 		"Customer": [
@@ -646,6 +723,48 @@ def get_custom_fields():
 				"label": _("Pay Double Time"),
 				"insert_after": "column_break_holiday_pay",
 				"description": _("Public holidays only. Mutually exclusive with Time and a Half."),
+			},
+		],
+		"System Settings": [
+			{
+				"fieldname": "agent_access_section",
+				"fieldtype": "Section Break",
+				"label": _("Agent Access"),
+				"insert_after": "allow_login_using_user_name",
+			},
+			{
+				"default": "0",
+				"fieldname": "restrict_agent_clockin_to_office_ip",
+				"fieldtype": "Check",
+				"label": _("Restrict Agent Clock-in to Office IPv4"),
+				"insert_after": "agent_access_section",
+			},
+			{
+				"depends_on": "restrict_agent_clockin_to_office_ip",
+				"description": _(
+					"Agents can clock in only from these IPv4 addresses. Enter one per line. Scan BPO IPv4 probes the office LAN; the first address becomes every agent's default IP."
+				),
+				"fieldname": "office_clockin_ipv4",
+				"fieldtype": "Small Text",
+				"label": _("Office IPv4"),
+				"insert_after": "restrict_agent_clockin_to_office_ip",
+			},
+			{
+				"depends_on": "restrict_agent_clockin_to_office_ip",
+				"fieldname": "scan_bpo_ipv4",
+				"fieldtype": "Button",
+				"label": _("Scan BPO IPv4"),
+				"insert_after": "office_clockin_ipv4",
+			},
+			{
+				"default": "0",
+				"description": _(
+					"The first successful agent login binds that browser. Clear Registered Device ID on the Employee to rebind."
+				),
+				"fieldname": "restrict_agent_login_to_device",
+				"fieldtype": "Check",
+				"label": _("Restrict Agent Login to Registered Device"),
+				"insert_after": "scan_bpo_ipv4",
 			},
 		],
 	}

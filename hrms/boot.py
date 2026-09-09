@@ -61,6 +61,7 @@ BPO_WORKSPACE_SIDEBARS = frozenset(
 		"pay",
 		"ss and taxes",
 		"talent",
+		"floor",
 		"finance",
 		"admin",
 	}

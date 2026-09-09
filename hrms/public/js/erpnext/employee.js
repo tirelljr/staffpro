@@ -212,6 +212,23 @@ frappe.ui.form.on("Employee", {
 		setup_employee_password_panel(frm);
 		setup_employee_profile_stats(frm);
 		set_employee_salary_defaults(frm);
+		refresh_user_bonus_status(frm);
+	},
+
+	user_bonus: function (frm) {
+		refresh_user_bonus_status(frm);
+	},
+
+	user_bonus_period_months: function (frm) {
+		refresh_user_bonus_status(frm);
+	},
+
+	user_bonus_attendance_target: function (frm) {
+		refresh_user_bonus_status(frm);
+	},
+
+	user_bonus_if_below: function (frm) {
+		refresh_user_bonus_status(frm);
 	},
 
 	add_hourly_rate_action: function (frm) {
@@ -408,6 +425,49 @@ function set_employee_salary_defaults(frm) {
 	if (!frm.doc.salary_mode) {
 		frm.set_value("salary_mode", "Bank");
 	}
+	if (!cint(frm.doc.user_bonus_period_months)) {
+		frm.set_value("user_bonus_period_months", 3);
+	}
+	if (!flt(frm.doc.user_bonus_attendance_target)) {
+		frm.set_value("user_bonus_attendance_target", 90);
+	}
+	if (!frm.doc.user_bonus_if_below) {
+		frm.set_value("user_bonus_if_below", "No Bonus");
+	}
+}
+
+function refresh_user_bonus_status(frm) {
+	if (frm.is_new() || !frm.doc.name || !frm.fields_dict.user_bonus) return;
+	frappe.call({
+		method: "hrms.payroll.user_bonus.get_user_bonus",
+		args: {
+			employee: frm.doc.name,
+			user_bonus: frm.doc.user_bonus,
+			period_months: frm.doc.user_bonus_period_months,
+			attendance_target: frm.doc.user_bonus_attendance_target,
+			if_below: frm.doc.user_bonus_if_below,
+		},
+		callback: function (r) {
+			if (!r.message) return;
+			const result = r.message;
+			frm.doc.user_bonus_attendance = result.attendance_pct;
+			frm.doc.user_bonus_missed_days = result.missed_days;
+			frm.doc.user_bonus_status = result.status;
+			["user_bonus_attendance", "user_bonus_missed_days", "user_bonus_status"].forEach((field) => {
+				frm.refresh_field(field);
+			});
+			if (result.bonus_type && frappe.model.can_create("Additional Salary")) {
+				frm.add_custom_button(__("Add Bonus"), () => {
+					frappe.new_doc("Additional Salary", {
+						employee: frm.doc.name,
+						bonus_type: result.bonus_type,
+						amount: result.amount,
+						payroll_date: frappe.datetime.get_today(),
+					});
+				});
+			}
+		},
+	});
 }
 
 function hourly_rate_dialog_values(d) {

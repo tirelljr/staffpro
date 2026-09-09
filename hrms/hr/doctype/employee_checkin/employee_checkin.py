@@ -58,6 +58,7 @@ class EmployeeCheckin(Document):
 		self.fetch_shift()
 		self.set_geolocation()
 		self.validate_distance_from_shift_location()
+		self.validate_office_clockin_ip()
 
 	def validate_duplicate_log(self):
 		doc = frappe.db.exists(
@@ -157,6 +158,14 @@ class EmployeeCheckin(Document):
 				_("You must be within {0} meters of your shift location to check in.").format(checkin_radius),
 				exc=CheckinRadiusExceededError,
 			)
+
+	def validate_office_clockin_ip(self):
+		if self.flags.get("ignore_ip_restriction"):
+			return
+
+		from hrms.hr.agent_access import validate_agent_clockin_ip
+
+		validate_agent_clockin_ip(self.employee)
 
 
 @frappe.whitelist()

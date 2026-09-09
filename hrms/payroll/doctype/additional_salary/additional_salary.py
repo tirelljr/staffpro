@@ -8,7 +8,11 @@ from frappe.model.document import Document
 from frappe.utils import comma_and, date_diff, flt, fmt_money, formatdate, get_link_to_form, getdate
 
 from hrms.hr.utils import validate_active_employee
-from hrms.payroll.doctype.bonus_type.bonus_type import ensure_bonus_salary_component
+from hrms.payroll.doctype.bonus_type.bonus_type import (
+	ensure_attendance_deduction_component,
+	ensure_bonus_salary_component,
+)
+from hrms.payroll.user_bonus import calculate_user_bonus
 
 
 class AdditionalSalary(Document):
@@ -22,6 +26,7 @@ class AdditionalSalary(Document):
 
 		amended_from: DF.Link | None
 		amount: DF.Currency
+		auto_bonus_note: DF.SmallText | None
 		bonus_type: DF.Link | None
 		company: DF.Link
 		currency: DF.Link
@@ -78,6 +83,7 @@ class AdditionalSalary(Document):
 		self.validate_duplicate_additional_salary()
 		self.validate_tax_component_overwrite()
 		self.validate_accrual_component()
+		self.apply_auto_bonus_note()
 
 		if self.exclude_from_tax:
 			self.deduct_full_tax_on_selected_payroll_date = 0
@@ -279,6 +285,29 @@ class AdditionalSalary(Document):
 				title=_("Warning"),
 				indicator="orange",
 			)
+
+	def apply_auto_bonus_note(self):
+		if self.ref_doctype or not self.employee or not self.bonus_type:
+			self.auto_bonus_note = None
+			return
+
+		result = calculate_user_bonus(
+			self.employee,
+			bonus_type=self.bonus_type,
+			as_of_date=self.payroll_date or self.from_date,
+		)
+		if not result.get("auto_calculate"):
+			self.auto_bonus_note = None
+			return
+
+		self.auto_bonus_note = result.get("status")
+		self.amount = flt(result.get("amount"))
+		if result.get("is_deduction"):
+			self.salary_component = ensure_attendance_deduction_component()
+			self.type = "Deduction"
+		else:
+			self.salary_component = ensure_bonus_salary_component()
+			self.type = "Earning"
 
 	def validate_employee_advance_return(self):
 		if self.ref_doctype != "Employee Advance" or not self.ref_docname:

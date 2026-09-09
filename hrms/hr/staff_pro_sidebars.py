@@ -67,6 +67,14 @@ SIDEBAR_SOURCES = (
 		"dock_icon": "user-plus",
 	},
 	{
+		"source": "workspace_sidebar/floor.json",
+		"title": "Floor",
+		"module": "HR",
+		"header_icon": "layout-grid",
+		"dock_title": "Floor",
+		"dock_icon": "layout-grid",
+	},
+	{
 		"source": "workspace_sidebar/ss_and_taxes.json",
 		"title": "SS and Taxes",
 		"module": "Payroll",
@@ -240,6 +248,7 @@ def after_setup_wizard(user_input: dict | None = None):
 	from hrms.branding import apply_branding
 	from hrms.subscription_utils import update_erpnext_workspaces
 
+	from hrms.hr.doctype.office_floor.office_floor import seed_office_floors
 	from hrms.hr.staff_pro_holiday_list import ensure_staff_pro_holiday_list
 	from hrms.hr.staff_pro_shift_locations import ensure_staff_pro_shift_locations
 	from hrms.payroll.doctype.bonus_type.bonus_type import seed_bonus_types
@@ -248,6 +257,7 @@ def after_setup_wizard(user_input: dict | None = None):
 	sync_staff_pro_sidebars()
 	ensure_staff_pro_holiday_list()
 	ensure_staff_pro_shift_locations()
+	seed_office_floors()
 	seed_bonus_types()
 	hide_unused_erpnext_workspaces()
 	update_erpnext_workspaces(disable=True)

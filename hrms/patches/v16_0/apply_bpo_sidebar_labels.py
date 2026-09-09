@@ -19,6 +19,7 @@ SIDEBAR_FIXTURES = {
 	"Workforce": "workspace_sidebar/workforce.json",
 	"Time": "workspace_sidebar/time.json",
 	"Talent": "workspace_sidebar/talent.json",
+	"Floor": "workspace_sidebar/floor.json",
 	"Pay": "workspace_sidebar/pay.json",
 	"SS and Taxes": "workspace_sidebar/ss_and_taxes.json",
 	"People": "workspace_sidebar/workforce.json",

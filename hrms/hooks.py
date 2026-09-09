@@ -142,6 +142,7 @@ after_migrate = [
 	"hrms.payroll.doctype.bonus_type.bonus_type.seed_bonus_types",
 	"hrms.hr.staff_pro_holiday_list.ensure_staff_pro_holiday_list",
 	"hrms.hr.staff_pro_shift_locations.ensure_staff_pro_shift_locations",
+	"hrms.hr.doctype.office_floor.office_floor.seed_office_floors",
 	"hrms.boot.hide_unused_erpnext_workspaces",
 	"hrms.boot.prepare_staff_pro_first_login",
 	"hrms.overrides.bpo_dashboards.hide_non_bpo_dashboard_records",
@@ -239,6 +240,9 @@ doc_events = {
 	"Customer": {
 		"validate": "hrms.payroll.bpo_client_accounts.set_client_billing_defaults",
 		"after_insert": "hrms.payroll.bpo_client_accounts.after_insert_customer",
+	},
+	"System Settings": {
+		"on_update": "hrms.hr.agent_access.apply_office_ipv4_defaults_on_settings",
 	},
 	"Timesheet": {"validate": "hrms.hr.utils.validate_active_employee"},
 	"Payment Entry": {

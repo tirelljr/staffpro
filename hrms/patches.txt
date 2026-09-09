@@ -132,3 +132,8 @@ hrms.patches.v16_0.add_bonus_types #2026-09-04
 hrms.patches.v16_0.add_employee_bank_account_type #2026-09-04
 hrms.patches.v16_0.ensure_staff_pro_first_login_home #2026-09-08
 hrms.patches.v16_0.fix_hourly_gross_pay_formula #2026-09-08
+hrms.patches.v16_0.add_user_bonus_fields #2026-09-09
+hrms.patches.v16_0.update_user_bonus_plan_fields #2026-09-09-plan
+hrms.patches.v16_0.add_floor_module #2026-09-08-floor
+hrms.patches.v16_0.add_agent_access_settings #2026-09-09-agent-access
+hrms.patches.v16_0.add_employee_default_ipv4 #2026-09-09-default-ipv4

@@ -1259,6 +1259,7 @@ const HR_SIDEBARS = [
 	"payroll",
 	"ss and taxes",
 	"talent",
+	"floor",
 	"finance",
 	"finance & admin",
 	"finance and admin",
@@ -1782,6 +1783,7 @@ const DOCK_ICONS = {
 	"ss and taxes": "/assets/hrms/images/belize-ssb-logo.png",
 	time: "clock",
 	talent: "user-plus",
+	floor: "layout-grid",
 	finance: "/assets/hrms/images/integrations/quickbooks.svg",
 	"finance & admin": "/assets/hrms/images/integrations/quickbooks.svg",
 	"finance and admin": "/assets/hrms/images/integrations/quickbooks.svg",
@@ -2130,6 +2132,7 @@ const STAFF_PRO_WORKSPACE_DASHBOARDS = {
 	payroll: ["dashboard-view", "Payroll"],
 	talent: ["dashboard-view", "Recruitment"],
 	recruitment: ["dashboard-view", "Recruitment"],
+	floor: ["floor-map"],
 	"ss and taxes": ["dashboard-view", "SS and Taxes"],
 };
 

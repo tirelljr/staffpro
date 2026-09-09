@@ -1,0 +1,159 @@
+# Copyright (c) 2026, Staff Pro BPO and Contributors
+# License: GNU General Public License v3. See license.txt
+
+import frappe
+from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+from frappe.utils.password import update_password
+
+from erpnext.setup.doctype.employee.test_employee import make_employee
+
+from hrms.api.kiosk import clock
+from hrms.hr.agent_access import (
+	apply_office_ipv4_defaults,
+	is_agent_access_exempt,
+	is_scannable_private_ipv4,
+	normalize_ipv4,
+	parse_office_ipv4s,
+	scan_office_ipv4,
+	validate_agent_clockin_ip,
+	validate_or_bind_login_device,
+)
+from hrms.hr.doctype.employee_checkin.test_employee_checkin import make_checkin
+from hrms.setup import get_custom_fields
+from hrms.tests.utils import HRMSTestSuite
+
+OFFICE_IP = "203.0.113.10"
+OTHER_IP = "198.51.100.20"
+
+
+def _ensure_fields():
+	custom_fields = get_custom_fields()
+	create_custom_fields(
+		{doctype: fields for doctype, fields in custom_fields.items() if doctype in {"System Settings", "Employee"}},
+		ignore_validate=True,
+	)
+
+
+def _set_ip_restriction(enabled: int, ips: str = ""):
+	frappe.db.set_single_value("System Settings", "restrict_agent_clockin_to_office_ip", enabled)
+	frappe.db.set_single_value("System Settings", "office_clockin_ipv4", ips)
+
+
+def _set_device_restriction(enabled: int):
+	frappe.db.set_single_value("System Settings", "restrict_agent_login_to_device", enabled)
+
+
+def _make_agent_user(email: str, username: str, password: str = "KioskPass123") -> tuple[str, str]:
+	employee = make_employee(email, company="_Test Company")
+	user = frappe.db.get_value("Employee", employee, "user_id")
+	frappe.db.set_value("User", user, {"username": username, "user_type": "Website User"})
+	update_password(user, password)
+	if frappe.get_meta("Employee").has_field("login_device_id"):
+		frappe.db.set_value("Employee", employee, "login_device_id", None, update_modified=False)
+	return employee, user
+
+
+class TestAgentAccess(HRMSTestSuite):
+	def setUp(self):
+		frappe.set_user("Administrator")
+		_ensure_fields()
+		_set_ip_restriction(0, "")
+		_set_device_restriction(0)
+		frappe.db.set_single_value("HR Settings", "allow_geolocation_tracking", 0)
+		frappe.local.request_ip = OFFICE_IP
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		_set_ip_restriction(0, "")
+		_set_device_restriction(0)
+		frappe.local.request_ip = "127.0.0.1"
+
+	def test_normalize_and_parse_ipv4(self):
+		self.assertEqual(normalize_ipv4("203.0.113.10"), OFFICE_IP)
+		self.assertEqual(normalize_ipv4("::ffff:203.0.113.10"), OFFICE_IP)
+		self.assertEqual(normalize_ipv4("203.0.113.10, 10.0.0.1"), OFFICE_IP)
+		self.assertEqual(normalize_ipv4("2001:db8::1"), "")
+		self.assertEqual(normalize_ipv4("not-an-ip"), "")
+		self.assertEqual(
+			parse_office_ipv4s("203.0.113.10\n198.51.100.20, 203.0.113.10"),
+			[OFFICE_IP, OTHER_IP],
+		)
+
+	def test_clock_rejects_non_office_ip(self):
+		_set_ip_restriction(1, OFFICE_IP)
+		_make_agent_user("kiosk.ip.deny@example.com", "KioskIpDeny")
+		frappe.local.request_ip = OTHER_IP
+		frappe.set_user("Guest")
+		with self.assertRaises(frappe.ValidationError):
+			clock("KioskIpDeny", "KioskPass123", "IN")
+
+	def test_clock_allows_office_ip(self):
+		_set_ip_restriction(1, OFFICE_IP)
+		employee, _user = _make_agent_user("kiosk.ip.allow@example.com", "KioskIpAllow")
+		frappe.local.request_ip = OFFICE_IP
+		frappe.set_user("Guest")
+		result = clock("KioskIpAllow", "KioskPass123", "IN")
+		self.assertEqual(result["log_type"], "IN")
+		self.assertEqual(result["employee"], employee)
+
+	def test_desk_admin_checkin_skips_ip(self):
+		_set_ip_restriction(1, OFFICE_IP)
+		frappe.local.request_ip = OTHER_IP
+		frappe.set_user("Administrator")
+		self.assertTrue(is_agent_access_exempt("Administrator"))
+		employee = make_employee("kiosk.ip.admin@example.com", company="_Test Company")
+		log = make_checkin(employee)
+		self.assertTrue(log.name)
+
+	def test_agent_checkin_rejects_non_office_ip(self):
+		_set_ip_restriction(1, OFFICE_IP)
+		frappe.local.request_ip = OTHER_IP
+		with self.assertRaises(frappe.ValidationError):
+			validate_agent_clockin_ip("EMP-0001", ignore_session_exemption=True)
+
+	def test_login_device_binds_on_first_use(self):
+		_set_device_restriction(1)
+		employee, user = _make_agent_user("kiosk.device.bind@example.com", "KioskDeviceBind")
+		validate_or_bind_login_device(user, "device-alpha")
+		self.assertEqual(frappe.db.get_value("Employee", employee, "login_device_id"), "device-alpha")
+		validate_or_bind_login_device(user, "device-alpha")
+
+	def test_login_device_requires_id_on_first_use(self):
+		_set_device_restriction(1)
+		_employee, user = _make_agent_user("kiosk.device.empty@example.com", "KioskDeviceEmpty")
+		with self.assertRaises(frappe.ValidationError):
+			validate_or_bind_login_device(user, "")
+
+	def test_login_device_rejects_mismatch(self):
+		_set_device_restriction(1)
+		employee, user = _make_agent_user("kiosk.device.deny@example.com", "KioskDeviceDeny")
+		frappe.db.set_value("Employee", employee, "login_device_id", "device-alpha")
+		with self.assertRaises(frappe.ValidationError):
+			validate_or_bind_login_device(user, "device-other")
+
+	def test_login_device_skips_desk_admin(self):
+		_set_device_restriction(1)
+		validate_or_bind_login_device("Administrator", "device-other")
+
+	def test_scan_office_ipv4(self):
+		frappe.local.request_ip = OFFICE_IP
+		result = scan_office_ipv4()
+		self.assertEqual(result["ip"], OFFICE_IP)
+		self.assertIn(OFFICE_IP, result["ips"])
+
+	def test_private_scan_scope(self):
+		self.assertTrue(is_scannable_private_ipv4("192.168.1.20"))
+		self.assertTrue(is_scannable_private_ipv4("10.0.0.8"))
+		self.assertFalse(is_scannable_private_ipv4(OFFICE_IP))
+		self.assertFalse(is_scannable_private_ipv4("127.0.0.1"))
+		self.assertFalse(is_scannable_private_ipv4("8.8.8.8"))
+
+	def test_apply_office_ipv4_defaults_to_agents(self):
+		employee = make_employee("kiosk.default.ip@example.com", company="_Test Company")
+		if frappe.get_meta("Employee").has_field("default_ipv4"):
+			frappe.db.set_value("Employee", employee, "default_ipv4", None, update_modified=False)
+		_set_ip_restriction(1, OFFICE_IP)
+		applied = apply_office_ipv4_defaults(OFFICE_IP)
+		self.assertEqual(applied["default_ip"], OFFICE_IP)
+		if frappe.get_meta("Employee").has_field("default_ipv4"):
+			self.assertEqual(frappe.db.get_value("Employee", employee, "default_ipv4"), OFFICE_IP)

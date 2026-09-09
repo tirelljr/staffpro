@@ -11,6 +11,7 @@
 		payroll: ["dashboard-view", "Payroll"],
 		talent: ["dashboard-view", "Recruitment"],
 		recruitment: ["dashboard-view", "Recruitment"],
+		floor: ["floor-map"],
 		"ss and taxes": ["dashboard-view", "SS and Taxes"],
 	};
 

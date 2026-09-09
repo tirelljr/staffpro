@@ -1,5 +1,6 @@
 import { computed, reactive } from "vue"
 import { createResource, call } from "frappe-ui"
+import { getDeviceId } from "@/utils/rememberedUsers"
 import { userResource } from "./user"
 import { employeeResource } from "./employee"
 import router from "@/router"
@@ -32,12 +33,12 @@ export const session = reactive({
 		} catch {
 			// Fall back to the typed value; Frappe login still accepts email.
 		}
-		const response = await call("login", { usr, pwd: password })
+		const response = await call("login", { usr, pwd: password, device_id: getDeviceId() })
 		handleLogin(response)
 		return response
 	},
 	otp: async (tmp_id, otp) => {
-		const response = await call("login", { tmp_id, otp })
+		const response = await call("login", { tmp_id, otp, device_id: getDeviceId() })
 		handleLogin(response)
 		return response
 	},

@@ -21,7 +21,9 @@ function writeStore(store) {
 export function getDeviceId() {
 	let id = localStorage.getItem(DEVICE_KEY)
 	if (!id) {
-		id = String(1000 + Math.floor(Math.random() * 9000))
+		id =
+			(typeof crypto !== "undefined" && crypto.randomUUID && crypto.randomUUID()) ||
+			`${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
 		localStorage.setItem(DEVICE_KEY, id)
 	}
 	return id

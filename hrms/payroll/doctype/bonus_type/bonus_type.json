@@ -10,7 +10,14 @@
  "field_order": [
   "bonus_type_name",
   "disabled",
-  "description"
+  "description",
+  "auto_calculate",
+  "rules_section",
+  "period_months",
+  "attendance_target",
+  "column_break_rules",
+  "if_below",
+  "bonus_amount"
  ],
  "fields": [
   {
@@ -32,11 +39,61 @@
    "fieldname": "description",
    "fieldtype": "Small Text",
    "label": "Description"
+  },
+  {
+   "default": "0",
+   "description": "Use this type to pay or deduct from an agent's user bonus based on attendance.",
+   "fieldname": "auto_calculate",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Use Employee User Bonus"
+  },
+  {
+   "depends_on": "auto_calculate",
+   "fieldname": "rules_section",
+   "fieldtype": "Section Break",
+   "label": "Default Agent Plan"
+  },
+  {
+   "default": "3",
+   "depends_on": "auto_calculate",
+   "description": "Default number of months to earn the bonus. Admins can change this on each employee.",
+   "fieldname": "period_months",
+   "fieldtype": "Int",
+   "label": "Default Over Months"
+  },
+  {
+   "default": "90",
+   "depends_on": "auto_calculate",
+   "description": "Default attendance percent the agent must keep, for example 90.",
+   "fieldname": "attendance_target",
+   "fieldtype": "Percent",
+   "label": "Default Attendance Target"
+  },
+  {
+   "fieldname": "column_break_rules",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "No Bonus",
+   "depends_on": "auto_calculate",
+   "description": "No Bonus withholds the period share. Deduct takes that share off their pay.",
+   "fieldname": "if_below",
+   "fieldtype": "Select",
+   "label": "If Below Target",
+   "options": "No Bonus\nDeduct"
+  },
+  {
+   "depends_on": "auto_calculate",
+   "description": "Optional default amount copied onto new employees. Set the real amount on the agent.",
+   "fieldname": "bonus_amount",
+   "fieldtype": "Currency",
+   "label": "Default Bonus Amount"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-04 00:00:00.000000",
+ "modified": "2026-09-09 04:00:00.000000",
  "modified_by": "Administrator",
  "module": "Payroll",
  "name": "Bonus Type",
@@ -80,7 +137,6 @@
    "write": 1
   }
  ],
- "quick_entry": 1,
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],

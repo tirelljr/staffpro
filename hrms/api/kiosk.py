@@ -9,6 +9,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt, get_datetime, getdate, now_datetime, time_diff_in_hours
 
+from hrms.hr.agent_access import validate_agent_clockin_ip
 from hrms.overrides.employee_master import resolve_user_from_login
 
 
@@ -217,6 +218,7 @@ def clock(
 
 	user = _authenticate(username, password)
 	employee = _employee_for_user(user)
+	validate_agent_clockin_ip(employee.name, ignore_session_exemption=True)
 	summary = _checkin_summary(employee.name)
 	action = (log_type or "").strip().upper() or summary["next_action"]
 	if action not in {"IN", "OUT"}:

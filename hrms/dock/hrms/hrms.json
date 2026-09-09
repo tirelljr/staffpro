@@ -40,6 +40,14 @@
   {
    "added": 0,
    "hidden": 0,
+   "icon": "layout-grid",
+   "link_to": "Floor",
+   "link_type": "Sidebar",
+   "title": "Floor"
+  },
+  {
+   "added": 0,
+   "hidden": 0,
    "icon": "shield",
    "link_to": "SS and Taxes",
    "link_type": "Sidebar",
@@ -62,7 +70,7 @@
    "title": "Admin"
   }
  ],
- "modified": "2026-09-08 15:58:25.933961",
+ "modified": "2026-09-08 23:09:51.377058",
  "modified_by": "Administrator",
  "name": "hrms",
  "owner": "Administrator",

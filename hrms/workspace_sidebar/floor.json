@@ -1,0 +1,63 @@
+{
+    "app":  "hrms",
+    "creation":  "2026-09-08 22:00:00.000000",
+    "docstatus":  0,
+    "doctype":  "Workspace Sidebar",
+    "for_user":  "",
+    "header_icon":  "layout-grid",
+    "idx":  0,
+    "items":  [
+                  {
+                      "child":  0,
+                      "collapsible":  1,
+                      "default_workspace":  1,
+                      "indent":  0,
+                      "keep_closed":  0,
+                      "label":  "Floor Map",
+                      "open_in_new_tab":  0,
+                      "show_arrow":  0,
+                      "type":  "Link",
+                      "icon":  "layout-grid",
+                      "link_to":  "floor-map",
+                      "link_type":  "Page"
+                  },
+                  {
+                      "child":  0,
+                      "collapsible":  1,
+                      "default_workspace":  0,
+                      "indent":  0,
+                      "keep_closed":  0,
+                      "label":  "Cubicles",
+                      "open_in_new_tab":  0,
+                      "show_arrow":  0,
+                      "type":  "Link",
+                      "icon":  "square",
+                      "link_to":  "Cubicle",
+                      "link_type":  "DocType"
+                  },
+                  {
+                      "child":  0,
+                      "collapsible":  1,
+                      "default_workspace":  0,
+                      "indent":  0,
+                      "keep_closed":  0,
+                      "label":  "Floors",
+                      "open_in_new_tab":  0,
+                      "show_arrow":  0,
+                      "type":  "Link",
+                      "icon":  "building-2",
+                      "link_to":  "Office Floor",
+                      "link_type":  "DocType"
+                  }
+              ],
+    "modified":  "2026-09-08 22:00:00.000000",
+    "modified_by":  "Administrator",
+    "module":  "HR",
+    "name":  "Floor",
+    "owner":  "Administrator",
+    "parent":  "",
+    "parentfield":  "",
+    "parenttype":  "",
+    "standard":  1,
+    "title":  "Floor"
+}
