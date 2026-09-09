@@ -130,6 +130,9 @@ hrms.day_view = {
 		this.$body.on("click", ".sp-dayview__btn-approve", () => me.approve_selected());
 		this.$body.on("click", ".sp-dayview__btn-delete", () => me.delete_selected());
 		this.$body.on("click", ".sp-dayview__btn-clock", () => me.open_clock());
+		if (hrms.time && typeof hrms.time.bind_adjustment_actions === "function") {
+			hrms.time.bind_adjustment_actions(this.$body, () => me.refresh());
+		}
 		this.$body.on("click", ".sp-dayview__link", function () {
 			const $btn = $(this);
 			const $row = $btn.closest(".sp-dayview__row");
@@ -551,6 +554,10 @@ hrms.day_view = {
 					`<div class="sp-dayview__comment">${frappe.utils.escape_html(this.format_comment(comment))}</div>`,
 			)
 			.join("");
+		const adjustment =
+			hrms.time && typeof hrms.time.render_adjustment_html === "function"
+				? hrms.time.render_adjustment_html(row?.adjustment)
+				: "";
 		const label = show_employee ? row.employee_label || row.employee_name || "" : this.date_label(date);
 		const check_disabled = !name || is_lunch ? "disabled" : "";
 		return `
@@ -568,6 +575,7 @@ hrms.day_view = {
 				<td>
 					${frappe.utils.escape_html(label)}
 					${comments}
+					${adjustment}
 				</td>
 				<td>${frappe.utils.escape_html(this.clock(row?.in_time))}</td>
 				<td>${frappe.utils.escape_html(this.clock(row?.out_time))}</td>
@@ -750,16 +758,8 @@ hrms.day_view = {
 	},
 
 	format_comment(comment) {
-		if (hrms.time) {
-			const when = moment(comment.creation);
-			const time = when.isValid() ? when.format("hh:mm A") : "";
-			const date = when.isValid() ? when.format("MM/DD/YYYY") : "";
-			return __("Comment ({0}, {1}, {2}): {3}", [
-				comment.comment_by || __("Admin"),
-				time,
-				date,
-				comment.content || "",
-			]);
+		if (hrms.time?.format_hours_comment) {
+			return hrms.time.format_hours_comment(comment);
 		}
 		return comment.content || "";
 	},
