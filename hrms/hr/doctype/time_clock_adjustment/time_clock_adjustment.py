@@ -523,7 +523,7 @@ def get_time_clock_adjustments(
 	if department and department != "__none__":
 		filters["department"] = department
 	elif department == "__none__":
-		filters["department"] = ["in", ["", None]]
+		filters["department"] = ["is", "not set"]
 	if from_date and to_date:
 		filters["attendance_date"] = ["between", [getdate(from_date), getdate(to_date)]]
 	elif from_date:
@@ -560,13 +560,9 @@ def get_time_clock_adjustments(
 	)
 	departments = sorted(
 		{
-			row
-			for row in frappe.get_all(
-				"Time Clock Adjustment",
-				pluck="department",
-				distinct=True,
-			)
-			if row
+			row.department
+			for row in frappe.get_all("Time Clock Adjustment", fields=["department"])
+			if row.department
 		}
 	)
 	return {

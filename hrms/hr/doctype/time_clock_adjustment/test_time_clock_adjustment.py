@@ -55,6 +55,7 @@ class TestTimeClockAdjustment(HRMSTestSuite):
 		self.assertEqual(result["adjustment"]["status"], "Pending")
 		self.assertEqual(time_to_str(result["adjustment"]["requested_out_time"])[:5], "18:00")
 
+		frappe.set_user("Administrator")
 		hours = get_hours_rows(from_date=nowdate(), to_date=nowdate(), employee=employee)
 		row = next(item for item in hours["rows"] if item.get("name") == name)
 		self.assertTrue(any("left at 6" in (comment.get("content") or "") for comment in row.get("comments") or []))
