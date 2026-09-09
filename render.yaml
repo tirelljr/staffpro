@@ -43,7 +43,6 @@ services:
     dockerContext: .
     autoDeployTrigger: commit
     healthCheckPath: /api/method/ping
-    maxShutdownDelaySeconds: 30
     disk:
       name: staffpro-sites
       mountPath: /home/frappe/frappe-bench/sites
