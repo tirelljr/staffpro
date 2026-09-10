@@ -42,13 +42,33 @@ body.staff-pro-has-topbar .dock {
 .dock .dock-logo {
 	height: auto !important;
 	padding: 4px 0 8px !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
 }
 .workspace-dock .workspace-dock-logo a,
-.dock .dock-logo a {
+.dock .dock-logo a,
+.dock .dock-logo .shell-header {
 	width: 32px !important;
 	height: 32px !important;
+	padding: 0 !important;
+	border: 0 !important;
 	border-radius: 8px !important;
 	overflow: hidden !important;
+	background: transparent !important;
+	box-shadow: none !important;
+}
+.dock .dock-logo .title-container,
+.dock .dock-logo .drop-icon {
+	display: none !important;
+}
+.dock .dock-logo .header-logo,
+.dock .dock-logo .header-logo img,
+.dock .dock-logo img {
+	display: block !important;
+	width: 32px !important;
+	height: 32px !important;
+	object-fit: contain !important;
 }
 .workspace-dock .workspace-dock-items,
 .workspace-dock .workspace-dock-shortcuts,
@@ -143,6 +163,7 @@ body.staff-pro-has-topbar .dock {
 .workspace-dock button.workspace-dock-item:has(.workspace-dock-label)::after,
 .dock button.dock-item:has(.workspace-dock-label)::after,
 .dock button.dock-item:has(.dock-label)::after,
+.dock button.dock-item:has(.dock-item-label)::after,
 .dock button.workspace-dock-item:has(.workspace-dock-label)::after {
 	content: none !important;
 	display: none !important;
@@ -150,6 +171,7 @@ body.staff-pro-has-topbar .dock {
 .workspace-dock .workspace-dock-icon,
 .workspace-dock button.workspace-dock-item .sidebar-item-icon,
 .dock .dock-icon,
+.dock .dock-item-icon,
 .dock button.dock-item .sidebar-item-icon {
 	display: inline-flex !important;
 	align-items: center !important;
@@ -199,8 +221,10 @@ body.staff-pro-has-topbar .dock {
 .workspace-dock .workspace-dock-label,
 .workspace-dock button.workspace-dock-item .workspace-dock-label,
 .dock .dock-label,
+.dock .dock-item-label,
 .dock button.dock-item .workspace-dock-label,
-.dock button.dock-item .dock-label {
+.dock button.dock-item .dock-label,
+.dock button.dock-item .dock-item-label {
 	display: block !important;
 	width: 100% !important;
 	max-width: 56px !important;
@@ -244,7 +268,21 @@ body.staff-pro-has-topbar .dock {
 	margin-top: 4px !important;
 	padding: 0 !important;
 	border: 0 !important;
+	overflow: hidden !important;
 	background: transparent !important;
+}
+.dock .dock-user .title-container {
+	display: none !important;
+}
+.dock .dock-collapse-toggle {
+	width: 28px !important;
+	height: 28px !important;
+	margin: 4px 0 !important;
+	padding: 0 !important;
+	border: 0 !important;
+	background: transparent !important;
+	color: #6b7280 !important;
+	flex: 0 0 auto !important;
 }
 
 :root {
@@ -1519,10 +1557,10 @@ function render_staff_pro_dock_integrations() {
 				data-sp-integration="${frappe.utils.escape_html(item.name)}"
 				aria-label="${label}"
 				title="${label}">
-				<span class="workspace-dock-icon dock-icon" aria-hidden="true">
+				<span class="workspace-dock-icon dock-icon dock-item-icon" aria-hidden="true">
 					<img src="${icon}" alt="" />
 				</span>
-				<span class="workspace-dock-label dock-label">${label}</span>
+				<span class="workspace-dock-label dock-label dock-item-label">${label}</span>
 			</button>
 		`);
 		$item.on("click", () => {
@@ -1577,23 +1615,43 @@ function patch_workspace_dock_logo() {
 	const original = Dock.prototype.render_logo;
 	Dock.prototype.render_logo = function () {
 		if (!should_use_staff_pro_desk_home()) {
-			return original.call(this);
+			return typeof original === "function" ? original.call(this) : undefined;
 		}
 
 		const brand = staff_pro_brand();
-		const homePath = staff_pro_desk_home_path();
-
-		this.$logo.empty();
-		const $link = $(
-			`<a href="${homePath}" title="${frappe.utils.escape_html(brand.title)}" aria-label="${frappe.utils.escape_html(brand.title)}">
-				<img src="${frappe.utils.escape_html(brand.logo_url)}" alt="${frappe.utils.escape_html(brand.title)}" />
-			</a>`
-		);
-		$link.on("click", (e) => {
+		const title = frappe.utils.escape_html(brand.title);
+		const img = `<img src="${frappe.utils.escape_html(brand.logo_url)}" alt="${title}" />`;
+		const goHome = (e) => {
 			e.preventDefault();
+			e.stopPropagation();
 			staff_pro_open_portal("hr");
-		});
-		this.$logo.append($link);
+		};
+
+		// Frappe develop Dock uses $header_logo / $header_title, not $logo.
+		if (this.$header_logo?.length) {
+			this.$header_logo.html(img);
+			if (this.$header_title?.length) {
+				this.$header_title.text(brand.title);
+			}
+			if (this.$header?.length) {
+				this.$header.attr({ "aria-label": brand.title, title: brand.title });
+				this.$header.off("click.staff_pro_logo").on("click.staff_pro_logo", goHome);
+			}
+			return;
+		}
+
+		const $logo =
+			(this.$logo && this.$logo.length && this.$logo) ||
+			this.$dock?.find(".dock-logo, .workspace-dock-logo").first();
+		if (!$logo?.length) return;
+
+		const homePath = staff_pro_desk_home_path();
+		$logo.empty();
+		const $link = $(
+			`<a href="${homePath}" title="${title}" aria-label="${title}">${img}</a>`
+		);
+		$link.on("click", goHome);
+		$logo.append($link);
 	};
 }
 
@@ -1768,7 +1826,11 @@ function refresh_staff_pro_dock_shortcuts() {
 	dock.render_shortcuts();
 	label_workspace_dock();
 	render_staff_pro_dock_integrations();
-	dock.render_logo();
+	try {
+		dock.render_logo?.();
+	} catch (e) {
+		console.warn("Staff Pro dock logo refresh failed", e);
+	}
 	frappe.app?.sidebar?.refresh_dock?.();
 }
 
@@ -1834,9 +1896,11 @@ function apply_dock_icon($item, label) {
 		if (!html || !String(html).includes("svg")) return;
 	}
 
-	let $wrap = $item.children(".workspace-dock-icon, .dock-icon, .sidebar-item-icon").first();
+	let $wrap = $item
+		.children(".workspace-dock-icon, .dock-icon, .dock-item-icon, .sidebar-item-icon")
+		.first();
 	if (!$wrap.length) {
-		$wrap = $('<span class="workspace-dock-icon dock-icon" aria-hidden="true"></span>');
+		$wrap = $('<span class="workspace-dock-icon dock-icon dock-item-icon" aria-hidden="true"></span>');
 		$item.prepend($wrap);
 	}
 	$wrap.html(html);
@@ -1867,13 +1931,13 @@ function label_workspace_dock() {
 
 		apply_dock_icon($item, label);
 
-		let $label = $item.children(".workspace-dock-label, .dock-label");
+		let $label = $item.children(".workspace-dock-label, .dock-label, .dock-item-label");
 		if ($label.length) {
 			if ($label.text() !== label) $label.text(label);
 			return;
 		}
 		$item.append(
-			`<span class="workspace-dock-label dock-label">${frappe.utils.escape_html(String(label))}</span>`
+			`<span class="workspace-dock-label dock-label dock-item-label">${frappe.utils.escape_html(String(label))}</span>`
 		);
 	});
 }
@@ -1907,9 +1971,9 @@ function patch_workspace_dock() {
 		}
 		const $item = origItem.call(this, entry);
 		if ($item && $item.length) {
-			if (label && !$item.children(".workspace-dock-label, .dock-label").length) {
+			if (label && !$item.children(".workspace-dock-label, .dock-label, .dock-item-label").length) {
 				$item.append(
-					`<span class="workspace-dock-label dock-label">${frappe.utils.escape_html(String(label))}</span>`
+					`<span class="workspace-dock-label dock-label dock-item-label">${frappe.utils.escape_html(String(label))}</span>`
 				);
 			}
 			apply_dock_icon($item, label);
@@ -2058,15 +2122,19 @@ function watch_workspace_dock() {
 	}
 
 	const observer = new MutationObserver(() => {
-		patch_workspace_dock();
-		refresh_staff_pro_dock_shortcuts();
-		label_workspace_dock();
-		render_staff_pro_dock_integrations();
-		remove_sidebar_search();
-		enhance_sidebar_menus();
-		style_sidebar_collapse_toggle();
-		disable_app_onboarding();
-		disable_sidebar_help();
+		try {
+			patch_workspace_dock();
+			refresh_staff_pro_dock_shortcuts();
+			label_workspace_dock();
+			render_staff_pro_dock_integrations();
+			remove_sidebar_search();
+			enhance_sidebar_menus();
+			style_sidebar_collapse_toggle();
+			disable_app_onboarding();
+			disable_sidebar_help();
+		} catch (e) {
+			console.warn("Staff Pro sidebar observer failed", e);
+		}
 	});
 	if (dock) observer.observe(dock, { childList: true, subtree: true });
 	if (container) observer.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
