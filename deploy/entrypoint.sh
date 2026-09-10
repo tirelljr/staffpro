@@ -46,8 +46,9 @@ PY
 }
 
 mkdir -p sites/assets logs
+# Persistent sites disk keeps old files. Never use cp -n here or hrms JS stays stale.
 if [ -d "$BENCH/assets" ]; then
-	cp -an "$BENCH/assets/." sites/assets/ || true
+	cp -a "$BENCH/assets/." sites/assets/ || true
 fi
 ls -1 apps > sites/apps.txt
 
