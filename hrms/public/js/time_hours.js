@@ -1,5 +1,24 @@
 frappe.provide("hrms.time");
 
+hrms.time.CLOCK_FORMAT = "h:mm A";
+hrms.time.FRAPPE_TIME_FORMAT = "hh:mm A";
+
+hrms.time.apply_twelve_hour_clock = function () {
+	const fmt = hrms.time.FRAPPE_TIME_FORMAT;
+	if (frappe.sys_defaults) {
+		frappe.sys_defaults.time_format = fmt;
+	}
+	if (frappe.boot?.sysdefaults) {
+		frappe.boot.sysdefaults.time_format = fmt;
+	}
+	if (frappe.datetime) {
+		frappe.datetime.get_user_time_fmt = function () {
+			return fmt;
+		};
+	}
+};
+hrms.time.apply_twelve_hour_clock();
+
 function escape_html(text) {
 	if (text == null) {
 		return "";
@@ -23,12 +42,13 @@ hrms.time.parse_clock = function (value) {
 	if (!value) {
 		return null;
 	}
-	const parsed = moment(value);
-	if (parsed.isValid()) {
-		return parsed;
+	const text = String(value).trim();
+	const as_time = moment(text, ["h:mm A", "hh:mm A", "h:mm a", "hh:mm a", "HH:mm:ss", "HH:mm"], true);
+	if (as_time.isValid()) {
+		return as_time;
 	}
-	const as_time = moment(String(value), ["HH:mm:ss", "HH:mm", "hh:mm a", "hh:mm A"], true);
-	return as_time.isValid() ? as_time : null;
+	const parsed = moment(value);
+	return parsed.isValid() ? parsed : null;
 };
 
 hrms.time.hours_between = function (in_time, out_time) {
@@ -74,8 +94,8 @@ hrms.time.format_clock = function (value) {
 	if (!value) {
 		return "";
 	}
-	const parsed = moment(value);
-	return parsed.isValid() ? parsed.format("hh:mm a") : "";
+	const parsed = hrms.time.parse_clock(value);
+	return parsed ? parsed.format(hrms.time.CLOCK_FORMAT) : "";
 };
 
 hrms.time.format_gps = function (_value, _df, doc) {
@@ -306,7 +326,7 @@ hrms.time.format_hours_comment = function (comment) {
 		return "";
 	}
 	const when = moment(comment.creation);
-	const time = when.isValid() ? when.format("hh:mm A") : "";
+	const time = when.isValid() ? when.format(hrms.time.CLOCK_FORMAT) : "";
 	const date = when.isValid() ? when.format("MM/DD/YYYY") : "";
 	return __("Comment ({0}, {1}, {2}): {3}", [
 		comment.comment_by || __("Admin"),
@@ -326,8 +346,8 @@ hrms.time.format_adjustment_clock = function (value) {
 			return formatted;
 		}
 	}
-	const parsed = moment(String(value), ["HH:mm:ss", "HH:mm", "hh:mm a", "hh:mm A"], true);
-	return parsed.isValid() ? parsed.format("hh:mm a") : String(value);
+	const parsed = moment(String(value), ["HH:mm:ss", "HH:mm", "hh:mm a", "hh:mm A", "h:mm A"], true);
+	return parsed.isValid() ? parsed.format(hrms.time.CLOCK_FORMAT) : String(value);
 };
 
 hrms.time.adjustment_range = function (in_time, out_time) {
@@ -371,6 +391,7 @@ hrms.time.bind_adjustment_actions = function ($root, on_done) {
 	$root.off("click.sp-tca").on("click.sp-tca", ".sp-tca-btn", function (event) {
 		event.preventDefault();
 		event.stopPropagation();
+		const $button = $(this);
 		const name = $(this).data("adjustment");
 		const act = $(this).data("act");
 		if (!name || !act) {
@@ -378,9 +399,11 @@ hrms.time.bind_adjustment_actions = function ($root, on_done) {
 		}
 		const message =
 			act === "approve"
-				? __("Apply this time change like a Day View add or edit?")
+				? __("Approve and apply this time change?")
 				: __("Reject this time change request?");
 		frappe.confirm(message, () => {
+			const $actions = $button.closest(".sp-tca-banner__actions").find(".sp-tca-btn");
+			$actions.prop("disabled", true);
 			frappe.call({
 				method: "hrms.hr.doctype.time_clock_adjustment.time_clock_adjustment.review_time_clock_adjustment",
 				args: { name, action: act },
@@ -389,6 +412,9 @@ hrms.time.bind_adjustment_actions = function ($root, on_done) {
 						on_done();
 					}
 					hrms.time.refresh_hours_views();
+				},
+				error() {
+					$actions.prop("disabled", false);
 				},
 			});
 		});

@@ -17,7 +17,6 @@
   "shift_type",
   "shift_location",
   "status",
-  "overtime_type",
   "column_break_brkq",
   "start_date",
   "end_date",
@@ -135,14 +134,6 @@
    "label": "Shift Schedule Assignment",
    "options": "Shift Schedule Assignment",
    "read_only": 1
-  },
-  {
-   "fetch_from": "shift_type.overtime_type",
-   "fetch_if_empty": 1,
-   "fieldname": "overtime_type",
-   "fieldtype": "Link",
-   "label": "Overtime Type",
-   "options": "Overtime Type"
   }
  ],
  "is_submittable": 1,

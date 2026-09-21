@@ -9,6 +9,9 @@ from hrms.hr.doctype.holiday_work_election.holiday_work_election import (
 	get_company_upcoming_holidays,
 	get_holiday_work_roster,
 )
+from hrms.hr.doctype.holiday_work_deadline.holiday_work_deadline import (
+	set_holiday_work_deadline as save_holiday_work_deadline,
+)
 
 HR_ROLES = ("HR Manager", "HR User", "System Manager", "Administrator")
 
@@ -29,3 +32,16 @@ def get_holiday_work_list(holiday_date: str | None = None, department: str | Non
 	if not holiday_date:
 		frappe.throw(frappe._("Holiday Date is required."))
 	return get_holiday_work_roster(holiday_date, department)
+
+
+@frappe.whitelist()
+def set_holiday_work_deadline(holiday_date: str | None = None, response_deadline: str | None = None) -> dict:
+	_assert_hr()
+	if not holiday_date:
+		frappe.throw(frappe._("Holiday Date is required."))
+	roster = get_holiday_work_roster(holiday_date)
+	return save_holiday_work_deadline(
+		holiday_date,
+		response_deadline,
+		roster.get("description"),
+	)

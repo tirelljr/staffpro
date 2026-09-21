@@ -79,7 +79,7 @@ body.staff-pro-alive #page-Workspaces .layout-main-section {
 	align-items: center;
 	justify-content: center;
 	gap: 16px 32px;
-	margin: 8px 0 40px;
+	margin: 8px 0 16px;
 	padding: 0;
 	width: 100%;
 	max-width: 100%;
@@ -150,6 +150,410 @@ body.staff-pro-alive #page-Workspaces .layout-main-section {
 	flex-direction: column;
 	gap: 16px;
 	margin: 0 0 18px;
+}
+
+/* —— Attendance board —— */
+.sp-attendance-board {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.sp-attendance__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.sp-attendance__title {
+	margin: 0;
+	font-size: 22px;
+	font-weight: 700;
+	letter-spacing: -0.03em;
+	color: var(--sp-ink);
+}
+
+.sp-attendance__kpis {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.sp-attendance__kpi {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-height: 88px;
+	padding: 16px 18px;
+	border: 1px solid var(--sp-card-border);
+	border-radius: 16px;
+	background: #fff;
+	box-shadow: var(--sp-shadow);
+	text-align: left;
+	font: inherit;
+	color: inherit;
+	cursor: pointer;
+}
+
+.sp-attendance__kpi:hover {
+	border-color: #d7dde5;
+	background: #fcfcfd;
+}
+
+.sp-attendance__kpi-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	background: #f4f6f8;
+	color: var(--sp-icon-navy);
+	flex-shrink: 0;
+}
+
+.sp-attendance__kpi-icon svg {
+	width: 18px;
+	height: 18px;
+}
+
+.sp-attendance__kpi-copy {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+}
+
+.sp-attendance__kpi-value-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.sp-attendance__kpi-value {
+	font-size: 22px;
+	font-weight: 700;
+	letter-spacing: -0.04em;
+	line-height: 1;
+	color: var(--sp-ink);
+}
+
+.sp-attendance__kpi-change {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--sp-muted);
+}
+
+.sp-attendance__kpi-change.is-up {
+	color: #16a34a;
+}
+
+.sp-attendance__kpi-change.is-down {
+	color: #ef4444;
+}
+
+.sp-attendance__kpi-change.is-flat {
+	color: var(--sp-soft);
+}
+
+.sp-attendance__kpi-label {
+	font-size: 13px;
+	color: var(--sp-muted);
+}
+
+.sp-attendance__card {
+	padding: 16px 18px 10px;
+	border: 1px solid var(--sp-card-border);
+	border-radius: 16px;
+	background: #fff;
+	box-shadow: var(--sp-shadow);
+}
+
+.sp-attendance__toolbar {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+	margin-bottom: 12px;
+}
+
+.sp-attendance__search {
+	position: relative;
+	display: flex;
+	align-items: center;
+	flex: 1 1 240px;
+	min-width: 220px;
+	height: 38px;
+	padding: 0 34px 0 36px;
+	border: 1px solid var(--sp-card-border);
+	border-radius: 999px;
+	background: #f7f8fa;
+}
+
+.sp-attendance__search-icon {
+	position: absolute;
+	left: 12px;
+	display: inline-flex;
+	color: var(--sp-soft);
+}
+
+.sp-attendance__search-input {
+	width: 100%;
+	border: 0;
+	background: transparent;
+	color: var(--sp-ink);
+	font: inherit;
+	font-size: 13px;
+	outline: none;
+}
+
+.sp-attendance__search-clear {
+	position: absolute;
+	right: 8px;
+	width: 22px;
+	height: 22px;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	color: var(--sp-soft);
+	font-size: 16px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.sp-attendance__filter {
+	position: relative;
+}
+
+.sp-attendance__filter-btn,
+.sp-attendance__date {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	height: 38px;
+	padding: 0 14px;
+	border: 1px solid var(--sp-card-border);
+	border-radius: 999px;
+	background: #fff;
+	color: var(--sp-ink);
+	font: inherit;
+	font-size: 13px;
+	font-weight: 500;
+}
+
+.sp-attendance__filter-btn {
+	cursor: pointer;
+}
+
+.sp-attendance__filter-btn svg,
+.sp-attendance__date-icon svg {
+	width: 14px;
+	height: 14px;
+	color: var(--sp-muted);
+}
+
+.sp-attendance__filter-menu {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 0;
+	z-index: 20;
+	min-width: 160px;
+	padding: 6px;
+	border: 1px solid var(--sp-card-border);
+	border-radius: 12px;
+	background: #fff;
+	box-shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
+}
+
+.sp-attendance__filter-menu[hidden] {
+	display: none;
+}
+
+.sp-attendance__filter-option {
+	display: block;
+	width: 100%;
+	padding: 8px 10px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--sp-ink);
+	font: inherit;
+	font-size: 13px;
+	text-align: left;
+	cursor: pointer;
+}
+
+.sp-attendance__filter-option:hover,
+.sp-attendance__filter-option.is-selected {
+	background: #f4f6f8;
+}
+
+.sp-attendance__toolbar-end {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-left: auto;
+	flex-wrap: wrap;
+}
+
+.sp-attendance__field .sp-dash-select__btn {
+	height: 38px;
+}
+
+.sp-attendance__date {
+	position: relative;
+}
+
+.sp-attendance__table-wrap {
+	overflow-x: auto;
+}
+
+.sp-attendance__table-head,
+.sp-attendance__row {
+	display: grid;
+	grid-template-columns: 72px minmax(180px, 1.4fr) minmax(120px, 1fr) 150px 100px 100px 100px 80px;
+	gap: 12px;
+	align-items: center;
+	width: 100%;
+	min-width: 950px;
+}
+
+.sp-attendance__table-head {
+	padding: 10px 8px;
+	color: var(--sp-soft);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.sp-attendance__row {
+	padding: 12px 8px;
+	border: 0;
+	border-top: 1px solid #eef1f4;
+	background: transparent;
+	font: inherit;
+	font-size: 13px;
+	color: var(--sp-ink);
+	text-align: left;
+	cursor: pointer;
+}
+
+.sp-attendance__row:hover {
+	background: #fafbfc;
+}
+
+.sp-attendance__list.is-loading {
+	opacity: 0.55;
+}
+
+.sp-attendance__agent {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+
+.sp-attendance__avatar {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	overflow: hidden;
+	background: #eef2f6;
+	flex-shrink: 0;
+}
+
+.sp-attendance__avatar .sp-celebrations__avatar-img,
+.sp-attendance__avatar .sp-celebrations__avatar-fallback {
+	width: 100%;
+	height: 100%;
+	font-size: 11px;
+}
+
+.sp-attendance__name,
+.sp-attendance__role {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.sp-attendance__hours {
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.sp-attendance__status-pill {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 22px;
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	white-space: nowrap;
+}
+
+.sp-attendance__status-pill.is-present {
+	background: #e8f8ef;
+	color: #16a34a;
+}
+
+.sp-attendance__status-pill.is-absent {
+	background: #fdecec;
+	color: #ef4444;
+}
+
+.sp-attendance__status-pill.is-late {
+	background: #f8f1d8;
+	color: #ca8a04;
+}
+
+.sp-attendance__empty {
+	padding: 28px 8px;
+	text-align: center;
+}
+
+.sp-attendance__empty p {
+	margin: 0;
+	font-size: 13px;
+	color: var(--sp-muted);
+}
+
+.sp-attendance__pager {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 12px 4px 6px;
+}
+
+.sp-attendance__pager-label {
+	font-size: 13px;
+	color: var(--sp-muted);
+}
+
+.sp-attendance__pager-btn {
+	height: 32px;
+	padding: 0 12px;
+	border: 1px solid var(--sp-card-border);
+	border-radius: 8px;
+	background: #fff;
+	color: var(--sp-ink);
+	font: inherit;
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.sp-attendance__pager-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
 }
 
 .sp-dash-split {
@@ -708,14 +1112,17 @@ body.staff-pro-alive #page-Workspaces .layout-main-section {
 .sp-payroll__row {
 	display: grid;
 	grid-template-columns:
-		minmax(0, 1.4fr)
-		minmax(0, 0.95fr)
-		minmax(0, 1.05fr)
-		minmax(0, 0.75fr);
+		minmax(0, 2.1fr)
+		minmax(0, 1.3fr)
+		minmax(0, 1.5fr)
+		minmax(92px, 0.9fr);
+	justify-content: stretch;
+	justify-items: start;
 	align-items: center;
-	column-gap: 8px;
+	column-gap: 16px;
 	width: 100%;
 	min-width: 0;
+	box-sizing: border-box;
 }
 
 .sp-payroll__table-head {
@@ -726,6 +1133,14 @@ body.staff-pro-alive #page-Workspaces .layout-main-section {
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 	color: var(--sp-soft);
+}
+
+.sp-payroll__table-head > span,
+.sp-payroll__row > .sp-payroll__agent,
+.sp-payroll__row > .sp-payroll__hours,
+.sp-payroll__row > .sp-payroll__date,
+.sp-payroll__row > .sp-payroll__status {
+	min-width: 0;
 }
 
 .sp-payroll__list {
@@ -739,14 +1154,24 @@ body.staff-pro-alive #page-Workspaces .layout-main-section {
 }
 
 .sp-payroll__row {
+	appearance: none;
 	width: 100%;
+	margin: 0;
 	padding: 12px 4px;
 	border: 0;
 	border-bottom: 1px solid #eef1f4;
 	background: transparent;
+	font: inherit;
+	line-height: inherit;
+	color: inherit;
 	text-align: left;
 	cursor: pointer;
 	transition: background 0.15s ease;
+}
+
+.sp-payroll__row:focus-visible {
+	outline: 2px solid var(--sp-teal);
+	outline-offset: 2px;
 }
 
 .sp-payroll__row:last-child {
@@ -874,11 +1299,23 @@ body.staff-pro-alive #page-Workspaces .layout-main-section {
 	font-variant-numeric: tabular-nums;
 }
 
+.sp-payroll__table-head .sp-payroll__agent,
+.sp-payroll__table-head .sp-payroll__hours,
+.sp-payroll__table-head .sp-payroll__date,
+.sp-payroll__table-head .sp-payroll__status,
 .sp-payroll__table-head .sp-payroll__gross,
 .sp-payroll__table-head .sp-payroll__ss {
+	display: block;
+	padding: 0;
+	background: transparent;
 	font-size: inherit;
 	font-weight: inherit;
+	letter-spacing: inherit;
+	text-transform: inherit;
 	color: inherit;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .sp-payroll__empty {
@@ -1022,7 +1459,7 @@ body.staff-pro-alive #page-Workspaces .layout-main-section {
 .sp-inout-dash__table-head,
 .sp-inout-dash__row {
 	display: grid;
-	grid-template-columns: minmax(140px, 1.6fr) minmax(88px, 0.9fr) 0.7fr minmax(90px, 1fr) 0.8fr;
+	grid-template-columns: minmax(140px, 1.6fr) minmax(88px, 0.9fr) minmax(88px, 0.8fr) minmax(88px, 0.8fr) minmax(90px, 1fr) 0.8fr;
 	align-items: center;
 	gap: 12px;
 }
@@ -2373,6 +2810,16 @@ body.staff-pro-alive #page-dashboard-view.sp-dash--hours .sp-empty-chart {
 	display: none !important;
 }
 
+/* Payroll dashboard: custom board replaces stock cards and charts */
+body.staff-pro-alive #page-dashboard-view.sp-dash--payroll .dashboard-graph {
+	display: none !important;
+}
+
+body.staff-pro-alive #page-dashboard-view.sp-dash--payroll .layout-main-section,
+body.staff-pro-alive #page-dashboard-view.sp-dash--payroll .dashboard {
+	overflow: visible;
+}
+
 /* —— Hours list on Attendance dashboard —— */
 .sp-dash-hours {
 	margin: 16px 0 0;
@@ -2841,6 +3288,39 @@ body.staff-pro-alive #page-dashboard-view .dashboard-graph:has(.sp-dash-hours) {
 	.sp-dash-pills {
 		gap: 12px 20px;
 		margin-bottom: 28px;
+	}
+
+	.sp-attendance__kpis {
+		grid-template-columns: 1fr 1fr;
+	}
+
+	.sp-paydash__kpis,
+	.sp-paydash__charts {
+		grid-template-columns: 1fr;
+	}
+
+	.sp-paydash__table-head {
+		display: none;
+	}
+
+	.sp-paydash__row {
+		grid-template-columns: 1fr 1fr;
+		min-width: 0;
+	}
+
+	.sp-attendance__toolbar-end {
+		margin-left: 0;
+		width: 100%;
+	}
+
+	.sp-attendance__table-head {
+		display: none;
+	}
+
+	.sp-attendance__row {
+		grid-template-columns: 1fr 1fr;
+		min-width: 0;
+		gap: 8px 12px;
 	}
 
 	.sp-payroll__table-head {

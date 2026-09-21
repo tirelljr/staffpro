@@ -220,6 +220,17 @@ body.staff-pro-has-topbar .dock {
 	margin: 8px auto;
 }
 
+/* Dock expand toggle — pin to top of the rail (Frappe defaults to bottom). */
+.workspace-dock .expand-sidebar-link,
+.workspace-dock .expand-sidebar-link.dock-toggle-btn,
+.dock .expand-sidebar-link,
+.dock .expand-sidebar-link.dock-toggle-btn {
+	order: -10;
+	flex: 0 0 auto;
+	align-self: center;
+	margin: 0 0 8px !important;
+}
+
 /* Pin workspace submenus next to the dock. Frappe's expanded sidebar is an
    absolute overlay over a 100vh placeholder; keeping the panel in-flow inside
    a column flex stacked that placeholder above the menu. */
@@ -237,6 +248,7 @@ body.staff-pro-has-topbar .dock {
 	min-height: 100dvh !important;
 	max-height: none !important;
 	overflow: hidden;
+	background: transparent;
 }
 
 body.staff-pro-has-topbar .body-sidebar-container {
@@ -569,7 +581,8 @@ body.staff-pro-has-topbar .body-sidebar-container {
 .body-sidebar .collapse-sidebar-link.sidebar-toggle-btn {
 	position: absolute;
 	top: 12px;
-	right: 6px;
+	left: auto;
+	right: 8px;
 	z-index: 3;
 	display: inline-flex !important;
 	align-items: center;
@@ -754,7 +767,7 @@ body.staff-pro-has-topbar .body-sidebar-container {
 	}
 
 	.body-sidebar .collapse-sidebar-link {
-		pointer-events: auto !important;
+		display: none !important;
 	}
 }
 

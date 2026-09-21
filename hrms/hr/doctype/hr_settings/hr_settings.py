@@ -37,6 +37,8 @@ class HRSettings(Document):
 		leave_approval_notification_template: DF.Link | None
 		leave_approver_mandatory_in_leave_application: DF.Check
 		leave_status_notification_template: DF.Link | None
+		overtime_pay_multiplier: DF.Float
+		overtime_threshold_hours: DF.Float
 		prevent_self_expense_approval: DF.Check
 		prevent_self_leave_approval: DF.Check
 		remind_before: DF.Time | None
@@ -57,6 +59,11 @@ class HRSettings(Document):
 	# end: auto-generated types
 
 	def validate(self):
+		if not self.overtime_threshold_hours:
+			self.overtime_threshold_hours = 80
+		if not self.overtime_pay_multiplier:
+			self.overtime_pay_multiplier = 1.5
+
 		self.set_naming_series()
 
 		# Based on proceed flag

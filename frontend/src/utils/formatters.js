@@ -32,8 +32,10 @@ export const formatCurrency = (value, currency) => {
 	)
 }
 
+export const CLOCK_FORMAT = "h:mm A"
+
 export const formatTimestamp = (timestamp) => {
-	const formattedTime = dayjs(timestamp).format("hh:mm a")
+	const formattedTime = dayjs(timestamp).format(CLOCK_FORMAT)
 
 	if (dayjs(timestamp).isToday()) return formattedTime
 	else if (dayjs(timestamp).isYesterday()) return `${formattedTime} yesterday`
@@ -58,14 +60,19 @@ export const formatHours = (value, keepZero = false) => {
 
 export const formatClock = (value) => {
 	if (!value) return ""
-	const parsed = dayjs(value)
-	return parsed.isValid() ? parsed.format("hh:mm a") : ""
+	const raw = String(value).trim()
+	const asDate = dayjs(raw)
+	if (asDate.isValid() && (raw.includes("-") || raw.includes("T"))) {
+		return asDate.format(CLOCK_FORMAT)
+	}
+	const asTime = dayjs(`2000-01-01 ${raw}`)
+	return asTime.isValid() ? asTime.format(CLOCK_FORMAT) : ""
 }
 
 export const formatHoursNote = (comment) => {
 	if (!comment) return ""
 	const when = dayjs(comment.creation)
-	const time = when.isValid() ? when.format("hh:mm A") : ""
+	const time = when.isValid() ? when.format(CLOCK_FORMAT) : ""
 	const date = when.isValid() ? when.format("MM/DD/YYYY") : ""
 	const author = comment.comment_by || "Admin"
 	const text = comment.content || ""

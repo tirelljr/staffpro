@@ -112,6 +112,8 @@ def _import_fixture_doc(doctype: str, fixture_path: str, rows_field: str):
 
 
 def _sync_workspace(name: str, fixture_path: str):
+	if not frappe.get_meta("Workspace").has_field("sidebar_items"):
+		return
 	if not frappe.db.exists("Workspace", name):
 		_import_fixture_doc("Workspace", fixture_path, "sidebar_items")
 		return

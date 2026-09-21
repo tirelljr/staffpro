@@ -144,3 +144,14 @@ hrms.patches.v16_0.add_holiday_work_list_page #2026-09-09-holiday-work-list
 hrms.patches.v16_0.ensure_staff_pro_first_admins #2026-09-09-first-admins
 hrms.patches.v16_0.add_time_clock_adjustment_page #2026-09-09-time-clock-adjustment
 hrms.patches.v16_0.hide_unused_erpnext_roles_and_modules #2026-09-09-bpo-user-roles
+hrms.patches.v16_0.remove_hours_worked_chart #2026-09-20-hours-worked-chart
+hrms.patches.v16_0.simplify_overtime_thresholds #2026-09-20-overtime-thresholds
+hrms.patches.v16_0.set_hr_settings_overtime_defaults #2026-09-20-hr-settings-ot-defaults
+hrms.patches.v16_0.rename_time_clock_adjustment_page #2026-09-20-time-clock-adjustments
+hrms.patches.v16_0.payroll_dashboard_board #2026-09-20-payroll-dashboard-board
+hrms.patches.v16_0.set_belize_timezone_and_ask_ai_settings #2026-09-21-lock-belize-tz
+hrms.patches.v16_0.reorder_ask_ai_tab_before_email #2026-09-20-ask-ai-tab-order
+hrms.patches.v16_0.add_ask_ai_write_capabilities #2026-09-20-ask-ai-write-ops
+hrms.patches.v16_0.scope_ask_ai_history_to_user #2026-09-20-ask-ai-user-history
+hrms.patches.v16_0.seed_overtime_and_holiday_demo #2026-09-20-ot-holiday-demo
+hrms.patches.v16_0.sanitize_employee_list_fields #2026-09-20-employee-list-fields

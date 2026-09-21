@@ -2247,7 +2247,9 @@ def _link_row_is_field(row, fieldname: str) -> bool:
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def payroll_client_query(doctype, txt, searchfield, start, page_len, filters):
+def payroll_client_query(
+	doctype: str, txt: str, searchfield: str, start: int, page_len: int, filters: dict
+):
 	"""Optional client filter. Leave blank to include every agent."""
 	start = cint(start)
 	page_len = cint(page_len)
@@ -2452,6 +2454,7 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 	slips = _get_excel_salary_slips(entry)
 	working_by_employee = _working_hours_by_employee(entry)
 	overtime_by_employee = _overtime_hours_by_employee(entry)
+	ordinary_overtime_by_employee = _ordinary_overtime_hours_by_employee(entry)
 	holiday_hours_by_employee = _holiday_hours_by_employee(entry)
 	holiday_pay_by_employee = _holiday_pay_by_employee(entry)
 	bonus_by_slip = _bonus_by_salary_slip([row.name for row in slips])
@@ -2488,6 +2491,9 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 			bonus,
 			employee=slip.employee,
 			holiday_hours=holiday_hours,
+			payable_regular_hours=regular_hours
+			+ max(overtime_hours - flt(ordinary_overtime_by_employee.get(slip.employee)), 0),
+			payable_overtime_hours=ordinary_overtime_by_employee.get(slip.employee),
 		)
 		ee_period, er_period = _slip_social_amounts(slip)
 		ee_ytd, er_ytd = ytd_social_by_employee.get(slip.employee) or (ee_period, er_period)
@@ -2540,6 +2546,9 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 			0,
 			employee=emp.employee,
 			holiday_hours=holiday_hours,
+			payable_regular_hours=regular_hours
+			+ max(overtime_hours - flt(ordinary_overtime_by_employee.get(emp.employee)), 0),
+			payable_overtime_hours=ordinary_overtime_by_employee.get(emp.employee),
 		)
 		rows.append(
 			{
@@ -3046,6 +3055,8 @@ def _excel_gross_pay(
 	bonus,
 	employee: str | None = None,
 	holiday_hours: float = 0,
+	payable_regular_hours: float | None = None,
+	payable_overtime_hours: float | None = None,
 ) -> float:
 	from hrms.payroll.hourly_gross import (
 		compute_hourly_gross_pay,
@@ -3068,8 +3079,12 @@ def _excel_gross_pay(
 		# Holiday hours are already in regular hours; only add holiday premium / unworked statutory pay.
 		holiday_extra = flt(holiday_pay) - flt(holiday_hours) * flt(hourly_rate)
 		return compute_hourly_gross_pay(
-			regular_hours=regular_hours,
-			overtime_hours=overtime_hours,
+			regular_hours=(
+				regular_hours if payable_regular_hours is None else payable_regular_hours
+			),
+			overtime_hours=(
+				overtime_hours if payable_overtime_hours is None else payable_overtime_hours
+			),
 			hourly_rate=hourly_rate,
 			holiday_pay=max(holiday_extra, 0),
 			bonus=bonus,
@@ -3090,70 +3105,69 @@ def _holiday_hours_by_employee(entry) -> dict[str, float]:
 	from hrms.payroll.daily_pay import ensure_working_hours_from_times, get_public_holiday_pay_context
 
 	hours: dict[str, float] = {}
-	fields = ["employee", "attendance_date", "working_hours", "status"]
+	fields = ["employee", "attendance_date", "working_hours", "status", "daily_pay"]
 	if frappe.db.has_column("Attendance", "in_time"):
 		fields += ["in_time", "out_time"]
 	for row in _period_attendance(entry, fields, include_draft=True):
-		if (row.get("status") or "") == "Absent":
-			continue
 		if not get_public_holiday_pay_context(row.employee, row.attendance_date):
 			continue
 		worked = flt(row.working_hours) or flt(ensure_working_hours_from_times(row))
+		if worked <= 0 and flt(row.get("daily_pay")) > 0:
+			worked = 8.0
 		hours[row.employee] = hours.get(row.employee, 0) + worked
 	return hours
 
 
 def _working_hours_by_employee(entry) -> dict[str, float]:
 	"""Attendance hours per agent for the pay period (draft or submitted)."""
-	from hrms.payroll.daily_pay import ensure_working_hours_from_times
+	from hrms.payroll.daily_pay import ensure_working_hours_from_times, get_public_holiday_pay_context
 
 	hours: dict[str, float] = {}
-	fields = ["employee", "working_hours", "status"]
+	fields = ["employee", "attendance_date", "working_hours", "status", "daily_pay"]
 	if frappe.db.has_column("Attendance", "in_time"):
 		fields += ["in_time", "out_time"]
 	for row in _period_attendance(entry, fields, include_draft=True):
-		if (row.get("status") or "") == "Absent":
+		is_holiday = bool(get_public_holiday_pay_context(row.employee, row.attendance_date))
+		if (row.get("status") or "") == "Absent" and not is_holiday:
 			continue
 		worked = flt(row.working_hours) or flt(ensure_working_hours_from_times(row))
+		if is_holiday and worked <= 0 and flt(row.get("daily_pay")) > 0:
+			worked = 8.0
 		hours[row.employee] = hours.get(row.employee, 0) + worked
 	return hours
 
 
 def _overtime_hours_by_employee(entry) -> dict[str, float]:
-	"""Overtime hours per agent, preferring Overtime Slip detail rows over attendance."""
-	hours: dict[str, float] = {}
-	slips = frappe.get_all(
-		"Overtime Slip",
-		filters={"payroll_entry": entry.name, "docstatus": ("<", 2)},
-		fields=["name", "employee", "total_overtime_duration"],
-	)
+	"""Total threshold overtime per agent, including holiday hours above the threshold."""
+	return _threshold_overtime_hours_by_employee(entry, "total_overtime_duration")
 
-	if slips:
-		employee_by_slip = {row.name: row.employee for row in slips}
-		details = frappe.get_all(
-			"Overtime Details",
-			filters={"parent": ("in", list(employee_by_slip))},
-			fields=["parent", "overtime_duration"],
+
+def _ordinary_overtime_hours_by_employee(entry) -> dict[str, float]:
+	"""Ordinary OT eligible for the global OT multiplier (holiday premium is separate)."""
+	return _threshold_overtime_hours_by_employee(entry, "ordinary_overtime_duration")
+
+
+def _threshold_overtime_hours_by_employee(entry, result_field: str) -> dict[str, float]:
+	from hrms.hr.doctype.overtime_slip.overtime_slip import get_pay_period_overtime
+
+	employees = {row.employee for row in (entry.employees or []) if row.employee}
+	if not employees:
+		employees = set(
+			frappe.get_all(
+				"Attendance",
+				filters={
+					"attendance_date": ("between", [entry.start_date, entry.end_date]),
+					"docstatus": ("<", 2),
+				},
+				pluck="employee",
+			)
 		)
-		if details:
-			for detail in details:
-				employee = employee_by_slip.get(detail.parent)
-				if employee:
-					hours[employee] = hours.get(employee, 0) + flt(detail.overtime_duration)
-			return hours
-
-		for slip in slips:
-			hours[slip.employee] = hours.get(slip.employee, 0) + flt(slip.total_overtime_duration)
-		return hours
-
-	ot_field = (
-		["employee", "actual_overtime_duration"]
-		if frappe.db.has_column("Attendance", "actual_overtime_duration")
-		else ["employee"]
-	)
-	for row in _period_attendance(entry, ot_field, include_draft=True):
-		hours[row.employee] = hours.get(row.employee, 0) + flt(row.get("actual_overtime_duration"))
-	return hours
+	return {
+		employee: flt(
+			get_pay_period_overtime(employee, entry.start_date, entry.end_date)[result_field]
+		)
+		for employee in employees
+	}
 
 
 def _holiday_pay_by_employee(entry) -> dict[str, float]:

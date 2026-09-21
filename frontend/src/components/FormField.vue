@@ -139,7 +139,7 @@
 			v-else-if="props.fieldtype === 'Datetime'"
 			:value="modelValue"
 			:placeholder="`Select ${props.label}`"
-			:formatter="(val) => dayjs(val).format('DD-MM-YYYY HH:mm:ss')"
+			:formatter="(val) => dayjs(val).format('DD-MM-YYYY h:mm A')"
 			@update:modelValue="(v) => emit('update:modelValue', v)"
 			v-bind="$attrs"
 			:disabled="isReadOnly"

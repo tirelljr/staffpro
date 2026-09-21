@@ -10,6 +10,7 @@ from frappe.custom.doctype.property_setter.property_setter import make_property_
 
 EMPLOYEE_FIELD_LABELS = {
 	"ctc": "Agent Hourly",
+	"overtime_threshold_hours": "OT Threshold (Hours)",
 	"pan_number": "Tax Number",
 	"designation": "Role",
 	"grade": "Campaign",

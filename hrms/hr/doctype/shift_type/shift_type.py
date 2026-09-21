@@ -45,7 +45,6 @@ class ShiftType(Document):
 		from frappe.types import DF
 
 		allow_check_out_after_shift_end_time: DF.Int
-		allow_overtime: DF.Check
 		auto_update_last_sync: DF.Check
 		begin_check_in_before_shift_start_time: DF.Int
 		color: DF.Literal[
@@ -64,7 +63,6 @@ class ShiftType(Document):
 		last_sync_of_checkin: DF.Datetime | None
 		late_entry_grace_period: DF.Int
 		mark_auto_attendance_on_holidays: DF.Check
-		overtime_type: DF.Link | None
 		process_attendance_after: DF.Date | None
 		start_time: DF.Time
 		working_hours_calculation_based_on: DF.Literal[
@@ -190,7 +188,6 @@ class ShiftType(Document):
 				working_hours_threshold_for_half_day = flt(self.working_hours_threshold_for_half_day) / 2
 				working_hours_threshold_for_absent = flt(self.working_hours_threshold_for_absent) / 2
 
-			overtime_type = single_shift_logs[0].get("overtime_type")
 			(
 				attendance_status,
 				working_hours,
@@ -212,7 +209,6 @@ class ShiftType(Document):
 				in_time,
 				out_time,
 				self.name,
-				overtime_type,
 			)
 
 		# commit after processing checkin logs to avoid losing progress
@@ -250,7 +246,6 @@ class ShiftType(Document):
 				"shift_actual_start",
 				"shift_actual_end",
 				"device_id",
-				"overtime_type",
 			],
 			filters={
 				"skip_auto_attendance": 0,

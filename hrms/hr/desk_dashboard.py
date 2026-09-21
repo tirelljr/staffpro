@@ -336,6 +336,75 @@ def get_upcoming_payroll(period: str = "monthly", company: str | None = None) ->
 	}
 
 
+PAYROLL_BOARD_MONTHS = 6
+PAYROLL_DEPT_LIMIT = 6
+BONUS_EARNING_CATEGORIES = {"Bonus", "Incentive"}
+OVERTIME_EARNING_CATEGORIES = {"Overtime"}
+
+
+@frappe.whitelist()
+def get_payroll_board(
+	from_date: str | None = None,
+	to_date: str | None = None,
+	company: str | None = None,
+	department: str | None = None,
+	months: int | str | None = None,
+) -> dict:
+	"""Salary, overtime, and department totals for the Payroll dashboard."""
+	company = company or frappe.defaults.get_user_default("Company")
+	department = department or None
+	currency = frappe.db.get_value("Company", company, "default_currency") if company else None
+	periods = _payroll_board_periods(company) if company else []
+	start_date, end_date = _payroll_board_dates(from_date, to_date, company, periods)
+	prev_start, prev_end = _previous_pay_period(start_date, company, periods)
+	trend_periods = _trend_pay_periods(periods, start_date, end_date, months)
+
+	if not company:
+		return _empty_payroll_board(start_date, end_date, currency, periods)
+
+	fetch_start = start_date
+	if trend_periods:
+		fetch_start = min(fetch_start, getdate(trend_periods[0]["from_date"]))
+	fetch_start = min(fetch_start, prev_start)
+	slips = _fetch_board_slips(company, fetch_start, end_date, department)
+	splits = _earning_splits_for_slips([slip.name for slip in slips])
+	attendance_index = _attendance_pay_dates(company, fetch_start, end_date)
+	bonus_index = _additional_salary_bonus_index(company, fetch_start, end_date)
+	rows = [
+		_build_payroll_board_row(
+			slip,
+			splits.get(slip.name) or {},
+			currency,
+			attendance_pay=_pay_in_range(attendance_index, slip.employee, slip.start_date, slip.end_date),
+			extra_bonus=_bonus_in_range(bonus_index, slip.employee, slip.start_date, slip.end_date),
+		)
+		for slip in slips
+	]
+
+	current_rows = [row for row in rows if _row_overlaps_range(row, start_date, end_date)]
+	previous_rows = [row for row in rows if _row_overlaps_range(row, prev_start, prev_end)]
+	employees = _get_active_employees(company)
+	if department:
+		employees = [emp for emp in employees if emp.department == department]
+
+	kpis = _payroll_board_kpis(current_rows, previous_rows, len(employees), currency)
+	trend = _payroll_board_trend(rows, trend_periods, currency)
+	departments = _payroll_board_departments(current_rows, currency, previous_rows)
+	return {
+		"from_date": str(start_date),
+		"to_date": str(end_date),
+		"period_label": _payroll_board_period_label(start_date, end_date),
+		"change_label": _("from last period"),
+		"currency": currency,
+		"kpis": kpis,
+		"trend": trend,
+		"departments": departments,
+		"rows": current_rows,
+		"periods": periods,
+		"filter_departments": _payroll_board_filter_departments(employees, current_rows),
+	}
+
+
 @frappe.whitelist()
 def get_upcoming_absences(period: str = "monthly", company: str | None = None) -> dict:
 	"""Return upcoming leave applications for the HR dashboard panel."""
@@ -350,6 +419,249 @@ def get_upcoming_absences(period: str = "monthly", company: str | None = None) -
 		"period_label": _payroll_period_label(start_date, end_date),
 		"start_date": start_date,
 		"end_date": end_date,
+	}
+
+
+ATTENDANCE_PRESENT_STATUSES = {"Present", "Half Day", "Work From Home"}
+
+
+@frappe.whitelist()
+def get_attendance_board(attendance_date: str | None = None, department: str | None = None) -> dict:
+	"""Daily attendance roster for the People dashboard. Always the present day."""
+	from hrms.hr.page.in_out_today.in_out_today import get_in_out_today
+
+	day = getdate()
+	department = department or None
+	current = get_in_out_today(department=department, attendance_date=str(day))
+	previous = get_in_out_today(department=department, attendance_date=str(add_days(day, -1)))
+	rows = _attendance_board_rows(current.get("details") or [], day)
+	prev_rows = _attendance_board_rows(previous.get("details") or [], add_days(day, -1))
+	paid_leave = _paid_leave_request_count([row["employee"] for row in rows], day)
+	prev_paid_leave = _paid_leave_request_count([row["employee"] for row in prev_rows], add_days(day, -1))
+	return {
+		"date": str(day),
+		"date_label": day.strftime("%d %b, %Y").lstrip("0").replace(" 0", " "),
+		"departments": current.get("departments") or [],
+		"kpis": _attendance_board_kpis(rows, paid_leave, prev_rows, prev_paid_leave),
+		"rows": rows,
+	}
+
+
+def _attendance_board_status(row: dict) -> str:
+	clocked_in = bool(
+		row.get("in_time")
+		or row.get("status") == "IN"
+		or (row.get("attendance_status") or "") in ATTENDANCE_PRESENT_STATUSES
+	)
+	if clocked_in and row.get("late"):
+		return "late"
+	if clocked_in:
+		return "present"
+	return "absent"
+
+
+def _format_overtime_label(hours) -> str:
+	value = flt(hours)
+	if value <= 0:
+		return "0h"
+	if abs(value - round(value)) < 0.05:
+		return f"{int(round(value))}h"
+	return f"{flt(value, 1)}h"
+
+
+def _attendance_board_rows(details: list[dict], day) -> list[dict]:
+	if not details:
+		return []
+
+	employee_ids = [row["employee"] for row in details if row.get("employee")]
+	extra = _employee_board_fields(employee_ids)
+	day_stats = _day_checkin_stats_by_employee(employee_ids, day)
+	date_label = getdate(day).strftime("%d/%m")
+	rows = []
+	for detail in details:
+		employee = detail.get("employee")
+		info = extra.get(employee) or {}
+		stats = day_stats.get(employee) or {}
+		worked = flt(stats.get("hours"))
+		ot_hours = _daily_overtime_hours(worked)
+		status = _attendance_board_status(detail)
+		rows.append(
+			{
+				"employee": employee,
+				"employee_name": detail.get("employee_name") or employee,
+				"image": detail.get("image") or "",
+				"designation": info.get("designation") or "",
+				"department": detail.get("department") or "",
+				"hours_worked": worked,
+				"hours_worked_label": _format_overtime_label(worked),
+				"status": status,
+				"status_label": _(status.upper()),
+				"date": str(getdate(day)),
+				"date_label": date_label,
+				"in_time": _format_board_clock(stats.get("first_in")) or detail.get("in_time") or "",
+				"out_time": _format_board_clock(stats.get("last_out")) or detail.get("out_time") or "",
+				"overtime_hours": ot_hours,
+				"overtime_label": _format_overtime_label(ot_hours),
+				"attendance": detail.get("attendance") or "",
+			}
+		)
+	return rows
+
+
+def _employee_board_fields(employee_ids: list[str]) -> dict:
+	if not employee_ids:
+		return {}
+	rows = frappe.get_all("Employee", filters={"name": ["in", employee_ids]}, fields=["name", "designation"])
+	return {row.name: row for row in rows}
+
+
+def _format_board_clock(value) -> str:
+	if not value:
+		return ""
+	text = str(value).strip()
+	if text and any(token in text.upper() for token in ("AM", "PM")) and ":" in text:
+		return text
+	from hrms.hr.clock_format import format_clock
+
+	return format_clock(value)
+
+
+def _hours_worked_today_by_employee(employee_ids: list[str], day) -> dict[str, float]:
+	"""Total hours worked on the given day, including an open clock-in through now."""
+	return {
+		employee: flt(stats.get("hours"))
+		for employee, stats in _day_checkin_stats_by_employee(employee_ids, day).items()
+	}
+
+
+def _day_checkin_stats_by_employee(employee_ids: list[str], day) -> dict[str, dict]:
+	"""Hours plus first IN and last recorded OUT for the calendar day."""
+	if not employee_ids:
+		return {}
+
+	from hrms.payroll.daily_pay import _as_datetime, _hours_between, _log_time, _log_type, pair_checkin_logs
+
+	day = getdate(day)
+	attendance_fields = ["employee", "in_time", "out_time"]
+	if frappe.db.has_column("Attendance", "working_hours"):
+		attendance_fields.append("working_hours")
+	attendance_by_employee = {
+		row.employee: row
+		for row in frappe.get_all(
+			"Attendance",
+			filters={
+				"employee": ["in", employee_ids],
+				"attendance_date": day,
+				"docstatus": ["<", 2],
+			},
+			fields=attendance_fields,
+		)
+	}
+
+	start = get_datetime(day)
+	end = get_datetime(add_days(day, 1))
+	punches_by_employee: dict[str, list] = {}
+	for punch in frappe.get_all(
+		"Employee Checkin",
+		fields=["name", "employee", "log_type", "time"],
+		filters=[
+			["employee", "in", employee_ids],
+			["time", ">=", start],
+			["time", "<", end],
+		],
+		order_by="time asc",
+	):
+		punches_by_employee.setdefault(punch.employee, []).append(punch)
+
+	now = now_datetime()
+	if getdate(now) == day:
+		as_of = now
+	elif getdate(now) < day:
+		as_of = start
+	else:
+		as_of = end
+
+	out = {}
+	for employee in employee_ids:
+		logs = punches_by_employee.get(employee) or []
+		result = pair_checkin_logs(logs)
+		live = flt(result.get("working_hours"))
+		open_pairs = [pair for pair in result.get("pairs") or [] if pair.get("open") and pair.get("in_time")]
+		if open_pairs:
+			for pair in open_pairs:
+				live = flt(live + _hours_between(pair["in_time"], as_of), 2)
+			hours = live
+		else:
+			stored = flt((attendance_by_employee.get(employee) or {}).get("working_hours"))
+			hours = stored if stored else live
+
+		first_in = _as_datetime(result.get("in_time"))
+		out_times = [
+			_as_datetime(_log_time(log))
+			for log in logs
+			if _log_type(log) == "OUT" and _log_time(log)
+		]
+		out_times = [when for when in out_times if when]
+		last_out = max(out_times) if out_times else None
+
+		attendance = attendance_by_employee.get(employee)
+		if not first_in and attendance and attendance.in_time:
+			first_in = _as_datetime(attendance.in_time)
+		if not last_out and attendance and attendance.out_time:
+			last_out = _as_datetime(attendance.out_time)
+
+		out[employee] = {"hours": hours, "first_in": first_in, "last_out": last_out}
+	return out
+
+
+def _daily_overtime_hours(worked) -> float:
+	"""Hours past 8 on the day. Pay still folds these into regular time under the monthly threshold."""
+	from hrms.hr.doctype.overtime_slip.overtime_slip import REGULAR_DAY_HOURS
+
+	return flt(max(flt(worked) - REGULAR_DAY_HOURS, 0.0), 2)
+
+
+def _attendance_overtime_by_employee(employee_ids: list[str], day) -> dict[str, float]:
+	if not employee_ids:
+		return {}
+	stats = _day_checkin_stats_by_employee(employee_ids, day)
+	return {
+		employee: _daily_overtime_hours((stats.get(employee) or {}).get("hours"))
+		for employee in employee_ids
+	}
+
+
+def _paid_leave_request_count(employee_ids: list[str], day) -> int:
+	if not employee_ids:
+		return 0
+	return len(
+		frappe.get_all(
+			"Leave Application",
+			filters=[
+				["employee", "in", employee_ids],
+				["from_date", "<=", day],
+				["to_date", ">=", day],
+				["docstatus", "<", 2],
+				["status", "in", ["Open", "Approved"]],
+			],
+			pluck="name",
+		)
+	)
+
+
+def _attendance_board_kpis(rows, paid_leave, prev_rows, prev_paid_leave) -> dict:
+	def counts(items):
+		present = sum(1 for row in items if row["status"] in {"present", "late"})
+		absent = sum(1 for row in items if row["status"] == "absent")
+		return len(items), present, absent
+
+	total, present, absent = counts(rows)
+	prev_total, prev_present, prev_absent = counts(prev_rows)
+	return {
+		"total": {"value": total, "change": _percent_change(total, prev_total)},
+		"present": {"value": present, "change": _percent_change(present, prev_present)},
+		"absent": {"value": absent, "change": _percent_change(absent, prev_absent)},
+		"paid_leave": {"value": cint(paid_leave), "change": _percent_change(paid_leave, prev_paid_leave)},
 	}
 
 
@@ -396,12 +708,30 @@ def _absence_status_label(status: str | None) -> str:
 	return status or _("—")
 
 
+def _day_ordinal(day: int) -> str:
+	if 10 <= day % 100 <= 20:
+		suffix = "th"
+	else:
+		suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+	return f"{day}{suffix}"
+
+
 def _absence_date_label(from_date, to_date) -> str:
+	from_date = getdate(from_date) if from_date else None
 	if not from_date:
 		return ""
+
+	to_date = getdate(to_date) if to_date else from_date
+	start = f"{from_date.strftime('%B')} {_day_ordinal(from_date.day)}"
 	if from_date == to_date:
-		return formatdate(from_date)
-	return f"{formatdate(from_date)} – {formatdate(to_date)}"
+		return start
+
+	end_day = _day_ordinal(to_date.day)
+	if from_date.month == to_date.month and from_date.year == to_date.year:
+		return f"{start} – {end_day}"
+	if from_date.year == to_date.year:
+		return f"{start} – {to_date.strftime('%B')} {end_day}"
+	return f"{start}, {from_date.year} – {to_date.strftime('%B')} {end_day}, {to_date.year}"
 
 
 def _get_absence_rows(company: str, start_date, end_date) -> list[dict]:
@@ -426,6 +756,9 @@ def _get_absence_rows(company: str, start_date, end_date) -> list[dict]:
 		employee.employee_name,
 	]
 
+	today = getdate()
+	active_from = start_date if start_date > today else today
+
 	records = (
 		frappe.qb.from_(LeaveApplication)
 		.left_join(employee)
@@ -433,7 +766,7 @@ def _get_absence_rows(company: str, start_date, end_date) -> list[dict]:
 		.select(*select_fields)
 		.where(LeaveApplication.company == company)
 		.where(LeaveApplication.from_date <= end_date)
-		.where(LeaveApplication.to_date >= start_date)
+		.where(LeaveApplication.to_date >= active_from)
 		.where(LeaveApplication.docstatus != 2)
 		.where(LeaveApplication.status.isin(["Open", "Approved"]))
 		.orderby(LeaveApplication.from_date)
@@ -554,7 +887,7 @@ def _get_payroll_rows(company, start_date, end_date):
 				"ss_contribution": flt(ss_by_employee.get(emp.name)),
 				"currency": currency,
 				"pay_date": end_date,
-				"pay_date_label": formatdate(end_date),
+				"pay_date_label": _payroll_pay_date_label(end_date),
 				"status": "pending",
 				"status_label": _("Pending"),
 				"salary_slip": None,
@@ -591,7 +924,7 @@ def _build_payroll_row(slip, start_date, end_date, attendance_ss=None):
 		"ss_contribution": ss_amount,
 		"currency": slip.currency,
 		"pay_date": slip.end_date or end_date,
-		"pay_date_label": formatdate(slip.end_date or end_date),
+		"pay_date_label": _payroll_pay_date_label(slip.end_date or end_date),
 		"status": status,
 		"status_label": status_label,
 		"salary_slip": slip.name,
@@ -644,15 +977,629 @@ def _ss_amount_for_slip(slip) -> float:
 
 
 def _payroll_status(slip):
-	if slip.docstatus == 0 or slip.status == "Draft":
+	if slip.docstatus == 0 or slip.status in (None, "", "Draft"):
 		return "pending", _("Pending")
-	if slip.journal_entry:
+	if slip.journal_entry or slip.get("payment_status") == "Paid":
 		return "paid", _("Paid")
-	if slip.status == "Submitted":
-		return "ready", _("Ready")
 	if slip.status == "Withheld":
-		return "pending", _("Withheld")
-	return "pending", _("Pending")
+		return "pending", _("Pending")
+	return "unpaid", _("Not Paid")
+
+
+def _payroll_pay_date_label(value) -> str:
+	day = getdate(value) if value else None
+	if not day:
+		return ""
+	return f"{day.strftime('%B')} {_day_ordinal(day.day)}, {day.year}"
+
+
+def _payroll_board_interval() -> int:
+	from hrms.payroll.auto_payroll import days_for_frequency, get_enabled_templates
+
+	templates = get_enabled_templates()
+	if templates:
+		return max(cint(templates[0]["interval"]), 1)
+	return max(days_for_frequency("Fortnightly"), 1)
+
+
+def _upcoming_pay_period(company: str | None):
+	from hrms.payroll.auto_payroll import add_working_days, get_last_payroll_end, get_pay_period
+
+	today = getdate()
+	interval = _payroll_board_interval()
+	if company:
+		covering = frappe.get_all(
+			"Payroll Entry",
+			filters={
+				"company": company,
+				"start_date": ("<=", today),
+				"end_date": (">=", today),
+				"docstatus": ("<", 2),
+			},
+			fields=["start_date", "end_date"],
+			order_by="end_date desc",
+			limit=1,
+		)
+		if covering:
+			return getdate(covering[0].start_date), getdate(covering[0].end_date)
+
+		last_end = get_last_payroll_end(company)
+		start, end = get_pay_period(
+			interval=interval,
+			as_of=today,
+			company=company,
+			last_end=last_end if last_end else "",
+		)
+	else:
+		start, end = get_pay_period(interval=interval, as_of=today, company="", last_end="")
+
+	guard = 0
+	while end and getdate(end) < today and guard < 40:
+		start = add_days(getdate(end), 1)
+		end = add_working_days(start, interval)
+		guard += 1
+	return getdate(start), getdate(end)
+
+
+def _payroll_board_periods(company: str | None, count: int = 8) -> list[dict]:
+	from hrms.payroll.auto_payroll import subtract_working_days
+
+	if not company:
+		return []
+
+	interval = _payroll_board_interval()
+	upcoming_start, upcoming_end = _upcoming_pay_period(company)
+	seen = set()
+	periods = []
+
+	def add(start, end, current=False):
+		if not start or not end:
+			return
+		start, end = getdate(start), getdate(end)
+		key = (str(start), str(end))
+		if key in seen or end < start:
+			return
+		if any(getdate(row["from_date"]) <= end and getdate(row["to_date"]) >= start for row in periods):
+			return
+		seen.add(key)
+		periods.append(
+			{
+				"from_date": str(start),
+				"to_date": str(end),
+				"label": _payroll_board_period_label(start, end),
+				"current": bool(current),
+			}
+		)
+
+	add(upcoming_start, upcoming_end, current=True)
+
+	entries = frappe.get_all(
+		"Payroll Entry",
+		filters={"company": company, "docstatus": ("<", 2)},
+		fields=["start_date", "end_date"],
+		order_by="end_date desc",
+		limit=20,
+	)
+	for entry in entries:
+		add(entry.start_date, entry.end_date)
+
+	def overlapping(start, end):
+		return [
+			row
+			for row in periods
+			if getdate(row["from_date"]) <= end and getdate(row["to_date"]) >= start
+		]
+
+	cursor_end = add_days(upcoming_start, -1)
+	for _unused in range(max(count, 6) * 2):
+		if not cursor_end or len(periods) >= max(count, 6) * 2:
+			break
+		start = subtract_working_days(cursor_end, interval)
+		if not start or start > cursor_end:
+			break
+		hits = overlapping(start, cursor_end)
+		if hits:
+			cursor_end = add_days(min(getdate(row["from_date"]) for row in hits), -1)
+			continue
+		add(start, cursor_end)
+		cursor_end = add_days(start, -1)
+
+	periods.sort(key=lambda row: row["from_date"], reverse=True)
+	current_key = (str(upcoming_start), str(upcoming_end))
+	for row in periods:
+		row["current"] = (row["from_date"], row["to_date"]) == current_key
+	return periods[: max(count, 6)]
+
+
+def _payroll_board_dates(from_date, to_date, company=None, periods=None):
+	if from_date and to_date:
+		start, end = getdate(from_date), getdate(to_date)
+		if end < start:
+			start, end = end, start
+		return start, end
+	if periods:
+		current = next((row for row in periods if row.get("current")), periods[0])
+		return getdate(current["from_date"]), getdate(current["to_date"])
+	if company:
+		return _upcoming_pay_period(company)
+	today = getdate()
+	return getdate(get_first_day(today)), getdate(get_last_day(today))
+
+
+def _previous_date_range(start_date, end_date):
+	start_date = getdate(start_date)
+	end_date = getdate(end_date)
+	days = max(1, (end_date - start_date).days + 1)
+	prev_end = add_days(start_date, -1)
+	prev_start = add_days(prev_end, -(days - 1))
+	return prev_start, prev_end
+
+
+def _previous_pay_period(start_date, company=None, periods=None):
+	from hrms.payroll.auto_payroll import subtract_working_days
+
+	start_date = getdate(start_date)
+	if periods:
+		older = [row for row in periods if getdate(row["to_date"]) < start_date]
+		if older:
+			return getdate(older[0]["from_date"]), getdate(older[0]["to_date"])
+	interval = _payroll_board_interval()
+	prev_end = add_days(start_date, -1)
+	return subtract_working_days(prev_end, interval), prev_end
+
+
+def _trend_pay_periods(periods, start_date, end_date, count: int | None = None):
+	count = max(3, min(cint(count) or PAYROLL_BOARD_MONTHS, 12))
+	if not periods:
+		return [
+			{
+				"from_date": str(start_date),
+				"to_date": str(end_date),
+				"label": _payroll_board_short_label(end_date),
+			}
+		]
+	idx = next(
+		(
+			i
+			for i, row in enumerate(periods)
+			if row["from_date"] == str(start_date) and row["to_date"] == str(end_date)
+		),
+		0,
+	)
+	window = periods[idx : idx + count]
+	return sorted(window, key=lambda row: row["from_date"])
+
+
+def _payroll_board_period_label(start_date, end_date):
+	start_date = getdate(start_date)
+	end_date = getdate(end_date)
+	if start_date.year == end_date.year:
+		return f"{start_date.day} {start_date.strftime('%B')} - {end_date.day} {end_date.strftime('%B %Y')}"
+	return f"{start_date.day} {start_date.strftime('%B %Y')} - {end_date.day} {end_date.strftime('%B %Y')}"
+
+
+def _payroll_board_short_label(end_date) -> str:
+	end_date = getdate(end_date)
+	return f"{end_date.day} {end_date.strftime('%b').upper()}"
+
+
+def _empty_payroll_board(start_date, end_date, currency, periods=None):
+	periods = periods or []
+	return {
+		"from_date": str(start_date),
+		"to_date": str(end_date),
+		"period_label": _payroll_board_period_label(start_date, end_date),
+		"change_label": _("from last period"),
+		"currency": currency,
+		"kpis": _payroll_board_kpis([], [], 0, currency),
+		"trend": _payroll_board_trend([], _trend_pay_periods(periods, start_date, end_date), currency),
+		"departments": {
+			"total": 0,
+			"formatted_total": _format_board_money(0, currency),
+			"change": 0,
+			"items": [],
+		},
+		"rows": [],
+		"periods": periods,
+		"filter_departments": [],
+	}
+
+
+def _fetch_board_slips(company, start_date, end_date, department=None):
+	salary_slip = frappe.qb.DocType("Salary Slip")
+	employee = frappe.qb.DocType("Employee")
+	select_fields = [
+		salary_slip.name,
+		salary_slip.employee,
+		salary_slip.employee_name,
+		salary_slip.start_date,
+		salary_slip.end_date,
+		salary_slip.gross_pay,
+		salary_slip.net_pay,
+		salary_slip.currency,
+		salary_slip.status,
+		salary_slip.docstatus,
+		salary_slip.journal_entry,
+		salary_slip.department,
+		salary_slip.company,
+		employee.designation,
+		employee.department.as_("employee_department"),
+		employee.image,
+	]
+	for fieldname in ("hour_rate", "total_working_hours", "payment_days", "payment_status", "ss_employee_amount", "payroll_frequency"):
+		if frappe.db.has_column("Salary Slip", fieldname):
+			select_fields.append(getattr(salary_slip, fieldname))
+
+	query = (
+		frappe.qb.from_(salary_slip)
+		.left_join(employee)
+		.on(salary_slip.employee == employee.name)
+		.select(*select_fields)
+		.where(salary_slip.company == company)
+		.where(salary_slip.start_date <= end_date)
+		.where(salary_slip.end_date >= start_date)
+		.where(salary_slip.docstatus != 2)
+	)
+	if department:
+		query = query.where(
+			Criterion.any([employee.department == department, salary_slip.department == department])
+		)
+	return query.orderby(salary_slip.end_date, order=frappe.qb.desc).orderby(salary_slip.employee_name).run(
+		as_dict=True
+	)
+
+
+def _classify_earning(component_name, category=None) -> str:
+	cat = str(category or "").strip()
+	if cat in BONUS_EARNING_CATEGORIES:
+		return "bonus"
+	if cat in OVERTIME_EARNING_CATEGORIES:
+		return "overtime"
+	name = str(component_name or "").lower()
+	if "overtime" in name:
+		return "overtime"
+	if "bonus" in name or "incentive" in name:
+		return "bonus"
+	return "base"
+
+
+def _earning_splits_for_slips(slip_names: list) -> dict:
+	if not slip_names or not frappe.db.table_exists("Salary Detail"):
+		return {}
+
+	details = frappe.get_all(
+		"Salary Detail",
+		filters={"parent": ["in", slip_names], "parenttype": "Salary Slip", "parentfield": "earnings"},
+		fields=["parent", "salary_component", "amount"],
+	)
+	if not details:
+		return {}
+
+	categories = {}
+	if frappe.db.table_exists("Salary Component") and frappe.db.has_column("Salary Component", "earning_category"):
+		names = list({row.salary_component for row in details if row.salary_component})
+		if names:
+			categories = {
+				row.name: row.earning_category
+				for row in frappe.get_all(
+					"Salary Component",
+					filters={"name": ["in", names]},
+					fields=["name", "earning_category"],
+				)
+			}
+
+	splits = {}
+	for row in details:
+		bucket = splits.setdefault(row.parent, {"base": 0.0, "bonus": 0.0, "overtime": 0.0})
+		kind = _classify_earning(row.salary_component, categories.get(row.salary_component))
+		bucket[kind] = flt(bucket[kind]) + flt(row.amount)
+	return splits
+
+
+def _hourly_slip_pay(slip) -> float:
+	rate = flt(slip.get("hour_rate"))
+	hours = flt(slip.get("total_working_hours"))
+	if not hours:
+		hours = flt(slip.get("payment_days")) * 8
+	if rate and hours:
+		return flt(rate * hours, 2)
+	return 0.0
+
+
+def _attendance_pay_dates(company, start_date, end_date) -> dict:
+	if not company or not start_date or not end_date:
+		return {}
+	if not frappe.db.has_column("Attendance", "daily_pay"):
+		return {}
+
+	attendance = frappe.qb.DocType("Attendance")
+	fields = [attendance.employee, attendance.attendance_date, attendance.daily_pay]
+	if frappe.db.has_column("Attendance", "working_hours"):
+		fields.append(attendance.working_hours)
+	if frappe.db.has_column("Attendance", "hour_rate"):
+		fields.append(attendance.hour_rate)
+
+	query = (
+		frappe.qb.from_(attendance)
+		.select(*fields)
+		.where(attendance.docstatus < 2)
+		.where(attendance.attendance_date.between(start_date, end_date))
+	)
+	if frappe.db.has_column("Attendance", "company"):
+		query = query.where(attendance.company == company)
+	rows = query.run(as_dict=True)
+
+	index = {}
+	for row in rows:
+		if not row.get("employee") or not row.get("attendance_date"):
+			continue
+		pay = flt(row.daily_pay)
+		if not pay:
+			pay = flt(row.get("hour_rate")) * flt(row.get("working_hours"))
+		if not pay:
+			continue
+		index.setdefault(row.employee, []).append((getdate(row.attendance_date), flt(pay, 2)))
+	return index
+
+
+def _pay_in_range(index, employee, start_date, end_date) -> float:
+	if not employee or not index:
+		return 0.0
+	start = getdate(start_date) if start_date else None
+	end = getdate(end_date) if end_date else start
+	if not start or not end:
+		return 0.0
+	return flt(sum(amount for day, amount in index.get(employee) or [] if start <= day <= end), 2)
+
+
+def _additional_salary_bonus_index(company, start_date, end_date) -> dict:
+	if not company or not frappe.db.table_exists("Additional Salary"):
+		return {}
+
+	filters = {"company": company, "docstatus": ["<", 2]}
+	if frappe.db.has_column("Additional Salary", "disabled"):
+		filters["disabled"] = 0
+	fields = ["employee", "amount", "payroll_date"]
+	if frappe.db.has_column("Additional Salary", "from_date"):
+		fields.append("from_date")
+	if frappe.db.has_column("Additional Salary", "to_date"):
+		fields.append("to_date")
+	if frappe.db.has_column("Additional Salary", "type"):
+		fields.append("type")
+
+	or_filters = []
+	start = getdate(start_date) if start_date else None
+	end = getdate(end_date) if end_date else start
+	if start and end:
+		or_filters.append(["payroll_date", "between", [str(start), str(end)]])
+		if frappe.db.has_column("Additional Salary", "from_date"):
+			or_filters.append(["from_date", "between", [str(start), str(end)]])
+
+	index = {}
+	kwargs = {"filters": filters, "fields": fields}
+	if or_filters:
+		kwargs["or_filters"] = or_filters
+	for row in frappe.get_all("Additional Salary", **kwargs):
+		if str(row.get("type") or "Earning").lower() == "deduction":
+			continue
+		if not row.get("employee") or flt(row.amount) <= 0:
+			continue
+		index.setdefault(row.employee, []).append(row)
+	return index
+
+
+def _bonus_in_range(index, employee, start_date, end_date) -> float:
+	if not employee or not index:
+		return 0.0
+	start = getdate(start_date) if start_date else None
+	end = getdate(end_date) if end_date else start
+	if not start or not end:
+		return 0.0
+
+	total = 0.0
+	for row in index.get(employee) or []:
+		payroll_date = getdate(row.payroll_date) if row.get("payroll_date") else None
+		if payroll_date:
+			if start <= payroll_date <= end:
+				total += flt(row.amount)
+			continue
+		from_date = getdate(row.from_date) if row.get("from_date") else None
+		to_date = getdate(row.to_date) if row.get("to_date") else from_date
+		if from_date and to_date and from_date <= end and to_date >= start:
+			total += flt(row.amount)
+	return flt(total, 2)
+
+
+def _build_payroll_board_row(slip, split, currency, attendance_pay=0, extra_bonus=0):
+	status, status_label = _payroll_status(slip)
+	gross = flt(slip.gross_pay)
+	bonus = flt(split.get("bonus"))
+	overtime = flt(split.get("overtime"))
+	base = flt(split.get("base"))
+	has_slip_pay = bool(base or overtime or gross)
+
+	if not bonus and not has_slip_pay:
+		bonus = flt(extra_bonus)
+
+	if not has_slip_pay:
+		base = _hourly_slip_pay(slip) or flt(attendance_pay)
+	elif base + bonus + overtime <= 0 and gross:
+		base = gross
+	elif not base:
+		base = max(gross - bonus - overtime, 0)
+
+	display_base = flt(base + overtime, 2)
+	bonus = flt(bonus, 2)
+	gross_total = flt(display_base + bonus, 2)
+	if gross > gross_total:
+		gross_total = flt(gross, 2)
+		if not display_base:
+			display_base = max(gross_total - bonus, 0)
+			gross_total = flt(display_base + bonus, 2)
+
+	ss = flt(slip.get("ss_employee_amount"))
+	if not ss and slip.get("name") and frappe.db.exists("Salary Slip", slip.name):
+		try:
+			ss = _ss_amount_for_slip(slip)
+		except Exception:
+			ss = 0
+	ss = flt(ss, 2)
+
+	net = flt(slip.net_pay, 2)
+	if ss and (not net or abs(net - gross_total) < 0.005):
+		net = flt(max(gross_total - ss, 0), 2)
+	elif not net:
+		net = gross_total
+
+	department = slip.employee_department or slip.department or ""
+	return {
+		"salary_slip": slip.name,
+		"employee": slip.employee,
+		"employee_name": slip.employee_name,
+		"image": slip.image,
+		"department": department,
+		"department_label": department or _("No Department"),
+		"designation": slip.designation or "",
+		"start_date": slip.start_date,
+		"end_date": slip.end_date,
+		"pay_date": slip.end_date,
+		"pay_date_label": _payroll_pay_date_label(slip.end_date),
+		"status": status,
+		"status_label": status_label,
+		"base_salary": display_base,
+		"bonus": bonus,
+		"overtime": flt(overtime, 2),
+		"ss_contribution": ss,
+		"gross_pay": gross_total,
+		"net_pay": net,
+		"currency": slip.currency or currency,
+	}
+
+
+def _row_overlaps_range(row, start_date, end_date) -> bool:
+	row_start = getdate(row.get("start_date") or row.get("pay_date"))
+	row_end = getdate(row.get("end_date") or row.get("pay_date"))
+	return bool(row_start and row_end and row_start <= getdate(end_date) and row_end >= getdate(start_date))
+
+
+def _format_board_money(amount, currency) -> str:
+	value = flt(amount, 2)
+	precision = 0 if abs(value - round(value)) < 0.005 else 2
+	return frappe.utils.fmt_money(value, precision=precision, currency=currency)
+
+
+def _payroll_board_kpis(current_rows, previous_rows, employee_total, currency):
+	salary = sum(flt(row.get("gross_pay")) for row in current_rows)
+	prev_salary = sum(flt(row.get("gross_pay")) for row in previous_rows)
+	overtime = sum(flt(row.get("overtime")) for row in current_rows)
+	prev_overtime = sum(flt(row.get("overtime")) for row in previous_rows)
+	paid = len({row["employee"] for row in current_rows if row.get("status") == "paid" and row.get("employee")})
+	prev_paid = len(
+		{row["employee"] for row in previous_rows if row.get("status") == "paid" and row.get("employee")}
+	)
+	return {
+		"total_salary": {
+			"value": flt(salary, 2),
+			"formatted": _format_board_money(salary, currency),
+			"change": _percent_change(salary, prev_salary),
+		},
+		"employees_paid": {
+			"value": paid,
+			"total": cint(employee_total),
+			"change": _percent_change(paid, prev_paid),
+		},
+		"total_overtime": {
+			"value": flt(overtime, 2),
+			"formatted": _format_board_money(overtime, currency),
+			"change": _percent_change(overtime, prev_overtime),
+		},
+	}
+
+
+def _payroll_board_trend(rows, periods, currency):
+	points = []
+	for period in periods or []:
+		start = period.get("from_date")
+		end = period.get("to_date")
+		period_rows = [row for row in rows if _row_overlaps_range(row, start, end)]
+		salary = sum(flt(row.get("base_salary") or row.get("gross_pay")) for row in period_rows)
+		bonus = sum(flt(row.get("bonus")) for row in period_rows)
+		points.append(
+			{
+				"label": _payroll_board_short_label(end),
+				"salary": flt(salary, 2),
+				"bonus": flt(bonus, 2),
+			}
+		)
+
+	previous_total = 0.0
+	if len(points) >= 2:
+		previous_total = points[-2]["salary"] + points[-2]["bonus"]
+	latest = points[-1]["salary"] + points[-1]["bonus"] if points else 0.0
+	return {
+		"total": flt(latest, 2),
+		"formatted_total": _format_board_money(latest, currency),
+		"change": _percent_change(latest, previous_total),
+		"points": points,
+	}
+
+
+def _department_short_label(name) -> str:
+	if not name:
+		return _("OTHER")
+	word = str(name).replace("_", " ").split()[0]
+	return word[:10].upper()
+
+
+def _payroll_board_departments(rows, currency, previous_rows=None):
+	buckets = {}
+	for row in rows:
+		key = row.get("department") or ""
+		bucket = buckets.setdefault(
+			key,
+			{"label": _department_short_label(key), "name": key or _("No Department"), "salary": 0.0, "bonus": 0.0},
+		)
+		bucket["salary"] += flt(row.get("base_salary") or row.get("gross_pay"))
+		bucket["bonus"] += flt(row.get("bonus"))
+
+	items = sorted(buckets.values(), key=lambda item: item["salary"] + item["bonus"], reverse=True)
+	if len(items) > PAYROLL_DEPT_LIMIT:
+		head = items[: PAYROLL_DEPT_LIMIT - 1]
+		rest = items[PAYROLL_DEPT_LIMIT - 1 :]
+		head.append(
+			{
+				"label": _("OTHER"),
+				"name": _("Other"),
+				"salary": flt(sum(item["salary"] for item in rest), 2),
+				"bonus": flt(sum(item["bonus"] for item in rest), 2),
+			}
+		)
+		items = head
+
+	for item in items:
+		item["salary"] = flt(item["salary"], 2)
+		item["bonus"] = flt(item["bonus"], 2)
+
+	total = sum(item["salary"] + item["bonus"] for item in items)
+	prev_total = 0.0
+	for row in previous_rows or []:
+		prev_total += flt(row.get("base_salary") or row.get("gross_pay")) + flt(row.get("bonus"))
+	return {
+		"total": flt(total, 2),
+		"formatted_total": _format_board_money(total, currency),
+		"change": _percent_change(total, prev_total),
+		"items": items,
+	}
+
+
+def _payroll_board_filter_departments(employees, rows):
+	names = []
+	for source in (employees, rows):
+		for item in source:
+			name = item.get("department") if isinstance(item, dict) else getattr(item, "department", None)
+			if name and name not in names:
+				names.append(name)
+	return names
 
 
 def _ss_from_attendance(company, start_date, end_date) -> dict:
@@ -1185,8 +2132,53 @@ def _eval_dynamic_expr(expr):
 		return None
 
 
+def _custom_chart_source_method(doc):
+	source = getattr(doc, "source", None)
+	if not source or not frappe.db.exists("Dashboard Chart Source", source):
+		return None
+	module = frappe.db.get_value("Dashboard Chart Source", source, "module")
+	if not module:
+		return None
+	app = frappe.local.module_app.get(frappe.scrub(module)) or frappe.db.get_value(
+		"Module Def", module, "app_name"
+	)
+	if not app:
+		return None
+	path = (
+		f"{app}.{frappe.scrub(module)}.dashboard_chart_source."
+		f"{frappe.scrub(source)}.{frappe.scrub(source)}.get_data"
+	)
+	try:
+		return frappe.get_attr(path)
+	except Exception:
+		return None
+
+
+def _fetch_custom_chart_data(doc, filters, start, end, time_interval: str) -> dict:
+	method = _custom_chart_source_method(doc)
+	if not method:
+		return {"labels": [], "datasets": []}
+	data = method(
+		chart_name=doc.name,
+		filters=filters,
+		from_date=str(start),
+		to_date=str(end),
+		time_interval=time_interval,
+		timespan="Select Date Range",
+		refresh=1,
+	)
+	return data if isinstance(data, dict) else {"labels": [], "datasets": []}
+
+
 def _fetch_dashboard_chart_data(doc, filters, start, end, time_interval: str) -> dict:
 	from frappe.desk.doctype.dashboard_chart.dashboard_chart import get as get_chart
+
+	if getattr(doc, "chart_type", None) == "Custom":
+		try:
+			return _fetch_custom_chart_data(doc, filters, start, end, time_interval)
+		except Exception:
+			frappe.log_error(title=f"Dashboard chart period failed: {doc.name}")
+			return {"labels": [], "datasets": []}
 
 	args = {
 		"chart_name": doc.name,
@@ -1196,18 +2188,12 @@ def _fetch_dashboard_chart_data(doc, filters, start, end, time_interval: str) ->
 		"timespan": "Select Date Range",
 		"time_interval": time_interval,
 		"refresh": 1,
-		"no_cache": 1,
 	}
 	try:
 		data = get_chart(**args)
 	except Exception:
-		args.pop("timespan", None)
-		args.pop("no_cache", None)
-		try:
-			data = get_chart(**args)
-		except Exception:
-			frappe.log_error(title=f"Dashboard chart period failed: {doc.name}")
-			return {"labels": [], "datasets": []}
+		frappe.log_error(title=f"Dashboard chart period failed: {doc.name}")
+		return {"labels": [], "datasets": []}
 	return data if isinstance(data, dict) else {"labels": [], "datasets": []}
 
 

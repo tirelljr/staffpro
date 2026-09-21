@@ -2,7 +2,7 @@
 # License: GNU General Public License v3. See license.txt
 
 import frappe
-from frappe.utils import nowdate
+from frappe.utils import getdate, nowdate
 
 from erpnext.setup.doctype.employee.test_employee import make_employee
 
@@ -136,8 +136,23 @@ class TestTimeClockAdjustment(HRMSTestSuite):
 		self.assertRaises(frappe.PermissionError, get_time_clock_adjustments)
 
 		frappe.set_user("Administrator")
+		frappe.db.set_value(
+			"Employee",
+			employee,
+			{
+				"designation": "QA Engineer",
+				"employment_type": "Full-time",
+				"image": "/files/tca-test-avatar.png",
+			},
+		)
 		payload = get_time_clock_adjustments(status="Pending")
-		self.assertTrue(any(row["employee"] == employee for row in payload["rows"]))
+		row = next(row for row in payload["rows"] if row["employee"] == employee)
+		self.assertEqual(row["designation"], "QA Engineer")
+		self.assertEqual(row["employment_type"], "Full-time")
+		self.assertEqual(row["image"], "/files/tca-test-avatar.png")
+		self.assertEqual(row["date_label"], getdate(nowdate()).strftime("%d/%m"))
+		self.assertEqual(row["requested_hours"], 9.0)
+		self.assertEqual(row["requested_hours_label"], "9h")
 
 	def test_employee_hours_include_pending_adjustment(self):
 		employee = make_employee("tca.pwa.rows@example.com", company="_Test Company")

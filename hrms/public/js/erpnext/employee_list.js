@@ -4,7 +4,7 @@ const existing_refresh = existing_employee_listview.refresh;
 const EMPLOYEE_IMAGE_FIELDS = ["department", "date_of_joining", "image", "employee_name"];
 
 frappe.listview_settings["Employee"] = Object.assign({}, existing_employee_listview, {
-	add_fields: [...new Set([...(existing_employee_listview.add_fields || []), ...EMPLOYEE_IMAGE_FIELDS])],
+	add_fields: [...new Set([...field_name_list(existing_employee_listview.add_fields), ...EMPLOYEE_IMAGE_FIELDS])],
 	onload(listview) {
 		existing_onload?.(listview);
 		hide_employee_list_menu(listview);
@@ -13,10 +13,41 @@ frappe.listview_settings["Employee"] = Object.assign({}, existing_employee_listv
 	refresh(listview) {
 		existing_refresh?.(listview);
 		hide_employee_list_menu(listview);
+		ensure_employee_image_fields(listview);
 	},
 });
 
 patch_employee_image_view();
+patch_employee_list_args();
+if (typeof frappe.ready === "function") {
+	frappe.ready(() => {
+		patch_employee_image_view();
+		patch_employee_list_args();
+	});
+}
+
+function field_name_list(value) {
+	if (Array.isArray(value)) {
+		return value.flatMap(field_name_list);
+	}
+	if (typeof value !== "string") return [];
+	const text = value.trim();
+	if (!text) return [];
+	if (text.includes(",") && !text.includes("`")) {
+		return text.split(",").flatMap(field_name_list);
+	}
+	const name = text.replace(/`/g, "").split(".").pop();
+	if (!name || name.length < 2 || is_garbage_field(text)) return [];
+	return [name];
+}
+
+function is_garbage_field(field) {
+	const text = String(field || "").replace(/`/g, "");
+	if (!text || text.length === 1) return true;
+	const parts = text.split(".");
+	const parent = (parts[0] || "").replace(/^tab/i, "");
+	return parts.length === 2 && parent.length <= 1;
+}
 
 function hide_employee_list_menu(listview) {
 	const page = listview?.page;
@@ -29,9 +60,10 @@ function hide_employee_list_menu(listview) {
 }
 
 function ensure_employee_image_fields(listview) {
-	if (!listview?.fields) return;
+	if (!listview) return;
+	listview.fields = field_name_list(listview.fields);
 	EMPLOYEE_IMAGE_FIELDS.forEach((fieldname) => {
-		if (fieldname && !listview.fields.includes(fieldname)) {
+		if (!listview.fields.includes(fieldname)) {
 			listview.fields.push(fieldname);
 		}
 	});
@@ -104,4 +136,32 @@ function patch_employee_image_view() {
 		}
 		return employee_image_details_html(item);
 	};
+}
+
+function patch_employee_list_args() {
+	const ListView = frappe.views?.ListView;
+	if (!ListView?.prototype || ListView._staff_pro_employee_args_patch) return;
+	ListView._staff_pro_employee_args_patch = true;
+
+	if (typeof ListView.prototype.set_fields === "function") {
+		const original_set = ListView.prototype.set_fields;
+		ListView.prototype.set_fields = function () {
+			original_set.apply(this, arguments);
+			if (this.doctype === "Employee") ensure_employee_image_fields(this);
+		};
+	}
+
+	if (typeof ListView.prototype.get_args === "function") {
+		const original_args = ListView.prototype.get_args;
+		ListView.prototype.get_args = function () {
+			const args = original_args.apply(this, arguments);
+			if (this.doctype === "Employee" && args) {
+				args.fields = field_name_list(args.fields);
+				EMPLOYEE_IMAGE_FIELDS.forEach((fieldname) => {
+					if (!args.fields.includes(fieldname)) args.fields.push(fieldname);
+				});
+			}
+			return args;
+		};
+	}
 }

@@ -39,6 +39,7 @@ class TestHolidayWorkElectionAPI(HRMSTestSuite):
 		self.assertTrue(holiday["can_toggle"])
 		self.assertFalse(holiday["will_work"])
 		self.assertEqual(holiday["description"], "API Public Holiday")
+		self.assertFalse(holiday.get("deadline_passed"))
 
 	def test_employee_cannot_fetch_another_employees_holidays(self):
 		_employee_one, user_one = make_election_employee("hwe.api.one@example.com", self.holiday_list)

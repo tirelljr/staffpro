@@ -53,6 +53,20 @@ class TestStaffProDeskHome(HRMSTestSuite):
 		if frappe.get_meta("System Settings").has_field("default_app"):
 			self.assertEqual(frappe.db.get_single_value("System Settings", "default_app"), "hrms")
 
+	def test_branding_locks_belize_timezone(self):
+		from hrms.branding import STAFF_PRO_TIMEZONE, apply_branding, lock_system_timezone
+
+		if not frappe.get_meta("System Settings").has_field("time_zone"):
+			return
+		frappe.db.set_single_value("System Settings", "time_zone", "Asia/Kolkata")
+		apply_branding()
+		self.assertEqual(frappe.db.get_single_value("System Settings", "time_zone"), STAFF_PRO_TIMEZONE)
+
+		settings = frappe.get_doc("System Settings")
+		settings.time_zone = "Asia/Kolkata"
+		lock_system_timezone(settings)
+		self.assertEqual(settings.time_zone, STAFF_PRO_TIMEZONE)
+
 	def test_missing_hashed_js_bundle_is_copied_from_newest_build(self):
 		with tempfile.TemporaryDirectory() as tmp:
 			app_dist = Path(tmp) / "dist"

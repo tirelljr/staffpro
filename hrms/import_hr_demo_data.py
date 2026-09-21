@@ -136,6 +136,18 @@ CLIENT_ASSIGNMENTS = {
 	"luis.herrera@staffpro.local": "Caribbean Collections",
 }
 
+# Per-employee OT Threshold (Hours). Blank on everyone else → HR Settings default (80).
+DEMO_OT_PROFILES = {
+	"carlos.mendoza@staffpro.local": {"threshold": 8, "work_holiday": True},
+	"sofia.reyes@staffpro.local": {"threshold": 40, "work_holiday": True},
+	"james.rivera@staffpro.local": {"threshold": 60, "work_holiday": True},
+	"miguel.torres@staffpro.local": {"threshold": 80, "work_holiday": False},
+}
+
+STANDARD_DAY_PUNCHES = [("08:00:00", "IN"), ("12:00:00", "OUT"), ("13:00:00", "IN"), ("17:00:00", "OUT")]
+OVERTIME_DAY_PUNCHES = [("08:00:00", "IN"), ("12:00:00", "OUT"), ("13:00:00", "IN"), ("19:00:00", "OUT")]
+HOLIDAY_WORK_PUNCHES = [("09:00:00", "IN"), ("17:00:00", "OUT")]
+
 # Paid-to bank on each demo employee (Belize banks + unique account numbers).
 DEMO_BANK_ACCOUNTS = {
 	"maria.santos@staffpro.local": {"bank": "Heritage Bank", "account_no": "1500284739", "account_type": "Checking"},
@@ -1083,7 +1095,399 @@ def _set_default_company(company):
 	frappe.db.set_default("company", company)
 
 
+def seed_overtime_and_holiday_demo(company=None):
+	"""Paste OT thresholds on a few agents and clock hours that show OT + holiday pay."""
+	from hrms.hr.belize_holidays import add_belize_holidays_to_list
+	from hrms.hr.doctype.overtime_slip.overtime_slip import get_pay_period_overtime
+	from hrms.hr.staff_pro_holiday_list import DEFAULT_HOLIDAY_LIST
+	from hrms.payroll.daily_pay import (
+		calculate_holiday_daily_pay,
+		get_hour_rate,
+		get_public_holiday_pay_context,
+	)
+
+	company = company or _get_company()
+	if not company:
+		print("No company found. Cannot seed overtime demo.")
+		return {"employees": 0}
+
+	_ensure_holiday_list(company)
+	if frappe.db.exists("Holiday List", DEFAULT_HOLIDAY_LIST):
+		add_belize_holidays_to_list(DEFAULT_HOLIDAY_LIST)
+		holiday_meta = frappe.get_meta("Holiday List")
+		holiday_values = {}
+		if holiday_meta.has_field("pay_time_and_a_half"):
+			holiday_values["pay_time_and_a_half"] = 1
+		if holiday_meta.has_field("pay_double_time"):
+			holiday_values["pay_double_time"] = 0
+		if holiday_values:
+			frappe.db.set_value(
+				"Holiday List", DEFAULT_HOLIDAY_LIST, holiday_values, update_modified=False
+			)
+
+	hr_meta = frappe.get_meta("HR Settings")
+	hr_values = {}
+	if hr_meta.has_field("overtime_threshold_hours"):
+		hr_values["overtime_threshold_hours"] = 80
+	if hr_meta.has_field("overtime_pay_multiplier"):
+		hr_values["overtime_pay_multiplier"] = 1.5
+	if hr_values:
+		frappe.db.set_single_value("HR Settings", hr_values, update_modified=False)
+
+	employee_map = _demo_employee_map(company)
+	_apply_employee_bpo_fields(company, employee_map)
+
+	today = getdate()
+	month_start = get_first_day(today)
+	holiday_date = _st_georges_caye_day(today.year) or getdate(f"{today.year}-09-10")
+	weekdays = _weekdays_between(month_start, today)
+	open_week = _open_payroll_week()
+	holiday_week = _week_bounds_for(holiday_date)
+	summaries = []
+
+	for email, profile in DEMO_OT_PROFILES.items():
+		employee = employee_map.get(email)
+		if not employee:
+			continue
+		ot_days = _ot_extra_days(
+			weekdays,
+			profile["threshold"],
+			holiday_date,
+			highlight_weeks=[open_week, holiday_week],
+		)
+		for day in weekdays:
+			try:
+				if day == holiday_date:
+					if profile["work_holiday"]:
+						_upsert_ot_demo_day(employee, company, day, 8, HOLIDAY_WORK_PUNCHES)
+					else:
+						_upsert_ot_demo_day(
+							employee, company, day, 0, punches=None, unworked_holiday=True
+						)
+					continue
+				if day in ot_days:
+					_upsert_ot_demo_day(employee, company, day, 10, OVERTIME_DAY_PUNCHES)
+				else:
+					_upsert_ot_demo_day(employee, company, day, 8, STANDARD_DAY_PUNCHES)
+			except Exception:
+				frappe.log_error(title=f"OT demo day failed {email} {day}")
+
+	_submit_open_attendance(company, month_start, today)
+
+	for email, profile in DEMO_OT_PROFILES.items():
+		employee = employee_map.get(email)
+		if not employee:
+			continue
+		period_start, period_end = open_week or (month_start, today)
+		result = get_pay_period_overtime(employee, period_start, period_end)
+		holiday_week_ot = (
+			get_pay_period_overtime(employee, holiday_week[0], holiday_week[1])
+			if holiday_week
+			else result
+		)
+		rate = flt(get_hour_rate(employee, period_end) or DEMO_HOUR_RATE, 2)
+		holiday_pay = 0.0
+		holiday_ctx = get_public_holiday_pay_context(employee, holiday_date)
+		if holiday_ctx and month_start <= holiday_date <= today:
+			hours = 8 if profile["work_holiday"] else 0
+			holiday_pay = calculate_holiday_daily_pay(rate, hours, holiday_ctx["premium_multiplier"])
+		name = frappe.db.get_value("Employee", employee, "employee_name") or email
+		summaries.append(
+			{
+				"employee": employee,
+				"name": name,
+				"threshold": profile["threshold"],
+				"period": f"{period_start} to {period_end}",
+				"ordinary_ot": result["ordinary_overtime_duration"],
+				"holiday_ot": holiday_week_ot["holiday_overtime_duration"],
+				"holiday_pay": holiday_pay,
+				"rate": rate,
+			}
+		)
+		_upsert_overtime_slip(employee, company, period_start, period_end)
+		if holiday_week and holiday_week != open_week:
+			_upsert_overtime_slip(employee, company, holiday_week[0], holiday_week[1])
+		print(
+			f"OT demo {name}: threshold {profile['threshold']}h, "
+			f"ordinary OT {result['ordinary_overtime_duration']} ({period_start}–{period_end}), "
+			f"holiday OT {holiday_week_ot['holiday_overtime_duration']}, "
+			f"holiday pay ${flt(holiday_pay, 2)}"
+		)
+
+	payroll_entry = _ensure_open_week_payroll_entry(company)
+	holiday_payroll = None
+	if holiday_week and holiday_week != open_week:
+		holiday_payroll = _ensure_payroll_entry_for(company, holiday_week[0], holiday_week[1])
+	if not frappe.flags.in_test:
+		frappe.db.commit()
+	return {
+		"employees": len(summaries),
+		"holiday_date": str(holiday_date),
+		"payroll_entry": payroll_entry,
+		"holiday_payroll_entry": holiday_payroll,
+		"summaries": summaries,
+	}
+
+
+def _st_georges_caye_day(year: int):
+	from hrms.hr.belize_holidays import get_belize_holidays
+
+	for row in get_belize_holidays(year):
+		if "Caye" in (row.get("description") or ""):
+			return getdate(row["holiday_date"])
+	return None
+
+
+def _weekdays_between(start, end):
+	days = []
+	day = getdate(start)
+	end = getdate(end)
+	while day <= end:
+		if day.weekday() < 5:
+			days.append(day)
+		day = add_days(day, 1)
+	return days
+
+
+def _ot_extra_days(weekdays, threshold, holiday_date, highlight_weeks=None):
+	"""First weekday after the monthly threshold, plus one 10h day in each highlighted week."""
+	running = 0.0
+	extra = []
+	placed = False
+	highlight_days = []
+	for week in highlight_weeks or []:
+		if not week:
+			continue
+		start, end = week
+		for day in weekdays:
+			if start <= day <= end and day != holiday_date:
+				highlight_days.append(day)
+				break
+	for day in weekdays:
+		if day == holiday_date:
+			running += 8
+			continue
+		use_overtime = (not placed and running >= flt(threshold)) or day in highlight_days
+		if use_overtime:
+			if day not in extra:
+				extra.append(day)
+			if not placed and running >= flt(threshold):
+				placed = True
+			running += 10
+			continue
+		running += 8
+	return extra
+
+
+def _open_payroll_week():
+	weeks = _completed_week_bounds()
+	if not weeks:
+		return None
+	return weeks[-1]
+
+
+def _week_bounds_for(day):
+	if not day:
+		return None
+	start = getdate(get_first_day_of_week(day))
+	return start, add_days(start, 4)
+
+
+def _upsert_ot_demo_day(employee, company, day, hours, punches=None, unworked_holiday=False):
+	from datetime import datetime
+
+	from frappe.utils import get_time
+
+	from hrms.payroll.daily_pay import apply_daily_pay_to_doc, get_hour_rate, resync_attendance_from_day_logs
+
+	day = getdate(day)
+	start = f"{day} 00:00:00"
+	end = f"{day} 23:59:59"
+	existing = frappe.db.get_value(
+		"Attendance",
+		{"employee": employee, "attendance_date": day, "docstatus": ("<", 2)},
+		["name", "docstatus", "status"],
+		as_dict=True,
+	)
+	if existing and existing.status == "On Leave":
+		return False
+
+	can_rebuild = not (existing and cint(existing.docstatus) == 1)
+	if can_rebuild:
+		for name in frappe.get_all(
+			"Employee Checkin",
+			filters={"employee": employee, "time": ["between", [start, end]]},
+			pluck="name",
+		):
+			frappe.delete_doc("Employee Checkin", name, force=True, ignore_permissions=True)
+
+	if punches and can_rebuild and not unworked_holiday:
+		for clock, log_type in punches:
+			when = datetime.combine(day, get_time(clock))
+			log = frappe.get_doc(
+				{
+					"doctype": "Employee Checkin",
+					"employee": employee,
+					"time": when,
+					"log_type": log_type,
+					"device_id": "demo-device",
+					"skip_auto_attendance": 1,
+				}
+			)
+			log.flags.ignore_geolocation = True
+			log.insert(ignore_permissions=True)
+		resync_attendance_from_day_logs(
+			employee, day, attendance_name=existing.name if existing else None
+		)
+
+	attendance_name = frappe.db.get_value(
+		"Attendance",
+		{"employee": employee, "attendance_date": day, "docstatus": ("<", 2)},
+		"name",
+	)
+	if not attendance_name:
+		doc = frappe.get_doc(
+			{
+				"doctype": "Attendance",
+				"employee": employee,
+				"company": company,
+				"attendance_date": day,
+				"status": "Present",
+				"working_hours": 0 if unworked_holiday else hours,
+			}
+		)
+		doc.flags.ignore_permissions = True
+		doc.insert()
+		attendance_name = doc.name
+
+	doc = frappe.get_doc("Attendance", attendance_name)
+	if unworked_holiday:
+		doc.status = "Present"
+		doc.working_hours = 0
+		doc.in_time = None
+		doc.out_time = None
+	else:
+		doc.status = "Present"
+		doc.working_hours = hours
+		if punches:
+			doc.in_time = datetime.combine(day, get_time(punches[0][0]))
+			doc.out_time = datetime.combine(day, get_time(punches[-1][0]))
+	apply_daily_pay_to_doc(doc)
+	if not flt(doc.hour_rate):
+		doc.hour_rate = get_hour_rate(employee, day) or DEMO_HOUR_RATE
+		apply_daily_pay_to_doc(doc)
+	values = {
+		key: getattr(doc, key, None)
+		for key in (
+			"status",
+			"working_hours",
+			"in_time",
+			"out_time",
+			"hour_rate",
+			"daily_pay",
+			"ss_deduction",
+			"tax_deduction",
+			"net_daily_pay",
+		)
+		if frappe.db.has_column("Attendance", key)
+	}
+	frappe.db.set_value("Attendance", attendance_name, values, update_modified=False)
+	return True
+
+
+def _upsert_overtime_slip(employee, company, start_date, end_date):
+	from hrms.hr.doctype.overtime_slip.overtime_slip import get_pay_period_overtime
+
+	result = get_pay_period_overtime(employee, start_date, end_date)
+	if flt(result.get("total_overtime_duration")) <= 0:
+		return None
+
+	existing = frappe.db.get_value(
+		"Overtime Slip",
+		{
+			"employee": employee,
+			"start_date": start_date,
+			"end_date": end_date,
+			"docstatus": ("<", 2),
+		},
+		"name",
+	)
+	details = [
+		{
+			"reference_document": row["reference_document"],
+			"date": row["date"],
+			"overtime_duration": row["overtime_duration"],
+		}
+		for row in result["allocations"]
+	]
+	if existing:
+		slip = frappe.get_doc("Overtime Slip", existing)
+		slip.overtime_details = []
+		for row in details:
+			slip.append("overtime_details", row)
+		slip.total_overtime_duration = result["total_overtime_duration"]
+		slip.save(ignore_permissions=True)
+		return slip.name
+
+	slip = frappe.get_doc(
+		{
+			"doctype": "Overtime Slip",
+			"employee": employee,
+			"company": company,
+			"posting_date": end_date,
+			"start_date": start_date,
+			"end_date": end_date,
+			"overtime_details": details,
+			"total_overtime_duration": result["total_overtime_duration"],
+		}
+	)
+	slip.flags.ignore_permissions = True
+	try:
+		slip.insert()
+		return slip.name
+	except Exception:
+		frappe.log_error(title="OT demo slip insert failed")
+		return None
+
+
+def _ensure_open_week_payroll_entry(company):
+	week = _open_payroll_week()
+	if not week:
+		return None
+	return _ensure_payroll_entry_for(company, week[0], week[1])
+
+
+def _ensure_payroll_entry_for(company, start_date, end_date):
+	from hrms.payroll.auto_payroll import build_payroll_entry
+
+	existing = frappe.db.get_value(
+		"Payroll Entry",
+		{
+			"company": company,
+			"start_date": start_date,
+			"end_date": end_date,
+			"docstatus": ("<", 2),
+		},
+		"name",
+	)
+	if existing:
+		return existing
+	settings = frappe.get_single("Payroll Settings")
+	try:
+		entry = build_payroll_entry(settings, company, start_date, end_date, "Weekly")
+		entry.flags.ignore_mandatory = True
+		entry.flags.ignore_permissions = True
+		entry.insert()
+		entry.fill_employee_details(raise_if_empty=False)
+		entry.save(ignore_permissions=True)
+		return entry.name
+	except Exception:
+		frappe.log_error(title="OT demo payroll entry failed")
+		return None
+
+
 def seed_connected_bpo_demo(company=None):
+
 	"""Fill attendance, payroll, SS, clients, invoices, and dashboard metrics."""
 	from hrms.payroll.social_security import (
 		ensure_employee_ss_fields,
@@ -1135,13 +1539,15 @@ def seed_connected_bpo_demo(company=None):
 			frappe.log_error(title="Demo invoice seed failed")
 			invoices = 0
 		_prepare_run_payroll_window(company)
+		ot_demo = seed_overtime_and_holiday_demo(company)
 		if not frappe.flags.in_test:
 			frappe.db.commit()
 		print(
 			"Connected BPO demo: "
 			f"{history['created']} clock days, {submitted} attendance submitted, "
 			f"{exceptions['absent']} absent, {exceptions['late']} late, {exceptions['early']} early, "
-			f"{payroll['slips']} salary slips, {invoices} client invoices."
+			f"{payroll['slips']} salary slips, {invoices} client invoices, "
+			f"{(ot_demo or {}).get('employees', 0)} OT-threshold agents."
 		)
 		return {
 			"employees": len(employee_map),
@@ -1154,6 +1560,7 @@ def seed_connected_bpo_demo(company=None):
 			"payroll_entries": payroll["entries"],
 			"invoices": invoices,
 			"customers": customers,
+			"ot_demo": ot_demo,
 		}
 	finally:
 		frappe.flags.in_import = was_importing
@@ -1198,8 +1605,10 @@ def _apply_employee_bpo_fields(company, employee_map):
 			values["billing_currency"] = "USD"
 		if meta.has_field("default_shift"):
 			values["default_shift"] = SHIFT_NAME
-		if meta.has_field("holiday_list") and not frappe.db.get_value("Employee", employee, "holiday_list"):
+		if meta.has_field("holiday_list"):
 			values["holiday_list"] = "Staff Pro Holiday List"
+		if meta.has_field("overtime_threshold_hours") and email in DEMO_OT_PROFILES:
+			values["overtime_threshold_hours"] = DEMO_OT_PROFILES[email]["threshold"]
 		if values:
 			frappe.db.set_value("Employee", employee, values, update_modified=False)
 	_apply_employee_bank_fields(employee_map)

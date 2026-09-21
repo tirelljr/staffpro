@@ -1747,6 +1747,7 @@ class TestPayrollEntry(HRMSTestSuite):
 
 		company = frappe.get_doc("Company", "_Test Company")
 		employee = make_employee("payroll.excel.hours@example.com", company=company.name)
+		frappe.db.set_value("Employee", employee, "overtime_threshold_hours", 8)
 		setup_salary_structure(employee, company)
 		dates = get_start_end_dates("Monthly", nowdate())
 		attendance = frappe.get_doc(
@@ -1757,7 +1758,6 @@ class TestPayrollEntry(HRMSTestSuite):
 				"attendance_date": dates.start_date,
 				"status": "Present",
 				"working_hours": 10,
-				"actual_overtime_duration": 2,
 			}
 		)
 		attendance.flags.ignore_validate = True
@@ -1779,8 +1779,13 @@ class TestPayrollEntry(HRMSTestSuite):
 	def test_hourly_gross_formula_uses_hours_times_rate(self):
 		from hrms.payroll.hourly_gross import compute_hourly_gross_pay
 
+		frappe.db.set_single_value("HR Settings", "overtime_pay_multiplier", 1.5)
 		self.assertEqual(compute_hourly_gross_pay(17, 0, 12.5), 212.50)
 		self.assertEqual(compute_hourly_gross_pay(17, 2, 12.5, holiday_pay=20, bonus=10), 280.00)
+
+		frappe.db.set_single_value("HR Settings", "overtime_pay_multiplier", 2)
+		self.assertEqual(compute_hourly_gross_pay(17, 2, 12.5), 262.50)
+		frappe.db.set_single_value("HR Settings", "overtime_pay_multiplier", 1.5)
 
 	def test_payroll_excel_gross_is_hours_times_rate(self):
 		from hrms.payroll.doctype.payroll_entry.payroll_entry import get_payroll_excel_data

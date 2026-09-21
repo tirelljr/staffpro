@@ -2,6 +2,7 @@ import { createResource } from "frappe-ui"
 import { employeeResource } from "./employee"
 
 import dayjs from "@/utils/dayjs"
+import { formatClock } from "@/utils/formatters"
 
 
 export const getDates = (shift) => {
@@ -31,11 +32,7 @@ export const getTotalShiftDays = (shift) => {
 }
 
 export const getShiftTiming = (shift) => {
-	return (
-		shift.start_time.split(":").slice(0, 2).join(":") +
-		" - " +
-		shift.end_time.split(":").splice(0, 2).join(":")
-	)
+	return `${formatClock(shift.start_time)} - ${formatClock(shift.end_time)}`
 }
 
 const transformShiftRequests = (data) =>

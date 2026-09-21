@@ -73,7 +73,7 @@
 		<div class="h-120 w-full flex flex-col items-center justify-center gap-5 p-4 mb-5">
 			<div class="flex flex-col gap-1.5 mt-2 items-center justify-center">
 				<div class="font-bold text-xl">
-					{{ dayjs(checkinTimestamp).format("hh:mm:ss a") }}
+					{{ dayjs(checkinTimestamp).format("h:mm:ss A") }}
 				</div>
 				<div class="font-medium text-gray-500 text-sm">
 					{{ dayjs().format("D MMM, YYYY") }}

@@ -321,3 +321,48 @@ class TestInOutToday(HRMSTestSuite):
 		self.assertEqual(row["status"], "OUT")
 		self.assertTrue(row["in_time"])
 		self.assertTrue(row["out_time"])
+
+	def test_first_in_and_last_out_for_the_day(self):
+		employee = make_employee(
+			"inout.today.clocks@example.com",
+			company=self.company,
+			department=self.dept_a,
+			first_name="Clocks",
+			last_name="Today",
+		)
+		today = getdate()
+		make_checkin(employee, time=datetime.combine(today, datetime.min.time()).replace(hour=8, minute=5), log_type="IN")
+		make_checkin(employee, time=datetime.combine(today, datetime.min.time()).replace(hour=12, minute=0), log_type="OUT")
+		make_checkin(employee, time=datetime.combine(today, datetime.min.time()).replace(hour=12, minute=45), log_type="IN")
+		make_checkin(employee, time=datetime.combine(today, datetime.min.time()).replace(hour=17, minute=10), log_type="OUT")
+		make_checkin(employee, time=datetime.combine(today, datetime.min.time()).replace(hour=17, minute=40), log_type="IN")
+
+		payload = get_in_out_today(department=self.dept_a)
+		row = next(item for item in payload["details"] if item["employee"] == employee)
+		self.assertRegex(row["in_time"], r"(?i)^8:05\s*AM$")
+		self.assertRegex(row["out_time"], r"(?i)^5:10\s*PM$")
+
+	def test_same_day_in_and_out_show_when_times_look_future(self):
+		employee = make_employee(
+			"inout.today.futureclocks@example.com",
+			company=self.company,
+			department=self.dept_a,
+			first_name="FutureClocks",
+			last_name="Today",
+		)
+		now = now_datetime()
+		skewed_in = now.replace(hour=23, minute=0, second=0, microsecond=0)
+		skewed_out = now.replace(hour=23, minute=30, second=0, microsecond=0)
+		if skewed_in <= now:
+			skewed_in = now + timedelta(minutes=20)
+			skewed_out = now + timedelta(minutes=40)
+			if getdate(skewed_out) != getdate(now):
+				self.skipTest("Not enough time left in the day to place future clocks")
+		make_checkin(employee, time=skewed_in, log_type="IN")
+		make_checkin(employee, time=skewed_out, log_type="OUT")
+
+		payload = get_in_out_today(department=self.dept_a)
+		row = next(item for item in payload["details"] if item["employee"] == employee)
+		self.assertTrue(row["in_time"])
+		self.assertTrue(row["out_time"])
+		self.assertEqual(row["status"], "OUT")

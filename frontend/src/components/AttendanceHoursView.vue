@@ -462,7 +462,7 @@ function formatTimeOnly(value) {
 	const clock = formatClock(value)
 	if (clock) return clock
 	const parsed = dayjs(`2000-01-01 ${value}`)
-	return parsed.isValid() ? parsed.format("hh:mm a") : String(value)
+	return parsed.isValid() ? parsed.format("h:mm A") : String(value)
 }
 
 function saveNote(row) {

@@ -10,7 +10,6 @@
   "employee_name",
   "log_type",
   "shift",
-  "overtime_type",
   "column_break_4",
   "time",
   "device_id",
@@ -177,13 +176,6 @@
    "hidden": 1,
    "label": "Off-shift",
    "read_only": 1
-  },
-  {
-   "fieldname": "overtime_type",
-   "fieldtype": "Link",
-   "hidden": 1,
-   "label": "Overtime Type",
-   "options": "Overtime Type"
   }
  ],
  "in_create": 1,

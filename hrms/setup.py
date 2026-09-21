@@ -117,6 +117,8 @@ def get_customizations():
 			{"doc_type": "Employee", "property": "default_view"},
 			{"doc_type": "System Settings", "field_name": "default_app", "property": "hidden"},
 			{"doc_type": "System Settings", "field_name": "app_tab", "property": "hidden"},
+			{"doc_type": "System Settings", "field_name": "time_zone", "property": "read_only"},
+			{"doc_type": "System Settings", "field_name": "time_zone", "property": "default"},
 			*[
 				{"doc_type": "Employee", "field_name": fieldname, "property": "hidden"}
 				for fieldname in HIDDEN_EMPLOYEE_FIELDS
@@ -325,6 +327,15 @@ def get_custom_fields():
 			},
 		],
 		"Employee": [
+			{
+				"default": "80",
+				"description": _("Hours in a calendar month before this agent begins earning ordinary overtime. Extra time over 8 hours in a day only counts after this threshold."),
+				"fieldname": "overtime_threshold_hours",
+				"fieldtype": "Float",
+				"insert_after": "ctc",
+				"label": _("OT Threshold (Hours)"),
+				"non_negative": 1,
+			},
 			{
 				"fieldname": "employment_type",
 				"fieldtype": "Link",
@@ -728,6 +739,7 @@ def get_custom_fields():
 			},
 		],
 		"System Settings": [
+			*_get_ask_ai_system_settings_fields(),
 			{
 				"fieldname": "agent_access_section",
 				"fieldtype": "Section Break",
@@ -992,6 +1004,8 @@ def update_hr_defaults():
 	hr_settings = frappe.get_doc("HR Settings")
 	hr_settings.emp_created_by = "Full Name"
 	hr_settings.standard_working_hours = 40
+	hr_settings.overtime_threshold_hours = 80
+	hr_settings.overtime_pay_multiplier = 1.5
 	hr_settings.send_birthday_reminders = 1
 	hr_settings.leave_approval_notification_template = _("Leave Approval Notification")
 	hr_settings.leave_status_notification_template = _("Leave Status Notification")
@@ -1005,6 +1019,307 @@ def update_hr_defaults():
 
 	hr_settings.exit_questionnaire_notification_template = _("Exit Questionnaire Notification")
 	hr_settings.save()
+
+
+def _system_settings_field_before_email() -> str:
+	fallback = "minimum_password_score"
+	try:
+		meta = frappe.get_meta("System Settings")
+		names = [df.fieldname for df in meta.fields]
+	except Exception:
+		return fallback
+	for tab in ("email_tab",):
+		if tab in names:
+			idx = names.index(tab)
+			return names[idx - 1] if idx else fallback
+	for df in meta.fields:
+		if df.fieldtype == "Tab Break" and (df.label or "").strip().lower() == "email":
+			idx = names.index(df.fieldname)
+			return names[idx - 1] if idx else fallback
+	for name in (
+		"minimum_password_score",
+		"enable_password_policy",
+		"password_reset_limit",
+		"logout_on_password_reset",
+		"reset_password_link_expiry_duration",
+		"force_user_to_reset_password",
+	):
+		if name in names:
+			return name
+	return fallback
+
+
+def _get_ask_ai_system_settings_fields():
+	insert_after = _system_settings_field_before_email()
+	depends = "eval:doc.enable_ask_ai"
+	return [
+		{
+			"fieldname": "ask_ai_tab",
+			"fieldtype": "Tab Break",
+			"label": _("AI"),
+			"insert_after": insert_after,
+		},
+		{
+			"fieldname": "ask_ai_section",
+			"fieldtype": "Section Break",
+			"label": _("Ask AI"),
+			"insert_after": "ask_ai_tab",
+		},
+		{
+			"default": "0",
+			"description": _("Show Ask AI in the desk topbar and allow HR users to chat with the assistant."),
+			"fieldname": "enable_ask_ai",
+			"fieldtype": "Check",
+			"label": _("Enable Ask AI"),
+			"insert_after": "ask_ai_section",
+		},
+		{
+			"depends_on": depends,
+			"fieldname": "ask_ai_provider_section",
+			"fieldtype": "Section Break",
+			"label": _("Provider"),
+			"insert_after": "enable_ask_ai",
+		},
+		{
+			"default": "DeepSeek",
+			"depends_on": depends,
+			"fieldname": "ask_ai_provider",
+			"fieldtype": "Select",
+			"insert_after": "ask_ai_provider_section",
+			"label": _("Provider"),
+			"options": "DeepSeek\nOpenAI\nAnthropic\nCustom",
+		},
+		{
+			"depends_on": depends,
+			"fieldname": "ask_ai_provider_column",
+			"fieldtype": "Column Break",
+			"insert_after": "ask_ai_provider",
+		},
+		{
+			"depends_on": depends,
+			"description": _("Stored encrypted. Used for the selected provider."),
+			"fieldname": "ask_ai_api_key",
+			"fieldtype": "Password",
+			"insert_after": "ask_ai_provider_column",
+			"label": _("API Key"),
+		},
+		{
+			"default": "deepseek-chat",
+			"depends_on": depends,
+			"fieldname": "ask_ai_model",
+			"fieldtype": "Data",
+			"insert_after": "ask_ai_api_key",
+			"label": _("Model"),
+		},
+		{
+			"default": "https://api.deepseek.com",
+			"depends_on": depends,
+			"fieldname": "ask_ai_api_base",
+			"fieldtype": "Data",
+			"insert_after": "ask_ai_model",
+			"label": _("API Base URL"),
+		},
+		{
+			"depends_on": depends,
+			"fieldname": "ask_ai_read_section",
+			"fieldtype": "Section Break",
+			"insert_after": "ask_ai_api_base",
+			"label": _("What Ask AI can look up"),
+		},
+		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_employees",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_read_section",
+			"label": _("Employees"),
+		},
+		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_attendance",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_allow_employees",
+			"label": _("Attendance and hours"),
+		},
+		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_overtime",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_allow_attendance",
+			"label": _("Overtime"),
+		},
+		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_agent_queries",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_allow_overtime",
+			"label": _("Agent queries"),
+		},
+		{
+			"depends_on": depends,
+			"fieldname": "ask_ai_read_column",
+			"fieldtype": "Column Break",
+			"insert_after": "ask_ai_allow_agent_queries",
+		},
+		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_payroll",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_read_column",
+			"label": _("Payroll"),
+		},
+		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_clock_adjustments",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_allow_payroll",
+			"label": _("Time clock adjustments"),
+		},
+		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_navigation",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_allow_clock_adjustments",
+			"label": _("Open Staff Pro pages"),
+		},
+		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_floors",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_allow_navigation",
+			"label": _("Floors"),
+		},
+		{
+			"depends_on": depends,
+			"description": _("Write actions still require a confirmation card in Ask AI."),
+			"fieldname": "ask_ai_write_section",
+			"fieldtype": "Section Break",
+			"insert_after": "ask_ai_allow_floors",
+			"label": _("What Ask AI can change"),
+		},
+		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_review_adjustments",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_write_section",
+			"label": _("Approve or reject time clock adjustments"),
+		},
+		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_hours_comment",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_allow_review_adjustments",
+			"label": _("Add hours comments"),
+		},
+		{
+			"depends_on": depends,
+			"fieldname": "ask_ai_write_column",
+			"fieldtype": "Column Break",
+			"insert_after": "ask_ai_allow_hours_comment",
+		},
+		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_hours_adjustment",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_write_column",
+			"label": _("Add hours, clock times, or bulk attendance"),
+		},
+		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_book_time_off",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_allow_hours_adjustment",
+			"label": _("Book paid time off"),
+		},
+		{
+			"depends_on": depends,
+			"description": _("Write actions still require a confirmation card in Ask AI."),
+			"fieldname": "ask_ai_ops_section",
+			"fieldtype": "Section Break",
+			"insert_after": "ask_ai_allow_book_time_off",
+			"label": _("What Ask AI can run"),
+		},
+		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_run_payroll",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_ops_section",
+			"label": _("Run new payroll"),
+		},
+		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_respond_queries",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_allow_run_payroll",
+			"label": _("Respond to agent queries"),
+		},
+		{
+			"depends_on": depends,
+			"fieldname": "ask_ai_ops_column",
+			"fieldtype": "Column Break",
+			"insert_after": "ask_ai_allow_respond_queries",
+		},
+		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_floor_settings",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_ops_column",
+			"label": _("Change floor settings"),
+		},
+		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_export",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_allow_floor_settings",
+			"label": _("Export as PDF, Excel, or CSV"),
+		},
+		{
+			"collapsible": 1,
+			"depends_on": depends,
+			"fieldname": "ask_ai_advanced_section",
+			"fieldtype": "Section Break",
+			"insert_after": "ask_ai_allow_export",
+			"label": _("Advanced"),
+		},
+		{
+			"default": "0",
+			"depends_on": depends,
+			"fieldname": "ask_ai_temperature",
+			"fieldtype": "Float",
+			"insert_after": "ask_ai_advanced_section",
+			"label": _("Temperature"),
+			"precision": "2",
+		},
+		{
+			"depends_on": depends,
+			"fieldname": "ask_ai_advanced_column",
+			"fieldtype": "Column Break",
+			"insert_after": "ask_ai_temperature",
+		},
+		{
+			"default": "6",
+			"depends_on": depends,
+			"fieldname": "ask_ai_max_tool_rounds",
+			"fieldtype": "Int",
+			"insert_after": "ask_ai_advanced_column",
+			"label": _("Maximum Tool Rounds"),
+		},
+	]
 
 
 def set_single_defaults():

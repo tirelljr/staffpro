@@ -1,302 +1,188 @@
 # Copyright (c) 2024, Frappe Technologies Pvt. Ltd. and Contributors
 # See license.txt
 
+from unittest.mock import patch
+
 import frappe
-from frappe.utils import add_days, flt, get_first_day, getdate, nowdate, today
+from frappe.utils import add_days, getdate
 
 from erpnext.setup.doctype.employee.test_employee import make_employee
 
-from hrms.hr.doctype.employee_checkin.test_employee_checkin import make_checkin
-from hrms.hr.doctype.overtime_type.test_overtime_type import create_overtime_type
-from hrms.hr.doctype.shift_type.test_shift_type import make_shift_assignment, setup_shift_type
-from hrms.payroll.doctype.salary_slip.test_salary_slip import make_earning_salary_component
-from hrms.payroll.doctype.salary_structure.test_salary_structure import make_salary_structure
+from hrms.hr.doctype.overtime_slip.overtime_slip import (
+	DEFAULT_OVERTIME_THRESHOLD_HOURS,
+	filter_employees_for_overtime_slip_creation,
+	get_employee_overtime_threshold,
+	get_pay_period_overtime,
+	ordinary_overtime_hours,
+)
 from hrms.tests.utils import HRMSTestSuite
 
 
 class TestOvertimeSlip(HRMSTestSuite):
-	def test_overtime_calculation_and_additional_salary_creation(self):
-		from hrms.payroll.doctype.salary_structure.salary_structure import make_salary_slip
+	def setUp(self):
+		super().setUp()
+		frappe.db.set_single_value("HR Settings", "overtime_threshold_hours", 80)
+		frappe.db.set_single_value("HR Settings", "overtime_pay_multiplier", 1.5)
 
-		employee = make_employee("test_overtime_slip_salary@example.com", company="_Test Company")
-		salary_structure = make_salary_structure(
-			"Test Overtime Salary Slip", "Monthly", employee=employee, company="_Test Company"
-		)
+	def test_daily_overtime_only_counts_after_period_threshold(self):
+		self.assertEqual(ordinary_overtime_hours(9, 0, 80), 0)
+		self.assertEqual(ordinary_overtime_hours(10, 70, 80), 0)
+		self.assertEqual(ordinary_overtime_hours(10, 71, 80), 1)
+		self.assertEqual(ordinary_overtime_hours(10, 79, 80), 2)
+		self.assertEqual(ordinary_overtime_hours(10, 80, 80), 2)
+		self.assertEqual(ordinary_overtime_hours(6, 80, 80), 0)
+		self.assertEqual(ordinary_overtime_hours(8, 80, 80), 0)
+		self.assertEqual(ordinary_overtime_hours(9.5, 0, 8), 1.5)
 
-		overtime_type, overtime_slip, total_overtime_hours = setup_overtime(employee)
+	def test_pay_period_threshold_boundaries(self):
+		start = getdate("2026-01-05")
+		employee = self.make_employee("ot-boundaries@example.com")
+		self.make_attendance_days(employee, start, [9] * 5)
 
-		# Verify overtime details match attendance records
-		attendance_records = frappe.get_all(
-			"Attendance",
-			filters={"employee": employee, "status": "Present"},
-			fields=["name", "actual_overtime_duration", "overtime_type", "attendance_date"],
-		)
-		records = {rec.name: rec for rec in attendance_records}
+		result = get_pay_period_overtime(employee, start, add_days(start, 4), ensure_holidays=False)
+		self.assertEqual(result["total_hours"], 45)
+		self.assertEqual(result["total_overtime_duration"], 0)
 
-		for detail in overtime_slip.overtime_details:
-			self.assertIn(detail.reference_document, records)
-			self.assertEqual(
-				detail.overtime_duration, records[detail.reference_document].actual_overtime_duration
+		self.make_attendance_days(employee, add_days(start, 5), [8] * 5)
+		result = get_pay_period_overtime(employee, start, add_days(start, 9), ensure_holidays=False)
+		self.assertEqual(result["total_hours"], 85)
+		self.assertEqual(result["total_overtime_duration"], 0)
+
+		self.make_attendance(employee, add_days(start, 10), 10)
+		result = get_pay_period_overtime(employee, start, add_days(start, 10), ensure_holidays=False)
+		self.assertEqual(result["total_overtime_duration"], 2)
+		self.assertEqual(result["allocations"][0]["date"], add_days(start, 10))
+
+	def test_monthly_hours_carry_into_later_weeks(self):
+		employee = self.make_employee("ot-month-carry@example.com")
+		self.make_attendance_days(employee, getdate("2026-09-01"), [8] * 10)
+		week_day = getdate("2026-09-16")
+		self.make_attendance(employee, week_day, 10)
+
+		week = get_pay_period_overtime(employee, week_day, add_days(week_day, 6), ensure_holidays=False)
+		self.assertEqual(week["total_hours"], 10)
+		self.assertEqual(week["total_overtime_duration"], 2)
+
+		same_day = get_pay_period_overtime(employee, week_day, week_day, ensure_holidays=False)
+		self.assertEqual(same_day["total_overtime_duration"], 2)
+
+	def test_employee_threshold_overrides_global_default(self):
+		start = getdate("2026-02-02")
+		employee = self.make_employee("ot-override@example.com")
+		frappe.db.set_value("Employee", employee, "overtime_threshold_hours", 60)
+		self.make_attendance_days(employee, start, [8] * 7)
+		self.make_attendance(employee, add_days(start, 7), 10)
+
+		result = get_pay_period_overtime(employee, start, add_days(start, 7), ensure_holidays=False)
+		self.assertEqual(result["threshold_hours"], 60)
+		self.assertEqual(result["total_overtime_duration"], 2)
+
+	def test_paid_holiday_hours_count_without_stacking_ordinary_ot(self):
+		start = getdate("2026-03-02")
+		employee = self.make_employee("ot-holiday@example.com")
+		self.make_attendance_days(employee, start, [8] * 11)
+		holiday_date = add_days(start, 10)
+
+		def holiday_context(_employee, on_date):
+			return {"pay_time_and_a_half": True, "pay_double_time": False} if getdate(on_date) == holiday_date else None
+
+		with patch(
+			"hrms.payroll.daily_pay.get_public_holiday_pay_context",
+			side_effect=holiday_context,
+		):
+			result = get_pay_period_overtime(
+				employee, start, holiday_date, ensure_holidays=False
 			)
-			self.assertEqual(str(detail.date), str(records[detail.reference_document].attendance_date))
 
-		# Create salary slip and calculate expected overtime amount
-		salary_slip = make_salary_slip(
-			source_name=salary_structure.name,
-			employee=employee,
-			posting_date=overtime_slip.start_date,
-		)
+		self.assertEqual(result["total_overtime_duration"], 8)
+		self.assertEqual(result["holiday_overtime_duration"], 8)
+		self.assertEqual(result["ordinary_overtime_duration"], 0)
+		self.assertTrue(result["allocations"][0]["is_holiday"])
 
-		standard_working_hours = overtime_slip.overtime_details[0].standard_working_hours
-		applicable_amount = sum(
-			data.amount
-			for data in salary_slip.earnings
-			if data.salary_component == "Basic Salary" and not data.get("additional_salary")
-		)
-		daily_wages = applicable_amount / salary_slip.payment_days
-		hourly_rate = daily_wages / standard_working_hours
-		expected_overtime_amount = hourly_rate * total_overtime_hours * overtime_type.standard_multiplier
+	def test_overtime_slip_is_record_only(self):
+		start = getdate("2026-04-06")
+		employee = self.make_employee("ot-slip@example.com")
+		self.make_attendance_days(employee, start, [8] * 10)
+		self.make_attendance(employee, add_days(start, 10), 10)
 
-		actual_overtime_amount = frappe.db.get_value(
-			"Additional Salary", {"ref_docname": overtime_slip.name}, "amount"
-		)
-		self.assertEqual(flt(expected_overtime_amount, 2), actual_overtime_amount)
-
-	def test_overtime_calculation_for_fixed_hourly_rate(self):
-		employee = make_employee("test_overtime_slip_fixed@example.com", company="_Test Company")
-		make_salary_structure(
-			"Test Overtime Salary Slip", "Monthly", employee=employee, company="_Test Company"
-		)
-
-		overtime_type, overtime_slip, total_overtime_hours = setup_overtime(employee, "Fixed Hourly Rate")
-		expected_overtime_amount = (
-			overtime_type.hourly_rate * total_overtime_hours * overtime_type.standard_multiplier
-		)
-
-		actual_overtime_amount = frappe.db.get_value(
-			"Additional Salary", {"ref_docname": overtime_slip.name}, "amount"
-		)
-
-		self.assertEqual(flt(expected_overtime_amount, 2), flt(actual_overtime_amount, 2))
-
-	def test_overtime_slip_creation_via_payroll_entry(self):
-		"""Test creation of overtime slips via payroll entry."""
-		from hrms.payroll.doctype.payroll_entry.payroll_entry import get_start_end_dates
-		from hrms.payroll.doctype.payroll_entry.test_payroll_entry import get_payroll_entry
-
-		date = getdate()
-		month_start_date = get_first_day(date)
-
-		company = frappe.get_doc("Company", "_Test Company")
-		make_earning_salary_component(setup=True, company_list=["_Test Company"])
-		employee = make_employee("test_overtime_slip_01@example.com", company="_Test Company")
-		overtime_type = create_overtime_type(overtime_calculation_method="Fixed Hourly Rate")
-		shift_type = setup_shift_type(
-			company="_Test Company",
-			shift_type="_Test Overtime Shift",
-			allow_overtime=1,
-			overtime_type=overtime_type.name,
-			last_sync_of_checkin=f"{add_days(date, 10)} 15:00:00",
-			process_attendance_after=add_days(month_start_date, -1),
-			mark_auto_attendance_on_holidays=1,
-		)
-		frappe.db.set_single_value("Payroll Settings", "create_overtime_slip", 1)
-
-		make_salary_structure(
-			"Test Overtime Salary Slip", "Monthly", employee=employee, company="_Test Company"
-		)
-		make_shift_assignment(
-			shift_type=shift_type.name, employee=employee, start_date=add_days(month_start_date, -1)
-		)
-		create_checkin_records_for_overtime(employee)
-		shift_type.process_auto_attendance()
-
-		dates = get_start_end_dates("Monthly", nowdate())
-		payroll_entry = get_payroll_entry(
-			start_date=dates.start_date,
-			end_date=dates.end_date,
-			payable_account=company.default_payroll_payable_account,
-			currency=company.default_currency,
-			company=company.name,
-			cost_center="Main - _TC",
-		)
-
-		payroll_entry.create_overtime_slips()
-		payroll_entry.submit_overtime_slips()
-
-		overtime_slip = frappe.db.exists(
-			"Overtime Slip",
+		slip = frappe.get_doc(
 			{
+				"doctype": "Overtime Slip",
 				"employee": employee,
-				"payroll_entry": payroll_entry.name,
-				"docstatus": 1,
-			},
+				"company": "_Test Company",
+				"posting_date": add_days(start, 10),
+				"start_date": start,
+				"end_date": add_days(start, 10),
+			}
 		)
-
-		self.assertTrue(overtime_slip)
-
-	def test_overtime_slip_creation_via_payroll_entry_mid_month_leaver(self):
-		"""OT slip `end_date` must be capped at `relieving_date` so the resulting Additional Salary `payroll_date` falls within the employee's employment window."""
-		from hrms.hr.doctype.overtime_slip.overtime_slip import create_overtime_slips_for_employees
-		from hrms.payroll.doctype.payroll_entry.payroll_entry import get_start_end_dates
-		from hrms.payroll.doctype.payroll_entry.test_payroll_entry import get_payroll_entry
-
-		date = getdate()
-		month_start_date = get_first_day(date)
-		relieving_date = add_days(month_start_date, 14)  # mid-month, day 15
-
-		company = frappe.get_doc("Company", "_Test Company")
-		make_earning_salary_component(setup=True, company_list=["_Test Company"])
-		employee = make_employee(
-			"test_overtime_slip_mid_leaver@example.com",
-			company="_Test Company",
-			relieving_date=relieving_date,
-			status="Left",
-		)
-		overtime_type = create_overtime_type(overtime_calculation_method="Fixed Hourly Rate")
-		shift_type = setup_shift_type(
-			company="_Test Company",
-			shift_type="_Test Overtime Shift Mid Leaver",
-			allow_overtime=1,
-			overtime_type=overtime_type.name,
-			last_sync_of_checkin=f"{add_days(date, 10)} 15:00:00",
-			process_attendance_after=add_days(month_start_date, -1),
-			mark_auto_attendance_on_holidays=1,
-		)
-		frappe.db.set_single_value("Payroll Settings", "create_overtime_slip", 1)
-
-		make_salary_structure(
-			"Test Overtime Salary Slip", "Monthly", employee=employee, company="_Test Company"
-		)
-		make_shift_assignment(
-			shift_type=shift_type.name, employee=employee, start_date=add_days(month_start_date, -1)
-		)
-		create_checkin_records_for_overtime(employee)
-		shift_type.process_auto_attendance()
-
-		dates = get_start_end_dates("Monthly", nowdate())
-		payroll_entry = get_payroll_entry(
-			start_date=dates.start_date,
-			end_date=dates.end_date,
-			payable_account=company.default_payroll_payable_account,
-			currency=company.default_currency,
-			company=company.name,
-			cost_center="Main - _TC",
-		)
-
-		payroll_entry.create_overtime_slips()
-
-		slip_name = frappe.db.get_value(
-			"Overtime Slip",
-			{"employee": employee, "payroll_entry": payroll_entry.name, "docstatus": 0},
-			"name",
-		)
-		self.assertTrue(slip_name, "Overtime Slip not created for mid-month leaver")
-
-		slip = frappe.get_doc("Overtime Slip", slip_name)
-		self.assertEqual(
-			getdate(slip.end_date),
-			getdate(relieving_date),
-			"end_date must be capped at relieving_date, not PE.end_date",
-		)
-
-		# submission must succeed as payroll_date = relieving_date is valid
+		slip.get_emp_and_overtime_details()
+		self.assertEqual(slip.total_overtime_duration, 2)
+		self.assertEqual(len(slip.overtime_details), 1)
 		slip.submit()
-		self.assertEqual(slip.docstatus, 1)
 
-		additional_salary = frappe.db.get_value(
-			"Additional Salary", {"ref_docname": slip.name}, "payroll_date"
+		self.assertFalse(
+			frappe.db.exists("Additional Salary", {"ref_docname": slip.name})
 		)
+
+	def test_payroll_eligibility_uses_threshold_and_excludes_existing_period(self):
+		start = getdate("2026-05-04")
+		employee = self.make_employee("ot-eligibility@example.com")
+		self.make_attendance_days(employee, start, [8] * 10)
+		self.make_attendance(employee, add_days(start, 10), 10)
+		end = add_days(start, 10)
+
 		self.assertEqual(
-			getdate(additional_salary),
-			getdate(relieving_date),
-			"Additional Salary payroll_date must equal relieving_date",
-		)
-
-		# creating slips from the client sends the payroll entry dates as strings,
-		# so the capped end_date must stay comparable with start_date in validate()
-		frappe.db.delete("Additional Salary", {"ref_docname": slip.name})
-		slip.cancel()
-		frappe.delete_doc("Overtime Slip", slip.name, force=True)
-
-		create_overtime_slips_for_employees(
+			filter_employees_for_overtime_slip_creation(start, end, [employee]),
 			[employee],
-			frappe._dict(
-				{
-					"posting_date": str(dates.end_date),
-					"start_date": str(dates.start_date),
-					"end_date": str(dates.end_date),
-					"company": "_Test Company",
-					"currency": company.default_currency,
-					"payroll_entry": payroll_entry.name,
-				}
-			),
 		)
 
-		slip_name = frappe.db.get_value("Overtime Slip", {"employee": employee}, "name")
-		self.assertTrue(slip_name, "Overtime Slip not created when dates are passed as strings")
+		slip = frappe.get_doc(
+			{
+				"doctype": "Overtime Slip",
+				"employee": employee,
+				"company": "_Test Company",
+				"posting_date": end,
+				"start_date": start,
+				"end_date": end,
+			}
+		)
+		slip.get_emp_and_overtime_details()
 		self.assertEqual(
-			getdate(frappe.db.get_value("Overtime Slip", slip_name, "end_date")),
-			getdate(relieving_date),
-			"end_date must be capped at relieving_date when dates are passed as strings",
+			filter_employees_for_overtime_slip_creation(start, end, [employee]),
+			[],
 		)
 
+	def test_missing_hr_settings_field_uses_default(self):
+		employee = self.make_employee("ot-missing-field@example.com")
+		if frappe.get_meta("Employee").has_field("overtime_threshold_hours"):
+			frappe.db.set_value("Employee", employee, "overtime_threshold_hours", None)
+		employee_meta = frappe.get_meta("Employee")
+		hr_meta = frappe._dict(has_field=lambda _name: False)
+		with patch("hrms.hr.doctype.overtime_slip.overtime_slip.frappe.get_meta") as get_meta:
+			get_meta.side_effect = lambda doctype: hr_meta if doctype == "HR Settings" else employee_meta
+			self.assertEqual(get_employee_overtime_threshold(employee), DEFAULT_OVERTIME_THRESHOLD_HOURS)
 
-def create_overtime_slip(employee):
-	date = getdate()
-	month_start_date = get_first_day(date)
-	slip = frappe.new_doc("Overtime Slip")
-	slip.employee = employee
-	slip.posting_date = today()
-	slip.start_date = month_start_date
-	slip.end_date = add_days(month_start_date, 2)
-	slip.get_emp_and_overtime_details()
-	return slip
+	def make_employee(self, email):
+		employee = make_employee(email, company="_Test Company")
+		if frappe.get_meta("Employee").has_field("overtime_threshold_hours"):
+			frappe.db.set_value("Employee", employee, "overtime_threshold_hours", 80)
+		return employee
 
+	def make_attendance_days(self, employee, start, hours):
+		for offset, value in enumerate(hours):
+			self.make_attendance(employee, add_days(start, offset), value)
 
-def create_checkin_records_for_overtime(employee):
-	date = getdate()
-	month_start_date = get_first_day(date)
-	checkin_times = [
-		(f"{month_start_date} 7:00:00", "IN"),
-		(f"{month_start_date} 13:00:00", "OUT"),
-		(f"{add_days(month_start_date, 1)} 7:00:00", "IN"),
-		(f"{add_days(month_start_date, 1)} 13:00:00", "OUT"),
-	]
-	for time, log_type in checkin_times:
-		make_checkin(employee, time=time, log_type=log_type)
-
-
-def setup_overtime(employee, overtime_calculation_method="Salary Component Based"):
-	overtime_type = create_overtime_type(overtime_calculation_method=overtime_calculation_method)
-
-	date = getdate()
-	month_start_date = get_first_day(date)
-	shift_type = setup_shift_type(
-		company="_Test Company",
-		shift_type="_Test Overtime Shift",
-		allow_overtime=1,
-		overtime_type=overtime_type.name,
-		last_sync_of_checkin=f"{add_days(date, 10)} 15:00:00",
-		process_attendance_after=add_days(month_start_date, -1),
-		mark_auto_attendance_on_holidays=1,
-	)
-
-	make_shift_assignment(
-		shift_type=shift_type.name, employee=employee, start_date=add_days(month_start_date, -1)
-	)
-	create_checkin_records_for_overtime(employee)
-	shift_type.process_auto_attendance()
-
-	slip = create_overtime_slip(employee)
-	slip.submit()
-
-	overtime_details = frappe.get_all(
-		"Overtime Details",
-		filters={"parent": slip.name},
-		fields=["overtime_type", "overtime_duration", "date", "standard_working_hours"],
-	)
-
-	total_overtime_hours = sum(detail["overtime_duration"] for detail in overtime_details)
-
-	return overtime_type, slip, total_overtime_hours
+	def make_attendance(self, employee, attendance_date, hours):
+		doc = frappe.get_doc(
+			{
+				"doctype": "Attendance",
+				"employee": employee,
+				"company": "_Test Company",
+				"attendance_date": attendance_date,
+				"status": "Present",
+				"working_hours": hours,
+			}
+		)
+		doc.insert()
+		doc.submit()
+		return doc

@@ -225,13 +225,57 @@ def parse_requested_times(note: str | None, current_in=None, current_out=None) -
 	return {"in_time": in_time, "out_time": out_time}
 
 
-def serialize_adjustment(doc) -> dict:
+def _requested_duration(in_time, out_time) -> float | None:
+	start = time_to_str(in_time)
+	finish = time_to_str(out_time)
+	if not start or not finish:
+		return None
+	start_time = get_time(start)
+	finish_time = get_time(finish)
+	start_seconds = start_time.hour * 3600 + start_time.minute * 60 + start_time.second
+	finish_seconds = finish_time.hour * 3600 + finish_time.minute * 60 + finish_time.second
+	duration = finish_seconds - start_seconds
+	if duration < 0:
+		duration += 24 * 3600
+	return round(duration / 3600, 2)
+
+
+def _hours_label(hours: float | None) -> str:
+	if hours is None:
+		return "—"
+	return f"{hours:g}h"
+
+
+def _employee_summary(employee: str | None) -> dict:
+	if not employee:
+		return {}
+	return (
+		frappe.db.get_value(
+			"Employee",
+			employee,
+			["image", "designation", "employment_type"],
+			as_dict=True,
+		)
+		or {}
+	)
+
+
+def serialize_adjustment(doc, employee_details: dict | None = None) -> dict:
+	details = employee_details if employee_details is not None else _employee_summary(doc.employee)
+	requested_in = time_to_str(doc.requested_in_time) or time_to_str(doc.current_in_time)
+	requested_out = time_to_str(doc.requested_out_time) or time_to_str(doc.current_out_time)
+	requested_hours = _requested_duration(requested_in, requested_out)
+	attendance_date = getdate(doc.attendance_date) if doc.attendance_date else None
 	return {
 		"name": doc.name,
 		"employee": doc.employee,
 		"employee_name": doc.employee_name,
 		"department": doc.department,
-		"attendance_date": str(getdate(doc.attendance_date)) if doc.attendance_date else "",
+		"image": details.get("image"),
+		"designation": details.get("designation"),
+		"employment_type": details.get("employment_type"),
+		"attendance_date": str(attendance_date) if attendance_date else "",
+		"date_label": attendance_date.strftime("%d/%m") if attendance_date else "",
 		"attendance": doc.attendance,
 		"action": doc.action,
 		"in_log": doc.in_log,
@@ -240,6 +284,10 @@ def serialize_adjustment(doc) -> dict:
 		"current_out_time": time_to_str(doc.current_out_time),
 		"requested_in_time": time_to_str(doc.requested_in_time),
 		"requested_out_time": time_to_str(doc.requested_out_time),
+		"effective_in_time": requested_in,
+		"effective_out_time": requested_out,
+		"requested_hours": requested_hours,
+		"requested_hours_label": _hours_label(requested_hours),
 		"note": doc.note,
 		"status": doc.status,
 		"requested_by": doc.requested_by,
@@ -558,6 +606,17 @@ def get_time_clock_adjustments(
 		order_by="attendance_date desc, creation desc",
 		limit=200,
 	)
+	employees = {row.employee for row in rows if row.employee}
+	employee_details = {}
+	if employees:
+		employee_details = {
+			row.name: row
+			for row in frappe.get_all(
+				"Employee",
+				filters={"name": ["in", list(employees)]},
+				fields=["name", "image", "designation", "employment_type"],
+			)
+		}
 	departments = sorted(
 		{
 			row.department
@@ -566,7 +625,7 @@ def get_time_clock_adjustments(
 		}
 	)
 	return {
-		"rows": [serialize_adjustment(row) for row in rows],
+		"rows": [serialize_adjustment(row, employee_details.get(row.employee, {})) for row in rows],
 		"departments": departments,
 		"status": selected,
 	}

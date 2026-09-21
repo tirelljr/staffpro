@@ -1,0 +1,322 @@
+body.staff-pro-alive #page-time-clock-adjustments,
+body.staff-pro-alive .page-container[data-page-route="time-clock-adjustments"] {
+	background: var(--sp-canvas, #f4f4f4) !important;
+}
+
+body.staff-pro-alive #page-time-clock-adjustments .layout-main-section-wrapper,
+body.staff-pro-alive #page-time-clock-adjustments .page-body,
+body.staff-pro-alive .page-container[data-page-route="time-clock-adjustments"] .layout-main-section-wrapper,
+body.staff-pro-alive .page-container[data-page-route="time-clock-adjustments"] .page-body {
+	background: var(--sp-canvas, #f4f4f4) !important;
+}
+
+body.staff-pro-alive #page-time-clock-adjustments .layout-main-section,
+body.staff-pro-alive .page-container[data-page-route="time-clock-adjustments"] .layout-main-section {
+	padding: 8px 20px 32px !important;
+	border: 0 !important;
+	background: transparent !important;
+	box-shadow: none !important;
+}
+
+body.staff-pro-alive #page-time-clock-adjustments .page-head,
+body.staff-pro-alive .page-container[data-page-route="time-clock-adjustments"] .page-head {
+	border-bottom: 0 !important;
+	background: transparent !important;
+	box-shadow: none !important;
+}
+
+.sp-tca-page {
+	padding: 0 0 24px;
+	color: var(--sp-ink, #111827);
+}
+
+.sp-tca__card {
+	padding-top: 14px;
+}
+
+.sp-tca__toolbar {
+	margin-bottom: 4px;
+}
+
+.sp-tca__filter-menu {
+	z-index: 30;
+}
+
+.sp-tca__date {
+	padding-right: 8px;
+}
+
+.sp-tca__date-input {
+	width: 112px;
+	border: 0;
+	outline: 0;
+	background: transparent;
+	color: var(--sp-ink, #111827);
+	font: inherit;
+	font-size: 13px;
+}
+
+.sp-tca__date-input::-webkit-calendar-picker-indicator {
+	cursor: pointer;
+	opacity: 0.55;
+}
+
+.sp-tca__date-clear {
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	color: var(--sp-soft, #6b7280);
+	font: inherit;
+	font-size: 16px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.sp-tca__summary {
+	min-height: 28px;
+	padding: 2px 8px 8px;
+	color: var(--sp-muted, #6b7280);
+	font-size: 12px;
+}
+
+.sp-tca__table-head,
+.sp-tca__row {
+	display: grid;
+	grid-template-columns:
+		64px minmax(190px, 1.5fr) minmax(115px, 0.85fr) 120px 92px
+		105px 105px 66px minmax(146px, 0.9fr);
+	align-items: center;
+	gap: 12px;
+	width: 100%;
+	min-width: 1120px;
+}
+
+.sp-tca__table-head {
+	padding: 10px 8px;
+	color: var(--sp-soft, #6b7280);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.sp-tca__row {
+	min-height: 62px;
+	padding: 10px 8px;
+	border-top: 1px solid #eef1f4;
+	background: #fff;
+	color: var(--sp-ink, #111827);
+	font-size: 13px;
+}
+
+.sp-tca__row:hover {
+	background: #fafbfc;
+}
+
+.sp-tca__list.is-loading {
+	min-height: 120px;
+	opacity: 0.55;
+}
+
+.sp-tca__date-cell,
+.sp-tca__hours,
+.sp-tca__time-primary {
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.sp-tca__employee {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+
+.sp-tca__avatar {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	overflow: hidden;
+	flex: 0 0 32px;
+	border-radius: 50%;
+	background: #eef2f6;
+}
+
+.sp-tca__avatar-img,
+.sp-tca__avatar-fallback {
+	width: 100%;
+	height: 100%;
+}
+
+.sp-tca__avatar-img {
+	object-fit: cover;
+}
+
+.sp-tca__avatar-fallback {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	color: #334155;
+	font-size: 11px;
+	font-weight: 700;
+}
+
+.sp-tca__employee-copy {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.sp-tca__employee-copy strong,
+.sp-tca__role,
+.sp-tca__note {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.sp-tca__note {
+	max-width: 220px;
+	color: var(--sp-muted, #6b7280);
+	font-size: 11px;
+}
+
+.sp-tca__employment,
+.sp-tca__status {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 22px;
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+	white-space: nowrap;
+}
+
+.sp-tca__employment {
+	background: #fce7f3;
+	color: #9d174d;
+}
+
+.sp-tca__employment.is-part-time {
+	background: #fff7ed;
+	color: #9a3412;
+}
+
+.sp-tca__status.is-pending {
+	background: #fff7ed;
+	color: #9a3412;
+}
+
+.sp-tca__status.is-approved {
+	background: #e8f8ef;
+	color: #15803d;
+}
+
+.sp-tca__status.is-rejected {
+	background: #fdecec;
+	color: #dc2626;
+}
+
+.sp-tca__time {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.sp-tca__time-current {
+	color: var(--sp-muted, #6b7280);
+	font-size: 10px;
+	white-space: nowrap;
+}
+
+.sp-tca__hours {
+	font-weight: 600;
+}
+
+.sp-tca__actions,
+.sp-tca__actions .sp-tca-banner__actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.sp-tca-page .sp-tca-btn {
+	height: 28px;
+	padding: 0 10px;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	font: inherit;
+	font-size: 11px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.sp-tca-page .sp-tca-btn.is-approve {
+	border-color: #16a34a;
+	background: #16a34a;
+	color: #fff;
+}
+
+.sp-tca-page .sp-tca-btn.is-approve:hover,
+.sp-tca-page .sp-tca-btn.is-approve:focus {
+	border-color: #15803d;
+	background: #15803d;
+}
+
+.sp-tca-page .sp-tca-btn.is-reject {
+	border-color: #ef4444;
+	background: #ef4444;
+	color: #fff;
+}
+
+.sp-tca-page .sp-tca-btn.is-reject:hover,
+.sp-tca-page .sp-tca-btn.is-reject:focus {
+	border-color: #dc2626;
+	background: #dc2626;
+}
+
+.sp-tca-page .sp-tca-btn:disabled {
+	cursor: wait;
+	opacity: 0.55;
+}
+
+.sp-tca__no-action {
+	color: var(--sp-soft, #9ca3af);
+}
+
+.sp-tca__empty {
+	min-height: 260px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-top: 1px solid #eef1f4;
+}
+
+.sp-tca__pager[hidden] {
+	display: none;
+}
+
+@media (max-width: 767px) {
+	body.staff-pro-alive #page-time-clock-adjustments .layout-main-section,
+	body.staff-pro-alive .page-container[data-page-route="time-clock-adjustments"] .layout-main-section {
+		padding-right: 8px !important;
+		padding-left: 8px !important;
+	}
+
+	.sp-tca__card {
+		padding-right: 10px;
+		padding-left: 10px;
+	}
+
+	.sp-tca__date-input {
+		width: 104px;
+	}
+}

@@ -94,7 +94,35 @@ frappe.holiday_work_list = {
 				</section>
 				<section class="sp-dash-panel sp-hwl-detail" aria-label="${this.escape(__("Holiday Work List"))}">
 					<div class="sp-dash-panel__head">
-						<h2 class="sp-dash-panel__title sp-hwl-detail-title">${this.escape(__("Select a holiday"))}</h2>
+						<div class="sp-hwl-detail-heading">
+							<h2 class="sp-dash-panel__title sp-hwl-detail-title">${this.escape(__("Select a holiday"))}</h2>
+							<label class="sp-hwl-deadline">
+								<span class="sp-hwl-deadline__label">${this.escape(__("Notification deadline"))}</span>
+								<div class="sp-hwl-deadline__row">
+									<input type="date" class="sp-hwl-deadline__date" disabled aria-label="${this.escape(__("Deadline date"))}" />
+									<select class="sp-hwl-deadline__hour" disabled aria-label="${this.escape(__("Hour"))}">
+										<option value="">${this.escape(__("Hour"))}</option>
+										${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+											.map((hour) => `<option value="${hour}">${hour}</option>`)
+											.join("")}
+									</select>
+									<span class="sp-hwl-deadline__sep">:</span>
+									<select class="sp-hwl-deadline__minute" disabled aria-label="${this.escape(__("Minute"))}">
+										${this.minute_options()
+											.map((minute) => `<option value="${minute}">${minute}</option>`)
+											.join("")}
+									</select>
+									<select class="sp-hwl-deadline__ampm" disabled aria-label="${this.escape(__("AM or PM"))}">
+										<option value="AM">${this.escape(__("AM"))}</option>
+										<option value="PM" selected>${this.escape(__("PM"))}</option>
+									</select>
+									<button type="button" class="sp-hwl-deadline__clear" disabled>${this.escape(__("Clear"))}</button>
+								</div>
+							</label>
+							<p class="sp-hwl-deadline__hint">${this.escape(
+								__("Agents who do not choose Not Working by this time are counted as Working."),
+							)}</p>
+						</div>
 						<div class="sp-dash-panel__filters">
 							<div class="sp-dash-panel__filter">
 								${this.select_html(
@@ -145,6 +173,117 @@ frappe.holiday_work_list = {
 				frappe.set_route("Form", "Employee", employee);
 			}
 		});
+		this.$body.on("change", ".sp-hwl-deadline__date, .sp-hwl-deadline__hour, .sp-hwl-deadline__minute, .sp-hwl-deadline__ampm", () => {
+			me.commit_deadline();
+		});
+		this.$body.on("click", ".sp-hwl-deadline__clear", () => me.save_deadline(""));
+	},
+
+	minute_options() {
+		return Array.from({ length: 12 }, (_, idx) => String(idx * 5).padStart(2, "0"));
+	},
+
+	parse_deadline(value) {
+		if (!value) {
+			return { date: "", hour: "", minute: "00", ampm: "PM" };
+		}
+		const parsed = moment(value, ["YYYY-MM-DD HH:mm:ss", "YYYY-MM-DD HH:mm", moment.ISO_8601], true);
+		if (!parsed.isValid()) {
+			return { date: "", hour: "", minute: "00", ampm: "PM" };
+		}
+		const hour24 = parsed.hour();
+		const ampm = hour24 >= 12 ? "PM" : "AM";
+		const hour = hour24 % 12 || 12;
+		let minute = parsed.minute();
+		const nearest = Math.round(minute / 5) * 5;
+		minute = nearest === 60 ? 55 : nearest;
+		return {
+			date: parsed.format("YYYY-MM-DD"),
+			hour: String(hour),
+			minute: String(minute).padStart(2, "0"),
+			ampm,
+		};
+	},
+
+	deadline_from_inputs() {
+		const date = this.$body.find(".sp-hwl-deadline__date").val() || "";
+		const hour = cint(this.$body.find(".sp-hwl-deadline__hour").val());
+		const minute = this.$body.find(".sp-hwl-deadline__minute").val() || "00";
+		const ampm = this.$body.find(".sp-hwl-deadline__ampm").val() || "PM";
+		if (!date || !hour) {
+			return "";
+		}
+		let hour24 = hour % 12;
+		if (ampm === "PM") {
+			hour24 += 12;
+		}
+		return `${date} ${String(hour24).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`;
+	},
+
+	deadline_control_focused() {
+		return Boolean(this.$body.find(".sp-hwl-deadline__row :focus").length);
+	},
+
+	commit_deadline() {
+		const value = this.deadline_from_inputs();
+		if (!value) {
+			return;
+		}
+		this.save_deadline(value);
+	},
+
+	save_deadline(value) {
+		const me = this;
+		if (!this.holiday_date || this._saving_deadline) {
+			return;
+		}
+		const current = this.roster?.response_deadline || "";
+		const next = value || "";
+		if ((current || "").slice(0, 16) === (next || "").slice(0, 16)) {
+			return;
+		}
+		this._saving_deadline = true;
+		frappe.call({
+			method: "hrms.hr.page.holiday_work_list.holiday_work_list.set_holiday_work_deadline",
+			args: {
+				holiday_date: this.holiday_date,
+				response_deadline: next,
+			},
+			callback() {
+				me._saving_deadline = false;
+				me.refresh();
+			},
+			error() {
+				me._saving_deadline = false;
+				me.render_deadline();
+			},
+		});
+	},
+
+	render_deadline() {
+		const disabled = !this.holiday_date;
+		const $date = this.$body.find(".sp-hwl-deadline__date");
+		const $hour = this.$body.find(".sp-hwl-deadline__hour");
+		const $minute = this.$body.find(".sp-hwl-deadline__minute");
+		const $ampm = this.$body.find(".sp-hwl-deadline__ampm");
+		const $clear = this.$body.find(".sp-hwl-deadline__clear");
+		if (!$date.length) {
+			return;
+		}
+		$date.add($hour).add($minute).add($ampm).add($clear).prop("disabled", disabled);
+		if (this.deadline_control_focused()) {
+			return;
+		}
+		const parts = this.parse_deadline(this.roster?.response_deadline || "");
+		if (parts.minute && !this.minute_options().includes(parts.minute)) {
+			$minute.append(
+				`<option value="${this.escape(parts.minute)}">${this.escape(parts.minute)}</option>`,
+			);
+		}
+		$date.val(parts.date);
+		$hour.val(parts.hour);
+		$minute.val(parts.minute || "00");
+		$ampm.val(parts.ampm || "PM");
 	},
 
 	empty_html(message) {
@@ -285,12 +424,19 @@ frappe.holiday_work_list = {
 			? this.roster.description
 			: __("Select a holiday");
 		this.$body.find(".sp-hwl-detail-title").text(title);
+		this.render_deadline();
 		const working = this.roster?.working_count || 0;
 		const notWorking = this.roster?.not_working_count || 0;
 		if (this.roster) {
+			const deadlineLabel = this.roster.response_deadline
+				? this.roster.deadline_passed
+					? __("Deadline passed — non-responders are Working.")
+					: __("Non-responders are counted as Working until they choose Not Working.")
+				: "";
 			this.$body.find(".sp-hwl-totals").html(`
 				<span><strong>${this.escape(__("Working"))}:</strong> ${working}</span>
 				<span><strong>${this.escape(__("Not Working"))}:</strong> ${notWorking}</span>
+				${deadlineLabel ? `<span class="sp-hwl-totals__note">${this.escape(deadlineLabel)}</span>` : ""}
 			`);
 		} else {
 			this.$body.find(".sp-hwl-totals").empty();
@@ -308,8 +454,8 @@ frappe.holiday_work_list = {
 		if (!rows.length) {
 			const message =
 				this.status === "Working"
-					? __("No one has elected to work on this holiday.")
-					: __("Everyone eligible has elected to work.");
+					? __("No one is scheduled to work on this holiday.")
+					: __("Everyone eligible is scheduled to work.");
 			$list.html(this.empty_html(message));
 			return;
 		}
@@ -323,7 +469,9 @@ frappe.holiday_work_list = {
 						<span class="sp-hwl-person__name">${this.escape(row.employee_name || row.employee || "")}</span>
 						${row.department ? `<span class="sp-hwl-person__dept">${this.escape(row.department)}</span>` : ""}
 					</span>
-					<span class="sp-hwl-person__status${row.will_work ? " is-working" : ""}">${this.escape(row.status)}</span>
+					<span class="sp-hwl-person__status${row.will_work ? " is-working" : ""}">${this.escape(
+						row.assumed_working ? __("Working (default)") : row.status,
+					)}</span>
 				</button>
 			`,
 				)

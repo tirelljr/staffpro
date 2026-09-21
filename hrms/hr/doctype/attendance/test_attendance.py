@@ -509,6 +509,17 @@ class TestAttendance(HRMSTestSuite):
 		self.assertEqual(entry["out_time"], "18:00:00")
 		self.assertEqual(entry["comment"], "updated")
 
+	def test_set_clock_times_replaces_existing_punches(self):
+		from hrms.hr.doctype.attendance.attendance import set_clock_times
+
+		employee = make_employee("test_hours_set_clock@example.com", company="_Test Company")
+		date = nowdate()
+		add_hours_entry(employee, date, "09:00:00", "17:00:00")
+		name = set_clock_times(employee=employee, attendance_date=date, in_time="10:00 AM", out_time="4:00 PM")
+		entry = get_hours_entry(name)
+		self.assertEqual(entry["in_time"], "10:00:00")
+		self.assertEqual(entry["out_time"], "16:00:00")
+
 	def test_add_hours_entries_creates_for_each_employee(self):
 		employee_one = make_employee("test_hours_bulk_one@example.com", company="_Test Company")
 		employee_two = make_employee("test_hours_bulk_two@example.com", company="_Test Company")

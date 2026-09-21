@@ -262,6 +262,36 @@ body.staff-pro-has-topbar .dock {
 .dock .dock-shortcuts:empty + .dock-divider {
 	display: none !important;
 }
+.workspace-dock .expand-sidebar-link,
+.workspace-dock .expand-sidebar-link.dock-toggle-btn,
+.dock .expand-sidebar-link,
+.dock .expand-sidebar-link.dock-toggle-btn {
+	order: -10 !important;
+	flex: 0 0 auto !important;
+	align-self: center !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	width: 24px !important;
+	height: 24px !important;
+	margin: 0 0 8px !important;
+	padding: 0 !important;
+	border: 0 !important;
+	background: transparent !important;
+	color: #000000 !important;
+	box-shadow: none !important;
+	cursor: pointer !important;
+}
+.workspace-dock .expand-sidebar-link svg,
+.workspace-dock .expand-sidebar-link .icon,
+.dock .expand-sidebar-link svg,
+.dock .expand-sidebar-link .icon {
+	width: 16px !important;
+	height: 16px !important;
+	color: #000000 !important;
+	stroke: #000000 !important;
+	fill: none !important;
+}
 .dock .dock-user {
 	width: 32px !important;
 	height: 32px !important;
@@ -307,6 +337,7 @@ body.staff-pro-has-topbar .dock {
 	min-height: 100dvh !important;
 	max-height: none !important;
 	overflow: hidden !important;
+	background: transparent !important;
 }
 body.staff-pro-has-topbar .body-sidebar-container {
 	min-height: calc(100vh - var(--staff-pro-topbar-height, 56px)) !important;
@@ -585,7 +616,8 @@ body.staff-pro-has-topbar .body-sidebar-container {
 .body-sidebar .collapse-sidebar-link.sidebar-toggle-btn {
 	position: absolute !important;
 	top: 12px !important;
-	right: 6px !important;
+	left: auto !important;
+	right: 8px !important;
 	z-index: 3 !important;
 	display: inline-flex !important;
 	align-items: center !important;
@@ -629,7 +661,7 @@ body.staff-pro-has-topbar .body-sidebar-container {
 	pointer-events: none;
 }
 .body-sidebar-container:not(.expanded) .body-sidebar .collapse-sidebar-link {
-	pointer-events: auto !important;
+	display: none !important;
 }
 
 body.staff-pro-hide-form-sidebar .layout-side-section.right,
@@ -1106,7 +1138,19 @@ function is_hidden_sidebar_item($item) {
 const SIDEBAR_COLLAPSE_ICON = `<svg class="icon icon-sm" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5" stroke="#000000" stroke-width="1.5"/><path d="M6.25 2.5v11" stroke="#000000" stroke-width="1.5"/><path d="M11.2 6.15 8.7 8l2.5 1.85" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const SIDEBAR_EXPAND_ICON = `<svg class="icon icon-sm" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5" stroke="#000000" stroke-width="1.5"/><path d="M6.25 2.5v11" stroke="#000000" stroke-width="1.5"/><path d="M8.7 6.15 11.2 8l-2.5 1.85" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
+function reposition_sidebar_toggles() {
+	const dock = document.querySelector(".dock, .workspace-dock");
+	if (dock) {
+		const expandBtn = dock.querySelector("button.expand-sidebar-link");
+		if (expandBtn?.parentElement === dock && dock.firstElementChild !== expandBtn) {
+			dock.insertBefore(expandBtn, dock.firstElementChild);
+		}
+	}
+}
+
 function style_sidebar_collapse_toggle() {
+	reposition_sidebar_toggles();
+
 	const sidebar = document.querySelector(".body-sidebar");
 	if (!sidebar) return;
 

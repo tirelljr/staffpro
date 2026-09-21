@@ -27,7 +27,10 @@ def get_adjustments(
 ) -> dict:
 	_assert_hr()
 	return get_time_clock_adjustments(
-		status=status, department=department, from_date=from_date, to_date=to_date
+		status=status,
+		department=department,
+		from_date=from_date,
+		to_date=to_date,
 	)
 
 

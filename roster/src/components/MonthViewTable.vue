@@ -497,8 +497,8 @@ const handleShifts = (
 			shift_type: event.shift_type,
 			shift_location: event.shift_location,
 			status: event.status,
-			start_time: dayjs(event.start_time, "hh:mm:ss").format("HH:mm"),
-			end_time: dayjs(event.end_time, "hh:mm:ss").format("HH:mm"),
+			start_time: dayjs(event.start_time, ["HH:mm:ss", "HH:mm"]).format("h:mm A"),
+			end_time: dayjs(event.end_time, ["HH:mm:ss", "HH:mm"]).format("h:mm A"),
 			color: event.color.toLowerCase() as Color,
 		});
 	}
@@ -507,7 +507,11 @@ const handleShifts = (
 const sortShiftsByStartTime = (mappedEvents: MappedEvents, employee: string, key: string) => {
 	const entry = mappedEvents[employee][key];
 	if (entry && typeof entry === "object" && "shift" in entry && Array.isArray(entry.shift))
-		entry.shift.sort((a: Shift, b: Shift) => a.start_time.localeCompare(b.start_time));
+		entry.shift.sort(
+			(a: Shift, b: Shift) =>
+				dayjs(a.start_time, ["h:mm A", "HH:mm", "HH:mm:ss"]).valueOf() -
+				dayjs(b.start_time, ["h:mm A", "HH:mm", "HH:mm:ss"]).valueOf(),
+		);
 };
 </script>
 

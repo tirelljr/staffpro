@@ -11,10 +11,11 @@ header.staff-pro-topbar {
 	margin: 0 !important;
 	padding: 0 !important;
 	overflow: visible !important;
-	background: #ffffff !important;
+	background: transparent !important;
 	border: 0 !important;
-	border-bottom: 1px solid #ececec !important;
+	border-bottom: 0 !important;
 	box-shadow: none !important;
+	opacity: 1 !important;
 	flex: 0 0 56px !important;
 }
 .staff-pro-topbar *,
@@ -34,6 +35,8 @@ header.staff-pro-topbar {
 	gap: 16px !important;
 	overflow: visible !important;
 	position: relative !important;
+	background: transparent !important;
+	opacity: 1 !important;
 }
 .staff-pro-topbar__left {
 	display: flex !important;
@@ -42,6 +45,7 @@ header.staff-pro-topbar {
 	min-width: 140px !important;
 	max-width: 220px !important;
 	flex: 0 1 180px !important;
+	z-index: 1 !important;
 }
 .staff-pro-topbar__id {
 	font-size: 11px !important;
@@ -76,23 +80,26 @@ header.staff-pro-topbar {
 	flex-direction: row !important;
 	align-items: center !important;
 	justify-content: center !important;
-	flex: 1 1 auto !important;
-	min-width: 0 !important;
-	position: relative !important;
-	left: auto !important;
-	top: auto !important;
-	transform: none !important;
+	position: absolute !important;
+	left: 50% !important;
+	top: 50% !important;
+	transform: translate(-50%, -50%) !important;
+	flex: 0 0 288px !important;
+	width: 288px !important;
+	max-width: calc(100% - 32px) !important;
+	min-width: 288px !important;
 	overflow: visible !important;
 	pointer-events: auto !important;
-	width: auto !important;
-	max-width: none !important;
+	z-index: 2 !important;
 }
 .staff-pro-topbar__search-wrap {
 	position: relative !important;
-	width: 320px !important;
+	display: block !important;
+	width: 288px !important;
 	max-width: 100% !important;
+	min-width: 288px !important;
 	overflow: visible !important;
-	flex-shrink: 0 !important;
+	flex: 0 0 288px !important;
 }
 .staff-pro-topbar__search {
 	display: flex !important;
@@ -106,7 +113,7 @@ header.staff-pro-topbar {
 	border: 0 !important;
 	border-radius: 999px !important;
 	background: #f3f4f6 !important;
-	box-shadow: none !important;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 6px 14px rgba(15, 23, 42, 0.08) !important;
 	cursor: text !important;
 	color: #9ca3af !important;
 	font: inherit !important;
@@ -116,7 +123,7 @@ header.staff-pro-topbar {
 }
 .staff-pro-topbar__search.is-open {
 	background: #eceef1 !important;
-	box-shadow: 0 0 0 1px #e5e7eb !important;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 18px rgba(15, 23, 42, 0.1) !important;
 }
 .staff-pro-topbar__search .icon,
 .staff-pro-topbar__search svg {
@@ -128,6 +135,8 @@ header.staff-pro-topbar {
 .staff-pro-topbar__search-input,
 .staff-pro-topbar__search-field {
 	flex: 1 1 auto !important;
+	width: 100% !important;
+	max-width: none !important;
 	min-width: 0 !important;
 	height: 100% !important;
 	margin: 0 !important;
@@ -289,13 +298,58 @@ header.staff-pro-topbar {
 	color: #9ca3af !important;
 	flex-shrink: 0 !important;
 }
+.staff-pro-topbar__ask-ai {
+	display: inline-flex !important;
+	flex-direction: row !important;
+	align-items: center !important;
+	justify-content: center !important;
+	gap: 8px !important;
+	flex: 0 0 auto !important;
+	height: 36px !important;
+	margin: 0 !important;
+	padding: 0 14px !important;
+	border: 0 !important;
+	border-radius: 999px !important;
+	background: #111111 !important;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 6px 14px rgba(15, 23, 42, 0.12) !important;
+	color: #ffffff !important;
+	font: inherit !important;
+	font-size: 13px !important;
+	font-weight: 600 !important;
+	line-height: 1 !important;
+	letter-spacing: 0.01em !important;
+	white-space: nowrap !important;
+	cursor: pointer !important;
+	appearance: none !important;
+	-webkit-appearance: none !important;
+	z-index: 1 !important;
+}
+.staff-pro-topbar__ask-ai:hover,
+.staff-pro-topbar__ask-ai:focus-visible {
+	background: #000000 !important;
+	outline: none !important;
+}
+.staff-pro-topbar__ask-ai svg {
+	width: 14px !important;
+	height: 14px !important;
+	flex-shrink: 0 !important;
+	stroke: currentColor !important;
+	fill: currentColor !important;
+}
 .staff-pro-topbar__right {
 	display: flex !important;
 	flex-direction: row !important;
 	align-items: center !important;
 	justify-content: flex-end !important;
-	gap: 8px !important;
+	gap: 2px !important;
 	flex: 0 0 auto !important;
+	margin-left: 0 !important;
+	height: 36px !important;
+	padding: 2px 4px !important;
+	border-radius: 999px !important;
+	background: #f3f4f6 !important;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 6px 14px rgba(15, 23, 42, 0.08) !important;
+	z-index: 1 !important;
 }
 .staff-pro-topbar__icon-btn,
 .staff-pro-topbar__avatar {
@@ -303,13 +357,13 @@ header.staff-pro-topbar {
 	flex-direction: row !important;
 	align-items: center !important;
 	justify-content: center !important;
-	width: 36px !important;
-	height: 36px !important;
+	width: 32px !important;
+	height: 32px !important;
 	margin: 0 !important;
 	padding: 0 !important;
 	border: 0 !important;
 	border-radius: 50% !important;
-	background: #f3f4f6 !important;
+	background: transparent !important;
 	box-shadow: none !important;
 	cursor: pointer !important;
 	appearance: none !important;
@@ -345,13 +399,16 @@ header.staff-pro-topbar {
 }
 .staff-pro-topbar__avatar .avatar,
 .staff-pro-topbar__avatar .avatar-frame {
-	width: 36px !important;
-	height: 36px !important;
+	width: 32px !important;
+	height: 32px !important;
 	border-radius: 50% !important;
 }
 .staff-pro-topbar__lang-wrap { position: relative !important; }
-.staff-pro-topbar__lang.is-open {
-	background: #eceef1 !important;
+.staff-pro-topbar__icon-btn:hover,
+.staff-pro-topbar__avatar:hover,
+.staff-pro-topbar__lang.is-open,
+.staff-pro-topbar__icon-btn.is-open {
+	background: #e8eaed !important;
 }
 .staff-pro-topbar__menu {
 	position: fixed !important;
@@ -389,15 +446,13 @@ header.staff-pro-topbar {
 .staff-pro-topbar__notifications-panel {
 	position: fixed !important;
 	z-index: 1050 !important;
-	width: min(360px, calc(100vw - 24px)) !important;
-	max-height: min(480px, calc(100vh - 80px)) !important;
-	display: flex !important;
-	flex-direction: column !important;
-	border-radius: 12px !important;
-	background: #fff !important;
-	border: 1px solid #eef0f2 !important;
-	box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12) !important;
-	overflow: hidden !important;
+	width: min(400px, calc(100vw - 24px)) !important;
+	display: block !important;
+	padding-top: 7px !important;
+	background: transparent !important;
+	border: 0 !important;
+	box-shadow: none !important;
+	overflow: visible !important;
 }
 .staff-pro-topbar__notifications-panel.hidden,
 .staff-pro-topbar__menu.hidden {
@@ -412,39 +467,88 @@ header.staff-pro-topbar {
 .staff-pro-topbar__notifications-backdrop.hidden {
 	display: none !important;
 }
+.staff-pro-topbar__notifications-caret {
+	position: absolute !important;
+	top: 0 !important;
+	right: 18px !important;
+	width: 14px !important;
+	height: 14px !important;
+	background: #fff !important;
+	border-left: 1px solid #eef0f2 !important;
+	border-top: 1px solid #eef0f2 !important;
+	transform: rotate(45deg) !important;
+	z-index: 2 !important;
+	pointer-events: none !important;
+}
+.staff-pro-topbar__notifications-card {
+	position: relative !important;
+	display: flex !important;
+	flex-direction: column !important;
+	min-height: 0 !important;
+	max-height: min(640px, calc(100vh - 80px)) !important;
+	border-radius: 20px !important;
+	background: #fff !important;
+	border: 1px solid #eef0f2 !important;
+	box-shadow: 0 18px 44px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+	overflow: hidden !important;
+}
 .staff-pro-topbar__notifications-header {
+	padding: 18px 20px 4px !important;
+	border: 0 !important;
+}
+.staff-pro-topbar__notifications-title {
+	font-size: 15px !important;
+	font-weight: 700 !important;
+	color: #111827 !important;
+	line-height: 1.3 !important;
+}
+.staff-pro-topbar__notifications-toolbar {
 	display: flex !important;
 	align-items: center !important;
 	justify-content: space-between !important;
 	gap: 12px !important;
-	padding: 12px 14px !important;
-	border-bottom: 1px solid #eef0f2 !important;
+	padding: 8px 20px 12px !important;
 }
-.staff-pro-topbar__notifications-title {
-	font-size: 14px !important;
-	font-weight: 700 !important;
-	color: #111827 !important;
-}
-.staff-pro-topbar__notifications-actions {
+.staff-pro-topbar__notifications-tabs {
 	display: flex !important;
 	align-items: center !important;
-	gap: 4px !important;
+	gap: 16px !important;
 }
-.staff-pro-topbar__notifications-action {
+.staff-pro-topbar__notifications-tab {
+	padding: 0 !important;
+	border: 0 !important;
+	background: transparent !important;
+	font-family: inherit !important;
+	font-size: 13px !important;
+	font-weight: 600 !important;
+	color: #9ca3af !important;
+	cursor: pointer !important;
+	line-height: 1.3 !important;
+}
+.staff-pro-topbar__notifications-tab.is-active {
+	color: #111827 !important;
+}
+.staff-pro-topbar__notifications-mark-read {
 	display: inline-flex !important;
 	align-items: center !important;
-	justify-content: center !important;
-	width: 28px !important;
-	height: 28px !important;
+	gap: 6px !important;
+	padding: 0 !important;
 	border: 0 !important;
-	border-radius: 8px !important;
 	background: transparent !important;
-	color: #6b7280 !important;
+	font-family: inherit !important;
+	font-size: 12px !important;
+	font-weight: 500 !important;
+	color: #9ca3af !important;
 	cursor: pointer !important;
+	white-space: nowrap !important;
 }
-.staff-pro-topbar__notifications-action:hover {
-	background: #f3f4f6 !important;
-	color: #111827 !important;
+.staff-pro-topbar__notifications-mark-read:hover {
+	color: #6b7280 !important;
+}
+.staff-pro-topbar__notifications-mark-read svg {
+	width: 14px !important;
+	height: 14px !important;
+	stroke: currentColor !important;
 }
 .staff-pro-topbar__notifications-body {
 	flex: 1 1 auto !important;
@@ -454,39 +558,102 @@ header.staff-pro-topbar {
 .staff-pro-topbar__notification-item {
 	display: flex !important;
 	align-items: flex-start !important;
-	gap: 10px !important;
+	gap: 12px !important;
 	width: 100% !important;
-	padding: 12px 14px !important;
+	padding: 14px 20px !important;
 	border: 0 !important;
 	border-bottom: 1px solid #f3f4f6 !important;
-	background: transparent !important;
+	background: #fff !important;
 	text-align: left !important;
 	cursor: pointer !important;
 }
+.staff-pro-topbar__notification-item:last-child {
+	border-bottom: 0 !important;
+}
 .staff-pro-topbar__notification-item:hover {
-	background: #f9fafb !important;
+	background: #fafafa !important;
 }
-.staff-pro-topbar__notification-item.is-unread {
-	background: #f8fbff !important;
-}
-.staff-pro-topbar__notification-item .avatar {
-	width: 32px !important;
-	height: 32px !important;
+.staff-pro-topbar__notification-item .avatar,
+.staff-pro-topbar__notification-item .avatar-frame {
+	width: 40px !important;
+	height: 40px !important;
+	margin: 0 !important;
 	flex-shrink: 0 !important;
+	border-radius: 50% !important;
+}
+.staff-pro-topbar__notification-icon {
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	width: 40px !important;
+	height: 40px !important;
+	border-radius: 50% !important;
+	background: #fff6d8 !important;
+	color: #e6a700 !important;
+	flex-shrink: 0 !important;
+}
+.staff-pro-topbar__notification-icon svg {
+	width: 18px !important;
+	height: 18px !important;
 }
 .staff-pro-topbar__notification-content {
 	flex: 1 1 auto !important;
 	min-width: 0 !important;
+	padding-top: 1px !important;
 }
 .staff-pro-topbar__notification-message {
+	display: -webkit-box !important;
+	-webkit-line-clamp: 2 !important;
+	-webkit-box-orient: vertical !important;
+	overflow: hidden !important;
 	font-size: 13px !important;
-	line-height: 1.4 !important;
+	font-weight: 600 !important;
+	line-height: 1.35 !important;
 	color: #111827 !important;
 }
 .staff-pro-topbar__notification-time {
-	margin-top: 4px !important;
-	font-size: 11px !important;
+	display: block !important;
+	margin-top: 3px !important;
+	font-size: 12px !important;
+	font-weight: 400 !important;
 	color: #9ca3af !important;
+}
+.staff-pro-topbar__notification-actions {
+	display: flex !important;
+	align-items: center !important;
+	flex-wrap: wrap !important;
+	gap: 8px !important;
+	margin-top: 10px !important;
+}
+.staff-pro-topbar__notification-btn {
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	height: 28px !important;
+	padding: 0 14px !important;
+	border-radius: 999px !important;
+	font-family: inherit !important;
+	font-size: 12px !important;
+	font-weight: 600 !important;
+	line-height: 1 !important;
+	cursor: pointer !important;
+}
+.staff-pro-topbar__notification-btn--ghost {
+	background: #fff !important;
+	border: 1px solid #e5e7eb !important;
+	color: #111827 !important;
+}
+.staff-pro-topbar__notification-btn--ghost:hover {
+	background: #f9fafb !important;
+}
+.staff-pro-topbar__notification-btn--primary {
+	background: #f5b400 !important;
+	border: 1px solid #f5b400 !important;
+	color: #fff !important;
+}
+.staff-pro-topbar__notification-btn--primary:hover {
+	background: #e6a700 !important;
+	border-color: #e6a700 !important;
 }
 .staff-pro-topbar__notifications-empty,
 .staff-pro-topbar__notifications-loading {
@@ -498,26 +665,6 @@ header.staff-pro-topbar {
 	font-size: 13px !important;
 	color: #6b7280 !important;
 	text-align: center !important;
-}
-.staff-pro-topbar__notifications-footer {
-	padding: 10px 14px !important;
-	border-top: 1px solid #eef0f2 !important;
-}
-.staff-pro-topbar__notifications-footer-btn {
-	display: block !important;
-	width: 100% !important;
-	padding: 8px 12px !important;
-	border: 0 !important;
-	border-radius: 8px !important;
-	background: transparent !important;
-	text-align: center !important;
-	font-size: 13px !important;
-	font-weight: 600 !important;
-	color: #11a5dd !important;
-	cursor: pointer !important;
-}
-.staff-pro-topbar__notifications-footer-btn:hover {
-	background: #f3f4f6 !important;
 }
 .staff-pro-topbar__search-toggle { display: none !important; }
 body.staff-pro-has-topbar .modal:has(.cool-awesomebar-modal-footer),
@@ -553,6 +700,7 @@ hrms.ui.TopBar = class {
 		this.search_seq = 0;
 		this.notifications_loaded = false;
 		this.notifications_loading = false;
+		this.notifications_filter = "all";
 		this.notification_items = [];
 		this.bound = false;
 		this.on_reposition_menu = () => {
@@ -598,6 +746,7 @@ hrms.ui.TopBar = class {
 		this.ensure_language_picker();
 		this.ensure_notifications_picker();
 		this.ensure_search_picker();
+		this.ensure_ask_ai_button();
 		this.patch_native_awesomebar();
 		this.bind();
 		this.refresh_context();
@@ -740,6 +889,33 @@ hrms.ui.TopBar = class {
 		this.mount_search_panel();
 	}
 
+	ask_ai_button_html() {
+		return `
+			<button type="button" class="staff-pro-topbar__ask-ai" data-action="ask-ai" title="${__("Ask AI")}" aria-label="${__("Ask AI")}">
+				<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+					<path d="M12 3l1.55 5.05L18.6 9.6l-5.05 1.55L12 16.2l-1.55-5.05L5.4 9.6l5.05-1.55L12 3z"></path>
+					<path d="M18.4 14.2l.7 2.25 2.25.7-2.25.7-.7 2.25-.7-2.25-2.25-.7 2.25-.7.7-2.25z"></path>
+				</svg>
+				<span>${__("Ask AI")}</span>
+			</button>
+		`;
+	}
+
+	ensure_ask_ai_button() {
+		if (!this.ask_ai_enabled()) {
+			this.$wrapper.find(".staff-pro-topbar__ask-ai").remove();
+			return;
+		}
+		if (this.$wrapper.find(".staff-pro-topbar__ask-ai").length) return;
+		const $right = this.$wrapper.find(".staff-pro-topbar__right");
+		if (!$right.length) return;
+		$right.before(this.ask_ai_button_html());
+	}
+
+	ask_ai_enabled() {
+		return Boolean(frappe.boot?.staff_pro_ask_ai?.enabled);
+	}
+
 	ensure_notifications_picker() {
 		let $wrap = this.$wrapper.find(".staff-pro-topbar__notifications-wrap");
 		const $existingBtn = this.$wrapper.find("[data-action='notifications']").first();
@@ -849,6 +1025,7 @@ hrms.ui.TopBar = class {
 							</div>
 						</div>
 					</div>
+					${this.ask_ai_enabled() ? this.ask_ai_button_html() : ""}
 					<div class="staff-pro-topbar__right">
 						<div class="staff-pro-topbar__icon-btn staff-pro-topbar__search-toggle" data-action="search" role="button" tabindex="0" title="${__("Search")}">
 							${frappe.utils.icon("search", "sm")}
@@ -900,6 +1077,10 @@ hrms.ui.TopBar = class {
 				this.toggle_notifications_panel();
 			});
 			this.$wrapper.on("click", "[data-action='profile']", () => this.open_profile());
+			this.$wrapper.on("click", "[data-action='ask-ai']", (e) => {
+				e.stopPropagation();
+				this.open_ask_ai();
+			});
 			this.$wrapper.on("click", "[data-action='language']", (e) => {
 				e.stopPropagation();
 				this.toggle_language_menu();
@@ -1447,7 +1628,10 @@ hrms.ui.TopBar = class {
 
 		const rect = anchor.getBoundingClientRect();
 		const width = Math.min(Math.max(rect.width, 480), window.innerWidth - 24);
-		let left = rect.left;
+		let left = rect.left + rect.width / 2 - width / 2;
+		if (left < 12) {
+			left = 12;
+		}
 		if (left + width > window.innerWidth - 12) {
 			left = Math.max(12, window.innerWidth - width - 12);
 		}
@@ -1512,45 +1696,92 @@ hrms.ui.TopBar = class {
 		if (!btn) return;
 
 		const rect = btn.getBoundingClientRect();
+		const width = Math.min(400, window.innerWidth - 24);
+		let left = rect.right - width;
+		if (left < 12) left = 12;
+		if (left + width > window.innerWidth - 12) {
+			left = Math.max(12, window.innerWidth - 12 - width);
+		}
+
+		const caretRight = Math.max(16, left + width - (rect.left + rect.width / 2) - 7);
 		$panel.css({
-			top: `${rect.bottom + 8}px`,
-			right: `${window.innerWidth - rect.right}px`,
+			top: `${rect.bottom + 6}px`,
+			left: `${left}px`,
+			right: "auto",
+			width: `${width}px`,
+		});
+		$panel.find(".staff-pro-topbar__notifications-caret").css({
+			right: `${caretRight}px`,
 			left: "auto",
 		});
 	}
 
+	get_unread_count() {
+		const loaded_unread = (this.notification_items || []).filter((item) => !cint(item.read)).length;
+		const boot = cint(frappe.boot?.notification_unread_count || 0);
+		if (this.notifications_loaded) {
+			return Math.max(loaded_unread, boot);
+		}
+		return boot || loaded_unread;
+	}
+
+	sync_notifications_toolbar() {
+		if (!this.$wrapper) return;
+		const count = this.get_unread_count();
+		const $unread = this.$wrapper.find('[data-notifications-filter="unread"]');
+		$unread.text(`${__("Unread")} (${count})`);
+		this.$wrapper.find("[data-notifications-filter]").each((_, el) => {
+			const $tab = $(el);
+			const active = $tab.attr("data-notifications-filter") === this.notifications_filter;
+			$tab.toggleClass("is-active", active).attr("aria-selected", active ? "true" : "false");
+		});
+	}
+
 	render_notifications_shell() {
+		const unread = this.get_unread_count();
 		return `
-			<div class="staff-pro-topbar__notifications-header">
-				<div class="staff-pro-topbar__notifications-title">${__("Notifications")}</div>
-				<div class="staff-pro-topbar__notifications-actions">
-					<button type="button" class="staff-pro-topbar__notifications-action" data-action="mark-all-read" title="${__("Mark all as read")}">
-						${frappe.utils.icon("check-check", "sm")}
-					</button>
-					<button type="button" class="staff-pro-topbar__notifications-action" data-action="notification-settings" title="${__("Notification Settings")}">
-						${frappe.utils.icon("setting", "sm")}
+			<div class="staff-pro-topbar__notifications-caret" aria-hidden="true"></div>
+			<div class="staff-pro-topbar__notifications-card">
+				<div class="staff-pro-topbar__notifications-header">
+					<div class="staff-pro-topbar__notifications-title">${__("Notifications")}</div>
+				</div>
+				<div class="staff-pro-topbar__notifications-toolbar">
+					<div class="staff-pro-topbar__notifications-tabs" role="tablist">
+						<button type="button" class="staff-pro-topbar__notifications-tab is-active" role="tab" aria-selected="true" data-notifications-filter="all">${__("All")}</button>
+						<button type="button" class="staff-pro-topbar__notifications-tab" role="tab" aria-selected="false" data-notifications-filter="unread">${__("Unread")} (${unread})</button>
+					</div>
+					<button type="button" class="staff-pro-topbar__notifications-mark-read" data-action="mark-all-read">
+						<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+						${__("Mark all as read")}
 					</button>
 				</div>
-			</div>
-			<div class="staff-pro-topbar__notifications-body">
-				<div class="staff-pro-topbar__notifications-loading">${__("Loading...")}</div>
-			</div>
-			<div class="staff-pro-topbar__notifications-footer">
-				<button type="button" class="staff-pro-topbar__notifications-footer-btn" data-action="view-all-notifications">
-					${__("See all Activity")}
-				</button>
+				<div class="staff-pro-topbar__notifications-body">
+					<div class="staff-pro-topbar__notifications-loading">${__("Loading...")}</div>
+				</div>
 			</div>
 		`;
 	}
 
-	get_notification_message(notification) {
-		let message = notification.title || notification.subject || notification.description || "";
+	strip_notification_text(value) {
+		if (!value) return "";
 		if (typeof strip_html === "function") {
-			message = strip_html(message);
-		} else if (frappe.utils?.strip_html) {
-			message = frappe.utils.strip_html(message);
+			return strip_html(value);
 		}
+		if (frappe.utils?.strip_html) {
+			return frappe.utils.strip_html(value);
+		}
+		return String(value);
+	}
+
+	get_notification_message(notification) {
+		const message = this.strip_notification_text(
+			notification.title || notification.subject || notification.description || ""
+		);
 		return message || __("New notification");
+	}
+
+	get_notification_haystack(notification) {
+		return `${notification.document_type || ""} ${this.get_notification_message(notification)}`.toLowerCase();
 	}
 
 	get_notification_route(notification) {
@@ -1563,28 +1794,105 @@ hrms.ui.TopBar = class {
 		return null;
 	}
 
+	pretty_notification_time(creation) {
+		if (!creation) return "";
+		try {
+			if (typeof frappe.datetime.prettyDate === "function") {
+				return this.strip_notification_text(frappe.datetime.prettyDate(creation));
+			}
+			return this.strip_notification_text(frappe.datetime.comment_when(creation));
+		} catch (e) {
+			return "";
+		}
+	}
+
+	notification_media_icon(kind) {
+		const icons = {
+			calendar: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="6" width="16" height="14" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M8 4v4M16 4v4M4 11h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`,
+			currency: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.25" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v10M15.2 9.2C15.2 8 13.8 7.2 12 7.2S8.8 8 8.8 9.2 10.2 11.2 12 11.2s3.2.8 3.2 2-1.4 2-3.2 2-3.2-.8-3.2-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`,
+		};
+		return `<span class="staff-pro-topbar__notification-icon">${icons[kind] || icons.calendar}</span>`;
+	}
+
+	get_notification_media(notification) {
+		const haystack = this.get_notification_haystack(notification);
+		if (/(interview)/.test(haystack)) {
+			return this.notification_media_icon("calendar");
+		}
+		if (/(salary|payroll|bonus)/.test(haystack) && !/(leave)/.test(haystack)) {
+			return this.notification_media_icon("currency");
+		}
+		return frappe.avatar(notification.from_user || "Administrator", "avatar-medium");
+	}
+
+	get_notification_actions(notification) {
+		const haystack = this.get_notification_haystack(notification);
+		if (/(contract|appointment letter|job offer|renewal)/.test(haystack)) {
+			return [
+				{ key: "decline", label: __("Decline"), variant: "ghost" },
+				{ key: "open", label: __("Renew"), variant: "primary" },
+			];
+		}
+		if (/(salary structure|salary revision|employee promotion|appraisal)/.test(haystack)) {
+			return [
+				{ key: "open", label: __("Review Revisions"), variant: "primary" },
+			];
+		}
+		return [];
+	}
+
+	render_notification_actions(notification) {
+		const actions = this.get_notification_actions(notification);
+		if (!actions.length) return "";
+		const buttons = actions
+			.map(
+				(action) => `
+					<button type="button" class="staff-pro-topbar__notification-btn staff-pro-topbar__notification-btn--${action.variant}" data-notification-action="${action.key}">
+						${frappe.utils.escape_html(action.label)}
+					</button>
+				`
+			)
+			.join("");
+		return `<div class="staff-pro-topbar__notification-actions">${buttons}</div>`;
+	}
+
+	visible_notifications() {
+		if (this.notifications_filter === "unread") {
+			return this.notification_items.filter((item) => !cint(item.read));
+		}
+		return this.notification_items;
+	}
+
 	render_notifications_list(notifications) {
-		this.notification_items = notifications;
+		this.notification_items = notifications || [];
+		this.sync_notifications_toolbar();
 		const $body = this.$wrapper.find(".staff-pro-topbar__notifications-body");
-		if (!notifications.length) {
-			$body.html(`<div class="staff-pro-topbar__notifications-empty">${__("You have no notifications")}</div>`);
+		const visible = this.visible_notifications();
+		if (!visible.length) {
+			const empty =
+				this.notifications_filter === "unread"
+					? __("No unread notifications")
+					: __("You have no notifications");
+			$body.html(`<div class="staff-pro-topbar__notifications-empty">${empty}</div>`);
 			return;
 		}
 
-		const items = notifications
+		const items = visible
 			.map((notification) => {
-				const unread_class = notification.read ? "" : "is-unread";
+				const unread_class = cint(notification.read) ? "" : "is-unread";
 				const message = frappe.utils.escape_html(this.get_notification_message(notification));
-				const time = frappe.datetime.comment_when(notification.creation);
-				const avatar = frappe.avatar(notification.from_user || "Administrator", "avatar-medium");
+				const time = frappe.utils.escape_html(this.pretty_notification_time(notification.creation));
+				const media = this.get_notification_media(notification);
+				const name = frappe.utils.escape_html(notification.name);
 				return `
-					<button type="button" class="staff-pro-topbar__notification-item ${unread_class}" data-notification="${frappe.utils.escape_html(notification.name)}">
-						${avatar}
-						<span class="staff-pro-topbar__notification-content">
-							<span class="staff-pro-topbar__notification-message">${message}</span>
-							<span class="staff-pro-topbar__notification-time">${frappe.utils.escape_html(time)}</span>
-						</span>
-					</button>
+					<div class="staff-pro-topbar__notification-item ${unread_class}" role="button" tabindex="0" data-notification="${name}">
+						${media}
+						<div class="staff-pro-topbar__notification-content">
+							<div class="staff-pro-topbar__notification-message">${message}</div>
+							<div class="staff-pro-topbar__notification-time">${time}</div>
+							${this.render_notification_actions(notification)}
+						</div>
+					</div>
 				`;
 			})
 			.join("");
@@ -1594,7 +1902,10 @@ hrms.ui.TopBar = class {
 
 	load_notifications(force = false) {
 		if (this.notifications_loading) return;
-		if (this.notifications_loaded && !force) return;
+		if (this.notifications_loaded && !force) {
+			this.render_notifications_list(this.notification_items);
+			return;
+		}
 
 		this.notifications_loading = true;
 		const $body = this.$wrapper.find(".staff-pro-topbar__notifications-body");
@@ -1639,27 +1950,49 @@ hrms.ui.TopBar = class {
 		frappe.set_route(route.split("/").filter(Boolean));
 	}
 
+	mark_notification_read(name) {
+		if (!name) return;
+		frappe.call({
+			method: "frappe.desk.doctype.notification_log.notification_log.mark_as_read",
+			args: { docname: name },
+		});
+		this.notification_items = this.notification_items.map((item) =>
+			item.name === name ? Object.assign({}, item, { read: 1 }) : item
+		);
+		if (frappe.boot && cint(frappe.boot.notification_unread_count) > 0) {
+			frappe.boot.notification_unread_count = cint(frappe.boot.notification_unread_count) - 1;
+		}
+	}
+
 	handle_notification_click(name) {
 		const notification = this.notification_items.find((item) => item.name === name);
+		this.mark_notification_read(name);
 		this.close_notifications_panel();
-		if (name) {
-			frappe.call({
-				method: "frappe.desk.doctype.notification_log.notification_log.mark_as_read",
-				args: { docname: name },
-			});
-		}
 		this.open_notification_route(notification ? this.get_notification_route(notification) : null);
 		this.refresh_notifications();
+	}
+
+	handle_notification_action(name, action) {
+		if (action === "decline") {
+			this.mark_notification_read(name);
+			this.render_notifications_list(this.notification_items);
+			this.refresh_notifications();
+			return;
+		}
+		this.handle_notification_click(name);
 	}
 
 	mark_all_notifications_read() {
 		frappe.call({
 			method: "frappe.desk.doctype.notification_log.notification_log.mark_all_as_read",
 			callback: () => {
-				this.$wrapper.find(".staff-pro-topbar__notification-item").removeClass("is-unread");
+				this.notification_items = this.notification_items.map((item) =>
+					Object.assign({}, item, { read: 1 })
+				);
 				if (frappe.boot) {
 					frappe.boot.notification_unread_count = 0;
 				}
+				this.render_notifications_list(this.notification_items);
 				this.refresh_notifications();
 			},
 		});
@@ -1672,26 +2005,39 @@ hrms.ui.TopBar = class {
 			e.stopPropagation();
 			this.close_notifications_panel();
 		});
-		$panel.off("click.notifications").on("click.notifications", (e) => {
+		$panel.off("click.notifications keydown.notifications");
+		$panel.on("click.notifications", (e) => {
 			e.stopPropagation();
 		});
 		$panel.on("click.notifications", "[data-action='mark-all-read']", (e) => {
 			e.stopPropagation();
 			this.mark_all_notifications_read();
 		});
-		$panel.on("click.notifications", "[data-action='notification-settings']", (e) => {
+		$panel.on("click.notifications", "[data-notifications-filter]", (e) => {
+			e.preventDefault();
 			e.stopPropagation();
-			this.close_notifications_panel();
-			frappe.set_route("Form", "Notification Settings", frappe.session.user);
+			this.notifications_filter = $(e.currentTarget).attr("data-notifications-filter") || "all";
+			this.render_notifications_list(this.notification_items);
 		});
-		$panel.on("click.notifications", "[data-action='view-all-notifications']", (e) => {
+		$panel.on("click.notifications", "[data-notification-action]", (e) => {
+			e.preventDefault();
 			e.stopPropagation();
-			this.close_notifications_panel();
-			frappe.set_route("List", "Notification Log");
+			const $item = $(e.currentTarget).closest("[data-notification]");
+			this.handle_notification_action(
+				$item.attr("data-notification"),
+				$(e.currentTarget).attr("data-notification-action")
+			);
 		});
 		$panel.on("click.notifications", "[data-notification]", (e) => {
+			if ($(e.target).closest("[data-notification-action]").length) return;
 			e.stopPropagation();
-			this.handle_notification_click($(e.currentTarget).data("notification"));
+			this.handle_notification_click($(e.currentTarget).attr("data-notification"));
+		});
+		$panel.on("keydown.notifications", "[data-notification]", (e) => {
+			if (e.key !== "Enter" && e.key !== " ") return;
+			if ($(e.target).closest("[data-notification-action]").length) return;
+			e.preventDefault();
+			this.handle_notification_click($(e.currentTarget).attr("data-notification"));
 		});
 	}
 
@@ -1703,6 +2049,7 @@ hrms.ui.TopBar = class {
 
 		this.close_language_menu();
 		this.close_search_panel();
+		this.notifications_filter = "all";
 		const $panel = this.$wrapper.find(".staff-pro-topbar__notifications-panel");
 		const $btn = this.$wrapper.find("[data-action='notifications']");
 		$panel.html(this.render_notifications_shell());
@@ -1727,6 +2074,17 @@ hrms.ui.TopBar = class {
 		this.$wrapper?.find(".staff-pro-topbar__notifications-panel").addClass("hidden");
 		$(".staff-pro-topbar__notifications-backdrop").addClass("hidden");
 		this.$wrapper?.find("[data-action='notifications']").removeClass("is-open").attr("aria-expanded", "false");
+	}
+
+	open_ask_ai() {
+		if (!this.ask_ai_enabled()) {
+			frappe.show_alert({
+				message: __("Ask AI is turned off. Enable it in System Settings."),
+				indicator: "orange",
+			});
+			return;
+		}
+		frappe.set_route("ask-ai");
 	}
 
 	open_profile() {

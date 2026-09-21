@@ -9,6 +9,7 @@ APP_TITLE = "Staff Pro BPO"
 APP_LOGO = "/assets/hrms/images/staff-pro-bpo-logo.png"
 APP_ICON = "/assets/hrms/images/staff-pro-bpo-icon.png"
 FOOTER_POWERED = "Staff Pro BPO<br>developed by Tirell Arzu"
+STAFF_PRO_TIMEZONE = "America/Belize"
 _LOGO_DATA_URI = None
 
 
@@ -37,6 +38,7 @@ def apply_branding():
 	_set_if_field("Website Settings", "footer_powered", FOOTER_POWERED)
 	_set_if_field("Navbar Settings", "app_logo", APP_LOGO)
 	_set_if_field("System Settings", "app_name", APP_TITLE)
+	ensure_belize_timezone()
 	hide_system_settings_app_tab()
 
 
@@ -130,6 +132,60 @@ def _publish_sites_asset_copy(source: Path):
 	dest.parent.mkdir(parents=True, exist_ok=True)
 	try:
 		shutil.copy2(source, dest)
+	except OSError:
+		return
+
+
+def ensure_belize_timezone() -> None:
+	"""Staff Pro always runs on Belize time. Keep System Settings locked to it."""
+	if not frappe.db.exists("DocType", "System Settings"):
+		return
+	if not frappe.get_meta("System Settings").has_field("time_zone"):
+		return
+
+	if frappe.db.get_single_value("System Settings", "time_zone") != STAFF_PRO_TIMEZONE:
+		frappe.db.set_single_value("System Settings", "time_zone", STAFF_PRO_TIMEZONE, update_modified=False)
+	frappe.db.set_default("time_zone", STAFF_PRO_TIMEZONE)
+	frappe.cache.set_value("time_zone", STAFF_PRO_TIMEZONE)
+	if getattr(frappe.local, "system_settings", None) is not None:
+		frappe.local.system_settings.time_zone = STAFF_PRO_TIMEZONE
+	_sync_site_config_timezone()
+	make_property_setter(
+		"System Settings",
+		"time_zone",
+		"read_only",
+		1,
+		"Check",
+		validate_fields_for_doctype=False,
+	)
+	make_property_setter(
+		"System Settings",
+		"time_zone",
+		"default",
+		STAFF_PRO_TIMEZONE,
+		"Text",
+		validate_fields_for_doctype=False,
+	)
+	frappe.clear_cache(doctype="System Settings")
+
+
+def lock_system_timezone(doc, method: str | None = None) -> None:
+	"""Keep System Settings on Belize time even if someone edits the form."""
+	if not doc.meta.has_field("time_zone"):
+		return
+	doc.time_zone = STAFF_PRO_TIMEZONE
+
+
+def _sync_site_config_timezone() -> None:
+	if frappe.flags.in_test:
+		return
+	from frappe.installer import update_site_config
+
+	if frappe.conf.get("time_zone") == STAFF_PRO_TIMEZONE:
+		return
+	try:
+		update_site_config("time_zone", STAFF_PRO_TIMEZONE)
+		frappe.conf["time_zone"] = STAFF_PRO_TIMEZONE
 	except OSError:
 		return
 

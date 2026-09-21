@@ -107,7 +107,7 @@
                               "show_arrow":  0,
                               "type":  "Link",
                               "icon":  "clock",
-                              "link_to":  "time-clock-adjustment",
+                              "link_to":  "time-clock-adjustments",
                               "link_type":  "Page"
                           },
                           {
@@ -253,41 +253,14 @@
                               "collapsible":  1,
                               "default_workspace":  0,
                               "icon":  "calendar-clock",
-                              "indent":  1,
-                              "keep_closed":  1,
-                              "label":  "Extra Hours",
-                              "link_type":  "DocType",
-                              "open_in_new_tab":  0,
-                              "show_arrow":  0,
-                              "type":  "Section Break"
-                          },
-                          {
-                              "child":  1,
-                              "collapsible":  1,
-                              "default_workspace":  0,
                               "indent":  0,
                               "keep_closed":  0,
-                              "label":  "OT Types",
-                              "open_in_new_tab":  0,
-                              "show_arrow":  0,
-                              "type":  "Link",
-                              "link_to":  "Overtime Type",
-                              "link_type":  "DocType",
-                              "icon":  "timer"
-                          },
-                          {
-                              "child":  1,
-                              "collapsible":  1,
-                              "default_workspace":  0,
-                              "indent":  0,
-                              "keep_closed":  0,
-                              "label":  "OT Records",
-                              "open_in_new_tab":  0,
-                              "show_arrow":  0,
-                              "type":  "Link",
+                              "label":  "Overtime",
                               "link_to":  "Overtime Slip",
                               "link_type":  "DocType",
-                              "icon":  "file-text"
+                              "open_in_new_tab":  0,
+                              "show_arrow":  0,
+                              "type":  "Link"
                           },
                           {
                               "child":  0,
@@ -384,6 +357,21 @@
                               "open_in_new_tab":  0,
                               "show_arrow":  0,
                               "type":  "Section Break"
+                          },
+                          {
+                              "child":  1,
+                              "collapsible":  1,
+                              "default_workspace":  0,
+                              "indent":  0,
+                              "keep_closed":  0,
+                              "label":  "Overtime Setup",
+                              "open_in_new_tab":  0,
+                              "show_arrow":  0,
+                              "type":  "Link",
+                              "link_to":  "HR Settings",
+                              "link_type":  "DocType",
+                              "navigate_to_tab":  "overtime_tab",
+                              "icon":  "timer"
                           },
                           {
                               "child":  1,

@@ -2801,26 +2801,27 @@ def _attendance_hours_for_slip(slip) -> float:
 
 
 def _hourly_inputs_for_slip(slip) -> tuple[float, float, float, float]:
+	from hrms.hr.doctype.overtime_slip.overtime_slip import get_pay_period_overtime
 	from hrms.payroll.daily_pay import ensure_working_hours_from_times, get_public_holiday_pay_context
 
-	overtime_hours = 0.0
+	overtime_result = get_pay_period_overtime(slip.employee, slip.start_date, slip.end_date)
+	overtime_hours = flt(overtime_result["ordinary_overtime_duration"])
 	holiday_hours = 0.0
 	holiday_pay = 0.0
 	total_hours = 0.0
 	fields = ["working_hours", "status", "attendance_date", "daily_pay"]
 	if frappe.db.has_column("Attendance", "in_time"):
 		fields += ["in_time", "out_time"]
-	if frappe.db.has_column("Attendance", "actual_overtime_duration"):
-		fields.append("actual_overtime_duration")
 
 	for row in _slip_period_attendance(slip, fields):
-		if (row.get("status") or "") == "Absent":
+		holiday_ctx = get_public_holiday_pay_context(slip.employee, row.attendance_date)
+		if (row.get("status") or "") == "Absent" and not holiday_ctx:
 			continue
 		worked = flt(row.working_hours) or flt(ensure_working_hours_from_times(row))
-		overtime = flt(row.get("actual_overtime_duration"))
+		if holiday_ctx and worked <= 0 and flt(row.get("daily_pay")) > 0:
+			worked = 8.0
 		total_hours += worked
-		overtime_hours += overtime
-		if get_public_holiday_pay_context(slip.employee, row.attendance_date):
+		if holiday_ctx:
 			holiday_hours += worked
 			holiday_pay += flt(row.get("daily_pay")) or flt(flt(slip.hour_rate) * worked, 2)
 

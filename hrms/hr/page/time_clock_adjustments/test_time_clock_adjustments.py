@@ -8,11 +8,14 @@ from erpnext.setup.doctype.employee.test_employee import make_employee
 
 from hrms.api import add_employee_hours_note
 from hrms.hr.doctype.attendance.attendance import add_hours_entry
-from hrms.hr.page.time_clock_adjustment.time_clock_adjustment import get_adjustments, review_adjustment
+from hrms.hr.page.time_clock_adjustments.time_clock_adjustments import (
+	get_adjustments,
+	review_adjustment,
+)
 from hrms.tests.utils import HRMSTestSuite
 
 
-class TestTimeClockAdjustmentPage(HRMSTestSuite):
+class TestTimeClockAdjustmentsPage(HRMSTestSuite):
 	def setUp(self):
 		frappe.set_user("Administrator")
 
@@ -33,7 +36,12 @@ class TestTimeClockAdjustmentPage(HRMSTestSuite):
 
 		review_adjustment(adjustment_name, "reject")
 		payload = get_adjustments(status="Rejected")
-		self.assertTrue(any(row["name"] == adjustment_name and row["status"] == "Rejected" for row in payload["rows"]))
+		self.assertTrue(
+			any(
+				row["name"] == adjustment_name and row["status"] == "Rejected"
+				for row in payload["rows"]
+			)
+		)
 
 	def test_page_api_is_hr_only(self):
 		employee = make_employee("tca.page.deny@example.com", company="_Test Company")

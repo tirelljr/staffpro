@@ -16,10 +16,17 @@ const ICONS = {
 	wallet: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M2 10h20"/><circle cx="16" cy="15" r="1.4"/></svg>`,
 	briefcase: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
 	upload: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0 4 4m-4-4-4 4"/><path d="M4 20h16"/></svg>`,
+	download: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12m0 0 4-4m-4 4-4-4"/><path d="M4 20h16"/></svg>`,
+	plus: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>`,
+	more: `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>`,
 	org: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><path d="M12 9v3m0 0H6v3m6-3h6v3"/></svg>`,
 	chart: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5"/><path d="M4 19h16"/><rect x="7" y="11" width="3" height="8" rx="1"/><rect x="12" y="7" width="3" height="12" rx="1"/><rect x="17" y="13" width="3" height="6" rx="1"/></svg>`,
 	file: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>`,
 	inbox: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>`,
+	search: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>`,
+	sliders: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M2 14h4"/><path d="M10 8h4"/><path d="M18 16h4"/></svg>`,
+	arrowUp: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 14 6-6 6 6"/></svg>`,
+	arrowDown: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 10 6 6 6-6"/></svg>`,
 	arrowUpRight: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>`,
 	info: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="8" r="1" fill="currentColor" stroke="none"/></svg>`,
 	sortDesc: `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4.2 2.2c.4 0 .7.3.7.7v7.1l1.3-1.3.9.9-2.4 2.4c-.3.3-.7.3-1 0L1.3 9.6l.9-.9 1.3 1.3V2.9c0-.4.3-.7.7-.7z"/><rect x="8.2" y="2.8" width="6.4" height="1.45" rx=".45"/><rect x="8.2" y="5.7" width="4.9" height="1.45" rx=".45"/><rect x="8.2" y="8.6" width="3.4" height="1.45" rx=".45"/><rect x="8.2" y="11.5" width="1.9" height="1.45" rx=".45"/></svg>`,
@@ -125,7 +132,7 @@ function empty_state_card({ title, text, button, size = "" }) {
 }
 
 const DASH_PILL_CSS = `
-.sp-dash-pills{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:16px 32px;margin:8px 0 40px;padding:0;width:100%;max-width:100%;overflow:hidden}
+.sp-dash-pills{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:16px 32px;margin:8px 0 16px;padding:0;width:100%;max-width:100%;overflow:hidden}
 .sp-dash-pill{display:inline-flex;align-items:center;gap:8px;max-width:100%;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;color:#111;font:inherit;font-size:13px;font-weight:500;line-height:1;cursor:pointer}
 .sp-dash-pill__icon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:24px;height:24px;max-width:24px;max-height:24px;overflow:hidden;border-radius:50%;background:#0f1b2d;color:var(--sp-icon-accent,#90ba93)}
 .sp-dash-pill__icon svg{width:12px!important;height:12px!important;max-width:12px;max-height:12px;stroke:currentColor;fill:none}
@@ -136,6 +143,7 @@ const DASH_PILL_CSS = `
 #page-dashboard-view .widget-subtitle,#page-dashboard .widget-subtitle,.dashboard-view .widget-subtitle,.dashboard-graph .widget-subtitle{display:none!important}
 #page-dashboard-view .filter-chart,#page-dashboard-view .chart-actions,#page-dashboard .filter-chart,#page-dashboard .chart-actions{display:none!important}
 #page-dashboard-view:not(:has(.sp-dash-pills)) .dashboard-graph,#page-dashboard:not(:has(.sp-dash-pills)) .dashboard-graph{visibility:hidden!important}
+#page-dashboard-view.sp-dash--payroll .dashboard-graph{display:none!important}
 `;
 
 const KPI_CARD_CSS = `
@@ -216,6 +224,99 @@ body.staff-pro-alive #page-dashboard-view .dashboard-graph:has(.sp-dash-hours){d
 .sp-hours__gross,.sp-hours__ss,.sp-hours__net{overflow:visible;text-align:right;text-overflow:unset;font-variant-numeric:tabular-nums}
 `;
 
+const PAYROLL_TABLE_CSS = `
+.sp-dash-payroll .sp-payroll__table-head,.sp-dash-payroll .sp-payroll__row{display:grid!important;grid-template-columns:minmax(0,2.1fr) minmax(0,1.3fr) minmax(0,1.5fr) minmax(92px,.9fr)!important;justify-content:stretch!important;justify-items:start!important;align-items:center!important;column-gap:16px!important;width:100%!important;min-width:0!important;box-sizing:border-box!important;padding-left:4px!important;padding-right:4px!important}
+.sp-dash-payroll .sp-payroll__row{appearance:none!important;margin:0!important;padding-top:12px!important;padding-bottom:12px!important;border:0!important;background:transparent!important;font:inherit!important;line-height:inherit!important;color:inherit!important;text-align:left!important;cursor:pointer}
+.sp-dash-payroll .sp-payroll__table-head .sp-payroll__agent,.sp-dash-payroll .sp-payroll__table-head .sp-payroll__hours,.sp-dash-payroll .sp-payroll__table-head .sp-payroll__date,.sp-dash-payroll .sp-payroll__table-head .sp-payroll__status{display:block!important;width:100%;padding:0!important;background:transparent!important;font-size:inherit!important;font-weight:inherit!important;letter-spacing:inherit!important;text-transform:inherit!important;color:inherit!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sp-dash-payroll .sp-payroll__hours,.sp-dash-payroll .sp-payroll__date,.sp-dash-payroll .sp-payroll__status{justify-self:start!important;text-align:left}
+`;
+
+const PAYROLL_BOARD_CSS = `
+body.staff-pro-alive #page-dashboard-view.sp-dash--payroll .layout-main-section,body.staff-pro-alive #page-dashboard-view.sp-dash--payroll .dashboard{overflow:visible}
+.sp-payroll-board{display:flex;flex-direction:column;gap:16px;margin:0 0 24px;width:100%;max-width:100%;min-width:0;overflow:visible}
+.sp-paydash__toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;position:relative;z-index:8;overflow:visible}
+.sp-paydash__title{margin:0;font-size:22px;font-weight:700;letter-spacing:-.03em;color:#111}
+.sp-paydash__actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;overflow:visible}
+.sp-paydash__range{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 6px 0 14px;border:1px solid #e3e6ea;border-radius:999px;background:#fff;color:#111;overflow:visible}
+.sp-paydash__range-icon{display:inline-flex;color:#6b7280}
+.sp-paydash__range-icon svg{width:14px;height:14px}
+.sp-paydash__range .sp-dash-select{min-width:0}
+.sp-paydash__range .sp-dash-select__btn{height:36px;min-width:210px;padding:0 10px 0 0;border:0;background:transparent;box-shadow:none;font-size:13px;font-weight:500}
+.sp-paydash__range .sp-dash-select__menu{z-index:1080;min-width:260px;max-height:280px;overflow-y:auto;right:auto}
+.sp-paydash__export,.sp-paydash__filter-btn{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 14px;border:1px solid #e3e6ea;border-radius:999px;background:#fff;color:#111;font:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.sp-paydash__export svg,.sp-paydash__new svg{width:14px;height:14px}
+.sp-paydash__new{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 16px;border:0;border-radius:999px;background:#f0c14a;color:#111;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.sp-paydash__new:hover{background:#e8b53a}
+.sp-paydash__kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.sp-paydash__kpi{display:flex;align-items:center;gap:12px;min-height:88px;padding:16px 18px;border:1px solid #e3e6ea;border-radius:16px;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.sp-paydash__kpi-icon{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:#f4f6f8;color:#0f1b2d;flex-shrink:0}
+.sp-paydash__kpi-icon svg{width:18px;height:18px}
+.sp-paydash__kpi-copy{display:flex;flex-direction:column;gap:4px;min-width:0}
+.sp-paydash__kpi-value-row{display:flex;align-items:center;gap:8px}
+.sp-paydash__kpi-value{font-size:22px;font-weight:700;letter-spacing:-.04em;line-height:1;color:#111}
+.sp-paydash__kpi-change{display:inline-flex;align-items:center;gap:2px;font-size:12px;font-weight:600;color:#9aa3af}
+.sp-paydash__kpi-change.is-up{color:#16a34a}
+.sp-paydash__kpi-change.is-down{color:#ef4444}
+.sp-paydash__kpi-label{font-size:13px;color:#6b7280}
+.sp-paydash__charts{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:12px}
+.sp-paydash__card{padding:18px 20px 16px;border:1px solid #e3e6ea;border-radius:16px;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.04);min-width:0}
+.sp-paydash__card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px}
+.sp-paydash__card-title{margin:0;font-size:15px;font-weight:600;color:#111}
+.sp-paydash__card-total{margin:0;font-size:26px;font-weight:700;letter-spacing:-.04em;line-height:1.1;color:#111}
+.sp-paydash__card-change{margin:6px 0 0;font-size:12px;font-weight:600;color:#16a34a}
+.sp-paydash__card-change.is-down{color:#ef4444}
+.sp-paydash__card-change.is-flat{color:#9aa3af}
+.sp-paydash__legend{display:flex;align-items:center;gap:14px;color:#6b7280;font-size:12px;font-weight:500;white-space:nowrap}
+.sp-paydash__legend i{display:inline-block;width:8px;height:8px;margin-right:6px;border-radius:50%;background:#f0c14a;vertical-align:middle}
+.sp-paydash__legend i.is-bonus{background:#1f2937}
+.sp-paydash__chart{width:100%;height:220px;margin-top:8px}
+.sp-paydash__chart svg{width:100%;height:100%;display:block}
+.sp-paydash__empty-chart{display:flex;align-items:center;justify-content:center;height:220px;color:#9aa3af;font-size:13px}
+.sp-paydash__list-card{padding:16px 18px 10px;border:1px solid #e3e6ea;border-radius:16px;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.sp-paydash__list-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.sp-paydash__list-title{margin:0;font-size:15px;font-weight:600;color:#111}
+.sp-paydash__list-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sp-paydash__search{position:relative;display:flex;align-items:center;flex:1 1 240px;min-width:220px;height:38px;padding:0 34px 0 36px;border:1px solid #e3e6ea;border-radius:999px;background:#f7f8fa}
+.sp-paydash__search-icon{position:absolute;left:12px;display:inline-flex;color:#9aa3af}
+.sp-paydash__search-input{width:100%;border:0;background:transparent;color:#111;font:inherit;font-size:13px;outline:none}
+.sp-paydash__search-clear{position:absolute;right:8px;width:22px;height:22px;border:0;border-radius:50%;background:transparent;color:#9aa3af;font-size:16px;cursor:pointer}
+.sp-paydash__filter{position:relative}
+.sp-paydash__filter-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:20;min-width:160px;padding:6px;border:1px solid #e3e6ea;border-radius:12px;background:#fff;box-shadow:0 8px 24px rgba(16,24,40,.08)}
+.sp-paydash__filter-menu[hidden]{display:none}
+.sp-paydash__filter-option{display:block;width:100%;padding:8px 10px;border:0;border-radius:8px;background:transparent;color:#111;font:inherit;font-size:13px;text-align:left;cursor:pointer}
+.sp-paydash__filter-option:hover,.sp-paydash__filter-option.is-selected{background:#f4f6f8}
+.sp-paydash__table-wrap{overflow-x:auto}
+.sp-paydash__table-head,.sp-paydash__row{display:grid;grid-template-columns:28px minmax(150px,1.4fr) minmax(100px,.95fr) minmax(130px,.85fr) minmax(84px,.6fr) minmax(88px,.75fr) minmax(76px,.65fr) minmax(72px,.6fr) minmax(88px,.75fr) 36px;gap:12px;align-items:center;width:100%;min-width:1120px}
+.sp-paydash__table-head{padding:10px 8px;color:#9aa3af;font-size:12px;font-weight:600}
+.sp-paydash__row{padding:12px 8px;border:0;border-top:1px solid #eef1f4;background:transparent;font:inherit;font-size:13px;color:#111;text-align:left;cursor:pointer}
+.sp-paydash__row:hover{background:#fafbfc}
+.sp-paydash__check{width:16px;height:16px;margin:0;accent-color:#f0c14a}
+.sp-paydash__agent{display:flex;align-items:center;gap:10px;min-width:0}
+.sp-paydash__avatar{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;overflow:hidden;background:#eef2f6;flex-shrink:0}
+.sp-paydash__avatar .sp-celebrations__avatar-img,.sp-paydash__avatar .sp-celebrations__avatar-fallback{width:100%;height:100%;font-size:11px}
+.sp-paydash__name,.sp-paydash__dept,.sp-paydash__date{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-paydash__money{font-variant-numeric:tabular-nums;white-space:nowrap}
+.sp-paydash__status{display:inline-flex;align-items:center;justify-content:center;min-height:22px;padding:2px 10px;border-radius:999px;background:#f3f4f6;color:#6b7280;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.sp-paydash__status.is-paid{background:#e8f8ef;color:#16a34a}
+.sp-paydash__status.is-pending{background:#fce8c8;color:#c9892e}
+.sp-paydash__status.is-unpaid,.sp-paydash__status.is-ready{background:#fdecec;color:#ef4444}
+.sp-paydash__more{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:0;border-radius:8px;background:transparent;color:#9aa3af;cursor:pointer}
+.sp-paydash__more svg{width:16px;height:16px}
+.sp-paydash__empty{padding:28px 8px;text-align:center;color:#6b7280;font-size:13px}
+.sp-paydash__list.is-loading{opacity:.55}
+.sp-paydash__pager{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 4px 6px}
+.sp-paydash__pager-label{font-size:13px;color:#6b7280}
+.sp-paydash__pager-btn{height:32px;padding:0 12px;border:1px solid #e3e6ea;border-radius:8px;background:#fff;color:#111;font:inherit;font-size:13px;cursor:pointer}
+.sp-paydash__pager-btn:disabled{opacity:.4;cursor:default}
+@media (max-width:768px){
+.sp-paydash__kpis{grid-template-columns:1fr}
+.sp-paydash__charts{grid-template-columns:1fr}
+.sp-paydash__toolbar{justify-content:stretch}
+.sp-paydash__table-head{display:none}
+.sp-paydash__row{grid-template-columns:1fr 1fr;min-width:0;gap:8px 12px}
+}
+`;
+
 const LIST_META_CSS = `
 .frappe-list .list-row-head > .level-right,
 .frappe-list .list-row > .level-right,
@@ -288,6 +389,24 @@ function inject_dash_css() {
 	}
 	if (hoursStyle.textContent !== HOURS_TABLE_CSS) {
 		hoursStyle.textContent = HOURS_TABLE_CSS;
+	}
+	let payrollStyle = document.getElementById("staff-pro-payroll-css");
+	if (!payrollStyle) {
+		payrollStyle = document.createElement("style");
+		payrollStyle.id = "staff-pro-payroll-css";
+		document.head.appendChild(payrollStyle);
+	}
+	if (payrollStyle.textContent !== PAYROLL_TABLE_CSS) {
+		payrollStyle.textContent = PAYROLL_TABLE_CSS;
+	}
+	let payrollBoardStyle = document.getElementById("staff-pro-payroll-board-css");
+	if (!payrollBoardStyle) {
+		payrollBoardStyle = document.createElement("style");
+		payrollBoardStyle.id = "staff-pro-payroll-board-css";
+		document.head.appendChild(payrollBoardStyle);
+	}
+	if (payrollBoardStyle.textContent !== PAYROLL_BOARD_CSS) {
+		payrollBoardStyle.textContent = PAYROLL_BOARD_CSS;
 	}
 }
 
@@ -547,6 +666,9 @@ function open_inout_clock_entry($widget) {
 				load_inout($widget);
 				const $hours = $(".sp-dash-hours").first();
 				if ($hours.length) load_hours($hours);
+				$(".sp-dash-home .sp-attendance-board").each(function () {
+					load_attendance_board($(this));
+				});
 			},
 			filter_area: {
 				get() {
@@ -609,6 +731,21 @@ const CELEBRATION_TYPES = {
 	anniversary: __("Anniversaries"),
 };
 
+const ATTENDANCE_PAGE_SIZE = 10;
+const PAYROLL_PAGE_SIZE = 10;
+const PAYROLL_STATUS_FILTERS = [
+	{ value: "all", label: __("All statuses") },
+	{ value: "paid", label: __("Paid") },
+	{ value: "pending", label: __("Pending") },
+	{ value: "unpaid", label: __("Not Paid") },
+];
+const ATTENDANCE_STATUS_FILTERS = [
+	{ value: "all", label: __("All Statuses") },
+	{ value: "present", label: __("Present") },
+	{ value: "late", label: __("Late") },
+	{ value: "absent", label: __("Absent") },
+];
+
 function dash_select_html({ className, variant, label, options, value }) {
 	const selected = options.find((opt) => opt.value === value) || options[0];
 	return `
@@ -642,7 +779,29 @@ function close_dash_selects($except) {
 			$wrap.removeClass("is-open");
 			$wrap.find(".sp-dash-select__menu").prop("hidden", true);
 			$wrap.find(".sp-dash-select__btn").attr("aria-expanded", "false");
+			$wrap.children(".sp-dash-select__menu").css({ top: "", left: "", minWidth: "", position: "" });
 		});
+}
+
+function place_dash_select_menu($wrap) {
+	const $btn = $wrap.children(".sp-dash-select__btn");
+	const $menu = $wrap.children(".sp-dash-select__menu");
+	if (!$btn.length || !$menu.length || $menu.prop("hidden")) return;
+	const rect = $btn[0].getBoundingClientRect();
+	const width = Math.max(rect.width, 240);
+	const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
+	$menu.css({
+		position: "fixed",
+		top: rect.bottom + 6,
+		left,
+		right: "auto",
+		minWidth: width,
+		zIndex: 1080,
+	});
+	const menuH = $menu.outerHeight() || 0;
+	if (rect.bottom + 6 + menuH > window.innerHeight - 8) {
+		$menu.css("top", Math.max(8, rect.top - menuH - 6));
+	}
 }
 
 function sync_dash_select_menu($wrap) {
@@ -699,12 +858,15 @@ function bind_dash_selects($root) {
 			const willOpen = $menu.prop("hidden");
 			close_dash_selects(willOpen ? $wrap : null);
 			close_hours_quick_menus();
+			close_attendance_filter_menus();
+			close_payroll_filter_menus();
 			if (!willOpen) return;
 			sync_dash_select_menu($wrap);
 			bind_hours_select_search($wrap);
 			$wrap.addClass("is-open");
 			$menu.prop("hidden", false);
 			$btn.attr("aria-expanded", "true");
+			place_dash_select_menu($wrap);
 			const $search = $menu.find(".sp-dash-select__search");
 			if ($search.length) $search.trigger("focus");
 			else $menu.find(".sp-dash-select__option.is-selected").trigger("focus");
@@ -1138,6 +1300,8 @@ function load_celebrations($widget, period, eventType = "all") {
 
 const KPI_HOURS_CARDS = new Set(["Hours Worked (This Week)"]);
 const HIDDEN_HR_CHARTS = new Set([
+	"Hours Worked",
+	"Hours Worked Today",
 	"Shift Assignment Breakup",
 	"Shift Coverage",
 	"Hiring vs Attrition Count",
@@ -1210,7 +1374,8 @@ function filter_hr_charts($root) {
 
 	$root.find(".dashboard-graph .widget.dashboard-widget-box, .dashboard-graph .chart-widget").each(function () {
 		const $widget = $(this).closest(".widget");
-		if (HIDDEN_HR_CHARTS.has(chart_widget_label($widget))) {
+		const label = chart_widget_label($widget);
+		if (HIDDEN_HR_CHARTS.has(label) || label.startsWith("Hours Worked")) {
 			freeze_charts_in($widget);
 			$widget.remove();
 		}
@@ -1489,8 +1654,9 @@ function widget_chart_is_empty($widget) {
 	return /no data/i.test(text.replace(/\s+/g, " ").trim());
 }
 
-function clear_empty_chart_overlay($widget) {
+function clear_empty_chart_overlay($widget, force = false) {
 	if (!$widget?.length || (!$widget.data("sp-empty") && !$widget.find(".sp-empty-chart").length)) return;
+	if ($widget.data("sp-chart-period-empty") && !force) return;
 	$widget.removeData("sp-empty");
 	$widget.find(".sp-empty-chart").remove();
 	if (!$widget.find(".sp-bubbles, .sp-gauge").length) {
@@ -1656,6 +1822,12 @@ function theme_charts($root) {
 
 		if ($widget.length) {
 			$widget.addClass("sp-chart");
+			if ($widget.data("sp-chart-period-empty")) {
+				$widget
+					.find(".widget-body .chart-container, .widget-body .widget-chart-box, .widget-body .flex.justify-center")
+					.addClass("sp-chart-replaced");
+				return;
+			}
 			if (is_composition_chart($widget, $chart)) {
 				if (render_composition_chart($widget, $chart)) {
 					clear_empty_chart_overlay($widget);
@@ -1814,6 +1986,8 @@ function chart_period_display($widget) {
 function load_chart_period($widget, period, from_date, to_date) {
 	const name = dashboard_chart_name($widget);
 	if (!name) return;
+	const requestId = Number($widget.data("sp-chart-period-request") || 0) + 1;
+	$widget.data("sp-chart-period-request", requestId);
 	$widget.addClass("is-period-loading");
 	const args = { chart_name: name, period };
 	if (period === "custom") {
@@ -1823,6 +1997,7 @@ function load_chart_period($widget, period, from_date, to_date) {
 	frappe
 		.xcall("hrms.hr.desk_dashboard.get_dashboard_chart_period", args)
 		.then((res) => {
+			if (Number($widget.data("sp-chart-period-request")) !== requestId) return;
 			if (!res || res.supported === false) {
 				frappe.show_alert({
 					message: __("This chart cannot change period."),
@@ -1833,12 +2008,17 @@ function load_chart_period($widget, period, from_date, to_date) {
 			apply_chart_period_result($widget, res);
 		})
 		.catch(() => {
+			if (Number($widget.data("sp-chart-period-request")) !== requestId) return;
 			frappe.show_alert({
 				message: __("Could not update this chart."),
 				indicator: "red",
 			});
 		})
-		.finally(() => $widget.removeClass("is-period-loading"));
+		.finally(() => {
+			if (Number($widget.data("sp-chart-period-request")) === requestId) {
+				$widget.removeClass("is-period-loading");
+			}
+		});
 }
 
 function apply_chart_period_result($widget, result) {
@@ -1857,7 +2037,7 @@ function apply_chart_period_result($widget, result) {
 }
 
 function show_chart_empty_state($widget) {
-	clear_empty_chart_overlay($widget);
+	clear_empty_chart_overlay($widget, true);
 	freeze_charts_in($widget);
 	$widget.find(".sp-bubbles, .sp-gauge").remove();
 	$widget.removeData("sp-bubbles");
@@ -1877,11 +2057,13 @@ function show_chart_empty_state($widget) {
 		</div>
 	`);
 	$widget.data("sp-empty", 1);
+	$widget.data("sp-chart-period-empty", 1);
 	$body.find(".sp-empty-list__btn").on("click", () => start_action(cfg));
 }
 
 function replace_widget_chart($widget, result) {
-	clear_empty_chart_overlay($widget);
+	clear_empty_chart_overlay($widget, true);
+	$widget.removeData("sp-chart-period-empty");
 	freeze_charts_in($widget);
 	$widget.removeData("sp-chart");
 	$widget.find(".sp-bubbles, .sp-gauge").remove();
@@ -1973,6 +2155,353 @@ function reorder_hr_dashboard_layout($root) {
 	filter_hr_kpi_cards($root);
 }
 
+function close_attendance_filter_menus() {
+	$(".sp-attendance__filter").removeClass("is-open");
+	$(".sp-attendance__filter-menu").prop("hidden", true);
+	$(".sp-attendance__filter-btn").attr("aria-expanded", "false");
+}
+
+function attendance_board_html() {
+	const today = frappe.datetime.get_today();
+	return `
+		<section class="sp-attendance-board" aria-label="${escape_html(__("Attendance"))}">
+			<div class="sp-attendance__head">
+				<h2 class="sp-attendance__title">${escape_html(__("Attendance"))}</h2>
+			</div>
+			<div class="sp-attendance__kpis" aria-live="polite"></div>
+			<div class="sp-attendance__card">
+				<div class="sp-attendance__toolbar">
+					<label class="sp-attendance__search">
+						<span class="sp-attendance__search-icon" aria-hidden="true">${ICONS.search}</span>
+						<input type="search" class="sp-attendance__search-input" placeholder="${escape_html(__("Search by name, role, department..."))}" autocomplete="off" />
+						<button type="button" class="sp-attendance__search-clear" hidden aria-label="${escape_html(__("Clear search"))}">×</button>
+					</label>
+					<div class="sp-attendance__filter">
+						<button type="button" class="sp-attendance__filter-btn" aria-haspopup="listbox" aria-expanded="false">
+							${ICONS.sliders}
+							<span>${escape_html(__("Filter"))}</span>
+						</button>
+						<div class="sp-attendance__filter-menu" hidden role="listbox" aria-label="${escape_html(__("Filter"))}">
+							${ATTENDANCE_STATUS_FILTERS.map(
+								(opt) =>
+									`<button type="button" class="sp-attendance__filter-option${opt.value === "all" ? " is-selected" : ""}" data-value="${escape_html(opt.value)}" role="option" aria-selected="${opt.value === "all" ? "true" : "false"}">${escape_html(opt.label)}</button>`,
+							).join("")}
+						</div>
+					</div>
+					<div class="sp-attendance__toolbar-end">
+						<div class="sp-attendance__field">
+							${dash_select_html({
+								className: "sp-attendance__department",
+								variant: "outline",
+								label: __("Department"),
+								value: "",
+								options: [{ value: "", label: __("All Departments") }],
+							})}
+						</div>
+						<div class="sp-attendance__date">
+							<span class="sp-attendance__date-icon" aria-hidden="true">${ICONS.calendar}</span>
+							<span class="sp-attendance__date-label">${escape_html(moment(today).format("D MMM, YYYY"))}</span>
+						</div>
+					</div>
+				</div>
+				<div class="sp-attendance__table-wrap">
+					<div class="sp-attendance__table-head">
+						<span>${escape_html(__("Date"))}</span>
+						<span>${escape_html(__("Employee"))}</span>
+						<span>${escape_html(__("Role"))}</span>
+						<span>${escape_html(__("Hours worked today"))}</span>
+						<span>${escape_html(__("Status"))}</span>
+						<span>${escape_html(__("Check In"))}</span>
+						<span>${escape_html(__("Check Out"))}</span>
+						<span>${escape_html(__("Over Time"))}</span>
+					</div>
+					<div class="sp-attendance__list"></div>
+				</div>
+				<div class="sp-attendance__pager">
+					<button type="button" class="sp-attendance__pager-btn sp-attendance__prev">${escape_html(__("Previous"))}</button>
+					<span class="sp-attendance__pager-label"></span>
+					<button type="button" class="sp-attendance__pager-btn sp-attendance__next">${escape_html(__("Next"))}</button>
+				</div>
+			</div>
+		</section>
+	`;
+}
+
+function attendance_department_value($board) {
+	return $board.find(".sp-attendance__department").val() || "";
+}
+
+function attendance_status_filter($board) {
+	return $board.data("attendance-status") || "all";
+}
+
+function attendance_search_query($board) {
+	return String($board.find(".sp-attendance__search-input").val() || "")
+		.trim()
+		.toLowerCase();
+}
+
+function attendance_department_options(payload) {
+	const options = [{ value: "", label: __("All Departments") }];
+	(payload.departments || []).forEach((name) => options.push({ value: name, label: name }));
+	if ((payload.rows || []).some((row) => !row.department)) {
+		options.push({ value: inout_none_department(), label: __("No Department") });
+	}
+	return options;
+}
+
+function matches_attendance_department(row, department) {
+	if (!department) return true;
+	if (department === inout_none_department()) return !row.department;
+	return row.department === department;
+}
+
+function matches_attendance_status(row, status) {
+	if (!status || status === "all") return true;
+	if (status === "present") return row.status === "present" || row.status === "late";
+	return row.status === status;
+}
+
+function matches_attendance_search(row, query) {
+	if (!query) return true;
+	const haystack = [row.employee_name, row.designation, row.department, row.hours_worked_label]
+		.filter(Boolean)
+		.join(" ")
+		.toLowerCase();
+	return haystack.includes(query);
+}
+
+function filtered_attendance_rows($board) {
+	const department = attendance_department_value($board);
+	const status = attendance_status_filter($board);
+	const query = attendance_search_query($board);
+	return ($board.data("attendance-rows") || []).filter(
+		(row) =>
+			matches_attendance_department(row, department) &&
+			matches_attendance_status(row, status) &&
+			matches_attendance_search(row, query),
+	);
+}
+
+function format_attendance_change(value) {
+	const number = Number(value || 0);
+	if (!number) return { text: "0%", dir: "flat" };
+	const abs = Math.abs(number);
+	const shown = abs >= 10 || Number.isInteger(abs) ? String(Math.round(abs)) : abs.toFixed(1);
+	return {
+		text: `${number > 0 ? "+" : "-"}${shown}%`,
+		dir: number > 0 ? "up" : "down",
+	};
+}
+
+function render_attendance_kpis($board) {
+	const kpis = $board.data("attendance-kpis") || {};
+	const cards = [
+		{ key: "total", label: __("Total Employee"), icon: "users", filter: "all" },
+		{ key: "present", label: __("Present"), icon: "briefcase", filter: "present" },
+		{ key: "absent", label: __("Absent"), icon: "clock", filter: "absent" },
+		{ key: "paid_leave", label: __("Request Paid Leave"), icon: "wallet", filter: "paid_leave" },
+	];
+	$board.find(".sp-attendance__kpis").html(
+		cards
+			.map((card) => {
+				const kpi = kpis[card.key] || { value: 0, change: 0 };
+				const change = format_attendance_change(kpi.change);
+				return `
+					<button type="button" class="sp-attendance__kpi" data-filter="${escape_html(card.filter)}">
+						<span class="sp-attendance__kpi-icon" aria-hidden="true">${ICONS[card.icon] || ICONS.users}</span>
+						<span class="sp-attendance__kpi-copy">
+							<span class="sp-attendance__kpi-value-row">
+								<span class="sp-attendance__kpi-value">${escape_html(Number(kpi.value || 0).toLocaleString())}</span>
+								${
+									change.dir === "flat"
+										? ""
+										: `<span class="sp-attendance__kpi-change is-${change.dir}">${change.dir === "down" ? ICONS.arrowDown : ICONS.arrowUp}${escape_html(change.text)}</span>`
+								}
+							</span>
+							<span class="sp-attendance__kpi-label">${escape_html(card.label)}</span>
+						</span>
+					</button>
+				`;
+			})
+			.join(""),
+	);
+}
+
+function render_attendance_rows(rows) {
+	if (!rows.length) {
+		return `
+			<div class="sp-attendance__empty">
+				<p>${escape_html(__("No attendance records for this filter."))}</p>
+			</div>
+		`;
+	}
+
+	return rows
+		.map(
+			(row) => `
+			<button type="button" class="sp-attendance__row" data-employee="${escape_html(row.employee || "")}">
+				<span class="sp-attendance__date-cell">${escape_html(row.date_label || "")}</span>
+				<span class="sp-attendance__agent">
+					<span class="sp-attendance__avatar">${celebration_avatar(row)}</span>
+					<span class="sp-attendance__name">${escape_html(row.employee_name || row.employee || "")}</span>
+				</span>
+				<span class="sp-attendance__role">${escape_html(row.designation || "—")}</span>
+				<span class="sp-attendance__hours">${escape_html(row.hours_worked_label || "0h")}</span>
+				<span class="sp-attendance__status">
+					<span class="sp-attendance__status-pill is-${escape_html(row.status || "absent")}">${escape_html(row.status_label || "")}</span>
+				</span>
+				<span>${escape_html(format_attendance_clock(row.in_time))}</span>
+				<span>${escape_html(format_attendance_clock(row.out_time))}</span>
+				<span>${escape_html(row.overtime_label || "0h")}</span>
+			</button>
+		`,
+		)
+		.join("");
+}
+
+function attendance_page_count(total) {
+	return Math.max(1, Math.ceil(total / ATTENDANCE_PAGE_SIZE));
+}
+
+function render_attendance_panel($board) {
+	const rows = filtered_attendance_rows($board);
+	const pages = attendance_page_count(rows.length);
+	let page = Number($board.data("attendance-page") || 1);
+	if (page > pages) page = pages;
+	if (page < 1) page = 1;
+	$board.data("attendance-page", page);
+	const start = (page - 1) * ATTENDANCE_PAGE_SIZE;
+	const visible = rows.slice(start, start + ATTENDANCE_PAGE_SIZE);
+
+	$board.find(".sp-attendance__list").html(render_attendance_rows(visible));
+	$board.find(".sp-attendance__pager-label").text(__("Page {0} of {1}", [page, pages]));
+	$board.find(".sp-attendance__prev").prop("disabled", page <= 1);
+	$board.find(".sp-attendance__next").prop("disabled", page >= pages);
+	$board.find(".sp-attendance__search-clear").prop("hidden", !attendance_search_query($board));
+
+	$board.find(".sp-attendance__row").on("click", function () {
+		const employee = $(this).data("employee");
+		if (employee) frappe.set_route("Form", "Employee", employee);
+	});
+}
+
+function set_attendance_status_filter($board, status, { rerender = true } = {}) {
+	const next = ATTENDANCE_STATUS_FILTERS.some((opt) => opt.value === status) ? status : "all";
+	$board.data("attendance-status", next);
+	$board.data("attendance-page", 1);
+	const selected = ATTENDANCE_STATUS_FILTERS.find((opt) => opt.value === next) || ATTENDANCE_STATUS_FILTERS[0];
+	$board.find(".sp-attendance__filter-btn span").text(next === "all" ? __("Filter") : selected.label);
+	$board.find(".sp-attendance__filter-option").each(function () {
+		const active = String($(this).data("value")) === next;
+		$(this).toggleClass("is-selected", active).attr("aria-selected", active ? "true" : "false");
+	});
+	if (rerender) render_attendance_panel($board);
+}
+
+function bind_attendance_board($board) {
+	if (!$board.length || $board.data("sp-attendance-bound")) return;
+	$board.data("sp-attendance-bound", true);
+	$board.data("attendance-status", "all");
+	$board.data("attendance-page", 1);
+	bind_dash_selects($board);
+
+	$board.find(".sp-attendance__department").on("change", function () {
+		$board.data("attendance-page", 1);
+		load_attendance_board($board);
+	});
+	$board.find(".sp-attendance__search-input").on("input", function () {
+		$board.data("attendance-page", 1);
+		render_attendance_panel($board);
+	});
+	$board.find(".sp-attendance__search-clear").on("click", function () {
+		$board.find(".sp-attendance__search-input").val("");
+		$board.data("attendance-page", 1);
+		render_attendance_panel($board);
+		$board.find(".sp-attendance__search-input").trigger("focus");
+	});
+	$board.find(".sp-attendance__filter-btn").on("click", function (event) {
+		event.preventDefault();
+		event.stopPropagation();
+		const $wrap = $board.find(".sp-attendance__filter");
+		const $menu = $board.find(".sp-attendance__filter-menu");
+		const willOpen = $menu.prop("hidden");
+		close_dash_selects();
+		close_hours_quick_menus();
+		close_attendance_filter_menus();
+		if (!willOpen) return;
+		$wrap.addClass("is-open");
+		$menu.prop("hidden", false);
+		$(this).attr("aria-expanded", "true");
+	});
+	$board.find(".sp-attendance__filter-option").on("click", function (event) {
+		event.preventDefault();
+		event.stopPropagation();
+		set_attendance_status_filter($board, String($(this).data("value")));
+		close_attendance_filter_menus();
+	});
+	$board.find(".sp-attendance__filter-menu").on("click", (event) => event.stopPropagation());
+	$board.on("click", ".sp-attendance__kpi", function () {
+		const filter = String($(this).data("filter") || "all");
+		if (filter === "paid_leave") {
+			go(["paid-time-off"]);
+			return;
+		}
+		set_attendance_status_filter($board, filter);
+	});
+	$board.find(".sp-attendance__prev").on("click", function () {
+		$board.data("attendance-page", Math.max(1, Number($board.data("attendance-page") || 1) - 1));
+		render_attendance_panel($board);
+	});
+	$board.find(".sp-attendance__next").on("click", function () {
+		$board.data("attendance-page", Number($board.data("attendance-page") || 1) + 1);
+		render_attendance_panel($board);
+	});
+	$(document)
+		.off("click.sp-attendance-filter")
+		.on("click.sp-attendance-filter", close_attendance_filter_menus);
+
+	load_attendance_board($board);
+}
+
+function load_attendance_board($board) {
+	const $list = $board.find(".sp-attendance__list");
+	$list.addClass("is-loading");
+	const department = attendance_department_value($board);
+	const args = { attendance_date: frappe.datetime.get_today() };
+	if (department && department !== inout_none_department()) {
+		args.department = department;
+	}
+
+	frappe.call({
+		method: "hrms.hr.desk_dashboard.get_attendance_board",
+		args,
+		callback(r) {
+			$list.removeClass("is-loading");
+			const payload = r.message || {};
+			$board.data("attendance-rows", payload.rows || []);
+			$board.data("attendance-kpis", payload.kpis || {});
+			if (payload.date_label) {
+				$board.find(".sp-attendance__date-label").text(payload.date_label);
+			}
+			set_dash_select_options($board.find(".sp-attendance__department"), attendance_department_options(payload));
+			render_attendance_kpis($board);
+			render_attendance_panel($board);
+		},
+		error() {
+			$list.removeClass("is-loading");
+			$board.data("attendance-rows", []);
+			$board.data("attendance-kpis", {});
+			render_attendance_kpis($board);
+			$list.html(`
+				<div class="sp-attendance__empty">
+					<p>${escape_html(__("Could not load attendance."))}</p>
+				</div>
+			`);
+		},
+	});
+}
+
 function inject_celebrations($root) {
 	if (dashboard_name() !== "Human Resource") {
 		$root.find(".sp-dash-home, .sp-dash-split, .sp-dash-celebrations, .sp-dash-payroll, .sp-dash-inout").remove();
@@ -1982,12 +2511,16 @@ function inject_celebrations($root) {
 	const $existingHome = $root.find(".sp-dash-home");
 	if (
 		$existingHome.length &&
+		$existingHome.find(".sp-attendance-board").length &&
+		!$existingHome.find(".sp-attendance__export").length &&
 		$existingHome.find(".sp-inout-dash__department").length &&
 		$existingHome.find(".sp-clock-btn").length &&
 		$existingHome.find(".sp-dash-payroll").length &&
 		$existingHome.find(".sp-payroll__list").length &&
 		$existingHome.find(".sp-absence__type-filter").length &&
-		$existingHome.find(".sp-absence__book").length
+		$existingHome.find(".sp-absence__book").length &&
+		$existingHome.children(".sp-dash-inout").nextAll(".sp-dash-split").length &&
+		$existingHome.find(".sp-inout-dash__table-head span").length >= 6
 	) {
 		return;
 	}
@@ -1999,6 +2532,7 @@ function inject_celebrations($root) {
 
 	const $home = $(`
 		<div class="sp-dash-home">
+			${attendance_board_html()}
 			<section class="sp-dash-split">
 				<section class="sp-dash-panel sp-dash-celebrations" aria-label="${escape_html(__("Birthdays & Anniversaries"))}" style="grid-column: 1 / -1;">
 					<div class="sp-dash-panel__head">
@@ -2065,10 +2599,10 @@ function inject_celebrations($root) {
 					</div>
 					<div class="sp-payroll__table-wrap">
 						<div class="sp-payroll__table-head">
-							<span>${escape_html(__("Agent"))}</span>
-							<span>${escape_html(__("Absence Type"))}</span>
-							<span>${escape_html(__("Dates"))}</span>
-							<span>${escape_html(__("Status"))}</span>
+							<span class="sp-payroll__agent">${escape_html(__("Agent"))}</span>
+							<span class="sp-payroll__hours">${escape_html(__("Absence Type"))}</span>
+							<span class="sp-payroll__date">${escape_html(__("Dates"))}</span>
+							<span class="sp-payroll__status">${escape_html(__("Status"))}</span>
 						</div>
 						<div class="sp-payroll__list"></div>
 					</div>
@@ -2100,7 +2634,8 @@ function inject_celebrations($root) {
 					<div class="sp-inout-dash__table-head">
 						<span>${escape_html(__("Name"))}</span>
 						<span>${escape_html(__("In / Out"))}</span>
-						<span>${escape_html(__("Time"))}</span>
+						<span>${escape_html(__("Check In"))}</span>
+						<span>${escape_html(__("Check Out"))}</span>
 						<span>${escape_html(__("Job / Pto Code"))}</span>
 						<span>${escape_html(__("Device ID"))}</span>
 					</div>
@@ -2112,14 +2647,18 @@ function inject_celebrations($root) {
 
 	$pills.after($home);
 
-	// Move absences panel below "Who Is In" panel (requested layout).
+	const $split = $home.find(".sp-dash-split").first();
 	const $inout_panel = $home.find(".sp-dash-inout").first();
 	const $payroll_panel = $home.find(".sp-dash-payroll").first();
-	if ($inout_panel.length && $payroll_panel.length) {
-		$payroll_panel.insertAfter($inout_panel);
+	if ($inout_panel.length && $split.length) {
+		$inout_panel.insertBefore($split);
+	}
+	if ($payroll_panel.length && $split.length) {
+		$payroll_panel.insertAfter($split);
 	}
 
 	bind_dash_selects($home);
+	bind_attendance_board($home.find(".sp-attendance-board"));
 
 	const $celebrations = $home.find(".sp-dash-celebrations");
 	reload_celebrations($celebrations);
@@ -2197,7 +2736,7 @@ function render_payroll_rows(rows) {
 	return rows
 		.map(
 			(row) => `
-			<button type="button" class="sp-payroll__row" data-employee="${escape_html(row.employee || "")}" data-leave="${escape_html(row.leave_application || "")}">
+			<div class="sp-payroll__row" role="button" tabindex="0" data-employee="${escape_html(row.employee || "")}" data-leave="${escape_html(row.leave_application || "")}">
 				<span class="sp-payroll__agent">
 					<span class="sp-payroll__avatar">${celebration_avatar(row)}</span>
 					<span class="sp-payroll__agent-meta">
@@ -2211,7 +2750,7 @@ function render_payroll_rows(rows) {
 					<span class="sp-payroll__status-dot" aria-hidden="true"></span>
 					<span class="sp-payroll__status-label">${escape_html(row.status_label || row.status || "")}</span>
 				</span>
-			</button>
+			</div>
 		`
 		)
 		.join("");
@@ -2241,7 +2780,7 @@ function render_payroll_panel($widget) {
 	const filtered = type === "all" ? rows : rows.filter((row) => row.leave_type === type);
 
 	$list.html(render_payroll_rows(filtered));
-	$list.find(".sp-payroll__row").on("click", function () {
+	const open_absence_row = function () {
 		const leaveApplication = $(this).data("leave");
 		const employee = $(this).data("employee");
 		if (leaveApplication) {
@@ -2249,6 +2788,13 @@ function render_payroll_panel($widget) {
 			return;
 		}
 		if (employee) frappe.set_route("Form", "Employee", employee);
+	};
+	$list.find(".sp-payroll__row").on("click", open_absence_row);
+	$list.find(".sp-payroll__row").on("keydown", function (event) {
+		if (event.key === "Enter" || event.key === " ") {
+			event.preventDefault();
+			open_absence_row.call(this);
+		}
 	});
 }
 
@@ -2415,7 +2961,8 @@ function render_inout_rows($widget) {
 						</span>
 					</span>
 					<span class="sp-inout-dash__status-pill ${inout_status_class(row)}">${escape_html(inout_status_label(row))}</span>
-					<span class="sp-inout-dash__time">${escape_html(row.time || "—")}</span>
+					<span class="sp-inout-dash__time">${escape_html(format_attendance_clock(row.in_time))}</span>
+					<span class="sp-inout-dash__time">${escape_html(format_attendance_clock(row.out_time))}</span>
 					<span class="sp-inout-dash__pto">${escape_html(row.pto_code || "—")}</span>
 					<span class="sp-inout-dash__device">${escape_html(row.device_id || "—")}</span>
 				</button>
@@ -2477,13 +3024,31 @@ function load_inout($widget) {
 	});
 }
 
-$(document).off("sp:hours-refresh.sp-dash").on("sp:hours-refresh.sp-dash", () => {
+function refresh_live_home_panels() {
 	$(".sp-dash-hours").each(function () {
 		load_hours($(this));
 	});
 	$(".sp-dash-home .sp-dash-inout").each(function () {
 		load_inout($(this));
 	});
+	$(".sp-dash-home .sp-attendance-board").each(function () {
+		load_attendance_board($(this));
+	});
+}
+
+$(document).off("sp:hours-refresh.sp-dash").on("sp:hours-refresh.sp-dash", () => {
+	refresh_live_home_panels();
+});
+
+$(document).off("page-change.sp-dash-live").on("page-change.sp-dash-live", () => {
+	setTimeout(() => {
+		if (dashboard_name() === "Human Resource") {
+			refresh_live_home_panels();
+		}
+		if (hrms.in_out_today?.$body?.length && frappe.get_route?.()?.[0] === "in-out-today") {
+			hrms.in_out_today.refresh();
+		}
+	}, 120);
 });
 
 function hide_attendance_charts($root) {
@@ -2731,9 +3296,15 @@ function hours_listview_stub($panel) {
 }
 
 function format_hours_clock(value) {
-	if (hrms.time?.format_clock) return hrms.time.format_clock(value);
-	if (!value) return "";
-	return frappe.datetime.str_to_user(value);
+	if (!value && value !== 0) return "";
+	if (hrms.time?.format_clock) {
+		return hrms.time.format_clock(value) || String(value);
+	}
+	return frappe.datetime.str_to_user(value) || String(value);
+}
+
+function format_attendance_clock(value) {
+	return format_hours_clock(value) || "—";
 }
 
 function format_hours_duration(value) {
@@ -2769,7 +3340,7 @@ function format_hours_comment(comment) {
 		return hrms.time.format_hours_comment(comment);
 	}
 	const when = moment(comment.creation);
-	const time = when.isValid() ? when.format("hh:mm A") : "";
+	const time = when.isValid() ? when.format(hrms.time?.CLOCK_FORMAT || "h:mm A") : "";
 	const date = when.isValid() ? when.format("MM/DD/YYYY") : "";
 	const who = comment.comment_by || __("Admin");
 	return __("Comment ({0}, {1}, {2}): {3}", [who, time, date, comment.content || ""]);
@@ -2987,6 +3558,563 @@ function load_hours($panel) {
 			$list.html(`<div class="sp-hours__empty"><p>${escape_html(__("Could not load hours."))}</p></div>`);
 		},
 	});
+}
+
+function payroll_board_html() {
+	return `
+		<section class="sp-payroll-board" aria-label="${escape_html(__("Payroll"))}">
+			<div class="sp-paydash__toolbar">
+				<h2 class="sp-paydash__title">${escape_html(__("Payroll"))}</h2>
+				<div class="sp-paydash__actions">
+				<div class="sp-paydash__range">
+					<span class="sp-paydash__range-icon" aria-hidden="true">${ICONS.calendar}</span>
+					${dash_select_html({
+						className: "sp-paydash__period",
+						variant: "outline",
+						label: __("Pay period"),
+						options: [{ value: "", label: __("Pay period") }],
+						value: "",
+					})}
+				</div>
+				<button type="button" class="sp-paydash__export">${ICONS.download}<span>${escape_html(__("Export CSV"))}</span></button>
+				<button type="button" class="sp-paydash__new">${ICONS.plus}<span>${escape_html(__("New Payroll"))}</span></button>
+				</div>
+			</div>
+			<div class="sp-paydash__kpis" aria-live="polite"></div>
+			<div class="sp-paydash__charts">
+				<section class="sp-paydash__card" aria-label="${escape_html(__("Payroll Trend"))}">
+					<div class="sp-paydash__card-head">
+						<div>
+							<h3 class="sp-paydash__card-title">${escape_html(__("Payroll Trend"))}</h3>
+							<p class="sp-paydash__card-total sp-paydash__trend-total">—</p>
+							<p class="sp-paydash__card-change sp-paydash__trend-change"></p>
+						</div>
+						<div class="sp-paydash__legend">
+							<span><i></i>${escape_html(__("Salary"))}</span>
+							<span><i class="is-bonus"></i>${escape_html(__("Bonus"))}</span>
+						</div>
+					</div>
+					<div class="sp-paydash__trend-chart"></div>
+				</section>
+				<section class="sp-paydash__card" aria-label="${escape_html(__("Total Payroll"))}">
+					<div class="sp-paydash__card-head">
+						<div>
+							<h3 class="sp-paydash__card-title">${escape_html(__("Total Payroll"))}</h3>
+							<p class="sp-paydash__card-total sp-paydash__dept-total">—</p>
+							<p class="sp-paydash__card-change sp-paydash__dept-change"></p>
+						</div>
+						<div class="sp-paydash__legend">
+							<span><i></i>${escape_html(__("Salary"))}</span>
+							<span><i class="is-bonus"></i>${escape_html(__("Bonus"))}</span>
+						</div>
+					</div>
+					<div class="sp-paydash__dept-chart"></div>
+				</section>
+			</div>
+			<section class="sp-paydash__list-card" aria-label="${escape_html(__("Payroll list"))}">
+				<div class="sp-paydash__list-head">
+					<h3 class="sp-paydash__list-title">${escape_html(__("Payroll list"))}</h3>
+					<div class="sp-paydash__list-tools">
+						<label class="sp-paydash__search">
+							<span class="sp-paydash__search-icon" aria-hidden="true">${ICONS.search}</span>
+							<input type="search" class="sp-paydash__search-input" placeholder="${escape_html(__("Search by name, role, department"))}" autocomplete="off" />
+							<button type="button" class="sp-paydash__search-clear" hidden aria-label="${escape_html(__("Clear search"))}">×</button>
+						</label>
+						<div class="sp-paydash__filter">
+							<button type="button" class="sp-paydash__filter-btn" aria-haspopup="listbox" aria-expanded="false">
+								${ICONS.sliders}
+								<span>${escape_html(__("Filter"))}</span>
+							</button>
+							<div class="sp-paydash__filter-menu" hidden role="listbox" aria-label="${escape_html(__("Filter"))}">
+								${PAYROLL_STATUS_FILTERS.map(
+									(opt) =>
+										`<button type="button" class="sp-paydash__filter-option${opt.value === "all" ? " is-selected" : ""}" data-value="${escape_html(opt.value)}" role="option" aria-selected="${opt.value === "all" ? "true" : "false"}">${escape_html(opt.label)}</button>`,
+								).join("")}
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="sp-paydash__table-wrap">
+					<div class="sp-paydash__table-head">
+						<label><input type="checkbox" class="sp-paydash__check sp-paydash__check-all" aria-label="${escape_html(__("Select all"))}" /></label>
+						<span>${escape_html(__("Full name"))}</span>
+						<span>${escape_html(__("Department"))}</span>
+						<span>${escape_html(__("Pay date"))}</span>
+						<span>${escape_html(__("Status"))}</span>
+						<span>${escape_html(__("Base salary"))}</span>
+						<span>${escape_html(__("Bonuses"))}</span>
+						<span>${escape_html(__("SS"))}</span>
+						<span>${escape_html(__("Total salary"))}</span>
+						<span></span>
+					</div>
+					<div class="sp-paydash__list"></div>
+				</div>
+				<div class="sp-paydash__pager">
+					<button type="button" class="sp-paydash__pager-btn sp-paydash__prev">${escape_html(__("Previous"))}</button>
+					<span class="sp-paydash__pager-label"></span>
+					<button type="button" class="sp-paydash__pager-btn sp-paydash__next">${escape_html(__("Next"))}</button>
+				</div>
+			</section>
+		</section>
+	`;
+}
+
+function format_payroll_change(value) {
+	const number = Number(value || 0);
+	const abs = Math.abs(number);
+	const shown = abs >= 10 || Number.isInteger(abs) ? String(Math.round(abs)) : abs.toFixed(1);
+	return {
+		text: `${number < 0 ? "-" : "+"}${shown}%`,
+		dir: !number ? "flat" : number > 0 ? "up" : "down",
+	};
+}
+
+function payroll_search_query($board) {
+	return String($board.find(".sp-paydash__search-input").val() || "")
+		.trim()
+		.toLowerCase();
+}
+
+function payroll_status_filter($board) {
+	return $board.data("payroll-status") || "all";
+}
+
+function payroll_row_status(row) {
+	if (row.status === "ready") return "unpaid";
+	return row.status || "pending";
+}
+
+function filtered_payroll_board_rows($board) {
+	const status = payroll_status_filter($board);
+	const query = payroll_search_query($board);
+	return ($board.data("payroll-rows") || []).filter((row) => {
+		if (status !== "all" && payroll_row_status(row) !== status) return false;
+		if (!query) return true;
+		const haystack = [row.employee_name, row.department_label, row.department, row.designation, row.status_label]
+			.filter(Boolean)
+			.join(" ")
+			.toLowerCase();
+		return haystack.includes(query);
+	});
+}
+
+function selected_payroll_keys($board) {
+	return new Set($board.data("payroll-selected") || []);
+}
+
+function payroll_row_key(row) {
+	return row.salary_slip || `${row.employee || ""}:${row.pay_date || ""}`;
+}
+
+function render_payroll_board_kpis($board) {
+	const kpis = $board.data("payroll-kpis") || {};
+	const cards = [
+		{ key: "total_salary", label: __("Total Salary"), icon: "wallet", money: true },
+		{ key: "employees_paid", label: __("Employees Paid"), icon: "users" },
+		{ key: "total_overtime", label: __("Total Overtime"), icon: "clock", money: true },
+	];
+	$board.find(".sp-paydash__kpis").html(
+		cards
+			.map((card) => {
+				const kpi = kpis[card.key] || {};
+				const change = format_payroll_change(kpi.change);
+				const value =
+					card.key === "employees_paid"
+						? `${Number(kpi.value || 0).toLocaleString()} / ${Number(kpi.total || 0).toLocaleString()}`
+						: kpi.formatted || format_payroll_money(kpi.value || 0, $board.data("payroll-currency"));
+				return `
+					<div class="sp-paydash__kpi">
+						<span class="sp-paydash__kpi-icon" aria-hidden="true">${ICONS[card.icon] || ICONS.wallet}</span>
+						<span class="sp-paydash__kpi-copy">
+							<span class="sp-paydash__kpi-value-row">
+								<span class="sp-paydash__kpi-value">${escape_html(value)}</span>
+								<span class="sp-paydash__kpi-change is-${change.dir}">${change.dir === "down" ? ICONS.arrowDown : ICONS.arrowUp}${escape_html(change.text)}</span>
+							</span>
+							<span class="sp-paydash__kpi-label">${escape_html(card.label)}</span>
+						</span>
+					</div>
+				`;
+			})
+			.join(""),
+	);
+}
+
+function payroll_line_chart_svg(points) {
+	const labels = points.map((point) => point.label);
+	const salary = points.map((point) => Number(point.salary || 0));
+	const bonus = points.map((point) => Number(point.bonus || 0));
+	const w = 560;
+	const h = 220;
+	const pad = { l: 8, r: 8, t: 16, b: 28 };
+	const innerW = w - pad.l - pad.r;
+	const innerH = h - pad.t - pad.b;
+	const max = Math.max(1, ...salary, ...bonus);
+	const n = Math.max(labels.length, 1);
+	const xAt = (i) => pad.l + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+	const yAt = (v) => pad.t + innerH - (v / max) * innerH;
+	const pathFor = (values) => values.map((value, i) => `${i ? "L" : "M"}${xAt(i).toFixed(1)},${yAt(value).toFixed(1)}`).join(" ");
+	const ticks = labels
+		.map((label, i) => `<text x="${xAt(i).toFixed(1)}" y="${h - 8}" text-anchor="middle" fill="#9aa3af" font-size="11">${escape_html(label)}</text>`)
+		.join("");
+	const dots = salary
+		.map((value, i) => `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(value).toFixed(1)}" r="3.2" fill="#f0c14a" />`)
+		.join("");
+	const bonusDots = bonus
+		.map((value, i) => `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(value).toFixed(1)}" r="2.6" fill="#1f2937" />`)
+		.join("");
+	return `<svg class="sp-paydash__chart" viewBox="0 0 ${w} ${h}" role="img" aria-hidden="true"><path d="${pathFor(salary)}" fill="none" stroke="#f0c14a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="${pathFor(bonus)}" fill="none" stroke="#1f2937" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>${dots}${bonusDots}${ticks}</svg>`;
+}
+
+function payroll_bar_chart_svg(items) {
+	const w = 420;
+	const h = 220;
+	const pad = { l: 8, r: 8, t: 12, b: 28 };
+	const innerW = w - pad.l - pad.r;
+	const innerH = h - pad.t - pad.b;
+	const max = Math.max(1, ...items.map((item) => Number(item.salary || 0) + Number(item.bonus || 0)));
+	const groupW = innerW / Math.max(items.length, 1);
+	const barW = Math.min(18, groupW * 0.28);
+	const gap = 4;
+	const bars = items
+		.map((item, i) => {
+			const salary = Number(item.salary || 0);
+			const bonus = Number(item.bonus || 0);
+			const cx = pad.l + groupW * i + groupW / 2;
+			const salaryH = (salary / max) * innerH;
+			const bonusH = (bonus / max) * innerH;
+			const salaryX = cx - barW - gap / 2;
+			const bonusX = cx + gap / 2;
+			return `
+				<rect x="${salaryX.toFixed(1)}" y="${(pad.t + innerH - salaryH).toFixed(1)}" width="${barW}" height="${Math.max(salaryH, 0).toFixed(1)}" rx="3" fill="#f0c14a"></rect>
+				<rect x="${bonusX.toFixed(1)}" y="${(pad.t + innerH - bonusH).toFixed(1)}" width="${barW}" height="${Math.max(bonusH, 0).toFixed(1)}" rx="3" fill="#f8e3a3"></rect>
+				<text x="${cx.toFixed(1)}" y="${h - 8}" text-anchor="middle" fill="#9aa3af" font-size="11">${escape_html(item.label || "")}</text>
+			`;
+		})
+		.join("");
+	return `<svg class="sp-paydash__chart" viewBox="0 0 ${w} ${h}" role="img" aria-hidden="true">${bars}</svg>`;
+}
+
+function render_payroll_board_charts($board) {
+	const payload = $board.data("payroll-payload") || {};
+	const changeLabel = payload.change_label || __("from last period");
+	const trend = payload.trend || {};
+	const departments = payload.departments || {};
+	const trendChange = format_payroll_change(trend.change);
+	const deptChange = format_payroll_change(departments.change);
+	$board.find(".sp-paydash__trend-total").text(trend.formatted_total || "—");
+	$board
+		.find(".sp-paydash__trend-change")
+		.attr("class", `sp-paydash__card-change sp-paydash__trend-change is-${trendChange.dir}`)
+		.text(`${trendChange.text} ${changeLabel}`);
+	const points = trend.points || [];
+	$board
+		.find(".sp-paydash__trend-chart")
+		.html(points.length ? payroll_line_chart_svg(points) : `<div class="sp-paydash__empty-chart">${escape_html(__("No payroll trend yet."))}</div>`);
+
+	$board.find(".sp-paydash__dept-total").text(departments.formatted_total || "—");
+	$board
+		.find(".sp-paydash__dept-change")
+		.attr("class", `sp-paydash__card-change sp-paydash__dept-change is-${deptChange.dir}`)
+		.text(`${deptChange.text} ${changeLabel}`);
+	const items = departments.items || [];
+	$board
+		.find(".sp-paydash__dept-chart")
+		.html(items.length ? payroll_bar_chart_svg(items) : `<div class="sp-paydash__empty-chart">${escape_html(__("No department totals yet."))}</div>`);
+}
+
+function render_payroll_board_rows(rows, selected) {
+	if (!rows.length) {
+		return `<div class="sp-paydash__empty"><p>${escape_html(__("No salary slips in this period."))}</p></div>`;
+	}
+	return rows
+		.map((row) => {
+			const key = payroll_row_key(row);
+			const checked = selected.has(key) ? " checked" : "";
+			return `
+				<div class="sp-paydash__row" role="link" tabindex="0" data-key="${escape_html(key)}" data-slip="${escape_html(row.salary_slip || "")}" data-employee="${escape_html(row.employee || "")}">
+					<span><input type="checkbox" class="sp-paydash__check"${checked} aria-label="${escape_html(__("Select row"))}" /></span>
+					<span class="sp-paydash__agent">
+						<span class="sp-paydash__avatar">${celebration_avatar(row)}</span>
+						<span class="sp-paydash__name">${escape_html(row.employee_name || row.employee || "")}</span>
+					</span>
+					<span class="sp-paydash__dept">${escape_html(row.department_label || "—")}</span>
+					<span class="sp-paydash__date">${escape_html(row.pay_date_label || "")}</span>
+					<span class="sp-paydash__status is-${escape_html(payroll_row_status(row))}">${escape_html(row.status_label || "")}</span>
+					<span class="sp-paydash__money">${escape_html(format_payroll_money(row.base_salary, row.currency))}</span>
+					<span class="sp-paydash__money">${escape_html(format_payroll_money(row.bonus, row.currency))}</span>
+					<span class="sp-paydash__money">${escape_html(format_payroll_money(row.ss_contribution, row.currency))}</span>
+					<span class="sp-paydash__money">${escape_html(format_payroll_money(row.net_pay, row.currency))}</span>
+					<span><button type="button" class="sp-paydash__more" aria-label="${escape_html(__("Open pay stub"))}">${ICONS.more}</button></span>
+				</div>
+			`;
+		})
+		.join("");
+}
+
+function payroll_page_count(total) {
+	return Math.max(1, Math.ceil(total / PAYROLL_PAGE_SIZE));
+}
+
+function render_payroll_board_list($board) {
+	const rows = filtered_payroll_board_rows($board);
+	const pages = payroll_page_count(rows.length);
+	let page = Number($board.data("payroll-page") || 1);
+	if (page > pages) page = pages;
+	if (page < 1) page = 1;
+	$board.data("payroll-page", page);
+	const start = (page - 1) * PAYROLL_PAGE_SIZE;
+	const visible = rows.slice(start, start + PAYROLL_PAGE_SIZE);
+	const selected = selected_payroll_keys($board);
+	$board.find(".sp-paydash__list").html(render_payroll_board_rows(visible, selected));
+	$board.find(".sp-paydash__pager-label").text(__("Page {0} of {1}", [page, pages]));
+	$board.find(".sp-paydash__prev").prop("disabled", page <= 1);
+	$board.find(".sp-paydash__next").prop("disabled", page >= pages);
+	$board.find(".sp-paydash__search-clear").prop("hidden", !payroll_search_query($board));
+	const allVisibleSelected = visible.length && visible.every((row) => selected.has(payroll_row_key(row)));
+	$board.find(".sp-paydash__check-all").prop("checked", Boolean(allVisibleSelected));
+}
+
+function open_payroll_board_row(rowEl) {
+	const slip = $(rowEl).data("slip");
+	const employee = $(rowEl).data("employee");
+	if (slip) {
+		frappe.set_route("Form", "Salary Slip", slip);
+		return;
+	}
+	if (employee) frappe.set_route("Form", "Employee", employee);
+}
+
+function export_payroll_board_csv($board) {
+	const selected = selected_payroll_keys($board);
+	const rows = filtered_payroll_board_rows($board).filter((row) => !selected.size || selected.has(payroll_row_key(row)));
+	const header = ["Full name", "Department", "Pay date", "Status", "Base salary", "Bonuses", "SS", "Total salary"];
+	const lines = [
+		header.join(","),
+		...rows.map((row) =>
+			[
+				row.employee_name || row.employee || "",
+				row.department_label || "",
+				row.pay_date_label || "",
+				row.status_label || "",
+				row.base_salary ?? "",
+				row.bonus ?? "",
+				row.ss_contribution ?? "",
+				row.net_pay ?? row.gross_pay ?? "",
+			]
+				.map((value) => `"${String(value).replace(/"/g, '""')}"`)
+				.join(","),
+		),
+	];
+	const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+	const url = URL.createObjectURL(blob);
+	const link = document.createElement("a");
+	link.href = url;
+	link.download = "payroll-list.csv";
+	link.click();
+	URL.revokeObjectURL(url);
+}
+
+function close_payroll_filter_menus() {
+	$(".sp-paydash__filter").removeClass("is-open");
+	$(".sp-paydash__filter-menu").prop("hidden", true);
+	$(".sp-paydash__filter-btn").attr("aria-expanded", "false");
+}
+
+function set_payroll_status_filter($board, status, { rerender = true } = {}) {
+	const next = PAYROLL_STATUS_FILTERS.some((opt) => opt.value === status) ? status : "all";
+	$board.data("payroll-status", next);
+	$board.data("payroll-page", 1);
+	const selected = PAYROLL_STATUS_FILTERS.find((opt) => opt.value === next) || PAYROLL_STATUS_FILTERS[0];
+	$board.find(".sp-paydash__filter-btn span").text(next === "all" ? __("Filter") : selected.label);
+	$board.find(".sp-paydash__filter-option").each(function () {
+		const active = String($(this).data("value")) === next;
+		$(this).toggleClass("is-selected", active).attr("aria-selected", active ? "true" : "false");
+	});
+	if (rerender) render_payroll_board_list($board);
+}
+
+function bind_payroll_board($board) {
+	if (!$board.length || $board.data("sp-payroll-board-bound")) return;
+	$board.data("sp-payroll-board-bound", true);
+	$board.data("payroll-status", "all");
+	$board.data("payroll-page", 1);
+	$board.data("payroll-selected", []);
+
+	const reload = () => load_payroll_board($board);
+	bind_dash_selects($board);
+	$board.find(".sp-paydash__period").on("change", reload);
+	$board.find(".sp-paydash__new").on("click", () => new_doc("Payroll Entry"));
+	$board.find(".sp-paydash__export").on("click", () => export_payroll_board_csv($board));
+	$board.find(".sp-paydash__search-input").on("input", function () {
+		$board.data("payroll-page", 1);
+		render_payroll_board_list($board);
+	});
+	$board.find(".sp-paydash__search-clear").on("click", function () {
+		$board.find(".sp-paydash__search-input").val("");
+		$board.data("payroll-page", 1);
+		render_payroll_board_list($board);
+		$board.find(".sp-paydash__search-input").trigger("focus");
+	});
+	$board.find(".sp-paydash__filter-btn").on("click", function (event) {
+		event.preventDefault();
+		event.stopPropagation();
+		const $wrap = $board.find(".sp-paydash__filter");
+		const $menu = $board.find(".sp-paydash__filter-menu");
+		const willOpen = $menu.prop("hidden");
+		close_dash_selects();
+		close_attendance_filter_menus();
+		close_payroll_filter_menus();
+		if (!willOpen) return;
+		$wrap.addClass("is-open");
+		$menu.prop("hidden", false);
+		$(this).attr("aria-expanded", "true");
+	});
+	$board.find(".sp-paydash__filter-option").on("click", function (event) {
+		event.preventDefault();
+		event.stopPropagation();
+		set_payroll_status_filter($board, String($(this).data("value")));
+		close_payroll_filter_menus();
+	});
+	$board.find(".sp-paydash__filter-menu").on("click", (event) => event.stopPropagation());
+	$board.find(".sp-paydash__prev").on("click", function () {
+		$board.data("payroll-page", Math.max(1, Number($board.data("payroll-page") || 1) - 1));
+		render_payroll_board_list($board);
+	});
+	$board.find(".sp-paydash__next").on("click", function () {
+		$board.data("payroll-page", Number($board.data("payroll-page") || 1) + 1);
+		render_payroll_board_list($board);
+	});
+	$board.find(".sp-paydash__check-all").on("change", function () {
+		const selected = selected_payroll_keys($board);
+		const rows = filtered_payroll_board_rows($board);
+		const page = Number($board.data("payroll-page") || 1);
+		const visible = rows.slice((page - 1) * PAYROLL_PAGE_SIZE, page * PAYROLL_PAGE_SIZE);
+		if (this.checked) visible.forEach((row) => selected.add(payroll_row_key(row)));
+		else visible.forEach((row) => selected.delete(payroll_row_key(row)));
+		$board.data("payroll-selected", Array.from(selected));
+		render_payroll_board_list($board);
+	});
+	$board.on("click", ".sp-paydash__row", function (event) {
+		if ($(event.target).is("input, .sp-paydash__check, .sp-paydash__more, .sp-paydash__more *")) return;
+		open_payroll_board_row(this);
+	});
+	$board.on("keydown", ".sp-paydash__row", function (event) {
+		if (event.key !== "Enter" && event.key !== " ") return;
+		event.preventDefault();
+		open_payroll_board_row(this);
+	});
+	$board.on("click", ".sp-paydash__more", function (event) {
+		event.preventDefault();
+		event.stopPropagation();
+		open_payroll_board_row($(this).closest(".sp-paydash__row"));
+	});
+	$board.on("click", ".sp-paydash__check", function (event) {
+		event.stopPropagation();
+		const key = $(this).closest(".sp-paydash__row").data("key");
+		const selected = selected_payroll_keys($board);
+		if (this.checked) selected.add(key);
+		else selected.delete(key);
+		$board.data("payroll-selected", Array.from(selected));
+	});
+	$(document).off("click.sp-paydash-filter").on("click.sp-paydash-filter", close_payroll_filter_menus);
+	load_payroll_board($board);
+}
+
+function payroll_period_value(fromDate, toDate) {
+	if (!fromDate || !toDate) return "";
+	return `${fromDate}|${toDate}`;
+}
+
+function selected_payroll_period($board) {
+	const raw = String($board.find(".sp-paydash__period").val() || "");
+	if (!raw.includes("|")) return { from_date: "", to_date: "" };
+	const [from_date, to_date] = raw.split("|");
+	return { from_date: from_date || "", to_date: to_date || "" };
+}
+
+function paint_payroll_period_select($board, payload) {
+	const $select = $board.find(".sp-paydash__period");
+	if (!$select.length) return;
+	const periods = payload.periods || [];
+	const selected = payroll_period_value(payload.from_date, payload.to_date);
+	const options = periods.map((period) => {
+		const value = payroll_period_value(period.from_date, period.to_date);
+		const label = period.current ? `${period.label} (${__("Current")})` : period.label;
+		return { value, label };
+	});
+	if (selected && !options.some((opt) => opt.value === selected)) {
+		options.unshift({
+			value: selected,
+			label: payload.period_label || selected,
+		});
+	}
+	if (!options.length) {
+		options.push({ value: "", label: __("Pay period") });
+	}
+	set_dash_select_options($select, options, false);
+	$select.val(selected || options[0].value);
+	const $wrap = $select.closest(".sp-dash-select");
+	if ($wrap.length) sync_dash_select_menu($wrap);
+}
+
+function load_payroll_board($board) {
+	const $list = $board.find(".sp-paydash__list");
+	$list.addClass("is-loading");
+	const selected = selected_payroll_period($board);
+	const args = {};
+	if (selected.from_date && selected.to_date) {
+		args.from_date = selected.from_date;
+		args.to_date = selected.to_date;
+	}
+	frappe.call({
+		method: "hrms.hr.desk_dashboard.get_payroll_board",
+		args,
+		callback(r) {
+			$list.removeClass("is-loading");
+			const payload = r.message || {};
+			$board.data("payroll-payload", payload);
+			$board.data("payroll-rows", payload.rows || []);
+			$board.data("payroll-kpis", payload.kpis || {});
+			$board.data("payroll-currency", payload.currency || "");
+			$board.data("payroll-page", 1);
+			paint_payroll_period_select($board, payload);
+			render_payroll_board_kpis($board);
+			render_payroll_board_charts($board);
+			render_payroll_board_list($board);
+		},
+		error() {
+			$list.removeClass("is-loading");
+			$board.data("payroll-payload", {});
+			$board.data("payroll-rows", []);
+			$board.data("payroll-kpis", {});
+			render_payroll_board_kpis($board);
+			render_payroll_board_charts($board);
+			$list.html(`<div class="sp-paydash__empty"><p>${escape_html(__("Could not load payroll."))}</p></div>`);
+		},
+	});
+}
+
+function inject_payroll_board($root) {
+	if (dashboard_name() !== "Payroll") {
+		$root.removeClass("sp-dash--payroll");
+		$root.find(".sp-payroll-board").remove();
+		return;
+	}
+
+	$root.addClass("sp-dash--payroll");
+	const $existing = $root.find(".sp-payroll-board");
+	if ($existing.length && $existing.data("sp-payroll-board-v3")) {
+		return;
+	}
+	$existing.remove();
+
+	const $pills = $root.find(".sp-dash-pills").first();
+	if (!$pills.length) return;
+
+	const $board = $(payroll_board_html());
+	$board.data("sp-payroll-board-v3", true);
+	$pills.after($board);
+	bind_payroll_board($board);
 }
 
 function inject_hours_board($root) {
@@ -3864,6 +4992,7 @@ function enhance_empty_charts($root) {
 		const $widget = $(this).closest(".widget");
 		if (!$widget.length) return;
 		if ($widget.hasClass("number-widget-box") || $widget.hasClass("sp-kpi")) return;
+		if ($widget.data("sp-chart-period-empty")) return;
 
 		if (chart_has_plotted_data($widget) || !widget_chart_is_empty($widget)) {
 			clear_empty_chart_overlay($widget);
@@ -4189,6 +5318,7 @@ function enhance() {
 		hide_frappe_dashboard_chrome($root);
 		$root.find(".sp-dash-celebrations:not(.sp-dash-panel)").remove();
 		inject_quick_actions($root);
+		inject_payroll_board($root);
 		inject_celebrations($root);
 		reorder_hr_dashboard_layout($root);
 		filter_hr_charts($root);
@@ -4197,7 +5327,7 @@ function enhance() {
 		inject_hours_board($root);
 		upgrade_native_selects($root);
 		$root.find(".sp-dash-start").remove();
-		if (dashboard_name() !== "Attendance") {
+		if (dashboard_name() !== "Attendance" && dashboard_name() !== "Payroll") {
 			enhance_empty_charts($root);
 		}
 		bind_chart_period_filters($root);

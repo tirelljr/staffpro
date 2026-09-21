@@ -146,10 +146,9 @@ def _employee_for_user(user: str) -> dict:
 
 
 def _format_clock(value) -> str:
-	if not value:
-		return ""
-	dt = get_datetime(value)
-	return dt.strftime("%I:%M %p").lstrip("0")
+	from hrms.hr.clock_format import format_clock
+
+	return format_clock(value)
 
 
 def _hours_label(hours: float) -> str:
@@ -236,6 +235,19 @@ def _checkin_summary(employee: str) -> dict:
 	}
 
 
+def _holiday_elections(employee: str) -> list[dict]:
+	from hrms.hr.doctype.holiday_work_election.holiday_work_election import (
+		get_upcoming_holidays_for_employee,
+	)
+
+	try:
+		holidays = get_upcoming_holidays_for_employee(employee)
+	except Exception:
+		frappe.log_error(title="Kiosk holiday elections")
+		return []
+	return [row for row in holidays if row.get("is_work_day")][:5]
+
+
 def _profile(employee: dict, username: str, client_ip: str | None = None) -> dict:
 	summary = _checkin_summary(employee.name)
 	summary.update(
@@ -245,6 +257,7 @@ def _profile(employee: dict, username: str, client_ip: str | None = None) -> dic
 			"employee_name": employee.employee_name or "",
 			"company": employee.company or "",
 			"device_id": resolve_workstation_device(employee.name, client_ip),
+			"holidays": _holiday_elections(employee.name),
 		}
 	)
 	return summary
@@ -328,6 +341,29 @@ def clock(
 		}
 	)
 	return profile
+
+
+@frappe.whitelist(allow_guest=True)
+def set_holiday_work_election(
+	username: str,
+	password: str,
+	holiday_date: str,
+	will_work: int | str | bool = 0,
+) -> dict:
+	"""Save a holiday working / not-working choice from the clock-in kiosk."""
+	if not (username or "").strip() or not password:
+		frappe.throw(_("Username and password are required."))
+	if not holiday_date:
+		frappe.throw(_("Holiday Date is required."))
+
+	user = _authenticate(username, password)
+	employee = _employee_for_user(user)
+	from hrms.hr.doctype.holiday_work_election.holiday_work_election import (
+		set_holiday_work_election as upsert_election,
+	)
+
+	upsert_election(employee.name, holiday_date, will_work, skip_permission=True)
+	return _profile(employee, frappe.db.get_value("User", user, "username") or username, _request_ip())
 
 
 @frappe.whitelist(allow_guest=True)

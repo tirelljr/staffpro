@@ -38,8 +38,7 @@ LINK_LABELS: dict[str, str] = {
 	"Leave Control Panel": "Time Off Control",
 	"Leave Policy Assignment": "PTO Policy Setup",
 	"Leave Allocation": "PTO Allocation",
-	"Overtime Type": "OT Types",
-	"Overtime Slip": "OT Records",
+	"Overtime Slip": "Overtime",
 	"Monthly Attendance Sheet": "Monthly Attendance",
 	"Shift Attendance": "Shift Coverage",
 	"Employee Leave Balance": "PTO Balance",
@@ -102,7 +101,6 @@ LINK_LABELS: dict[str, str] = {
 LABEL_LABELS: dict[str, str] = {
 	"In / Out today": "Who Is In",
 	"Leave Admin": "Time Off Admin",
-	"Overtime": "Extra Hours",
 	"Planning": "Workforce Planning",
 	"Leave Balance": "PTO Balance",
 	"Leave Balance Summary": "PTO Summary",
@@ -198,6 +196,7 @@ HIDDEN_SIDEBAR_LINKS = frozenset(
 		"Activity Type",
 		"Employee Attendance Tool",
 		"Accrued Earnings Report",
+		"Overtime Type",
 		"Leave Encashment",
 	}
 )

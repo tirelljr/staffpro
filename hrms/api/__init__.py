@@ -555,7 +555,7 @@ def get_holidays_for_employee(employee: str) -> list[dict]:
 
 
 @frappe.whitelist()
-def set_holiday_work_election(employee: str, holiday_date: str, will_work=0) -> dict:
+def set_holiday_work_election(employee: str, holiday_date: str, will_work: int | str | bool = 0) -> dict:
 	from hrms.hr.doctype.holiday_work_election.holiday_work_election import (
 		set_holiday_work_election as upsert_election,
 	)

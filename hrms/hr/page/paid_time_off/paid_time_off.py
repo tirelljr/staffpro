@@ -5,6 +5,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, formatdate, get_year_ending, get_year_start, getdate
 
+from hrms.hr.desk_dashboard import _absence_date_label
 from hrms.hr.doctype.leave_application.leave_application import get_employee_leave_approver
 from hrms.hr.report.employee_leave_balance.employee_leave_balance import get_data as get_leave_balance_data
 from hrms.hr.utils import get_leave_period
@@ -78,14 +79,6 @@ def _absence_status_label(status: str | None) -> str:
 	if status == "Open":
 		return _("Pending")
 	return status or _("—")
-
-
-def _absence_date_label(from_date, to_date) -> str:
-	if not from_date:
-		return ""
-	if from_date == to_date:
-		return formatdate(from_date)
-	return f"{formatdate(from_date)} – {formatdate(to_date)}"
 
 
 def _employee_company(employee: str | None) -> str | None:

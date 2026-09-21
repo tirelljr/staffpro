@@ -44,6 +44,11 @@
   "attendance_settings_section",
   "allow_employee_checkin_from_mobile_app",
   "allow_geolocation_tracking",
+  "overtime_tab",
+  "overtime_settings_section",
+  "overtime_threshold_hours",
+  "column_break_overtime",
+  "overtime_pay_multiplier",
   "tenure_tab",
   "employee_exit_settings_section",
   "exit_questionnaire_web_form",
@@ -299,6 +304,38 @@
    "fieldname": "attendance_settings_section",
    "fieldtype": "Section Break",
    "label": "Attendance Settings"
+  },
+  {
+   "fieldname": "overtime_tab",
+   "fieldtype": "Tab Break",
+   "label": "Overtime"
+  },
+  {
+   "fieldname": "overtime_settings_section",
+   "fieldtype": "Section Break",
+   "label": "Overtime Settings"
+  },
+  {
+   "default": "80",
+   "description": "Hours in a calendar month before overtime can pay. Extra time over 8 hours in a day only counts after this threshold. A few extra days under this total stay regular time. An employee-specific value takes precedence.",
+   "fieldname": "overtime_threshold_hours",
+   "fieldtype": "Float",
+   "label": "Default OT Threshold (Hours)",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_overtime",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1.5",
+   "description": "Multiplier used for ordinary overtime pay. Public-holiday pay continues to use the Holiday List rule.",
+   "fieldname": "overtime_pay_multiplier",
+   "fieldtype": "Float",
+   "label": "OT Pay Multiplier",
+   "non_negative": 1,
+   "reqd": 1
   },
   {
    "default": "0",

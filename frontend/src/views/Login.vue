@@ -99,7 +99,7 @@
 									v-if="showClockAction"
 									type="button"
 									class="w-full py-3 text-white text-lg font-semibold disabled:opacity-60"
-									:class="clockAction === 'OUT' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+									:class="clockAction === 'OUT' ? 'kiosk-clock-out' : 'kiosk-clock-in'"
 									:disabled="clocking || signingIn"
 									@click="submitClock"
 								>
@@ -114,6 +114,60 @@
 								<div v-if="activityLabels.length" class="mt-2 text-sm text-[#11a5dd] text-center sm:text-left">
 									<div v-for="(label, idx) in activityLabels" :key="idx">{{ label }}</div>
 								</div>
+							</div>
+						</div>
+
+						<div
+							v-if="holidayElections.length"
+							class="w-full mt-4 flex flex-col gap-3"
+						>
+							<div
+								v-for="holiday in holidayElections"
+								:key="holiday.holiday_date"
+								class="w-full border border-gray-300 rounded-md p-3 text-left"
+							>
+								<div class="flex items-start justify-between gap-3">
+									<div class="min-w-0">
+										<div class="text-sm font-semibold text-gray-900">
+											{{ holiday.description }}
+										</div>
+										<div class="text-xs text-gray-500">
+											{{ formatHolidayDate(holiday.holiday_date) }}
+										</div>
+									</div>
+									<div
+										v-if="holiday.response_deadline"
+										class="text-xs text-gray-500 text-right shrink-0"
+									>
+										{{ holiday.deadline_passed ? __("Deadline passed") : __("Reply by") }}
+										<div class="font-medium text-gray-700">
+											{{ formatHolidayDeadline(holiday.response_deadline) }}
+										</div>
+									</div>
+								</div>
+								<div class="mt-2 inline-flex w-full overflow-hidden rounded-full border border-gray-300">
+									<button
+										type="button"
+										class="flex-1 py-2 text-sm font-semibold disabled:opacity-60"
+										:class="holiday.will_work ? 'bg-green-600 text-white' : 'bg-white text-gray-700'"
+										:disabled="!holiday.can_toggle || holidaySaving === holiday.holiday_date"
+										@click="setHolidayWorking(holiday, true)"
+									>
+										{{ __("Working") }}
+									</button>
+									<button
+										type="button"
+										class="flex-1 py-2 text-sm font-semibold disabled:opacity-60"
+										:class="!holiday.will_work ? 'bg-red-600 text-white' : 'bg-white text-gray-700'"
+										:disabled="!holiday.can_toggle || holidaySaving === holiday.holiday_date"
+										@click="setHolidayWorking(holiday, false)"
+									>
+										{{ __("Not Working") }}
+									</button>
+								</div>
+								<p class="mt-2 text-xs text-gray-500">
+									{{ holidayHint(holiday) }}
+								</p>
 							</div>
 						</div>
 
@@ -271,6 +325,8 @@ const activityLabels = computed(() => {
 	}
 	return [user.last_in_label, user.last_pair_label].filter(Boolean)
 })
+const holidayElections = computed(() => activeProfile.value?.holidays || [])
+const holidaySaving = ref("")
 const wifiLabel = computed(() => navigator.onLine ? "online" : "na")
 const gpsLabel = computed(() => {
 	if (latitude.value == null || longitude.value == null) return "na"
@@ -317,7 +373,7 @@ const clockinBlocked = computed(() => {
 })
 const showClockAction = computed(() => {
 	if (clockinLatchedAllowed.value) return true
-	if (!kioskContext.data) return false
+	if (!kioskContext.data) return true
 	if (!clockinRestricted.value) return true
 	return Boolean(kioskContext.data.clockin_allowed)
 })
@@ -333,7 +389,7 @@ watch(
 )
 
 function tickClock() {
-	clockLabel.value = dayjs().format("hh:mm:ss A")
+	clockLabel.value = dayjs().format("h:mm:ss A")
 }
 
 function applyRememberedUser() {
@@ -420,6 +476,59 @@ function persistCurrentCredentials() {
 		next_action: activeProfile.value?.next_action || "IN",
 		device_id: activeProfile.value?.device_id || "",
 	})
+}
+
+function formatHolidayDate(value) {
+	return value ? dayjs(value).format("ddd, D MMM YYYY") : ""
+}
+
+function formatHolidayDeadline(value) {
+	return value ? dayjs(value).format("ddd, D MMM h:mm A") : ""
+}
+
+function holidayHint(holiday) {
+	if (holiday.deadline_passed) {
+		return holiday.will_work
+			? __("You are counted as working because the deadline has passed.")
+			: __("You chose not to work on this holiday.")
+	}
+	if (holiday.response_deadline) {
+		return __("Choose Not Working before the deadline if you will not work.")
+	}
+	return __("Choose whether you will work on this holiday.")
+}
+
+async function setHolidayWorking(holiday, willWork) {
+	if (!holiday?.can_toggle || holidaySaving.value === holiday.holiday_date) {
+		return
+	}
+	if (Boolean(holiday.will_work) === Boolean(willWork)) {
+		return
+	}
+	const login = requireCredentials()
+	if (!login) return
+
+	errorMessage.value = ""
+	successMessage.value = ""
+	holidaySaving.value = holiday.holiday_date
+	try {
+		const profile = await call("hrms.api.kiosk.set_holiday_work_election", {
+			username: login,
+			password: password.value,
+			holiday_date: holiday.holiday_date,
+			will_work: willWork ? 1 : 0,
+		})
+		applyLiveProfile(profile)
+		persistProfile(profile)
+		successMessage.value = willWork
+			? __("Saved: working on {0}", [holiday.description])
+			: __("Saved: not working on {0}", [holiday.description])
+	} catch (error) {
+		errorMessage.value =
+			error.messages?.join("\n") || error.message || __("Could not save holiday choice")
+	} finally {
+		holidaySaving.value = ""
+	}
 }
 
 function onRememberPasswordChange() {
@@ -573,3 +682,18 @@ onBeforeUnmount(() => {
 	clearTimeout(rememberedTimer)
 })
 </script>
+
+<style scoped>
+.kiosk-clock-in {
+	background-color: #16a34a;
+}
+.kiosk-clock-in:hover:not(:disabled) {
+	background-color: #15803d;
+}
+.kiosk-clock-out {
+	background-color: #dc2626;
+}
+.kiosk-clock-out:hover:not(:disabled) {
+	background-color: #b91c1c;
+}
+</style>

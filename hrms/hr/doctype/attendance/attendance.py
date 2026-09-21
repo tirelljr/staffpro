@@ -30,6 +30,7 @@ from frappe.utils import (
 from frappe.utils.background_jobs import get_job
 
 import hrms
+from hrms.hr.clock_format import parse_work_date
 from hrms.hr.doctype.shift_assignment.shift_assignment import has_overlapping_timings
 from hrms.hr.utils import (
 	get_holidays_for_employee,
@@ -55,7 +56,6 @@ class Attendance(Document):
 	if TYPE_CHECKING:
 		from frappe.types import DF
 
-		actual_overtime_duration: DF.Float
 		amended_from: DF.Link | None
 		attendance_date: DF.Date
 		attendance_request: DF.Link | None
@@ -76,10 +76,8 @@ class Attendance(Document):
 		naming_series: DF.Literal["HR-ATT-.YYYY.-"]
 		net_daily_pay: DF.Currency
 		out_time: DF.Datetime | None
-		overtime_type: DF.Link | None
 		shift: DF.Link | None
 		ss_deduction: DF.Currency
-		standard_working_hours: DF.Float
 		status: DF.Literal["", "Present", "Absent", "On Leave", "Half Day", "Work From Home"]
 		tax_deduction: DF.Currency
 		working_hours: DF.Float
@@ -491,9 +489,9 @@ def roster_from_attendance(attendance_date):
 
 
 def _format_clock(value):
-	if not value:
-		return ""
-	return get_datetime(value).strftime("%I:%M %p").lstrip("0")
+	from hrms.hr.clock_format import format_clock
+
+	return format_clock(value)
 
 
 def _employee_images(employee_ids: list[str]) -> dict[str, str]:
@@ -901,7 +899,18 @@ def get_employee_shift(employee: str, for_date: str | date | None = None) -> str
 
 
 def _combine_date_and_time(attendance_date, clock_time) -> datetime:
-	return datetime.combine(getdate(attendance_date), get_time(clock_time))
+	return datetime.combine(getdate(attendance_date), get_time(_normalize_clock_phrase(clock_time)))
+
+
+def _normalize_clock_phrase(value) -> str:
+	text = cstr(value).strip()
+	if not text:
+		return text
+	lowered = text.lower()
+	for token in ("am", "pm"):
+		if lowered.endswith(token) and not lowered.endswith(f" {token}"):
+			return f"{text[: -len(token)].rstrip()} {text[-len(token) :]}"
+	return text
 
 
 def _get_day_attendance(employee: str, attendance_date, shift: str | None = None):
@@ -974,7 +983,8 @@ def _insert_hours_checkin(employee: str, log_type: str, when: datetime, shift: s
 		}
 	)
 	log.flags.ignore_geolocation = True
-	log.insert()
+	log.flags.ignore_ip_restriction = True
+	log.insert(ignore_permissions=True)
 	return log
 
 
@@ -1187,6 +1197,57 @@ def update_hours_entry(
 
 
 @frappe.whitelist()
+def set_clock_times(
+	employee: str | None = None,
+	employees: str | list | None = None,
+	attendance_date: str | date | None = None,
+	in_time: str | None = None,
+	out_time: str | None = None,
+	comment: str | None = None,
+	shift: str | None = None,
+) -> str | list[str]:
+	"""Replace an employee's clock-in and clock-out for a date, creating the day if needed."""
+	frappe.has_permission("Attendance", "write", throw=True)
+	frappe.has_permission("Employee Checkin", "create", throw=True)
+	if not in_time:
+		frappe.throw(_("Clock-in time is required."))
+	day = parse_work_date(attendance_date)
+	emp_list = _as_employee_list(employee, employees)
+	updated = [
+		_set_employee_clock_times(emp, day, in_time, out_time, comment, shift) for emp in emp_list
+	]
+	return updated[0] if len(updated) == 1 else updated
+
+
+def _set_employee_clock_times(
+	employee: str,
+	attendance_date,
+	in_time: str,
+	out_time: str | None,
+	comment: str | None,
+	shift: str | None,
+) -> str:
+	existing = _get_day_attendance(employee, attendance_date)
+	if existing:
+		return update_hours_entry(
+			name=existing.name,
+			attendance_date=attendance_date,
+			in_time=in_time,
+			out_time=out_time,
+			shift=shift,
+			comment=comment,
+		)
+	return add_hours_entry(
+		employee=employee,
+		attendance_date=attendance_date,
+		in_time=in_time,
+		out_time=out_time,
+		shift=shift,
+		comment=comment,
+	)
+
+
+@frappe.whitelist()
 def add_absence(
 	employee: str,
 	from_date: str | date,
@@ -1278,9 +1339,6 @@ def _hours_list_fields() -> list[str]:
 		"shift",
 		"leave_type",
 		"docstatus",
-		"actual_overtime_duration",
-		"overtime_type",
-		"standard_working_hours",
 	]
 	meta = frappe.get_meta("Attendance")
 	for extra in (
@@ -1306,16 +1364,15 @@ def _employee_hours_label(employee: dict | None, fallback: str | None = None) ->
 	return cstr(row.get("employee_name") or fallback or row.get("name") or "").strip()
 
 
-def _hours_buckets(row, lwp_map: dict, ot_map: dict, holiday_ctx: dict | None = None) -> dict:
+def _hours_buckets(row, lwp_map: dict, holiday_ctx: dict | None = None) -> dict:
 	row = frappe._dict(row)
 	hours = flt(row.working_hours)
-	ot_raw = flt(row.get("actual_overtime_duration"))
-	std = flt(row.get("standard_working_hours")) or 8
+	ot_raw = flt(row.get("threshold_overtime_duration"))
+	std = 8.0
 	status = cstr(row.status)
 	leave_type = cstr(row.get("leave_type"))
-	multiplier = flt(ot_map.get(row.get("overtime_type"))) if row.get("overtime_type") else 0
-	dt = ot_raw if multiplier >= 2 else 0
-	ot = 0 if dt else ot_raw
+	dt = 0
+	ot = ot_raw
 	is_leave = status in ("On Leave", "Half Day") or bool(leave_type)
 	is_lwp = bool(lwp_map.get(leave_type)) if leave_type else False
 
@@ -1369,6 +1426,49 @@ def _hours_buckets(row, lwp_map: dict, ot_map: dict, holiday_ctx: dict | None = 
 	}
 
 
+def _threshold_overtime_by_row(rows: list) -> dict[int, float]:
+	"""Allocate each attendance day's threshold OT to its latest displayed hour rows."""
+	from hrms.hr.doctype.overtime_slip.overtime_slip import get_pay_period_overtime
+
+	periods: set[tuple[str, date, date]] = set()
+	for row in rows:
+		employee = row.get("employee")
+		attendance_date = row.get("attendance_date")
+		if not employee or not attendance_date:
+			continue
+		day = getdate(attendance_date)
+		periods.add((employee, get_first_day(day), get_last_day(day)))
+
+	overtime_by_attendance: dict[str, float] = {}
+	for employee, start_date, end_date in periods:
+		result = get_pay_period_overtime(
+			employee, start_date, end_date, ensure_holidays=False
+		)
+		for allocation in result["allocations"]:
+			reference = allocation.get("reference_document")
+			if reference:
+				overtime_by_attendance[reference] = overtime_by_attendance.get(reference, 0) + flt(
+					allocation.get("overtime_duration")
+				)
+
+	indices_by_attendance: dict[str, list[int]] = defaultdict(list)
+	for index, row in enumerate(rows):
+		if row.get("name"):
+			indices_by_attendance[row["name"]].append(index)
+
+	overtime_by_row: dict[int, float] = {}
+	for attendance, indices in indices_by_attendance.items():
+		remaining = flt(overtime_by_attendance.get(attendance))
+		for index in reversed(indices):
+			if remaining <= 0:
+				break
+			hours = flt(rows[index].get("working_hours"))
+			allocated = min(hours, remaining)
+			overtime_by_row[index] = flt(allocated, 2)
+			remaining -= allocated
+	return overtime_by_row
+
+
 def _decorate_hours_rows(rows: list) -> list:
 	if not rows:
 		return []
@@ -1393,23 +1493,15 @@ def _decorate_hours_rows(rows: list) -> list:
 		):
 			lwp_map[leave_type.name] = cint(leave_type.is_lwp)
 
-	ot_types = list({cstr(row.get("overtime_type")) for row in rows if row.get("overtime_type")})
-	ot_map = {}
-	if ot_types:
-		for overtime in frappe.get_all(
-			"Overtime Type",
-			filters={"name": ["in", ot_types]},
-			fields=["name", "standard_multiplier"],
-		):
-			ot_map[overtime.name] = flt(overtime.standard_multiplier)
-
 	from hrms.payroll.daily_pay import get_public_holiday_pay_context
 
 	holiday_cache = {}
+	overtime_by_row = _threshold_overtime_by_row(rows)
 
 	decorated = []
-	for row in rows:
+	for index, row in enumerate(rows):
 		data = dict(row)
+		data["threshold_overtime_duration"] = overtime_by_row.get(index, 0)
 		holiday_ctx = None
 		emp = data.get("employee")
 		day = data.get("attendance_date")
@@ -1425,7 +1517,7 @@ def _decorate_hours_rows(rows: list) -> list:
 		data["employee_label"] = _employee_hours_label(
 			emp_map.get(data.get("employee")), data.get("employee_name")
 		)
-		data.update(_hours_buckets(data, lwp_map, ot_map, holiday_ctx))
+		data.update(_hours_buckets(data, lwp_map, holiday_ctx))
 		if data.get("kind") == "lunch":
 			data["status"] = "Lunch"
 			data["job"] = "Lunch"
@@ -1965,7 +2057,14 @@ def _as_employee_list(employee: str | None, employees: str | list | None) -> lis
 	names: list[str] = []
 	if employees:
 		if isinstance(employees, str):
-			employees = frappe.parse_json(employees)
+			try:
+				parsed = frappe.parse_json(employees)
+			except Exception:
+				parsed = employees
+			if isinstance(parsed, (list, tuple)):
+				employees = parsed
+			else:
+				employees = [part.strip() for part in str(parsed).replace(";", ",").split(",") if part.strip()]
 		if isinstance(employees, (list, tuple)):
 			names.extend(cstr(name).strip() for name in employees if cstr(name).strip())
 	if employee and cstr(employee).strip() and cstr(employee).strip() not in names:

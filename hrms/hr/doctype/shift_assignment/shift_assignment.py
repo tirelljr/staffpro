@@ -37,7 +37,6 @@ class ShiftAssignment(Document):
 		employee: DF.Link
 		employee_name: DF.Data | None
 		end_date: DF.Date | None
-		overtime_type: DF.Link | None
 		shift_location: DF.Link | None
 		shift_request: DF.Link | None
 		shift_schedule_assignment: DF.Link | None
@@ -305,7 +304,6 @@ def get_shift_for_time(shifts: list[dict], for_timestamp: datetime) -> dict:
 
 	for assignment in shifts:
 		shift_details = get_shift_details(assignment.shift_type, for_timestamp=for_timestamp)
-		shift_details.overtime_type = assignment.overtime_type or None
 
 		if _is_shift_outside_assignment_period(shift_details, assignment):
 			continue
@@ -418,7 +416,6 @@ def get_shifts_for_date(employee: str, for_timestamp: datetime) -> list[dict[str
 			assignment.shift_type,
 			assignment.start_date,
 			assignment.end_date,
-			assignment.overtime_type,
 		)
 		.where(
 			(assignment.employee == employee)
@@ -644,8 +641,6 @@ def get_shift_details(shift_type_name: str, for_timestamp: datetime | None = Non
 
 	actual_start = start_datetime - timedelta(minutes=shift_type.begin_check_in_before_shift_start_time)
 	actual_end = end_datetime + timedelta(minutes=shift_type.allow_check_out_after_shift_end_time)
-	allow_overtime = shift_type.allow_overtime
-	overtime_type = shift_type.overtime_type
 
 	return frappe._dict(
 		{
@@ -654,8 +649,6 @@ def get_shift_details(shift_type_name: str, for_timestamp: datetime | None = Non
 			"end_datetime": end_datetime,
 			"actual_start": actual_start,
 			"actual_end": actual_end,
-			"allow_overtime": allow_overtime,
-			"overtime_type": overtime_type,
 		}
 	)
 
@@ -670,8 +663,6 @@ def get_shift_type(shift_type_name: str) -> dict:
 			"end_time",
 			"begin_check_in_before_shift_start_time",
 			"allow_check_out_after_shift_end_time",
-			"allow_overtime",
-			"overtime_type",
 		],
 		as_dict=1,
 	)

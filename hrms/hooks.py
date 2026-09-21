@@ -84,6 +84,7 @@ doctype_list_js = {
 	"Dashboard Chart": "public/js/bpo_dashboard_list.js",
 	"Number Card": "public/js/bpo_dashboard_list.js",
 	"Dashboard": "public/js/bpo_dashboard_list.js",
+	"Time Clock Adjustment": "hr/doctype/time_clock_adjustment/time_clock_adjustment_list.js",
 }
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -199,6 +200,8 @@ before_app_uninstall = "hrms.setup.before_app_uninstall"
 # Permissions evaluated in scripted ways
 
 permission_query_conditions = {
+	"AI Conversation": "hrms.hr.doctype.ai_conversation.ai_conversation.get_permission_query_conditions",
+	"AI User Memory": "hrms.hr.doctype.ai_user_memory.ai_user_memory.get_permission_query_conditions",
 	"Dashboard Chart": "hrms.overrides.bpo_dashboards.get_chart_permission_query_conditions",
 	"Number Card": "hrms.overrides.bpo_dashboards.get_card_permission_query_conditions",
 	"Dashboard": "hrms.overrides.bpo_dashboards.get_dashboard_permission_query_conditions",
@@ -207,6 +210,8 @@ permission_query_conditions = {
 }
 
 has_permission = {
+	"AI Conversation": "hrms.hr.doctype.ai_conversation.ai_conversation.has_permission",
+	"AI User Memory": "hrms.hr.doctype.ai_user_memory.ai_user_memory.has_permission",
 	"Holiday Work Election": "hrms.hr.doctype.holiday_work_election.holiday_work_election.has_permission",
 	"Time Clock Adjustment": "hrms.hr.doctype.time_clock_adjustment.time_clock_adjustment.has_permission",
 }
@@ -263,7 +268,14 @@ doc_events = {
 		"after_insert": "hrms.payroll.bpo_client_accounts.after_insert_customer",
 	},
 	"System Settings": {
-		"on_update": "hrms.hr.agent_access.apply_office_ipv4_defaults_on_settings",
+		"validate": [
+			"hrms.branding.lock_system_timezone",
+			"hrms.ai.settings.validate_system_settings",
+		],
+		"on_update": [
+			"hrms.hr.agent_access.apply_office_ipv4_defaults_on_settings",
+			"hrms.ai.settings.clear_assistant_cache",
+		],
 	},
 	"Timesheet": {"validate": "hrms.hr.utils.validate_active_employee"},
 	"Payment Entry": {
@@ -322,6 +334,7 @@ scheduler_events = {
 	],
 	"hourly": [
 		"hrms.hr.doctype.daily_work_summary_group.daily_work_summary_group.trigger_emails",
+		"hrms.hr.doctype.holiday_work_deadline.holiday_work_deadline.apply_default_working_after_deadline",
 	],
 	"hourly_long": [
 		"hrms.hr.doctype.shift_type.shift_type.update_last_sync_of_checkin",

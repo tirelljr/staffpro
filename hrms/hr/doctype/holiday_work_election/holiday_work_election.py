@@ -8,7 +8,7 @@ from collections import defaultdict
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cint, getdate, strip_html
+from frappe.utils import cint, get_datetime, getdate, now_datetime, strip_html
 
 from hrms.utils.holiday_list import get_holiday_list_for_employee
 
@@ -35,7 +35,10 @@ class HolidayWorkElection(Document):
 		self.holiday_date = getdate(self.holiday_date)
 		if not self.employee_name:
 			self.employee_name = frappe.db.get_value("Employee", self.employee, "employee_name")
-		assert_can_set_election(self.employee)
+		if not self.flags.get("skip_permission"):
+			assert_can_set_election(self.employee)
+		if not self.flags.get("skip_deadline"):
+			assert_can_change_election(self.holiday_date)
 		context = get_holiday_work_context(self.employee, self.holiday_date)
 		if not context["is_public"]:
 			frappe.throw(_("This date is not a public holiday."))
@@ -76,6 +79,61 @@ def assert_can_access_employee_holidays(employee: str) -> None:
 
 def assert_can_set_election(employee: str) -> None:
 	assert_can_access_employee_holidays(employee)
+
+
+def deadline_has_passed(deadline) -> bool:
+	if not deadline:
+		return False
+	return get_datetime(deadline) <= now_datetime()
+
+
+def get_deadlines_map(dates: list) -> dict:
+	if not dates or not frappe.db.table_exists("Holiday Work Deadline"):
+		return {}
+	rows = frappe.get_all(
+		"Holiday Work Deadline",
+		filters={"holiday_date": ["in", dates]},
+		fields=["holiday_date", "response_deadline"],
+		ignore_permissions=True,
+	)
+	return {getdate(row.holiday_date): row.response_deadline for row in rows}
+
+
+def get_deadline_for_date(holiday_date):
+	return get_deadlines_map([getdate(holiday_date)]).get(getdate(holiday_date))
+
+
+def format_deadline(deadline) -> str | None:
+	if not deadline:
+		return None
+	return str(get_datetime(deadline))
+
+
+def effective_will_work(election, deadline) -> bool:
+	if election is not None:
+		return bool(cint(election))
+	# A response deadline means agents are expected to work unless they opt out.
+	return bool(deadline)
+
+
+def holiday_toggle_state(_holiday_date, is_work_day: bool, is_past: bool, election, deadline) -> dict:
+	passed = deadline_has_passed(deadline)
+	responded = election is not None
+	return {
+		"will_work": effective_will_work(election, deadline),
+		"responded": responded,
+		"assumed_working": bool(deadline) and not responded,
+		"response_deadline": format_deadline(deadline),
+		"deadline_passed": passed,
+		"can_toggle": bool(is_work_day and not is_past and not passed),
+	}
+
+
+def assert_can_change_election(holiday_date) -> None:
+	if is_hr_user():
+		return
+	if deadline_has_passed(get_deadline_for_date(holiday_date)):
+		frappe.throw(_("The response deadline for this holiday has passed."))
 
 
 def get_permission_query_conditions(user: str | None = None) -> str:
@@ -154,17 +212,13 @@ def get_upcoming_holidays_for_employee(employee: str) -> list[dict]:
 	if not holiday_list:
 		return []
 
-	Holiday = frappe.qb.DocType("Holiday")
-	public = (
-		frappe.qb.from_(Holiday)
-		.select(Holiday.name, Holiday.holiday_date, Holiday.description)
-		.where(
-			(Holiday.parent == holiday_list)
-			& (Holiday.weekly_off == 0)
-			& (Holiday.holiday_date >= today)
-		)
-		.orderby(Holiday.holiday_date)
-	).run(as_dict=True)
+	public = frappe.get_all(
+		"Holiday",
+		filters={"parent": holiday_list, "weekly_off": 0, "holiday_date": [">=", today]},
+		fields=["name", "holiday_date", "description"],
+		order_by="holiday_date",
+		ignore_permissions=True,
+	)
 
 	if not public:
 		return []
@@ -180,28 +234,46 @@ def get_upcoming_holidays_for_employee(employee: str) -> list[dict]:
 	)
 	weekly_off_dates = {getdate(d) for d in weekly_off_dates}
 	elections = get_elections_map(employee, dates)
+	deadlines = get_deadlines_map(dates)
 
 	result = []
 	for row in public:
 		holiday_date = getdate(row.holiday_date)
 		is_work_day = holiday_date not in weekly_off_dates
 		is_past = holiday_date < today
+		election = elections[holiday_date] if holiday_date in elections else None
+		state = holiday_toggle_state(
+			holiday_date,
+			is_work_day,
+			is_past,
+			election,
+			deadlines.get(holiday_date),
+		)
 		result.append(
 			{
 				"name": row.name,
 				"holiday_date": str(holiday_date),
 				"description": strip_html(row.description or "").strip(),
-				"will_work": bool(elections.get(holiday_date)),
 				"is_work_day": is_work_day,
-				"can_toggle": is_work_day and not is_past,
+				**state,
 			}
 		)
 	return result
 
 
-def set_holiday_work_election(employee: str, holiday_date, will_work) -> dict:
-	assert_can_set_election(employee)
+def set_holiday_work_election(
+	employee: str,
+	holiday_date,
+	will_work: int | str | bool = 0,
+	*,
+	skip_permission: bool = False,
+	skip_deadline: bool = False,
+) -> dict:
+	if not skip_permission:
+		assert_can_set_election(employee)
 	holiday_date = getdate(holiday_date)
+	if not skip_deadline:
+		assert_can_change_election(holiday_date)
 	will_work = cint(will_work)
 	context = get_holiday_work_context(employee, holiday_date)
 	if not context["is_public"]:
@@ -219,6 +291,8 @@ def set_holiday_work_election(employee: str, holiday_date, will_work) -> dict:
 		doc = frappe.get_doc("Holiday Work Election", existing)
 		doc.will_work = will_work
 		doc.flags.ignore_permissions = True
+		doc.flags.skip_permission = skip_permission
+		doc.flags.skip_deadline = skip_deadline
 		doc.save()
 	else:
 		doc = frappe.get_doc(
@@ -231,6 +305,8 @@ def set_holiday_work_election(employee: str, holiday_date, will_work) -> dict:
 			}
 		)
 		doc.flags.ignore_permissions = True
+		doc.flags.skip_permission = skip_permission
+		doc.flags.skip_deadline = skip_deadline
 		doc.insert()
 
 	return {
@@ -317,28 +393,39 @@ def get_company_upcoming_holidays() -> list[dict]:
 		return []
 
 	dates = list(eligible_by_date)
+	deadlines = get_deadlines_map(dates)
 	elections = frappe.get_all(
 		"Holiday Work Election",
-		filters={"holiday_date": ["in", dates], "will_work": 1},
-		fields=["employee", "holiday_date"],
+		filters={"holiday_date": ["in", dates]},
+		fields=["employee", "holiday_date", "will_work"],
 		ignore_permissions=True,
 	)
-	working_by_date: dict = defaultdict(set)
+	election_by_date: dict = defaultdict(dict)
 	for row in elections:
 		holiday_date = getdate(row.holiday_date)
 		if row.employee in eligible_by_date.get(holiday_date, set()):
-			working_by_date[holiday_date].add(row.employee)
+			election_by_date[holiday_date][row.employee] = cint(row.will_work)
 
 	holidays = []
 	for holiday_date in sorted(eligible_by_date):
-		working = len(working_by_date.get(holiday_date, set()))
-		eligible = len(eligible_by_date[holiday_date])
+		deadline = deadlines.get(holiday_date)
+		eligible = eligible_by_date[holiday_date]
+		working = 0
+		for employee_name in eligible:
+			election = (
+				election_by_date[holiday_date][employee_name]
+				if employee_name in election_by_date[holiday_date]
+				else None
+			)
+			if effective_will_work(election, deadline):
+				working += 1
 		holidays.append(
 			{
 				"holiday_date": str(holiday_date),
 				"description": descriptions.get(holiday_date) or _("Public Holiday"),
 				"working_count": working,
-				"not_working_count": max(eligible - working, 0),
+				"not_working_count": max(len(eligible) - working, 0),
+				"response_deadline": format_deadline(deadline),
 			}
 		)
 	return holidays
@@ -360,6 +447,7 @@ def get_holiday_work_roster(holiday_date, department: str | None = None) -> dict
 			ignore_permissions=True,
 		)
 	}
+	deadline = get_deadline_for_date(holiday_date)
 
 	description = ""
 	details = []
@@ -380,15 +468,24 @@ def get_holiday_work_roster(holiday_date, department: str | None = None) -> dict
 		if not description:
 			description = public[holiday_list][holiday_date]
 
-		will_work = bool(elections.get(employee.name))
+		election = elections[employee.name] if employee.name in elections else None
+		state = holiday_toggle_state(
+			holiday_date,
+			True,
+			getdate(holiday_date) < getdate(),
+			election,
+			deadline,
+		)
 		details.append(
 			{
 				"employee": employee.name,
 				"employee_name": employee.employee_name,
 				"department": employee.department,
 				"image": employee.image,
-				"will_work": will_work,
-				"status": "Working" if will_work else "Not Working",
+				"will_work": state["will_work"],
+				"responded": state["responded"],
+				"assumed_working": state["assumed_working"],
+				"status": "Working" if state["will_work"] else "Not Working",
 			}
 		)
 
@@ -399,4 +496,6 @@ def get_holiday_work_roster(holiday_date, department: str | None = None) -> dict
 		"details": details,
 		"working_count": sum(1 for row in details if row["will_work"]),
 		"not_working_count": sum(1 for row in details if not row["will_work"]),
+		"response_deadline": format_deadline(deadline),
+		"deadline_passed": deadline_has_passed(deadline),
 	}

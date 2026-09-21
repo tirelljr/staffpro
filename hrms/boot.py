@@ -258,6 +258,8 @@ def extend_bootinfo(bootinfo):
 		bootinfo["staff_pro_integrations"] = STAFF_PRO_INTEGRATIONS
 
 	_disable_app_onboarding_bootinfo(bootinfo)
+	_force_twelve_hour_clock(bootinfo)
+	_force_belize_timezone(bootinfo)
 
 	first_name = ""
 	user = frappe.session.user
@@ -272,6 +274,11 @@ def extend_bootinfo(bootinfo):
 
 	bootinfo["staff_pro_bpo_roles"] = sorted(BPO_ROLES)
 	bootinfo["staff_pro_bpo_modules"] = sidebar_module_boot_list()
+	from hrms.ai.settings import is_ask_ai_enabled
+
+	bootinfo["staff_pro_ask_ai"] = {
+		"enabled": bool(is_staff_pro_desk_admin() and is_ask_ai_enabled()),
+	}
 	apply_payroll_frequency_translations(bootinfo)
 	_filter_bpo_workspace_sidebars(bootinfo)
 	_filter_bpo_module_sidebars(bootinfo)
@@ -423,6 +430,39 @@ def _disable_app_onboarding_bootinfo(bootinfo):
 		bootinfo["sysdefaults"] = {"enable_onboarding": 0}
 	else:
 		sysdefaults["enable_onboarding"] = 0
+
+
+def _force_twelve_hour_clock(bootinfo):
+	"""Frappe only ships 24-hour System Settings presets; Staff Pro always shows 12-hour clocks."""
+	from hrms.hr.clock_format import FRAPPE_TIME_FORMAT
+
+	sysdefaults = bootinfo.get("sysdefaults")
+	if sysdefaults is None:
+		bootinfo["sysdefaults"] = {"time_format": FRAPPE_TIME_FORMAT}
+	else:
+		sysdefaults["time_format"] = FRAPPE_TIME_FORMAT
+	sys_defaults = bootinfo.get("sys_defaults")
+	if isinstance(sys_defaults, dict):
+		sys_defaults["time_format"] = FRAPPE_TIME_FORMAT
+
+
+def _force_belize_timezone(bootinfo):
+	"""Staff Pro always uses Belize time, even if System Settings still has a leftover value."""
+	from hrms.branding import STAFF_PRO_TIMEZONE
+
+	sysdefaults = bootinfo.get("sysdefaults")
+	if sysdefaults is None:
+		bootinfo["sysdefaults"] = {"time_zone": STAFF_PRO_TIMEZONE}
+	else:
+		sysdefaults["time_zone"] = STAFF_PRO_TIMEZONE
+	sys_defaults = bootinfo.get("sys_defaults")
+	if isinstance(sys_defaults, dict):
+		sys_defaults["time_zone"] = STAFF_PRO_TIMEZONE
+	time_zone = bootinfo.get("time_zone")
+	if isinstance(time_zone, dict):
+		time_zone["system"] = STAFF_PRO_TIMEZONE
+	else:
+		bootinfo["time_zone"] = {"system": STAFF_PRO_TIMEZONE, "user": STAFF_PRO_TIMEZONE}
 
 
 def get_sidebar_label_maps():
