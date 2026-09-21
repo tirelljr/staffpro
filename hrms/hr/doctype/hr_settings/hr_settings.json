@@ -317,7 +317,7 @@
   },
   {
    "default": "80",
-   "description": "Hours in a calendar month before overtime can pay. Extra time over 8 hours in a day only counts after this threshold. A few extra days under this total stay regular time. An employee-specific value takes precedence.",
+   "description": "Hours in a 10-working-day pay period before overtime pay. Time over this total (80 hours by default) is overtime. An employee-specific value takes precedence.",
    "fieldname": "overtime_threshold_hours",
    "fieldtype": "Float",
    "label": "Default OT Threshold (Hours)",

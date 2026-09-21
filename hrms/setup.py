@@ -329,7 +329,7 @@ def get_custom_fields():
 		"Employee": [
 			{
 				"default": "80",
-				"description": _("Hours in a calendar month before this agent begins earning ordinary overtime. Extra time over 8 hours in a day only counts after this threshold."),
+				"description": _("Hours in a 10-working-day pay period before this agent begins earning overtime. Time over this total (80 hours by default) is overtime."),
 				"fieldname": "overtime_threshold_hours",
 				"fieldtype": "Float",
 				"insert_after": "ctc",

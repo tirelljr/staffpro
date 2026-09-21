@@ -24,14 +24,14 @@ class TestOvertimeSlip(HRMSTestSuite):
 		frappe.db.set_single_value("HR Settings", "overtime_threshold_hours", 80)
 		frappe.db.set_single_value("HR Settings", "overtime_pay_multiplier", 1.5)
 
-	def test_daily_overtime_only_counts_after_period_threshold(self):
+	def test_hours_past_period_threshold_are_overtime(self):
 		self.assertEqual(ordinary_overtime_hours(9, 0, 80), 0)
 		self.assertEqual(ordinary_overtime_hours(10, 70, 80), 0)
 		self.assertEqual(ordinary_overtime_hours(10, 71, 80), 1)
-		self.assertEqual(ordinary_overtime_hours(10, 79, 80), 2)
-		self.assertEqual(ordinary_overtime_hours(10, 80, 80), 2)
-		self.assertEqual(ordinary_overtime_hours(6, 80, 80), 0)
-		self.assertEqual(ordinary_overtime_hours(8, 80, 80), 0)
+		self.assertEqual(ordinary_overtime_hours(10, 79, 80), 9)
+		self.assertEqual(ordinary_overtime_hours(10, 80, 80), 10)
+		self.assertEqual(ordinary_overtime_hours(6, 80, 80), 6)
+		self.assertEqual(ordinary_overtime_hours(8, 80, 80), 8)
 		self.assertEqual(ordinary_overtime_hours(9.5, 0, 8), 1.5)
 
 	def test_pay_period_threshold_boundaries(self):
@@ -46,14 +46,28 @@ class TestOvertimeSlip(HRMSTestSuite):
 		self.make_attendance_days(employee, add_days(start, 5), [8] * 5)
 		result = get_pay_period_overtime(employee, start, add_days(start, 9), ensure_holidays=False)
 		self.assertEqual(result["total_hours"], 85)
-		self.assertEqual(result["total_overtime_duration"], 0)
+		self.assertEqual(result["total_overtime_duration"], 5)
 
 		self.make_attendance(employee, add_days(start, 10), 10)
 		result = get_pay_period_overtime(employee, start, add_days(start, 10), ensure_holidays=False)
-		self.assertEqual(result["total_overtime_duration"], 2)
-		self.assertEqual(result["allocations"][0]["date"], add_days(start, 10))
+		self.assertEqual(result["total_overtime_duration"], 15)
+		self.assertEqual(result["allocations"][-1]["date"], add_days(start, 10))
 
-	def test_monthly_hours_carry_into_later_weeks(self):
+	def test_eight_hour_days_overtime_after_eighty(self):
+		start = getdate("2026-01-05")
+		employee = self.make_employee("ot-80-period@example.com")
+		self.make_attendance_days(employee, start, [8] * 10)
+		result = get_pay_period_overtime(employee, start, add_days(start, 9), ensure_holidays=False)
+		self.assertEqual(result["total_hours"], 80)
+		self.assertEqual(result["total_overtime_duration"], 0)
+
+		self.make_attendance(employee, add_days(start, 10), 8)
+		result = get_pay_period_overtime(employee, start, add_days(start, 10), ensure_holidays=False)
+		self.assertEqual(result["total_hours"], 88)
+		self.assertEqual(result["ordinary_overtime_duration"], 8)
+		self.assertEqual(result["total_overtime_duration"], 8)
+
+	def test_pay_period_hours_do_not_carry_from_earlier_period(self):
 		employee = self.make_employee("ot-month-carry@example.com")
 		self.make_attendance_days(employee, getdate("2026-09-01"), [8] * 10)
 		week_day = getdate("2026-09-16")
@@ -61,10 +75,10 @@ class TestOvertimeSlip(HRMSTestSuite):
 
 		week = get_pay_period_overtime(employee, week_day, add_days(week_day, 6), ensure_holidays=False)
 		self.assertEqual(week["total_hours"], 10)
-		self.assertEqual(week["total_overtime_duration"], 2)
+		self.assertEqual(week["total_overtime_duration"], 0)
 
 		same_day = get_pay_period_overtime(employee, week_day, week_day, ensure_holidays=False)
-		self.assertEqual(same_day["total_overtime_duration"], 2)
+		self.assertEqual(same_day["total_overtime_duration"], 0)
 
 	def test_employee_threshold_overrides_global_default(self):
 		start = getdate("2026-02-02")
@@ -75,7 +89,7 @@ class TestOvertimeSlip(HRMSTestSuite):
 
 		result = get_pay_period_overtime(employee, start, add_days(start, 7), ensure_holidays=False)
 		self.assertEqual(result["threshold_hours"], 60)
-		self.assertEqual(result["total_overtime_duration"], 2)
+		self.assertEqual(result["total_overtime_duration"], 6)
 
 	def test_paid_holiday_hours_count_without_stacking_ordinary_ot(self):
 		start = getdate("2026-03-02")
@@ -116,7 +130,7 @@ class TestOvertimeSlip(HRMSTestSuite):
 			}
 		)
 		slip.get_emp_and_overtime_details()
-		self.assertEqual(slip.total_overtime_duration, 2)
+		self.assertEqual(slip.total_overtime_duration, 10)
 		self.assertEqual(len(slip.overtime_details), 1)
 		slip.submit()
 

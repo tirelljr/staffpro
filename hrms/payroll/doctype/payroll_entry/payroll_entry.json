@@ -135,7 +135,7 @@
    "fieldtype": "HTML"
   },
   {
-   "default": "1",
+   "default": "0",
    "fieldname": "salary_slip_based_on_timesheet",
    "fieldtype": "Check",
    "label": "Salary Slip Based on Timesheet"

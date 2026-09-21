@@ -21,12 +21,10 @@ frappe.ui.form.on("Payroll Entry", {
 		frm.toggle_reqd("customer", 0);
 		frm.set_df_property("customer", "hidden", 1);
 		if (frm.is_new()) {
-			if (!cint(frm.doc.salary_slip_based_on_timesheet)) {
-				frm.set_value("salary_slip_based_on_timesheet", 1);
-			}
 			if (!frm.doc.payroll_frequency) {
 				frm.set_value("payroll_frequency", "Fortnightly");
 			}
+			frm.set_value("salary_slip_based_on_timesheet", 0);
 			frm.set_value("deduct_social_security", 1);
 		}
 

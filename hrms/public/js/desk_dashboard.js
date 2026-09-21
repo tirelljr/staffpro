@@ -286,7 +286,7 @@ body.staff-pro-alive #page-dashboard-view.sp-dash--payroll .layout-main-section,
 .sp-paydash__filter-option{display:block;width:100%;padding:8px 10px;border:0;border-radius:8px;background:transparent;color:#111;font:inherit;font-size:13px;text-align:left;cursor:pointer}
 .sp-paydash__filter-option:hover,.sp-paydash__filter-option.is-selected{background:#f4f6f8}
 .sp-paydash__table-wrap{overflow-x:auto}
-.sp-paydash__table-head,.sp-paydash__row{display:grid;grid-template-columns:28px minmax(150px,1.4fr) minmax(100px,.95fr) minmax(130px,.85fr) minmax(84px,.6fr) minmax(88px,.75fr) minmax(76px,.65fr) minmax(72px,.6fr) minmax(88px,.75fr) 36px;gap:12px;align-items:center;width:100%;min-width:1120px}
+.sp-paydash__table-head,.sp-paydash__row{display:grid;grid-template-columns:28px minmax(150px,1.4fr) minmax(100px,.95fr) minmax(130px,.85fr) minmax(84px,.6fr) minmax(88px,.75fr) minmax(76px,.65fr) minmax(120px,.9fr) minmax(88px,.75fr) 36px;gap:12px;align-items:center;width:100%;min-width:1180px}
 .sp-paydash__table-head{padding:10px 8px;color:#9aa3af;font-size:12px;font-weight:600}
 .sp-paydash__row{padding:12px 8px;border:0;border-top:1px solid #eef1f4;background:transparent;font:inherit;font-size:13px;color:#111;text-align:left;cursor:pointer}
 .sp-paydash__row:hover{background:#fafbfc}
@@ -345,6 +345,27 @@ const LIST_META_CSS = `
 	border:0!important;
 	flex:0 0 0!important;
 }
+.sp-agent-import-dialog .modal-dialog{max-width:960px}
+.sp-agent-import-dialog .modal-body{max-height:min(70vh,720px);overflow:auto}
+.sp-agent-import-dialog .section-head,
+.sp-agent-import-dialog .frappe-control[data-fieldname="body"]> .clearfix,
+.sp-agent-import-dialog .frappe-control[data-fieldname="body"]> .clearfix label,
+.sp-agent-import-dialog .frappe-control[data-fieldname="body"]> label,
+.sp-agent-import-dialog .frappe-control[data-fieldname="body"] .help-box{display:none}
+.sp-agent-import{font-size:13px;color:#111}
+.sp-agent-import__help,.sp-agent-import__hint{margin:0 0 12px;line-height:1.45;color:#6b7280}
+.sp-agent-import__section{margin-bottom:12px}
+.sp-agent-import__section-title{margin-bottom:6px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#6b7280}
+.sp-agent-import__chips{display:flex;flex-wrap:wrap;gap:6px}
+.sp-agent-import__chip{display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;background:#eef2f6;color:#374151;font-size:12px}
+.sp-agent-import__chip.is-required{background:#0f1b2d;color:#fff}
+.sp-agent-import__actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:4px 0 12px}
+.sp-agent-import__file-name{color:#6b7280}
+.sp-agent-import__table-wrap{max-height:320px;overflow:auto;border:1px solid #e3e6ea;border-radius:8px}
+.sp-agent-import__table{width:100%;margin:0;border-collapse:collapse;font-size:12px}
+.sp-agent-import__table th,.sp-agent-import__table td{padding:7px 8px;border-bottom:1px solid #eef1f6;text-align:left;vertical-align:top;white-space:nowrap}
+.sp-agent-import__table th{position:sticky;top:0;background:#f8fafc;font-weight:700}
+.sp-agent-import-dialog .btn-primary{background:#11a5dd!important;border-color:#11a5dd!important;color:#fff!important}
 `;
 
 function inject_dash_css() {
@@ -357,11 +378,14 @@ function inject_dash_css() {
 	if (style.textContent !== DASH_PILL_CSS) {
 		style.textContent = DASH_PILL_CSS;
 	}
-	if (!document.getElementById("staff-pro-list-meta-css")) {
-		const style = document.createElement("style");
-		style.id = "staff-pro-list-meta-css";
-		style.textContent = LIST_META_CSS;
-		document.head.appendChild(style);
+	let listMetaStyle = document.getElementById("staff-pro-list-meta-css");
+	if (!listMetaStyle) {
+		listMetaStyle = document.createElement("style");
+		listMetaStyle.id = "staff-pro-list-meta-css";
+		document.head.appendChild(listMetaStyle);
+	}
+	if (listMetaStyle.textContent !== LIST_META_CSS) {
+		listMetaStyle.textContent = LIST_META_CSS;
 	}
 	let kpiStyle = document.getElementById("staff-pro-kpi-css");
 	if (!kpiStyle) {
@@ -636,11 +660,48 @@ function start_action(cfg) {
 }
 
 function open_import_employee() {
-	if (frappe.views.data_import) {
-		frappe.set_route("List", "Data Import", "List");
+	frappe.provide("hrms");
+	if (typeof hrms.open_import_agents === "function") {
+		hrms.open_import_agents();
 		return;
 	}
-	frappe.set_route("List", "Employee", "List");
+	const dialog = new frappe.ui.Dialog({
+		title: __("Import Agents"),
+		size: "large",
+		fields: [{ fieldtype: "HTML", fieldname: "body" }],
+	});
+	dialog.$wrapper.addClass("sp-agent-import-dialog");
+	dialog.show();
+	$(dialog.fields_dict.body.wrapper).html(
+		`<div class="sp-agent-import"><p>${escape_html(__("The import popup is still loading. Refresh this page and try again."))}</p></div>`,
+	);
+}
+
+function is_import_agents_pill(node) {
+	if (!node || !node.closest) return false;
+	const pill = node.closest(".sp-dash-pill");
+	if (!pill) return false;
+	if (pill.getAttribute("data-action") === "import-employee") return true;
+	const label = (pill.querySelector(".sp-dash-pill__label")?.textContent || pill.textContent || "")
+		.replace(/\s+/g, " ")
+		.trim();
+	return label === "Import Agents" || label === __("Import Agents");
+}
+
+function bind_import_agents_intercept() {
+	if (document.documentElement._spImportAgentsIntercept) return;
+	document.documentElement._spImportAgentsIntercept = true;
+	document.addEventListener(
+		"click",
+		(event) => {
+			if (!is_import_agents_pill(event.target)) return;
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation();
+			open_import_employee();
+		},
+		true,
+	);
 }
 
 function open_hours_add_entry() {
@@ -3643,7 +3704,7 @@ function payroll_board_html() {
 						<span>${escape_html(__("Status"))}</span>
 						<span>${escape_html(__("Base salary"))}</span>
 						<span>${escape_html(__("Bonuses"))}</span>
-						<span>${escape_html(__("SS"))}</span>
+						<span>${escape_html(__("Social Security"))}</span>
 						<span>${escape_html(__("Total salary"))}</span>
 						<span></span>
 					</div>
@@ -3887,7 +3948,7 @@ function open_payroll_board_row(rowEl) {
 function export_payroll_board_csv($board) {
 	const selected = selected_payroll_keys($board);
 	const rows = filtered_payroll_board_rows($board).filter((row) => !selected.size || selected.has(payroll_row_key(row)));
-	const header = ["Full name", "Department", "Pay date", "Status", "Base salary", "Bonuses", "SS", "Total salary"];
+	const header = ["Full name", "Department", "Pay date", "Status", "Base salary", "Bonuses", "Social Security", "Total salary"];
 	const lines = [
 		header.join(","),
 		...rows.map((row) =>
@@ -4316,6 +4377,24 @@ function inject_hours_board($root) {
 	});
 }
 
+function bind_pill_buttons($pills, pills) {
+	$pills.find(".sp-dash-pill").each(function (idx) {
+		const pill = pills[idx];
+		if (!pill) return;
+		const $btn = $(this);
+		$btn.attr("data-action", pill.action || "");
+		$btn.off("click.sp-pill").on("click.sp-pill", (event) => {
+			if ((pill.action || $btn.attr("data-action")) === "import-employee") {
+				event.preventDefault();
+				event.stopPropagation();
+				open_import_employee();
+				return;
+			}
+			run_pill(pill);
+		});
+	});
+}
+
 function inject_quick_actions($root) {
 	$root.find(".sp-dash-hero").remove();
 	$root.removeClass("staff-pro-has-hero");
@@ -4324,7 +4403,10 @@ function inject_quick_actions($root) {
 	const name = dashboard_name();
 	const $existing = $root.find(".sp-dash-pills").first();
 	if ($existing.length && $existing.attr("data-dashboard") === name) {
-		return;
+		if ($existing.find(".sp-dash-pill[data-action='import-employee']").length) {
+			bind_pill_buttons($existing, cfg.pills);
+			return;
+		}
 	}
 	$existing.remove();
 
@@ -4339,14 +4421,14 @@ function inject_quick_actions($root) {
 	);
 	cfg.pills.forEach((pill) => {
 		const $btn = $(`
-			<button type="button" class="sp-dash-pill">
+			<button type="button" class="sp-dash-pill" data-action="${escape_html(pill.action || "")}">
 				<span class="sp-dash-pill__icon" style="--sp-icon-accent:${pill.hue || "#90BA93"}">${ICONS[pill.icon] || ICONS.spark}</span>
 				<span class="sp-dash-pill__label">${escape_html(pill.label)}</span>
 			</button>
 		`);
-		$btn.on("click", () => run_pill(pill));
 		$pills.append($btn);
 	});
+	bind_pill_buttons($pills, cfg.pills);
 
 	$host.prepend($pills);
 }
@@ -5303,6 +5385,7 @@ function hide_frappe_dashboard_chrome($root) {
 }
 
 function enhance() {
+	bind_import_agents_intercept();
 	inject_dash_css();
 	patch_list_view_meta();
 	document.body.classList.add("staff-pro-alive");
@@ -5340,6 +5423,7 @@ function enhance() {
 }
 
 function watch() {
+	bind_import_agents_intercept();
 	patch_frappe_chart();
 	enhance();
 	const root = document.getElementById("body") || document.body;

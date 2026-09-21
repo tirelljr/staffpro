@@ -615,7 +615,7 @@ def _day_checkin_stats_by_employee(employee_ids: list[str], day) -> dict[str, di
 
 
 def _daily_overtime_hours(worked) -> float:
-	"""Hours past 8 on the day. Pay still folds these into regular time under the monthly threshold."""
+	"""Hours past 8 on the day. Payroll overtime still uses the 80-hour pay-period threshold."""
 	from hrms.hr.doctype.overtime_slip.overtime_slip import REGULAR_DAY_HOURS
 
 	return flt(max(flt(worked) - REGULAR_DAY_HOURS, 0.0), 2)
@@ -931,7 +931,7 @@ def _build_payroll_row(slip, start_date, end_date, attendance_ss=None):
 	}
 
 
-def _ss_amount_for_slip(slip) -> float:
+def _ss_amount_for_slip(slip, gross=None) -> float:
 	amount = flt(slip.get("ss_employee_amount"))
 	if amount:
 		return amount
@@ -951,22 +951,43 @@ def _ss_amount_for_slip(slip) -> float:
 		if amount:
 			return amount
 
-	gross = flt(slip.get("gross_pay") or slip.get("net_pay"))
-	if gross <= 0:
+	pay = flt(gross if gross is not None else (slip.get("gross_pay") or slip.get("net_pay")))
+	return _ss_amount_for_gross(
+		employee=slip.get("employee"),
+		company=slip.get("company"),
+		gross=pay,
+		frequency=slip.get("payroll_frequency"),
+		start_date=slip.get("start_date"),
+		end_date=slip.get("end_date"),
+	)
+
+
+def _ss_amount_for_gross(
+	employee=None,
+	company=None,
+	gross=0,
+	frequency=None,
+	start_date=None,
+	end_date=None,
+) -> float:
+	pay = flt(gross)
+	if pay <= 0:
 		return 0.0
 
 	from hrms.payroll.social_security import calculate_contribution, get_active_contribution_table
 
-	table = get_active_contribution_table(slip.get("company"), slip.get("end_date") or slip.get("start_date"))
-	emp_fields = ["date_of_birth"]
-	if frappe.get_meta("Employee").has_field("receiving_ss_benefit"):
-		emp_fields.append("receiving_ss_benefit")
-	emp = frappe.db.get_value("Employee", slip.employee, emp_fields, as_dict=True) or {}
+	table = get_active_contribution_table(company, end_date or start_date)
+	emp = {}
+	if employee:
+		emp_fields = ["date_of_birth"]
+		if frappe.get_meta("Employee").has_field("receiving_ss_benefit"):
+			emp_fields.append("receiving_ss_benefit")
+		emp = frappe.db.get_value("Employee", employee, emp_fields, as_dict=True) or {}
 	result = calculate_contribution(
-		gross,
-		slip.get("payroll_frequency") or "Monthly",
-		slip.get("start_date"),
-		slip.get("end_date"),
+		pay,
+		frequency or "Fortnightly",
+		start_date,
+		end_date,
 		date_of_birth=emp.get("date_of_birth"),
 		receiving_ss_benefit=bool(emp.get("receiving_ss_benefit")),
 		bands=table.bands if table else None,
@@ -1226,7 +1247,7 @@ def _fetch_board_slips(company, start_date, end_date, department=None):
 		employee.department.as_("employee_department"),
 		employee.image,
 	]
-	for fieldname in ("hour_rate", "total_working_hours", "payment_days", "payment_status", "ss_employee_amount", "payroll_frequency"):
+	for fieldname in ("hour_rate", "total_working_hours", "payment_days", "payment_status", "ss_employee_amount", "payroll_frequency", "current_month_income_tax"):
 		if frappe.db.has_column("Salary Slip", fieldname):
 			select_fields.append(getattr(salary_slip, fieldname))
 
@@ -1438,18 +1459,34 @@ def _build_payroll_board_row(slip, split, currency, attendance_pay=0, extra_bonu
 			gross_total = flt(display_base + bonus, 2)
 
 	ss = flt(slip.get("ss_employee_amount"))
-	if not ss and slip.get("name") and frappe.db.exists("Salary Slip", slip.name):
+	if not ss:
 		try:
-			ss = _ss_amount_for_slip(slip)
+			ss = _ss_amount_for_slip(slip, gross=gross_total)
+		except Exception:
+			ss = 0
+	if not ss:
+		try:
+			ss = _ss_amount_for_gross(
+				employee=slip.get("employee"),
+				company=slip.get("company"),
+				gross=gross_total,
+				frequency=slip.get("payroll_frequency") or "Fortnightly",
+				start_date=slip.get("start_date"),
+				end_date=slip.get("end_date"),
+			)
 		except Exception:
 			ss = 0
 	ss = flt(ss, 2)
 
+	tax = flt(slip.get("current_month_income_tax"))
 	net = flt(slip.net_pay, 2)
-	if ss and (not net or abs(net - gross_total) < 0.005):
-		net = flt(max(gross_total - ss, 0), 2)
+	statutory = flt(ss + tax, 2)
+	if statutory and (not net or abs(net - gross_total) < 0.005):
+		net = flt(max(gross_total - statutory, 0), 2)
 	elif not net:
-		net = gross_total
+		net = flt(max(gross_total - statutory, 0), 2)
+	elif ss and abs(net - display_base) < 0.005:
+		net = flt(max(gross_total - statutory, 0), 2)
 
 	department = slip.employee_department or slip.department or ""
 	return {

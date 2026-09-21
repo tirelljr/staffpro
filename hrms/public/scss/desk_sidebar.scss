@@ -231,9 +231,8 @@ body.staff-pro-has-topbar .dock {
 	margin: 0 0 8px !important;
 }
 
-/* Pin workspace submenus next to the dock. Frappe's expanded sidebar is an
-   absolute overlay over a 100vh placeholder; keeping the panel in-flow inside
-   a column flex stacked that placeholder above the menu. */
+/* Keep Frappe's overlay sidebar: the placeholder reserves width so the
+   submenu sits next to the dock instead of being clipped behind main content. */
 .body-sidebar-container {
 	align-self: stretch;
 	position: sticky;
@@ -247,7 +246,7 @@ body.staff-pro-has-topbar .dock {
 	min-height: 100vh !important;
 	min-height: 100dvh !important;
 	max-height: none !important;
-	overflow: hidden;
+	overflow: visible;
 	background: transparent;
 }
 
@@ -256,18 +255,32 @@ body.staff-pro-has-topbar .body-sidebar-container {
 	min-height: calc(100dvh - var(--staff-pro-topbar-height, 56px)) !important;
 }
 
+.body-sidebar-container.expanded {
+	flex: 0 0 var(--sidebar-width, 260px);
+	width: var(--sidebar-width, 260px);
+	overflow: visible;
+}
+
 .body-sidebar-container.expanded .body-sidebar-placeholder {
-	display: none !important;
-	width: 0 !important;
-	height: 0 !important;
-	flex: 0 0 0 !important;
+	display: block !important;
+	width: var(--sidebar-width, 260px) !important;
+	height: 100% !important;
+	min-height: 100% !important;
+	flex: 0 0 var(--sidebar-width, 260px) !important;
+}
+
+.body-sidebar-container.expanded .body-sidebar > * {
+	opacity: 1 !important;
+	transform: none !important;
 }
 
 /* —— Body sidebar (menus + submenus) —— */
 .body-sidebar {
-	position: relative;
+	position: absolute;
+	left: 0;
 	top: 0;
 	bottom: 0;
+	z-index: 1020;
 	align-self: stretch;
 	height: 100% !important;
 	min-height: 100% !important;
@@ -276,6 +289,7 @@ body.staff-pro-has-topbar .body-sidebar-container {
 	overflow-y: auto;
 	background: #ffffff;
 	border-right-color: var(--sp-sidebar-border) !important;
+	pointer-events: auto;
 }
 
 .body-sidebar-container.expanded .body-sidebar {

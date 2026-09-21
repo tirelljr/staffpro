@@ -138,6 +138,7 @@ class PayrollEntry(Document):
 	def validate(self):
 		self.number_of_employees = len(self.employees)
 		self.deduct_social_security = 1
+		self.salary_slip_based_on_timesheet = 0
 		self.sync_payment_account_from_bank()
 		self.set_status()
 
@@ -2476,7 +2477,6 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 			slip.total_working_hours,
 			working_by_employee,
 			overtime_by_employee,
-			prefer_attendance=not flt(slip.hour_rate),
 		)
 		hourly_rate = _excel_hourly_rate(slip, rate_by_employee.get(slip.employee))
 		holiday_pay = flt(holiday_pay_by_employee.get(slip.employee))
@@ -2495,9 +2495,11 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 			+ max(overtime_hours - flt(ordinary_overtime_by_employee.get(slip.employee)), 0),
 			payable_overtime_hours=ordinary_overtime_by_employee.get(slip.employee),
 		)
-		ee_period, er_period = _slip_social_amounts(slip)
+		ee_period, er_period, wage_band, insurable, income_tax = _excel_statutory(
+			entry, slip.employee, gross_pay, slip
+		)
 		ee_ytd, er_ytd = ytd_social_by_employee.get(slip.employee) or (ee_period, er_period)
-		net_pay = _excel_net_pay(slip, gross_pay)
+		net_pay = _excel_net_pay(slip, gross_pay, income_tax=income_tax, employee_ss=ee_period)
 		rows.append(
 			{
 				"employee": slip.employee,
@@ -2510,9 +2512,9 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 				"hourly_rate": hourly_rate,
 				"bonus": bonus,
 				"gross_pay": gross_pay,
-				"income_tax_wh": _slip_income_tax(slip),
-				"wage_band": slip.ss_wage_band or "",
-				"weekly_insurable_earnings": flt(slip.ss_insurable_earnings),
+				"income_tax_wh": income_tax,
+				"wage_band": wage_band or slip.ss_wage_band or "",
+				"weekly_insurable_earnings": insurable if insurable else flt(slip.ss_insurable_earnings),
 				"employee_social_security": ee_ytd,
 				"employer_social_security": er_ytd,
 				"pay_period_ee_social": ee_period,
@@ -2526,13 +2528,11 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 		if emp.employee in seen:
 			continue
 		agent_name = _payroll_agent_name(emp.employee, emp.employee_name, names_by_id)
-		ee_ytd, er_ytd = ytd_social_by_employee.get(emp.employee) or (0.0, 0.0)
 		overtime_hours, regular_hours = _excel_hours_for_employee(
 			emp.employee,
 			0,
 			working_by_employee,
 			overtime_by_employee,
-			prefer_attendance=True,
 		)
 		hourly_rate = flt(rate_by_employee.get(emp.employee))
 		holiday_pay = flt(holiday_pay_by_employee.get(emp.employee))
@@ -2550,6 +2550,10 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 			+ max(overtime_hours - flt(ordinary_overtime_by_employee.get(emp.employee)), 0),
 			payable_overtime_hours=ordinary_overtime_by_employee.get(emp.employee),
 		)
+		ee_period, er_period, wage_band, insurable, income_tax = _excel_statutory(
+			entry, emp.employee, gross_pay
+		)
+		ee_ytd, er_ytd = ytd_social_by_employee.get(emp.employee) or (ee_period, er_period)
 		rows.append(
 			{
 				"employee": emp.employee,
@@ -2562,14 +2566,14 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 				"hourly_rate": hourly_rate,
 				"bonus": 0,
 				"gross_pay": gross_pay,
-				"income_tax_wh": 0,
-				"wage_band": "",
-				"weekly_insurable_earnings": 0,
+				"income_tax_wh": income_tax,
+				"wage_band": wage_band,
+				"weekly_insurable_earnings": insurable,
 				"employee_social_security": ee_ytd,
 				"employer_social_security": er_ytd,
-				"pay_period_ee_social": 0,
-				"pay_period_er_social": 0,
-				"net_pay": gross_pay,
+				"pay_period_ee_social": ee_period,
+				"pay_period_er_social": er_period,
+				"net_pay": _excel_net_pay(None, gross_pay, income_tax=income_tax, employee_ss=ee_period),
 			}
 		)
 
@@ -3006,15 +3010,20 @@ def _excel_hours_for_employee(
 	slip_total_hours,
 	working_by_employee: dict[str, float],
 	overtime_by_employee: dict[str, float],
-	prefer_attendance: bool = False,
+	prefer_attendance: bool = True,
 ) -> tuple[float, float]:
-	"""Return (overtime_hours, regular_hours) for the spreadsheet row."""
+	"""Return (overtime_hours, regular_hours) for the spreadsheet row.
+
+	Attendance is the source of truth so a stale 8-hour slip cannot hide a full
+	10-working-day period. Slip hours win only when they are higher (manual edits).
+	"""
 	overtime_hours = flt(overtime_by_employee.get(employee))
 	attendance_hours = flt(working_by_employee.get(employee))
+	slip_hours = flt(slip_total_hours)
 	if prefer_attendance:
-		total_hours = attendance_hours or flt(slip_total_hours)
+		total_hours = max(attendance_hours, slip_hours)
 	else:
-		total_hours = flt(slip_total_hours) or attendance_hours
+		total_hours = slip_hours or attendance_hours
 	regular_hours = max(total_hours - overtime_hours, 0.0) if total_hours else 0.0
 	return overtime_hours, regular_hours
 
@@ -3092,13 +3101,117 @@ def _excel_gross_pay(
 	return flt(getattr(slip, "gross_pay", 0) if slip else 0)
 
 
-def _excel_net_pay(slip, gross_pay) -> float:
-	if not slip:
-		return flt(gross_pay)
-	deductions = flt(getattr(slip, "total_deduction", 0))
-	if not deductions and flt(slip.gross_pay):
-		deductions = flt(slip.gross_pay) - flt(slip.net_pay)
-	return flt(flt(gross_pay) - deductions, 2)
+def _excel_net_pay(slip, gross_pay, income_tax=None, employee_ss=None) -> float:
+	"""Net is always gross minus employee deductions; never copy gross as net."""
+	gross = flt(gross_pay)
+	if gross <= 0:
+		return 0.0
+
+	tax = flt(income_tax) if income_tax is not None else (_slip_income_tax(slip) if slip else 0.0)
+	ss_amount = flt(employee_ss)
+	if employee_ss is None and slip:
+		ss_amount = flt(getattr(slip, "ss_employee_amount", 0))
+
+	other = 0.0
+	loans = 0.0
+	if slip:
+		loans = flt(slip.get("total_loan_repayment")) if hasattr(slip, "get") else flt(
+			getattr(slip, "total_loan_repayment", 0)
+		)
+		slip_deductions = flt(getattr(slip, "total_deduction", 0))
+		other = max(
+			slip_deductions - flt(getattr(slip, "ss_employee_amount", 0)) - _slip_income_tax(slip),
+			0.0,
+		)
+
+	return flt(gross - tax - ss_amount - other - loans, 2)
+
+
+def _excel_statutory(entry, employee: str, gross_pay, slip=None) -> tuple[float, float, str, float, float]:
+	"""Employee/employer SS, wage band, insurable earnings, and income tax for the spreadsheet gross."""
+	from hrms.payroll.social_security import calculate_contribution, get_active_contribution_table
+
+	gross = flt(gross_pay)
+	frequency = getattr(entry, "payroll_frequency", None) or (getattr(slip, "payroll_frequency", None) if slip else None)
+	start_date = getattr(entry, "start_date", None)
+	end_date = getattr(entry, "end_date", None)
+	company = getattr(entry, "company", None)
+
+	table = get_active_contribution_table(company, end_date or start_date)
+	bands = table.bands if table else None
+	injury_employee = flt(table.injury_only_employee_amount) if table else 0.0
+	injury_employer = flt(table.injury_only_employer_amount) if table else 2.60
+
+	emp_fields = ["date_of_birth"]
+	meta = frappe.get_meta("Employee")
+	if meta.has_field("receiving_ss_benefit"):
+		emp_fields.append("receiving_ss_benefit")
+	emp = frappe.db.get_value("Employee", employee, emp_fields, as_dict=True) or {}
+
+	contribution = calculate_contribution(
+		gross_pay=gross,
+		payroll_frequency=frequency or "Fortnightly",
+		start_date=start_date,
+		end_date=end_date,
+		date_of_birth=emp.get("date_of_birth"),
+		receiving_ss_benefit=bool(emp.get("receiving_ss_benefit")),
+		bands=bands,
+		injury_only_employee_amount=injury_employee,
+		injury_only_employer_amount=injury_employer,
+	)
+	ee_ss = flt(contribution.get("employee_amount"))
+	er_ss = flt(contribution.get("employer_amount"))
+	wage_band = contribution.get("wage_band") or ""
+	insurable = flt(contribution.get("insurable_earnings"))
+
+	tax = _slip_income_tax(slip) if slip else 0.0
+	if not tax and gross > 0:
+		tax = _period_income_tax(
+			employee,
+			end_date or start_date,
+			gross,
+			frequency or "Fortnightly",
+			start_date,
+			end_date,
+		)
+
+	return ee_ss, er_ss, wage_band, insurable, tax
+
+
+def _period_income_tax(employee, on_date, gross_pay, frequency, start_date, end_date) -> float:
+	from hrms.payroll.daily_pay import get_assignment
+	from hrms.payroll.social_security import contribution_weeks, weekly_earnings_from_gross
+
+	weekly = weekly_earnings_from_gross(gross_pay, frequency)
+	if weekly <= 0:
+		return 0.0
+
+	weekly_tax = 0.0
+	assignment = get_assignment(employee, on_date)
+	slab_name = assignment.income_tax_slab if assignment else None
+	if slab_name:
+		from hrms.payroll.doctype.income_tax_slab.income_tax_slab import calculate_tax_by_tax_slab
+
+		tax_slab = frappe.get_cached_doc("Income Tax Slab", slab_name)
+		annual_tax, _other = calculate_tax_by_tax_slab(weekly * 52.0, tax_slab)
+		weekly_tax = flt(flt(annual_tax) / 52.0, 2)
+	if not weekly_tax:
+		weekly_tax = _belize_weekly_tax(weekly)
+	weeks = contribution_weeks(frequency, start_date, end_date)
+	return flt(weekly_tax * weeks, 2)
+
+
+def _belize_weekly_tax(weekly_pay: float) -> float:
+	"""PAYE for a week of earnings when the agent has no assigned tax slab."""
+	if flt(weekly_pay) <= 0:
+		return 0.0
+	from hrms.regional.belize.utils import calculate_tax_by_tax_slab
+
+	annual_tax, _other = calculate_tax_by_tax_slab(
+		flt(weekly_pay) * 52.0,
+		frappe._dict(tax_relief_limit=None),
+	)
+	return flt(flt(annual_tax) / 52.0, 2)
 
 
 def _holiday_hours_by_employee(entry) -> dict[str, float]:

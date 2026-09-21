@@ -319,10 +319,8 @@ body.staff-pro-has-topbar .dock {
 	--sidebar-width: 260px;
 }
 
-/* Pin workspace submenus next to the dock — Frappe overlays .body-sidebar
-   (position: absolute) over a 100vh placeholder. Forcing relative put the
-   panel back in a column flex, so the placeholder stacked above it and the
-   submenu landed at the bottom of the page. */
+/* Keep Frappe's overlay sidebar: the placeholder reserves width so the
+   submenu sits next to the dock instead of being clipped behind main content. */
 .body-sidebar-container {
 	align-self: stretch !important;
 	position: sticky !important;
@@ -336,19 +334,26 @@ body.staff-pro-has-topbar .dock {
 	min-height: 100vh !important;
 	min-height: 100dvh !important;
 	max-height: none !important;
-	overflow: hidden !important;
+	overflow: visible !important;
 	background: transparent !important;
 }
 body.staff-pro-has-topbar .body-sidebar-container {
 	min-height: calc(100vh - var(--staff-pro-topbar-height, 56px)) !important;
 	min-height: calc(100dvh - var(--staff-pro-topbar-height, 56px)) !important;
 }
+.body-sidebar-container.expanded {
+	flex: 0 0 var(--sidebar-width, 260px) !important;
+	width: var(--sidebar-width, 260px) !important;
+	overflow: visible !important;
+}
 
 /* Body sidebar */
 .body-sidebar {
-	position: relative !important;
+	position: absolute !important;
+	left: 0 !important;
 	top: 0 !important;
 	bottom: 0 !important;
+	z-index: 1020 !important;
 	align-self: stretch !important;
 	height: 100% !important;
 	min-height: 100% !important;
@@ -358,15 +363,23 @@ body.staff-pro-has-topbar .body-sidebar-container {
 	background: #ffffff !important;
 	border-right: 1px solid #ececec !important;
 	padding: 8px 8px 10px !important;
+	pointer-events: auto !important;
+}
+.body-sidebar-container.expanded .body-sidebar-placeholder {
+	display: block !important;
+	width: var(--sidebar-width, 260px) !important;
+	height: 100% !important;
+	min-height: 100% !important;
+	flex: 0 0 var(--sidebar-width, 260px) !important;
 }
 .body-sidebar-container.expanded .body-sidebar {
 	width: var(--sidebar-width, 260px) !important;
+	opacity: 1 !important;
+	pointer-events: auto !important;
 }
-.body-sidebar-container.expanded .body-sidebar-placeholder {
-	display: none !important;
-	width: 0 !important;
-	height: 0 !important;
-	flex: 0 0 0 !important;
+.body-sidebar-container.expanded .body-sidebar > * {
+	opacity: 1 !important;
+	transform: none !important;
 }
 .body-sidebar .sidebar-header {
 	display: flex !important;
@@ -1464,12 +1477,26 @@ function staff_pro_remember_sidebar(name) {
 	}
 }
 
+function keep_staff_pro_sidebar_expanded() {
+	if (!should_use_staff_pro_desk_home()) return;
+	if (typeof frappe.is_mobile === "function" && frappe.is_mobile()) return;
+	const sidebar = frappe.app?.sidebar;
+	if (!sidebar?.open) return;
+	try {
+		localStorage.setItem("sidebar-expanded", "true");
+	} catch (e) {
+		/* ignore */
+	}
+	sidebar.sidebar_expanded = true;
+	sidebar.open();
+}
+
 function staff_pro_activate_sidebar(name) {
 	const sidebar = frappe.app?.sidebar;
 	staff_pro_remember_sidebar(name);
 	if (!sidebar || !name) return;
 	sidebar._staff_pro_pinned_sidebar = name;
-	sidebar.open?.();
+	keep_staff_pro_sidebar_expanded();
 	if (typeof sidebar.select_module === "function") {
 		sidebar.select_module(name);
 	} else if (staff_pro_sidebar_payload(name) && typeof sidebar.select_sidebar === "function") {
@@ -2156,6 +2183,7 @@ function watch_workspace_dock() {
 	remove_sidebar_search();
 	enhance_sidebar_menus();
 	style_sidebar_collapse_toggle();
+	keep_staff_pro_sidebar_expanded();
 
 	const dock = document.querySelector(".dock, .workspace-dock");
 	const sidebar = document.querySelector(".body-sidebar");
@@ -2455,6 +2483,7 @@ $(document).on("app_ready", hide_list_page_chrome);
 $(document).on("page-change", () => redirect_staff_pro_desk_home());
 $(document).on("page-change", refresh_staff_pro_dock_shortcuts);
 $(document).on("page-change", enhance_sidebar_menus);
+$(document).on("page-change", keep_staff_pro_sidebar_expanded);
 $(document).on("page-change", prefer_employee_image_view);
 $(document).on("page-change", hide_page_menu);
 $(document).on("page-change", hide_list_page_chrome);

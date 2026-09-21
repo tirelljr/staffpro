@@ -2826,7 +2826,7 @@ def _hourly_inputs_for_slip(slip) -> tuple[float, float, float, float]:
 			holiday_pay += flt(row.get("daily_pay")) or flt(flt(slip.hour_rate) * worked, 2)
 
 	if flt(slip.total_working_hours):
-		total_hours = flt(slip.total_working_hours)
+		total_hours = max(flt(slip.total_working_hours), total_hours)
 	regular_hours = max(total_hours - overtime_hours - holiday_hours, 0.0)
 	bonus = _earning_amount_on_slip(slip, category="Bonus")
 	holiday_on_slip = _earning_amount_on_slip(slip, match="holiday")

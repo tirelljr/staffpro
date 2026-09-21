@@ -28,7 +28,7 @@ header.staff-pro-topbar {
 	flex-direction: row !important;
 	flex-wrap: nowrap !important;
 	align-items: center !important;
-	justify-content: space-between !important;
+	justify-content: flex-start !important;
 	width: 100% !important;
 	height: 56px !important;
 	padding: 0 16px !important;
@@ -90,7 +90,7 @@ header.staff-pro-topbar {
 	min-width: 288px !important;
 	overflow: visible !important;
 	pointer-events: auto !important;
-	z-index: 2 !important;
+	z-index: 1 !important;
 }
 .staff-pro-topbar__search-wrap {
 	position: relative !important;
@@ -297,6 +297,16 @@ header.staff-pro-topbar {
 	font-weight: 600 !important;
 	color: #9ca3af !important;
 	flex-shrink: 0 !important;
+}
+.staff-pro-topbar__actions {
+	display: flex !important;
+	flex-direction: row !important;
+	align-items: center !important;
+	gap: 10px !important;
+	margin-left: auto !important;
+	flex: 0 0 auto !important;
+	z-index: 3 !important;
+	position: relative !important;
 }
 .staff-pro-topbar__ask-ai {
 	display: inline-flex !important;
@@ -746,6 +756,7 @@ hrms.ui.TopBar = class {
 		this.ensure_language_picker();
 		this.ensure_notifications_picker();
 		this.ensure_search_picker();
+		this.ensure_actions_wrap();
 		this.ensure_ask_ai_button();
 		this.patch_native_awesomebar();
 		this.bind();
@@ -901,15 +912,43 @@ hrms.ui.TopBar = class {
 		`;
 	}
 
+	ensure_actions_wrap() {
+		if (!this.$wrapper) return $();
+		let $actions = this.$wrapper.find(".staff-pro-topbar__actions");
+		if ($actions.length) return $actions;
+
+		const $right = this.$wrapper.find(".staff-pro-topbar__right");
+		const $ask = this.$wrapper.find(".staff-pro-topbar__ask-ai");
+		if (!$right.length && !$ask.length) return $();
+
+		$actions = $('<div class="staff-pro-topbar__actions"></div>');
+		if ($right.length) {
+			$right.before($actions);
+			if ($ask.length) $actions.append($ask);
+			$actions.append($right);
+		} else {
+			$ask.before($actions);
+			$actions.append($ask);
+		}
+		return $actions;
+	}
+
 	ensure_ask_ai_button() {
 		if (!this.ask_ai_enabled()) {
 			this.$wrapper.find(".staff-pro-topbar__ask-ai").remove();
 			return;
 		}
+		const $actions = this.ensure_actions_wrap();
 		if (this.$wrapper.find(".staff-pro-topbar__ask-ai").length) return;
 		const $right = this.$wrapper.find(".staff-pro-topbar__right");
-		if (!$right.length) return;
-		$right.before(this.ask_ai_button_html());
+		const html = this.ask_ai_button_html();
+		if ($right.length) {
+			$right.before(html);
+			return;
+		}
+		if ($actions.length) {
+			$actions.prepend(html);
+		}
 	}
 
 	ask_ai_enabled() {
@@ -1025,6 +1064,7 @@ hrms.ui.TopBar = class {
 							</div>
 						</div>
 					</div>
+					<div class="staff-pro-topbar__actions">
 					${this.ask_ai_enabled() ? this.ask_ai_button_html() : ""}
 					<div class="staff-pro-topbar__right">
 						<div class="staff-pro-topbar__icon-btn staff-pro-topbar__search-toggle" data-action="search" role="button" tabindex="0" title="${__("Search")}">
@@ -1046,6 +1086,7 @@ hrms.ui.TopBar = class {
 						<div class="staff-pro-topbar__avatar" data-action="profile" role="button" tabindex="0" title="${__("Profile")}">
 							${avatar}
 						</div>
+					</div>
 					</div>
 				</div>
 			</header>

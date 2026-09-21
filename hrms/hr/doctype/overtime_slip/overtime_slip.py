@@ -6,7 +6,7 @@ import json
 import frappe
 from frappe import _, bold
 from frappe.model.document import Document
-from frappe.utils import flt, get_first_day
+from frappe.utils import flt
 from frappe.utils.data import get_link_to_form, getdate
 
 from hrms.payroll.doctype.payroll_entry.payroll_entry import get_start_end_dates
@@ -25,15 +25,15 @@ def get_employee_overtime_threshold(employee: str) -> float:
 	employee_meta = frappe.get_meta("Employee")
 	if employee_meta.has_field("overtime_threshold_hours"):
 		employee_threshold = frappe.db.get_value("Employee", employee, "overtime_threshold_hours")
-	if employee_threshold not in (None, ""):
-		return max(flt(employee_threshold), 0.0)
+	if employee_threshold not in (None, "") and flt(employee_threshold) > 0:
+		return flt(employee_threshold)
 
 	global_threshold = None
 	if frappe.get_meta("HR Settings").has_field("overtime_threshold_hours"):
 		global_threshold = frappe.db.get_single_value("HR Settings", "overtime_threshold_hours")
-	if global_threshold in (None, ""):
+	if global_threshold in (None, "") or flt(global_threshold) <= 0:
 		global_threshold = DEFAULT_OVERTIME_THRESHOLD_HOURS
-	return max(flt(global_threshold), 0.0)
+	return flt(global_threshold)
 
 
 def get_overtime_pay_multiplier() -> float:
@@ -46,11 +46,10 @@ def get_overtime_pay_multiplier() -> float:
 
 
 def ordinary_overtime_hours(day_hours, hours_before: float, threshold: float) -> float:
-	"""Hours over 8 in a day that also sit past the monthly threshold."""
+	"""Hours on this day that sit past the pay-period threshold (default 80)."""
 	day_hours = flt(day_hours)
-	daily_over = max(day_hours - REGULAR_DAY_HOURS, 0.0)
 	period_over = max(flt(hours_before) + day_hours - flt(threshold), 0.0)
-	return flt(min(daily_over, period_over), 2)
+	return flt(min(day_hours, period_over), 2)
 
 
 def get_pay_period_overtime(
@@ -60,7 +59,7 @@ def get_pay_period_overtime(
 	*,
 	ensure_holidays: bool = True,
 ) -> dict:
-	"""Hours over 8 in a day, counted only after the monthly hour threshold."""
+	"""Hours past the pay-period threshold (10 working days / 80 hours by default)."""
 	from hrms.payroll.daily_pay import (
 		ensure_paid_holiday_attendance,
 		ensure_working_hours_from_times,
@@ -69,9 +68,8 @@ def get_pay_period_overtime(
 
 	start_date = getdate(start_date)
 	end_date = getdate(end_date)
-	lookback_start = get_first_day(start_date)
 	if ensure_holidays:
-		ensure_paid_holiday_attendance(lookback_start, end_date, employee=employee)
+		ensure_paid_holiday_attendance(start_date, end_date, employee=employee)
 
 	fields = ["name", "attendance_date", "working_hours", "status"]
 	attendance_meta = frappe.get_meta("Attendance")
@@ -83,7 +81,7 @@ def get_pay_period_overtime(
 		"Attendance",
 		filters={
 			"employee": employee,
-			"attendance_date": ("between", [lookback_start, end_date]),
+			"attendance_date": ("between", [start_date, end_date]),
 			"docstatus": ("<", 2),
 		},
 		fields=fields,
@@ -92,7 +90,6 @@ def get_pay_period_overtime(
 
 	threshold = get_employee_overtime_threshold(employee)
 	running_hours = 0.0
-	current_month = None
 	allocations = []
 	ordinary_overtime = 0.0
 	holiday_overtime = 0.0
@@ -100,11 +97,6 @@ def get_pay_period_overtime(
 
 	for row in rows:
 		row_date = getdate(row.attendance_date)
-		row_month = (row_date.year, row_date.month)
-		if row_month != current_month:
-			running_hours = 0.0
-			current_month = row_month
-
 		is_holiday = bool(get_public_holiday_pay_context(employee, row_date))
 		if (row.status or "") == "On Leave":
 			continue
@@ -124,9 +116,8 @@ def get_pay_period_overtime(
 			overtime_duration = ordinary_overtime_hours(hours, running_hours, threshold)
 			running_hours += hours
 
-		if start_date <= row_date <= end_date:
-			period_hours += hours
-		if overtime_duration <= 0 or row_date < start_date:
+		period_hours += hours
+		if overtime_duration <= 0:
 			continue
 
 		if is_holiday:

@@ -27,9 +27,10 @@ body.staff-pro-has-topbar .main-section > #body {
 	position: relative;
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
+	justify-content: flex-start;
 	height: 100%;
 	padding: 0 1.25rem;
+	gap: 1rem;
 }
 
 .staff-pro-topbar__left {
@@ -86,7 +87,7 @@ body.staff-pro-has-topbar .main-section > #body {
 	min-width: 288px;
 	overflow: visible;
 	pointer-events: auto;
-	z-index: 2;
+	z-index: 1;
 }
 
 .staff-pro-topbar__search-wrap {
@@ -148,6 +149,16 @@ body.staff-pro-has-topbar .main-section > #body {
 	font-size: 0.6875rem;
 	font-weight: 600;
 	color: #9ca3af;
+}
+
+.staff-pro-topbar__actions {
+	display: flex;
+	align-items: center;
+	gap: 0.625rem;
+	margin-left: auto;
+	flex: 0 0 auto;
+	z-index: 3;
+	position: relative;
 }
 
 .staff-pro-topbar__ask-ai {

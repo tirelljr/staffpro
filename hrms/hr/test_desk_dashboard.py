@@ -590,6 +590,8 @@ class TestDeskDashboardPayrollBoard(HRMSTestSuite):
 		self.assertEqual(row["base_salary"], 5000)
 		self.assertEqual(row["bonus"], 500)
 		self.assertEqual(row["gross_pay"], 5500)
+		self.assertGreater(row["ss_contribution"], 0)
+		self.assertLess(row["net_pay"], row["gross_pay"])
 
 	def test_board_row_keeps_slip_amounts_and_adds_to_total(self):
 		slip = frappe._dict(
@@ -617,6 +619,8 @@ class TestDeskDashboardPayrollBoard(HRMSTestSuite):
 		self.assertEqual(row["base_salary"], 5000)
 		self.assertEqual(row["bonus"], 500)
 		self.assertEqual(row["gross_pay"], 5500)
+		self.assertGreater(row["ss_contribution"], 0)
+		self.assertLess(row["net_pay"], row["gross_pay"])
 
 	def test_board_row_uses_hourly_rate_when_gross_is_zero(self):
 		slip = frappe._dict(
@@ -645,6 +649,9 @@ class TestDeskDashboardPayrollBoard(HRMSTestSuite):
 		self.assertEqual(row["base_salary"], 1000)
 		self.assertEqual(row["bonus"], 0)
 		self.assertEqual(row["gross_pay"], 1000)
+		self.assertGreater(row["ss_contribution"], 0)
+		self.assertLess(row["net_pay"], row["base_salary"])
+		self.assertNotEqual(row["base_salary"], row["net_pay"])
 
 	def test_board_row_subtracts_ss_from_total_salary(self):
 		slip = frappe._dict(
