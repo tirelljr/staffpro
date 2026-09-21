@@ -1653,7 +1653,7 @@ def _apply_employee_bpo_fields(company, employee_map):
 		if meta.has_field("holiday_list"):
 			values["holiday_list"] = "Staff Pro Holiday List"
 		if meta.has_field("overtime_threshold_hours"):
-			values["overtime_threshold_hours"] = None
+			values["overtime_threshold_hours"] = 80
 		if values:
 			frappe.db.set_value("Employee", employee, values, update_modified=False)
 	_apply_employee_bank_fields(employee_map)
