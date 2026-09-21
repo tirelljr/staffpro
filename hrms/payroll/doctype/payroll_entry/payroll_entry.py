@@ -3017,6 +3017,8 @@ def _excel_hours_for_employee(
 	Attendance is the source of truth so a stale 8-hour slip cannot hide a full
 	10-working-day period. Slip hours win only when they are higher (manual edits).
 	"""
+	from hrms.hr.doctype.overtime_slip.overtime_slip import get_employee_overtime_threshold
+
 	overtime_hours = flt(overtime_by_employee.get(employee))
 	attendance_hours = flt(working_by_employee.get(employee))
 	slip_hours = flt(slip_total_hours)
@@ -3024,7 +3026,15 @@ def _excel_hours_for_employee(
 		total_hours = max(attendance_hours, slip_hours)
 	else:
 		total_hours = slip_hours or attendance_hours
-	regular_hours = max(total_hours - overtime_hours, 0.0) if total_hours else 0.0
+	threshold = flt(get_employee_overtime_threshold(employee)) if employee else 80.0
+	if total_hours <= threshold:
+		return 0.0, total_hours
+	overtime_hours = min(overtime_hours, max(total_hours - threshold, 0.0))
+	regular_hours = max(total_hours - overtime_hours, 0.0)
+	if overtime_hours and regular_hours < threshold:
+		shift = min(overtime_hours, threshold - regular_hours)
+		regular_hours += shift
+		overtime_hours -= shift
 	return overtime_hours, regular_hours
 
 

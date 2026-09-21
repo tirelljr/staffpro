@@ -13,10 +13,12 @@ from hrms.import_hr_demo_data import (
 	_apply_employee_bank_fields,
 	_demo_day_plan,
 	_demo_ss_number,
+	_ot_extra_days,
 	_punches_until_now,
 	_seed_history_day,
 	_stamp_attendance_exceptions,
 	_submit_open_attendance,
+	_weekdays_between,
 )
 from hrms.payroll.doctype.salary_structure.test_salary_structure import make_salary_structure
 from hrms.tests.utils import HRMSTestSuite
@@ -110,6 +112,15 @@ class TestBpoDemoSeed(HRMSTestSuite):
 		self.assertTrue(row)
 		if row.in_time and (row.in_time.hour > 9 or (row.in_time.hour == 9 and row.in_time.minute >= 10)):
 			self.assertEqual(cint_late(row.late_entry), 1)
+
+	def test_ot_extra_days_only_when_hours_pass_eighty(self):
+		days = _weekdays_between("2026-08-31", "2026-09-11")
+		self.assertEqual(len(days), 10)
+		holiday = getdate("2026-09-10")
+		self.assertEqual(_ot_extra_days(days, holiday, extra_hours=0), [])
+		extra = _ot_extra_days(days, holiday, extra_hours=8)
+		self.assertEqual(len(extra), 4)
+		self.assertNotIn(holiday, extra)
 
 
 def cint_late(value):

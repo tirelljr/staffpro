@@ -53,6 +53,15 @@ class TestOvertimeSlip(HRMSTestSuite):
 		self.assertEqual(result["total_overtime_duration"], 15)
 		self.assertEqual(result["allocations"][-1]["date"], add_days(start, 10))
 
+	def test_no_overtime_at_or_below_threshold(self):
+		start = getdate("2026-01-05")
+		employee = self.make_employee("ot-at-threshold@example.com")
+		self.make_attendance_days(employee, start, [10] * 8)
+		result = get_pay_period_overtime(employee, start, add_days(start, 7), ensure_holidays=False)
+		self.assertEqual(result["total_hours"], 80)
+		self.assertEqual(result["total_overtime_duration"], 0)
+		self.assertEqual(result["ordinary_overtime_duration"], 0)
+
 	def test_eight_hour_days_overtime_after_eighty(self):
 		start = getdate("2026-01-05")
 		employee = self.make_employee("ot-80-period@example.com")

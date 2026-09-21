@@ -133,6 +133,11 @@ def get_pay_period_overtime(
 			}
 		)
 
+	if flt(period_hours) <= flt(threshold):
+		ordinary_overtime = 0.0
+		holiday_overtime = 0.0
+		allocations = []
+
 	return {
 		"employee": employee,
 		"start_date": start_date,
