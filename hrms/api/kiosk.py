@@ -251,7 +251,12 @@ def _holiday_elections(employee: str) -> list[dict]:
 	except Exception:
 		frappe.log_error(title="Kiosk holiday elections")
 		return []
-	return [row for row in holidays if row.get("is_work_day")][:5]
+	# Only ask on clock-in after an admin sets a notification deadline, and only while it is still open.
+	return [
+		row
+		for row in holidays
+		if row.get("is_work_day") and row.get("response_deadline") and not row.get("deadline_passed")
+	][:5]
 
 
 def _profile(employee: dict, username: str, client_ip: str | None = None) -> dict:

@@ -291,6 +291,10 @@ def _create_user_for_employee(employee, login: str) -> str:
 	existing = frappe.db.get_value("User", {"email": user_email}, "name")
 	if existing:
 		_apply_username_to_user(existing, login)
+		from hrms.hr.bpo_user_permissions import is_agent_account
+
+		if is_agent_account(existing):
+			frappe.db.set_value("User", existing, "user_type", "Website User", update_modified=False)
 		return existing
 
 	user = frappe.get_doc(
@@ -302,11 +306,16 @@ def _create_user_for_employee(employee, login: str) -> str:
 			"username": login,
 			"send_welcome_email": 0,
 			"enabled": 1,
+			"user_type": "Website User",
 		}
 	)
 	user.flags.ignore_permissions = True
 	user.insert()
-	user.add_roles("Employee")
+	roles = ["Employee"]
+	if frappe.db.exists("Role", "Employee Self Service"):
+		roles.append("Employee Self Service")
+	user.add_roles(*roles)
+	frappe.db.set_value("User", user.name, "user_type", "Website User", update_modified=False)
 	return user.name
 
 
@@ -404,7 +413,7 @@ def user_username_query(doctype, txt, searchfield, start, page_len, filters):
 		from `tabUser`
 		where enabled = 1
 			and name not in ('Guest', 'Administrator')
-			and user_type = 'System User'
+			and user_type in ('System User', 'Website User')
 			and (
 				name like %(txt)s
 				or ifnull(username, '') like %(txt)s

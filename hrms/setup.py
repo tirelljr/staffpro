@@ -1487,7 +1487,7 @@ def get_lending_docperms_for_ess():
 def create_custom_role(data):
 	if data.get("role") and not frappe.db.exists("Role", data.get("role")):
 		frappe.get_doc(
-			{"doctype": "Role", "role_name": data.get("role"), "desk_access": 1, "is_custom": 1}
+			{"doctype": "Role", "role_name": data.get("role"), "desk_access": 0, "is_custom": 1}
 		).insert(ignore_permissions=True)
 
 

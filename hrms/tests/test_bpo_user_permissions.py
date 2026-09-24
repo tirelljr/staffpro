@@ -6,11 +6,16 @@ import frappe
 from hrms.hr.bpo_user_permissions import (
 	BPO_ROLES,
 	BPO_SIDEBAR_KEYS,
+	PORTAL_ONLY_ROLES,
 	apply_bpo_user_permissions,
 	canonical_sidebar_key,
+	convert_agent_users_to_website_users,
+	enforce_agent_portal_user,
 	filter_user_modules_onload,
 	get_all_roles,
 	get_allowed_bpo_sidebar_keys,
+	is_agent_account,
+	lock_portal_roles_without_desk_access,
 	parse_blocked_bpo_modules,
 )
 from hrms.tests.utils import HRMSTestSuite
@@ -61,3 +66,97 @@ class TestBpoUserPermissions(HRMSTestSuite):
 
 	def test_administrator_keeps_every_sidebar(self):
 		self.assertIsNone(get_allowed_bpo_sidebar_keys("Administrator"))
+
+	def test_portal_roles_have_no_desk_access(self):
+		lock_portal_roles_without_desk_access()
+		for role in PORTAL_ONLY_ROLES:
+			if frappe.db.exists("Role", role):
+				self.assertFalse(cint_desk_access(role))
+
+	def test_agent_user_is_website_user(self):
+		email = "agent.portal.only@example.com"
+		if frappe.db.exists("User", email):
+			frappe.delete_doc("User", email, force=True, ignore_permissions=True)
+		user = frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": email,
+				"first_name": "Agent",
+				"last_name": "Portal",
+				"send_welcome_email": 0,
+				"user_type": "System User",
+			}
+		)
+		user.append("roles", {"role": "Employee"})
+		enforce_agent_portal_user(user)
+		self.assertEqual(user.user_type, "Website User")
+		self.assertTrue(is_agent_account(email, {"Employee", "All"}))
+
+	def test_staff_user_stays_system_user(self):
+		user = frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": "hr.staff.desk@example.com",
+				"first_name": "HR",
+				"send_welcome_email": 0,
+				"user_type": "Website User",
+			}
+		)
+		user.append("roles", {"role": "HR User"})
+		enforce_agent_portal_user(user)
+		self.assertEqual(user.user_type, "System User")
+		self.assertFalse(is_agent_account("hr.staff.desk@example.com", {"HR User", "Employee"}))
+
+	def test_sidebar_hides_unreadable_doctypes(self):
+		from hrms.boot import _can_open_sidebar_item
+
+		self.assertTrue(_can_open_sidebar_item({"type": "Section Break", "label": "Setup"}))
+		self.assertTrue(_can_open_sidebar_item({"link_type": "DocType", "link_to": "User"}))
+
+		email = "agent.sidebar.hide@example.com"
+		if frappe.db.exists("User", email):
+			frappe.delete_doc("User", email, force=True, ignore_permissions=True)
+		user = frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": email,
+				"first_name": "Sidebar",
+				"send_welcome_email": 0,
+				"user_type": "Website User",
+			}
+		)
+		user.flags.ignore_permissions = True
+		user.insert()
+		user.add_roles("Employee Self Service")
+		frappe.set_user(email)
+		try:
+			self.assertFalse(_can_open_sidebar_item({"link_type": "DocType", "link_to": "User"}))
+			self.assertTrue(_can_open_sidebar_item({"type": "Section Break"}))
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_convert_existing_agent_system_users(self):
+		email = "agent.convert.desk@example.com"
+		if frappe.db.exists("User", email):
+			frappe.delete_doc("User", email, force=True, ignore_permissions=True)
+		user = frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": email,
+				"first_name": "Convert",
+				"send_welcome_email": 0,
+				"user_type": "System User",
+			}
+		)
+		user.flags.ignore_permissions = True
+		user.insert()
+		user.add_roles("Employee")
+		frappe.db.set_value("User", email, "user_type", "System User", update_modified=False)
+		self.assertGreaterEqual(convert_agent_users_to_website_users(), 1)
+		self.assertEqual(frappe.db.get_value("User", email, "user_type"), "Website User")
+
+
+def cint_desk_access(role: str) -> int:
+	from frappe.utils import cint
+
+	return cint(frappe.db.get_value("Role", role, "desk_access"))

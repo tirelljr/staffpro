@@ -325,7 +325,11 @@ const activityLabels = computed(() => {
 	}
 	return [user.last_in_label, user.last_pair_label].filter(Boolean)
 })
-const holidayElections = computed(() => activeProfile.value?.holidays || [])
+const holidayElections = computed(() =>
+	(activeProfile.value?.holidays || []).filter(
+		(holiday) => holiday.response_deadline && !holiday.deadline_passed,
+	),
+)
 const holidaySaving = ref("")
 const wifiLabel = computed(() => navigator.onLine ? "online" : "na")
 const gpsLabel = computed(() => {

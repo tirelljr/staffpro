@@ -413,10 +413,12 @@ header.staff-pro-topbar {
 	height: 32px !important;
 	border-radius: 50% !important;
 }
-.staff-pro-topbar__lang-wrap { position: relative !important; }
+.staff-pro-topbar__lang-wrap,
+.staff-pro-topbar__user-wrap { position: relative !important; }
 .staff-pro-topbar__icon-btn:hover,
 .staff-pro-topbar__avatar:hover,
 .staff-pro-topbar__lang.is-open,
+.staff-pro-topbar__avatar.is-open,
 .staff-pro-topbar__icon-btn.is-open {
 	background: #e8eaed !important;
 }
@@ -703,6 +705,7 @@ hrms.ui.TopBar = class {
 	constructor() {
 		this.$wrapper = null;
 		this.language_open = false;
+		this.user_menu_open = false;
 		this.notifications_open = false;
 		this.search_open = false;
 		this.search_items = [];
@@ -715,6 +718,7 @@ hrms.ui.TopBar = class {
 		this.bound = false;
 		this.on_reposition_menu = () => {
 			this.position_language_menu();
+			this.position_user_menu();
 			this.position_notifications_panel();
 			this.position_search_panel();
 		};
@@ -1083,8 +1087,11 @@ hrms.ui.TopBar = class {
 							</div>
 							<div class="staff-pro-topbar__menu hidden" role="listbox" aria-label="${__("Language")}"></div>
 						</div>
-						<div class="staff-pro-topbar__avatar" data-action="profile" role="button" tabindex="0" title="${__("Profile")}">
-							${avatar}
+						<div class="staff-pro-topbar__user-wrap">
+							<div class="staff-pro-topbar__avatar" data-action="user-menu" role="button" tabindex="0" title="${__("Account")}" aria-haspopup="menu" aria-expanded="false" aria-label="${__("Account")}">
+								${avatar}
+							</div>
+							<div class="staff-pro-topbar__menu staff-pro-topbar__user-menu hidden" role="menu" aria-label="${__("Account")}"></div>
 						</div>
 					</div>
 					</div>
@@ -1117,7 +1124,10 @@ hrms.ui.TopBar = class {
 				e.stopPropagation();
 				this.toggle_notifications_panel();
 			});
-			this.$wrapper.on("click", "[data-action='profile']", () => this.open_profile());
+			this.$wrapper.on("click", "[data-action='user-menu']", (e) => {
+				e.stopPropagation();
+				this.toggle_user_menu();
+			});
 			this.$wrapper.on("click", "[data-action='ask-ai']", (e) => {
 				e.stopPropagation();
 				this.open_ask_ai();
@@ -1138,6 +1148,7 @@ hrms.ui.TopBar = class {
 				this.refresh_context();
 				this.close_notifications_panel();
 				this.close_language_menu();
+				this.close_user_menu();
 				this.close_search_panel();
 			});
 
@@ -1157,8 +1168,11 @@ hrms.ui.TopBar = class {
 
 		$(document).off("click.staff-pro-topbar mousedown.staff-pro-topbar keydown.staff-pro-topbar");
 		$(document).on("click.staff-pro-topbar", (e) => {
-			if (!$(e.target).closest(".staff-pro-topbar__lang-wrap, .staff-pro-topbar__menu").length) {
+			if (!$(e.target).closest(".staff-pro-topbar__lang-wrap").length) {
 				this.close_language_menu();
+			}
+			if (!$(e.target).closest(".staff-pro-topbar__user-wrap").length) {
+				this.close_user_menu();
 			}
 			if (
 				!$(e.target).closest(".staff-pro-topbar__notifications-wrap").length &&
@@ -1189,6 +1203,7 @@ hrms.ui.TopBar = class {
 		$(document).on("keydown.staff-pro-topbar", (e) => {
 			if (e.key === "Escape") {
 				this.close_language_menu();
+				this.close_user_menu();
 				this.close_notifications_panel();
 				this.close_search_panel();
 			}
@@ -1202,7 +1217,7 @@ hrms.ui.TopBar = class {
 		this.$wrapper.find(".staff-pro-topbar__status-label").text(status);
 		this.$wrapper
 			.find(".staff-pro-topbar__avatar")
-			.attr("title", this.is_intake_flow() ? __("Logout") : __("Profile"));
+			.attr("title", __("Account"));
 		this.$wrapper
 			.find("[data-action='language']")
 			.not(".is-open")
@@ -1692,6 +1707,7 @@ hrms.ui.TopBar = class {
 		}
 
 		this.close_language_menu();
+		this.close_user_menu();
 		this.close_notifications_panel();
 		this.search_open = true;
 		$("body").addClass("staff-pro-search-open");
@@ -1712,7 +1728,7 @@ hrms.ui.TopBar = class {
 		this.search_open = false;
 		this.search_seq += 1;
 		clearTimeout(this._search_timer);
-		if (!this.language_open && !this.notifications_open) {
+		if (!this.language_open && !this.notifications_open && !this.user_menu_open) {
 			$(window).off("resize.staff-pro-topbar scroll.staff-pro-topbar", this.on_reposition_menu);
 		}
 		$("body").removeClass("staff-pro-search-open");
@@ -2089,6 +2105,7 @@ hrms.ui.TopBar = class {
 		}
 
 		this.close_language_menu();
+		this.close_user_menu();
 		this.close_search_panel();
 		this.notifications_filter = "all";
 		const $panel = this.$wrapper.find(".staff-pro-topbar__notifications-panel");
@@ -2109,7 +2126,7 @@ hrms.ui.TopBar = class {
 
 	close_notifications_panel() {
 		this.notifications_open = false;
-		if (!this.language_open && !this.search_open) {
+		if (!this.language_open && !this.search_open && !this.user_menu_open) {
 			$(window).off("resize.staff-pro-topbar scroll.staff-pro-topbar", this.on_reposition_menu);
 		}
 		this.$wrapper?.find(".staff-pro-topbar__notifications-panel").addClass("hidden");
@@ -2128,12 +2145,86 @@ hrms.ui.TopBar = class {
 		frappe.set_route("ask-ai");
 	}
 
-	open_profile() {
-		if (this.is_intake_flow()) {
+	user_menu() {
+		return this.$wrapper?.find(".staff-pro-topbar__user-menu") || $();
+	}
+
+	language_menu() {
+		return this.$wrapper?.find(".staff-pro-topbar__lang-wrap .staff-pro-topbar__menu") || $();
+	}
+
+	render_user_menu() {
+		const $menu = this.user_menu();
+		const name = frappe.utils.escape_html(frappe.session.user_fullname || frappe.session.user || "");
+		$menu.html(`
+			<div class="staff-pro-topbar__menu-item" data-user-action="profile" role="menuitem" tabindex="0">${__("My Settings")}</div>
+			<div class="staff-pro-topbar__menu-item" data-user-action="logout" role="menuitem" tabindex="0">${__("Logout")}</div>
+		`);
+		$menu.off("mousedown.user click.user keydown.user");
+		$menu.on("mousedown.user click.user", (e) => e.stopPropagation());
+		$menu.on("click.user", "[data-user-action]", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			this.handle_user_action($(e.currentTarget).attr("data-user-action"));
+		});
+		$menu.on("keydown.user", "[data-user-action]", (e) => {
+			if (e.key === "Enter" || e.key === " ") {
+				e.preventDefault();
+				e.stopPropagation();
+				this.handle_user_action($(e.currentTarget).attr("data-user-action"));
+			}
+		});
+		$menu.attr("data-user-name", name);
+	}
+
+	handle_user_action(action) {
+		this.close_user_menu();
+		if (action === "logout" || this.is_intake_flow()) {
 			this.logout();
 			return;
 		}
-		frappe.set_route("Form", "User", frappe.session.user);
+		if (action === "profile") {
+			frappe.set_route("Form", "User", frappe.session.user);
+		}
+	}
+
+	position_user_menu() {
+		if (!this.user_menu_open || !this.$wrapper) return;
+		const $btn = this.$wrapper.find("[data-action='user-menu']");
+		const $menu = this.user_menu();
+		const btn = $btn.get(0);
+		if (!btn || !$menu.length) return;
+		const rect = btn.getBoundingClientRect();
+		$menu.css({
+			top: `${rect.bottom + 8}px`,
+			right: `${window.innerWidth - rect.right}px`,
+			left: "auto",
+		});
+	}
+
+	toggle_user_menu() {
+		if (this.user_menu_open) {
+			this.close_user_menu();
+			return;
+		}
+		this.close_language_menu();
+		this.close_notifications_panel();
+		this.close_search_panel();
+		this.render_user_menu();
+		this.user_menu().removeClass("hidden");
+		this.$wrapper.find("[data-action='user-menu']").addClass("is-open").attr("aria-expanded", "true");
+		this.user_menu_open = true;
+		this.position_user_menu();
+		$(window).on("resize.staff-pro-topbar scroll.staff-pro-topbar", this.on_reposition_menu);
+	}
+
+	close_user_menu() {
+		this.user_menu_open = false;
+		if (!this.language_open && !this.notifications_open && !this.search_open) {
+			$(window).off("resize.staff-pro-topbar scroll.staff-pro-topbar", this.on_reposition_menu);
+		}
+		this.user_menu().addClass("hidden");
+		this.$wrapper?.find("[data-action='user-menu']").removeClass("is-open").attr("aria-expanded", "false");
 	}
 
 	is_intake_flow() {
@@ -2212,7 +2303,7 @@ hrms.ui.TopBar = class {
 	}
 
 	render_language_menu() {
-		const $menu = this.$wrapper.find(".staff-pro-topbar__menu");
+		const $menu = this.language_menu();
 		const current = this.current_language_code();
 		$menu.html(
 			this.languages()
@@ -2254,7 +2345,7 @@ hrms.ui.TopBar = class {
 	position_language_menu() {
 		if (!this.language_open || !this.$wrapper) return;
 		const $btn = this.$wrapper.find("[data-action='language']");
-		const $menu = this.$wrapper.find(".staff-pro-topbar__menu");
+		const $menu = this.language_menu();
 		const btn = $btn.get(0);
 		if (!btn) return;
 
@@ -2267,10 +2358,11 @@ hrms.ui.TopBar = class {
 	}
 
 	toggle_language_menu() {
-		const $menu = this.$wrapper.find(".staff-pro-topbar__menu");
+		const $menu = this.language_menu();
 		const $btn = this.$wrapper.find("[data-action='language']");
 		if (!this.language_open) {
 			this.close_notifications_panel();
+			this.close_user_menu();
 			this.close_search_panel();
 			$menu.html(`<div class="staff-pro-topbar__menu-item is-active">${__("Loading...")}</div>`);
 			$menu.removeClass("hidden");
@@ -2290,10 +2382,10 @@ hrms.ui.TopBar = class {
 
 	close_language_menu() {
 		this.language_open = false;
-		if (!this.notifications_open && !this.search_open) {
+		if (!this.notifications_open && !this.search_open && !this.user_menu_open) {
 			$(window).off("resize.staff-pro-topbar scroll.staff-pro-topbar", this.on_reposition_menu);
 		}
-		this.$wrapper?.find(".staff-pro-topbar__menu").addClass("hidden");
+		this.language_menu().addClass("hidden");
 		this.$wrapper?.find("[data-action='language']").removeClass("is-open").attr("aria-expanded", "false");
 	}
 

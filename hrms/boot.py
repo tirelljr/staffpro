@@ -289,6 +289,7 @@ def extend_bootinfo(bootinfo):
 	_filter_bpo_workspace_sidebars(bootinfo)
 	_filter_bpo_module_sidebars(bootinfo)
 	_filter_bpo_app_workspaces(bootinfo)
+	_filter_unpermitted_sidebar_items(bootinfo)
 
 
 def apply_payroll_frequency_translations(bootinfo):
@@ -406,6 +407,53 @@ def _is_allowed_bpo_dock_entry(entry, allowed_keys=None) -> bool:
 			allowed_keys,
 		)
 	return _is_allowed_bpo_workspace(entry, allowed_keys)
+
+
+def _can_open_sidebar_item(item) -> bool:
+	if not isinstance(item, dict):
+		return True
+	if frappe.session.user in {"Administrator", "Guest"}:
+		return True
+	link_type = str(item.get("link_type") or "").strip().lower()
+	link_to = item.get("link_to")
+	if not link_to or item.get("type") in {"Section Break", "section"}:
+		return True
+	try:
+		if link_type == "doctype":
+			return bool(frappe.has_permission(link_to, "read"))
+		if link_type == "page":
+			return bool(frappe.has_permission("Page", "read", link_to) or frappe.has_permission(link_to, "read"))
+		if link_type == "report":
+			return bool(frappe.has_permission(link_to, "read") or frappe.has_permission("Report", "read", link_to))
+	except Exception:
+		return True
+	return True
+
+
+def _filter_sidebar_item_rows(rows):
+	if not isinstance(rows, list):
+		return rows
+	return [row for row in rows if _can_open_sidebar_item(row)]
+
+
+def _filter_unpermitted_sidebar_items(bootinfo):
+	"""Hide doctypes, pages, and reports the signed-in user cannot open."""
+	if frappe.session.user in {"Administrator", "Guest"}:
+		return
+
+	sidebars = bootinfo.get("module_sidebars")
+	if isinstance(sidebars, dict):
+		for sidebar in sidebars.values():
+			if isinstance(sidebar, dict) and "items" in sidebar:
+				sidebar["items"] = _filter_sidebar_item_rows(sidebar.get("items"))
+
+	workspace_items = bootinfo.get("workspace_sidebar_item")
+	if isinstance(workspace_items, dict):
+		for key, sidebar in list(workspace_items.items()):
+			if isinstance(sidebar, dict) and "items" in sidebar:
+				sidebar["items"] = _filter_sidebar_item_rows(sidebar.get("items"))
+			elif isinstance(sidebar, list):
+				workspace_items[key] = _filter_sidebar_item_rows(sidebar)
 
 
 def _filter_bpo_app_workspaces(bootinfo):

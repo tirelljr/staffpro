@@ -40,6 +40,14 @@ NEVER_DISABLE_ROLES = frozenset(
 	}
 )
 
+# Agents use these roles for the portal only. They never get desk access.
+PORTAL_ONLY_ROLES = frozenset(
+	{
+		"Employee",
+		"Employee Self Service",
+	}
+)
+
 # Sidebar modules shown on the User form, in dock / left-nav order.
 BPO_SIDEBAR_MODULES = (
 	("people", "People"),
@@ -176,8 +184,80 @@ def apply_bpo_user_permissions():
 	"""Remove leftover ERPNext roles and hide Module Profile on User."""
 	ensure_user_fields()
 	remove_unused_erpnext_roles()
+	lock_portal_roles_without_desk_access()
 	hide_user_module_profile_field()
 	block_unused_modules_for_all_users()
+	convert_agent_users_to_website_users()
+
+
+def staff_desk_roles() -> frozenset[str]:
+	return BPO_ROLES - PORTAL_ONLY_ROLES
+
+
+def user_role_names(doc_or_user) -> set[str]:
+	if hasattr(doc_or_user, "get"):
+		roles = {row.role for row in (doc_or_user.get("roles") or []) if getattr(row, "role", None)}
+		if roles:
+			return roles
+		name = getattr(doc_or_user, "name", None)
+		if name:
+			return set(frappe.get_roles(name))
+		return set()
+	return set(frappe.get_roles(doc_or_user))
+
+
+def is_agent_account(user, roles: set[str] | None = None) -> bool:
+	if not user or user in {"Administrator", "Guest"}:
+		return False
+	roles = set(roles if roles is not None else user_role_names(user))
+	if roles.intersection(staff_desk_roles()):
+		return False
+	if roles.intersection(PORTAL_ONLY_ROLES):
+		return True
+	return bool(frappe.db.exists("Employee", {"user_id": user}))
+
+
+def lock_portal_roles_without_desk_access():
+	if not frappe.db.exists("DocType", "Role"):
+		return
+	for name in PORTAL_ONLY_ROLES:
+		if not frappe.db.exists("Role", name):
+			continue
+		if cint(frappe.db.get_value("Role", name, "desk_access")):
+			frappe.db.set_value("Role", name, "desk_access", 0, update_modified=False)
+
+
+def enforce_agent_portal_user(doc, method=None):
+	"""Agents stay Website Users. Desk roles are the only way onto the desk."""
+	if getattr(doc, "doctype", None) != "User":
+		return
+	if doc.name in {"Administrator", "Guest"}:
+		return
+	roles = user_role_names(doc)
+	if roles.intersection(staff_desk_roles()):
+		doc.user_type = "System User"
+		return
+	if roles.intersection(PORTAL_ONLY_ROLES) or (
+		doc.name and frappe.db.exists("Employee", {"user_id": doc.name})
+	):
+		doc.user_type = "Website User"
+
+
+def convert_agent_users_to_website_users() -> int:
+	lock_portal_roles_without_desk_access()
+	if not frappe.db.exists("DocType", "User"):
+		return 0
+	converted = 0
+	for user in frappe.get_all(
+		"User",
+		filters={"user_type": "System User", "name": ["not in", ["Administrator", "Guest"]]},
+		pluck="name",
+	):
+		if not is_agent_account(user):
+			continue
+		frappe.db.set_value("User", user, "user_type", "Website User", update_modified=False)
+		converted += 1
+	return converted
 
 
 def ensure_user_fields():

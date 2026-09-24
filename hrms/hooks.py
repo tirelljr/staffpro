@@ -246,6 +246,7 @@ doc_events = {
 			"erpnext.setup.doctype.employee.employee.validate_employee_role",
 			"hrms.overrides.employee_master.update_approver_user_roles",
 			"hrms.hr.bpo_user_permissions.enforce_bpo_block_modules",
+			"hrms.hr.bpo_user_permissions.enforce_agent_portal_user",
 			"hrms.hr.timezone.lock_user_timezone",
 		],
 	},

@@ -125,6 +125,14 @@ class TestHolidayWorkDeadline(HRMSTestSuite):
 		employee, user = make_election_employee("hwd.kiosk@example.com", self.holiday_list)
 		frappe.db.set_value("User", user, "username", "HwdKiosk")
 		update_password(user, "KioskPass123")
+
+		frappe.set_user("Guest")
+		before = get_kiosk_profile("HwdKiosk")
+		self.assertFalse(
+			any(row["holiday_date"] == str(self.weekday) for row in before.get("holidays") or [])
+		)
+
+		frappe.set_user("Administrator")
 		set_holiday_work_deadline(self.weekday, now_datetime() + timedelta(days=1), "Deadline Public Holiday")
 
 		frappe.set_user("Guest")

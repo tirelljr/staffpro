@@ -356,8 +356,9 @@ body.staff-pro-has-topbar .body-sidebar-container {
 	height: 100% !important;
 	min-height: 100% !important;
 	max-height: none !important;
-	overflow-x: hidden !important;
-	overflow-y: auto !important;
+	display: flex !important;
+	flex-direction: column !important;
+	overflow: visible !important;
 	background: #ffffff !important;
 	border-right: 1px solid #ececec !important;
 	padding: 8px 8px 10px !important;
@@ -410,7 +411,21 @@ body.staff-pro-has-topbar .body-sidebar-container {
 	display: none !important;
 }
 .body-sidebar .sidebar-items {
+	flex: 1 1 auto !important;
+	min-height: 0 !important;
+	overflow-x: hidden !important;
+	overflow-y: auto !important;
 	padding: 0 2px 8px !important;
+}
+.body-sidebar-bottom,
+.body-sidebar .dropdown-navbar-user {
+	flex: 0 0 auto !important;
+	overflow: visible !important;
+	position: relative !important;
+	z-index: 1080 !important;
+}
+.body-sidebar .dropdown-navbar-user .dropdown-menu {
+	z-index: 1200 !important;
 }
 .body-sidebar .standard-sidebar-item {
 	margin: 0 !important;
@@ -1161,7 +1176,112 @@ function is_hidden_sidebar_item($item) {
 	if (hidden_has(hiddenLinks, last) || hidden_has(hiddenLinks, last.replace(/-/g, " "))) {
 		return true;
 	}
-	return /\/query-report\/(General Ledger|Accounts Payable)\/?$/i.test(path);
+	if (/\/query-report\/(General Ledger|Accounts Payable)\/?$/i.test(path)) {
+		return true;
+	}
+	return is_unpermitted_sidebar_item($item, href, path);
+}
+
+function unslug_sidebar_name(value) {
+	return String(value || "")
+		.replace(/-/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+function can_read_sidebar_doctype(name) {
+	if (!name || frappe.session?.user === "Administrator") {
+		return true;
+	}
+	if (typeof frappe.model?.can_read === "function") {
+		try {
+			return Boolean(frappe.model.can_read(name));
+		} catch (e) {
+			/* fall through */
+		}
+	}
+	const allowed = frappe.boot?.user?.can_read;
+	return !Array.isArray(allowed) || allowed.includes(name);
+}
+
+function is_allowed_sidebar_page(name) {
+	const pages = frappe.boot?.allowed_pages || [];
+	return pages.includes(name) || pages.includes(unslug_sidebar_name(name));
+}
+
+function is_unpermitted_sidebar_item($item, href, path) {
+	if (is_section_header($item) || frappe.session?.user === "Administrator") {
+		return false;
+	}
+	const linkType = String(
+		$item.data("link-type") || $item.find(".item-anchor").data("link-type") || ""
+	).toLowerCase();
+	const linkTo = String(
+		$item.data("link-to") || $item.find(".item-anchor").data("link-to") || ""
+	).trim();
+	if (linkType === "doctype" && linkTo) {
+		return !can_read_sidebar_doctype(linkTo);
+	}
+	if ((linkType === "page" || linkType === "report") && linkTo) {
+		return !(is_allowed_sidebar_page(linkTo) || can_read_sidebar_doctype(linkTo));
+	}
+
+	const parts = String(path || href || "")
+		.replace(/\/$/, "")
+		.split("/")
+		.filter(Boolean);
+	if (parts.length < 2) {
+		return false;
+	}
+	const root = parts[0].toLowerCase();
+	if (root !== "app" && root !== "desk") {
+		return false;
+	}
+	if (["dashboard-view", "dashboard", "workspaces", "query-report"].includes(parts[1].toLowerCase())) {
+		return false;
+	}
+	const target = unslug_sidebar_name(parts[1] === "List" || parts[1] === "list" ? parts[2] : parts[1]);
+	if (!target) {
+		return false;
+	}
+	if (is_allowed_sidebar_page(target) || is_allowed_sidebar_page(parts[1])) {
+		return false;
+	}
+	if (can_read_sidebar_doctype(target)) {
+		return false;
+	}
+	return /\/list\//i.test(path) || linkType === "doctype";
+}
+
+function pin_sidebar_user_menu() {
+	const $user = $(".body-sidebar .dropdown-navbar-user, .body-sidebar-bottom .dropdown-navbar-user");
+	if (!$user.length) {
+		return;
+	}
+	$user.each(function () {
+		const $dropdown = $(this);
+		if ($dropdown.data("spUserMenuPinned")) {
+			return;
+		}
+		$dropdown.data("spUserMenuPinned", true);
+		$dropdown.on("shown.bs.dropdown show.bs.dropdown", function () {
+			const $menu = $dropdown.children(".dropdown-menu");
+			const btn = $dropdown.find(".sidebar-user-button").get(0);
+			if (!$menu.length || !btn) {
+				return;
+			}
+			const rect = btn.getBoundingClientRect();
+			$menu.css({
+				position: "fixed",
+				left: `${Math.max(8, rect.left)}px`,
+				bottom: `${Math.max(8, window.innerHeight - rect.top + 8)}px`,
+				top: "auto",
+				right: "auto",
+				display: "block",
+				zIndex: 2200,
+			});
+		});
+	});
 }
 
 const SIDEBAR_COLLAPSE_ICON = `<svg class="icon icon-sm" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5" stroke="#000000" stroke-width="1.5"/><path d="M6.25 2.5v11" stroke="#000000" stroke-width="1.5"/><path d="M11.2 6.15 8.7 8l2.5 1.85" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -2293,6 +2413,7 @@ function watch_workspace_dock() {
 	render_staff_pro_dock_integrations();
 	remove_sidebar_search();
 	pin_staff_pro_dock();
+	pin_sidebar_user_menu();
 	enhance_sidebar_menus();
 	style_sidebar_collapse_toggle();
 	keep_staff_pro_sidebar_expanded();
@@ -2595,6 +2716,7 @@ $(document).on("app_ready", hide_page_menu);
 $(document).on("app_ready", hide_list_page_chrome);
 $(document).on("page-change", () => redirect_staff_pro_desk_home());
 $(document).on("page-change", refresh_staff_pro_dock_shortcuts);
+$(document).on("page-change", pin_sidebar_user_menu);
 $(document).on("page-change", enhance_sidebar_menus);
 $(document).on("page-change", keep_staff_pro_sidebar_expanded);
 $(document).on("page-change", prefer_employee_image_view);
