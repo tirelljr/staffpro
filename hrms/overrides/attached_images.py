@@ -20,7 +20,7 @@ def _as_name_list(names) -> list[str]:
 
 
 @frappe.whitelist()
-def get_attached_images(doctype: str, names=None):
+def get_attached_images(doctype: str, names: list | str | None = None):
 	"""Return image URLs as `{name: [file_url, ...]}` for the given documents."""
 	names = _as_name_list(names)
 	if not names:
