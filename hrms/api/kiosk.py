@@ -315,11 +315,13 @@ def clock(
 
 	user = _authenticate(username, password)
 	employee = _employee_for_user(user)
-	validate_agent_clockin_ip(employee.name, ignore_session_exemption=True, client_ip=client_ip)
 	summary = _checkin_summary(employee.name)
 	action = (log_type or "").strip().upper() or summary["next_action"]
 	if action not in {"IN", "OUT"}:
 		frappe.throw(_("Invalid clock action."))
+	# Office IP lock applies to kiosk punch only (not portal login via /api/method/login).
+	if action == "IN":
+		validate_agent_clockin_ip(employee.name, ignore_session_exemption=True, client_ip=client_ip)
 
 	ip = _request_ip(client_ip)
 	workstation_id = resolve_workstation_device(employee.name, ip, device_id)

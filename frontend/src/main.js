@@ -21,6 +21,7 @@ import { userResource } from "@/data/user"
 import { employeeResource } from "@/data/employee"
 import { syncNotificationResources } from "@/data/notifications"
 import { canOpenDesk } from "@/utils/deskAccess"
+import { consumeKioskPortalLoginIntent } from "@/utils/kioskPortal"
 
 import dayjs from "@/utils/dayjs"
 import getIonicConfig from "@/utils/ionicConfig"
@@ -149,6 +150,9 @@ router.beforeEach(async (to, _, next) => {
 
 	// Desk admins opening /agents land on the kiosk, not their employee dashboard.
 	if (canOpenDesk(userResource.data) && KIOSK_HOME_ROUTES.has(to.name)) {
+		if (consumeKioskPortalLoginIntent()) {
+			return next()
+		}
 		return next({ name: "Login" })
 	}
 

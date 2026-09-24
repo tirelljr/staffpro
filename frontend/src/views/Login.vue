@@ -87,8 +87,10 @@
 							@keydown.enter.prevent
 						/>
 
-						<ErrorMessage :message="errorMessage" />
-						<div v-if="successMessage" class="text-sm text-green-700 text-center">{{ successMessage }}</div>
+						<ErrorMessage :message="clockErrorMessage || errorMessage" />
+						<div v-if="clockSuccessMessage || successMessage" class="text-sm text-green-700 text-center">
+							{{ clockSuccessMessage || successMessage }}
+						</div>
 
 						<div class="flex flex-col sm:flex-row sm:items-center gap-3 my-2">
 							<div class="text-4xl sm:text-5xl font-semibold text-gray-400 tracking-wide text-center sm:text-left tabular-nums shrink-0">
@@ -193,11 +195,18 @@
 							<button
 								type="button"
 								class="w-full py-3 text-white text-lg font-semibold bg-[#2f6fdb] hover:bg-[#2558b0] disabled:opacity-60 disabled:cursor-not-allowed"
-								:disabled="clocking || signingIn"
+								:disabled="clocking || signingIn || portalBlocked"
 								@click="submitLogin"
 							>
 								{{ signingIn ? __("Opening portal...") : __("Open my portal") }}
 							</button>
+							<ErrorMessage :message="portalErrorMessage" />
+							<p v-if="clockinBlocked && !portalBlocked" class="text-xs text-gray-500 text-center">
+								{{ __("Open my portal works from any network. Only clock-in requires the office network.") }}
+							</p>
+							<p v-if="portalBlocked" class="text-xs text-gray-500 text-center">
+								{{ __("An admin is signed in on this computer. Use Clock In/Out only.") }}
+							</p>
 						</div>
 					</form>
 
@@ -257,6 +266,8 @@ import { IonPage, IonContent } from "@ionic/vue"
 import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { Input, Button, ErrorMessage, Dialog, createResource, call, debounce } from "frappe-ui"
 import { STAFF_PRO_LOGO_URL } from "@/utils/branding"
+import { canOpenDesk } from "@/utils/deskAccess"
+import { getKioskLoginDeviceId, markKioskPortalLoginIntent } from "@/utils/kioskPortal"
 import { scanClientIpv4, isPlaceholderPeerIpv4 } from "@/utils/clientIp"
 import {
 	forgetPassword,
@@ -274,6 +285,9 @@ const password = ref("")
 const rememberPassword = ref(false)
 const errorMessage = ref("")
 const successMessage = ref("")
+const clockErrorMessage = ref("")
+const clockSuccessMessage = ref("")
+const portalErrorMessage = ref("")
 const clocking = ref(false)
 const signingIn = ref(false)
 const showRemembered = ref(false)
@@ -299,7 +313,9 @@ const otp = reactive({
 })
 
 const session = inject("$session")
+const userResource = inject("$user")
 const __ = inject("$translate")
+const portalBlocked = computed(() => canOpenDesk(userResource?.data))
 const dayjs = inject("$dayjs")
 const liveProfile = ref(null)
 const selectedRemembered = computed(() => getRememberedUser(username.value))
@@ -360,19 +376,17 @@ const displayIp = computed(() => {
 })
 
 const clockinRestricted = computed(() => Boolean(kioskContext.data?.clockin_restricted))
-const clockinLatchedAllowed = ref(false)
 const clockinBlocked = computed(() => {
-	if (clockinLatchedAllowed.value) return false
 	if (!kioskContext.data) return false
 	if (!clockinRestricted.value) return false
 	if (kioskContext.data.clockin_allowed) return false
-	return ipScanDone.value
+	return ipScanDone.value && clockAction.value === "IN"
 })
 const showClockAction = computed(() => {
-	if (clockinLatchedAllowed.value) return true
-	if (!kioskContext.data) return true
+	if (!kioskContext.data) return false
 	if (!clockinRestricted.value) return true
-	return Boolean(kioskContext.data.clockin_allowed)
+	if (kioskContext.data.clockin_allowed) return true
+	return clockAction.value === "OUT"
 })
 
 let clockOffsetMs = 0
@@ -380,9 +394,6 @@ let clockOffsetMs = 0
 watch(
 	() => kioskContext.data,
 	(data) => {
-		if (data && (!data.clockin_restricted || data.clockin_allowed)) {
-			clockinLatchedAllowed.value = true
-		}
 		if (data?.server_now) {
 			const parsed = dayjs(data.server_now)
 			if (parsed.isValid()) {
@@ -557,13 +568,21 @@ function requireCredentials() {
 	return login
 }
 
+function kioskLoginDeviceId() {
+	return getKioskLoginDeviceId({
+		profileDeviceId: activeProfile.value?.device_id,
+		contextDeviceId: kioskContext.data?.device_id,
+		fallbackDeviceId: localDeviceId,
+	})
+}
+
 async function submitClock() {
 	if (!showClockAction.value) return
 	const login = requireCredentials()
 	if (!login) return
 
-	errorMessage.value = ""
-	successMessage.value = ""
+	clockErrorMessage.value = ""
+	clockSuccessMessage.value = ""
 	clocking.value = true
 	try {
 		const profile = await call("hrms.api.kiosk.clock", {
@@ -580,26 +599,32 @@ async function submitClock() {
 		persistProfile(updated)
 		applyLiveProfile(updated)
 		const actionLabel = profile.log_type === "OUT" ? __("Clocked out") : __("Clocked in")
-		successMessage.value = __("{0} at {1}", [actionLabel, profile.time_label || clockLabel.value])
+		clockSuccessMessage.value = __("{0} at {1}", [actionLabel, profile.time_label || clockLabel.value])
 	} catch (error) {
-		errorMessage.value = error.messages?.join("\n") || __("Clock-in failed")
+		clockErrorMessage.value = error.messages?.join("\n") || __("Clock-in failed")
 	} finally {
 		clocking.value = false
 	}
 }
 
 async function submitLogin() {
+	if (portalBlocked.value && !otp.showDialog) {
+		portalErrorMessage.value = __("An admin is signed in on this computer. Use Clock In/Out only.")
+		return
+	}
+
 	signingIn.value = true
-	errorMessage.value = ""
-	successMessage.value = ""
+	portalErrorMessage.value = ""
+	const deviceId = kioskLoginDeviceId()
 	try {
 		let response
 		if (otp.showDialog) {
-			response = await session.otp(otp.tmp_id, otp.code)
+			response = await session.otp(otp.tmp_id, otp.code, deviceId)
 		} else {
 			const login = requireCredentials()
 			if (!login) return
-			response = await session.login(login, password.value)
+			markKioskPortalLoginIntent()
+			response = await session.login(login, password.value, deviceId)
 			persistProfile({
 				username: login,
 				employee_name: activeProfile.value?.employee_name || "",
@@ -628,7 +653,7 @@ async function submitLogin() {
 			}
 		}
 	} catch (error) {
-		errorMessage.value =
+		portalErrorMessage.value =
 			error.messages?.join("\n") || error.message || __("Invalid login credentials")
 	} finally {
 		signingIn.value = false
