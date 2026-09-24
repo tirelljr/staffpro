@@ -855,4 +855,6 @@ class TestTwelveHourClock(HRMSTestSuite):
 		_force_belize_timezone(bootinfo)
 		self.assertEqual(bootinfo["sysdefaults"]["time_zone"], STAFF_PRO_TIMEZONE)
 		self.assertEqual(bootinfo["time_zone"]["system"], STAFF_PRO_TIMEZONE)
+		self.assertEqual(bootinfo["time_zone"]["user"], STAFF_PRO_TIMEZONE)
+		self.assertEqual(bootinfo["staff_pro_timezone"], STAFF_PRO_TIMEZONE)
 

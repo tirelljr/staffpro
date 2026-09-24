@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, cint, flt, get_datetime, getdate, now_datetime, time_diff_in_hours
+from frappe.utils import add_days, cint, flt, get_datetime, getdate, time_diff_in_hours
 
 from hrms.hr.agent_access import (
 	best_client_ipv4,
@@ -99,6 +99,10 @@ def get_kiosk_context(client_ip: str | None = None) -> dict:
 	company = _default_company()
 	ip = _request_ip(client_ip)
 	status = get_clockin_ip_status(ignore_session_exemption=True, client_ip=client_ip)
+	from hrms.branding import STAFF_PRO_TIMEZONE
+	from hrms.hr.timezone import belize_now
+
+	now = belize_now()
 	return {
 		"ip": ip,
 		"device_id": resolve_workstation_device(client_ip=ip),
@@ -109,6 +113,8 @@ def get_kiosk_context(client_ip: str | None = None) -> dict:
 		),
 		"clockin_restricted": bool(status["restricted"]),
 		"clockin_allowed": bool(status["allowed"]),
+		"timezone": STAFF_PRO_TIMEZONE,
+		"server_now": now.strftime("%Y-%m-%d %H:%M:%S"),
 	}
 
 
@@ -317,10 +323,13 @@ def clock(
 	bound = bind_cubicle_device(employee.name, workstation_id)
 	workstation_id = bound or workstation_id
 
+	from hrms.hr.timezone import belize_now
+
 	doc = frappe.new_doc("Employee Checkin")
 	doc.employee = employee.name
 	doc.employee_name = employee.employee_name
-	doc.time = now_datetime().replace(microsecond=0)
+	doc.flags.staff_pro_live_clock = True
+	doc.time = belize_now()
 	doc.log_type = action
 	doc.device_id = workstation_id or None
 	if latitude not in (None, ""):

@@ -262,6 +262,9 @@ def extend_bootinfo(bootinfo):
 
 	_disable_app_onboarding_bootinfo(bootinfo)
 	_force_twelve_hour_clock(bootinfo)
+	from hrms.hr.timezone import apply_request_timezone
+
+	apply_request_timezone()
 	_force_belize_timezone(bootinfo)
 
 	first_name = ""
@@ -464,8 +467,16 @@ def _force_belize_timezone(bootinfo):
 	time_zone = bootinfo.get("time_zone")
 	if isinstance(time_zone, dict):
 		time_zone["system"] = STAFF_PRO_TIMEZONE
+		time_zone["user"] = STAFF_PRO_TIMEZONE
 	else:
 		bootinfo["time_zone"] = {"system": STAFF_PRO_TIMEZONE, "user": STAFF_PRO_TIMEZONE}
+	user_info = bootinfo.get("user_info")
+	if isinstance(user_info, dict):
+		user_info["time_zone"] = STAFF_PRO_TIMEZONE
+	user = bootinfo.get("user")
+	if isinstance(user, dict) and "time_zone" in user:
+		user["time_zone"] = STAFF_PRO_TIMEZONE
+	bootinfo["staff_pro_timezone"] = STAFF_PRO_TIMEZONE
 
 
 def get_sidebar_label_maps():

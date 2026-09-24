@@ -378,18 +378,26 @@ const showClockAction = computed(() => {
 	return Boolean(kioskContext.data.clockin_allowed)
 })
 
+let clockOffsetMs = 0
+
 watch(
 	() => kioskContext.data,
 	(data) => {
 		if (data && (!data.clockin_restricted || data.clockin_allowed)) {
 			clockinLatchedAllowed.value = true
 		}
+		if (data?.server_now) {
+			const parsed = dayjs(data.server_now)
+			if (parsed.isValid()) {
+				clockOffsetMs = parsed.valueOf() - Date.now()
+			}
+		}
 	},
 	{ immediate: true }
 )
 
 function tickClock() {
-	clockLabel.value = dayjs().format("h:mm:ss A")
+	clockLabel.value = dayjs(Date.now() + clockOffsetMs).format("h:mm:ss A")
 }
 
 function applyRememberedUser() {

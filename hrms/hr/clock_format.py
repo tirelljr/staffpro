@@ -19,7 +19,10 @@ def format_clock(value) -> str:
 
 
 def parse_work_date(value=None):
-	"""Site-local work date. 'today' follows System Settings timezone, not UTC."""
+	"""Belize work date. 'today' follows America/Belize, never UTC or the browser clock."""
+	from hrms.hr.timezone import apply_request_timezone
+
+	apply_request_timezone()
 	text = cstr(value).strip()
 	if not text or text.lower() in {"today", "todays", "now"}:
 		return getdate()

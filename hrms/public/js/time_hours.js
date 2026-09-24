@@ -2,6 +2,43 @@ frappe.provide("hrms.time");
 
 hrms.time.CLOCK_FORMAT = "h:mm A";
 hrms.time.FRAPPE_TIME_FORMAT = "hh:mm A";
+hrms.time.TIMEZONE = "America/Belize";
+
+hrms.time.apply_belize_timezone = function () {
+	const tz = hrms.time.TIMEZONE;
+	if (frappe.sys_defaults) {
+		frappe.sys_defaults.time_zone = tz;
+	}
+	if (frappe.boot) {
+		if (frappe.boot.sysdefaults) {
+			frappe.boot.sysdefaults.time_zone = tz;
+		}
+		frappe.boot.time_zone = frappe.boot.time_zone || {};
+		frappe.boot.time_zone.system = tz;
+		frappe.boot.time_zone.user = tz;
+		frappe.boot.staff_pro_timezone = tz;
+	}
+	if (frappe.boot?.user?.time_zone) {
+		frappe.boot.user.time_zone = tz;
+	}
+	if (typeof moment !== "undefined" && moment.tz) {
+		moment.tz.setDefault(tz);
+	}
+	if (frappe.datetime && typeof moment !== "undefined" && moment.tz) {
+		frappe.datetime.now_datetime = function (as_obj) {
+			const now = moment.tz(tz);
+			return as_obj ? now : now.format(frappe.defaultDatetimeFormat || "YYYY-MM-DD HH:mm:ss");
+		};
+		frappe.datetime.now_date = function (as_obj) {
+			const now = moment.tz(tz);
+			return as_obj ? now : now.format("YYYY-MM-DD");
+		};
+		frappe.datetime.get_today = function () {
+			return moment.tz(tz).format("YYYY-MM-DD");
+		};
+		frappe.datetime.nowdate = frappe.datetime.get_today;
+	}
+};
 
 hrms.time.apply_twelve_hour_clock = function () {
 	const fmt = hrms.time.FRAPPE_TIME_FORMAT;
@@ -17,7 +54,12 @@ hrms.time.apply_twelve_hour_clock = function () {
 		};
 	}
 };
+hrms.time.apply_belize_timezone();
 hrms.time.apply_twelve_hour_clock();
+$(document).on("app_ready", function () {
+	hrms.time.apply_belize_timezone();
+	hrms.time.apply_twelve_hour_clock();
+});
 
 function escape_html(text) {
 	if (text == null) {

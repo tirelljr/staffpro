@@ -122,10 +122,23 @@ function install_bpo_module_editor(frm) {
 	frm._bpo_module_editor = control;
 }
 
+function lock_belize_user_timezone(frm) {
+	if (!frm.fields_dict.time_zone) {
+		return;
+	}
+	frm.set_df_property("time_zone", "read_only", 1);
+	if (frm.doc.time_zone === "America/Belize") {
+		return;
+	}
+	frm.doc.time_zone = "America/Belize";
+	frm.refresh_field("time_zone");
+}
+
 function apply_bpo_user_form(frm) {
 	hide_module_profile(frm);
 	filter_role_checkboxes(frm);
 	install_bpo_module_editor(frm);
+	lock_belize_user_timezone(frm);
 }
 
 function watch_user_pickers(frm) {

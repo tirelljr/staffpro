@@ -67,6 +67,34 @@ class TestStaffProDeskHome(HRMSTestSuite):
 		lock_system_timezone(settings)
 		self.assertEqual(settings.time_zone, STAFF_PRO_TIMEZONE)
 
+	def test_user_timezone_locks_to_belize(self):
+		from datetime import datetime
+
+		from hrms.branding import STAFF_PRO_TIMEZONE
+		from hrms.hr.timezone import belize_now, lock_user_timezone, stamp_live_checkin_time
+
+		if not frappe.get_meta("User").has_field("time_zone"):
+			return
+		user = frappe.new_doc("User")
+		user.time_zone = "Asia/Kolkata"
+		lock_user_timezone(user)
+		self.assertEqual(user.time_zone, STAFF_PRO_TIMEZONE)
+		now = belize_now()
+		self.assertIsNone(now.tzinfo)
+		self.assertEqual(now.microsecond, 0)
+
+		live = frappe._dict(time=None, flags=frappe._dict(staff_pro_live_clock=True), is_new=lambda: True)
+		stamp_live_checkin_time(live)
+		self.assertLess(abs((live.time - belize_now()).total_seconds()), 2)
+
+		historic = frappe._dict(
+			time=datetime(2026, 1, 15, 8, 30, 0),
+			flags=frappe._dict(),
+			is_new=lambda: True,
+		)
+		stamp_live_checkin_time(historic)
+		self.assertEqual(historic.time, datetime(2026, 1, 15, 8, 30, 0))
+
 	def test_missing_hashed_js_bundle_is_copied_from_newest_build(self):
 		with tempfile.TemporaryDirectory() as tmp:
 			app_dist = Path(tmp) / "dist"

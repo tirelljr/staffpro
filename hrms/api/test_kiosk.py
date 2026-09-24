@@ -4,7 +4,7 @@
 from datetime import datetime
 
 import frappe
-from frappe.utils import getdate
+from frappe.utils import get_datetime, getdate
 from frappe.utils.password import update_password
 
 from erpnext.setup.doctype.employee.test_employee import make_employee
@@ -56,6 +56,10 @@ class TestKioskLogin(HRMSTestSuite):
 		self.assertEqual(result["employee"], employee)
 		self.assertEqual(result["next_action"], "OUT")
 		self.assertTrue(frappe.db.exists("Employee Checkin", result["checkin"]))
+		from hrms.hr.timezone import belize_now
+
+		stored = frappe.db.get_value("Employee Checkin", result["checkin"], "time")
+		self.assertLess(abs((get_datetime(stored) - belize_now()).total_seconds()), 5)
 
 	def test_kiosk_clock_out_flips_next_action_to_in(self):
 		employee = make_employee("kiosk.clock.out@example.com", company="_Test Company")
@@ -127,11 +131,15 @@ class TestKioskLogin(HRMSTestSuite):
 		self.assertEqual(get_kiosk_profile("NobodyHere"), {})
 
 	def test_kiosk_context_has_company(self):
+		from hrms.branding import STAFF_PRO_TIMEZONE
+
 		context = get_kiosk_context()
 		self.assertIn("company_name", context)
 		self.assertIn("ip", context)
 		self.assertIn("clockin_restricted", context)
 		self.assertIn("clockin_allowed", context)
+		self.assertEqual(context["timezone"], STAFF_PRO_TIMEZONE)
+		self.assertTrue(context["server_now"])
 
 	def test_kiosk_context_clockin_allowed_when_restriction_off(self):
 		from hrms.hr.test_agent_access import _ensure_fields, _set_ip_restriction

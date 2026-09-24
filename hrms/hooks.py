@@ -159,7 +159,10 @@ after_migrate = [
 	"hrms.hr.force_delete.install_force_delete_patch",
 ]
 
-before_request = ["hrms.hr.force_delete.install_force_delete_patch"]
+before_request = [
+	"hrms.hr.force_delete.install_force_delete_patch",
+	"hrms.hr.timezone.apply_request_timezone",
+]
 
 setup_wizard_requires = "assets/hrms/js/setup_wizard.js"
 setup_wizard_complete = "hrms.hr.staff_pro_sidebars.after_setup_wizard"
@@ -243,6 +246,7 @@ doc_events = {
 			"erpnext.setup.doctype.employee.employee.validate_employee_role",
 			"hrms.overrides.employee_master.update_approver_user_roles",
 			"hrms.hr.bpo_user_permissions.enforce_bpo_block_modules",
+			"hrms.hr.timezone.lock_user_timezone",
 		],
 	},
 	"Module Profile": {

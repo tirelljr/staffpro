@@ -215,7 +215,6 @@ const submitLog = (logType) => {
 		{
 			employee: employee.data.name,
 			log_type: logType,
-			time: checkinTimestamp.value,
 			latitude: latitude.value,
 			longitude: longitude.value,
 		},

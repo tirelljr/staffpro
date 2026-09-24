@@ -150,6 +150,9 @@ def ensure_belize_timezone() -> None:
 	if getattr(frappe.local, "system_settings", None) is not None:
 		frappe.local.system_settings.time_zone = STAFF_PRO_TIMEZONE
 	_sync_site_config_timezone()
+	from hrms.hr.timezone import lock_all_user_timezones
+
+	lock_all_user_timezones()
 	make_property_setter(
 		"System Settings",
 		"time_zone",
