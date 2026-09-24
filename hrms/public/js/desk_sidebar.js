@@ -1477,7 +1477,30 @@ function staff_pro_remember_sidebar(name) {
 	}
 }
 
+function sidebar_can_toggle_width(sidebar) {
+	return Boolean(sidebar?.sidebar_header && typeof sidebar.sidebar_header.toggle_width === "function");
+}
+
+function patch_sidebar_expand_guard() {
+	const Sidebar = frappe.ui && frappe.ui.Sidebar;
+	if (!Sidebar?.prototype || Sidebar.prototype._staff_pro_expand_guard) return;
+
+	const original = Sidebar.prototype.expand_sidebar;
+	if (typeof original !== "function") return;
+	Sidebar.prototype._staff_pro_expand_guard = true;
+
+	Sidebar.prototype.expand_sidebar = function () {
+		if (!sidebar_can_toggle_width(this)) {
+			this.wrapper?.toggleClass("expanded", !!this.sidebar_expanded);
+			$("body").toggleClass("sidebar-collapsed", !this.sidebar_expanded);
+			return;
+		}
+		return original.apply(this, arguments);
+	};
+}
+
 function keep_staff_pro_sidebar_expanded() {
+	patch_sidebar_expand_guard();
 	if (!should_use_staff_pro_desk_home()) return;
 	if (typeof frappe.is_mobile === "function" && frappe.is_mobile()) return;
 	const sidebar = frappe.app?.sidebar;
@@ -1488,7 +1511,12 @@ function keep_staff_pro_sidebar_expanded() {
 		/* ignore */
 	}
 	sidebar.sidebar_expanded = true;
-	sidebar.open();
+	if (!sidebar_can_toggle_width(sidebar)) return;
+	try {
+		sidebar.open();
+	} catch (e) {
+		/* header is created later in refresh_header() */
+	}
 }
 
 function staff_pro_activate_sidebar(name) {
@@ -1796,7 +1824,9 @@ function patch_sidebar_workspace_switch() {
 		}
 
 		this._staff_pro_pinned_sidebar = name;
-		this.open?.();
+		if (sidebar_can_toggle_width(this)) {
+			this.open?.();
+		}
 		if (typeof this.select_module === "function" && staff_pro_sidebar_payload(name)) {
 			this.select_module(name);
 		} else if (staff_pro_sidebar_payload(name) && typeof this.select_sidebar === "function") {
@@ -2022,6 +2052,7 @@ function patch_workspace_dock() {
 	patch_workspace_dock_logo();
 	patch_sidebar_header_branding();
 	patch_sidebar_workspace_switch();
+	patch_sidebar_expand_guard();
 
 	const Dock = staff_pro_dock_class();
 	if (!Dock || Dock.prototype._staff_pro_labeled) return;

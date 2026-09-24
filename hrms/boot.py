@@ -241,6 +241,9 @@ _patch_get_home_page()
 
 def extend_bootinfo(bootinfo):
 	"""Keep Staff Pro BPO as the only app on the desk apps screen."""
+	from hrms.hr.force_delete import install_force_delete_patch
+
+	install_force_delete_patch()
 	apps = bootinfo.get("apps") or []
 	filtered = [app for app in apps if app.get("name") == "hrms"]
 	if filtered:

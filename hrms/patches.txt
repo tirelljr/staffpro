@@ -156,3 +156,6 @@ hrms.patches.v16_0.scope_ask_ai_history_to_user #2026-09-20-ask-ai-user-history
 hrms.patches.v16_0.seed_overtime_and_holiday_demo #2026-09-20-ot-holiday-demo
 hrms.patches.v16_0.reseed_overtime_payroll #2026-09-21-reseed-80h-ot-payroll-b
 hrms.patches.v16_0.sanitize_employee_list_fields #2026-09-20-employee-list-fields
+hrms.patches.v16_0.remove_demo_employees #2026-09-23-remove-demo-agents
+hrms.patches.v16_0.remove_unused_sidebar_items #2026-09-23-trim-unused-sidebar
+hrms.patches.v16_0.remove_unused_erpnext_roles #2026-09-23-delete-unused-roles

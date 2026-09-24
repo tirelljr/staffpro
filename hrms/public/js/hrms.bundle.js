@@ -14,5 +14,7 @@ import "./agent_import.js";
 import "./desk_dashboard.js";
 import "./time_hours.js";
 import "./invoice_export.js";
+import "./list_actions.js";
+import "./attached_images.js";
 import "./attendance_calendar_ui.js";
 import "./client_ip.js";

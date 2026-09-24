@@ -4,6 +4,7 @@ from pathlib import Path
 import frappe
 
 from hrms.hr.bpo_sidebar_labels import apply_bpo_labels
+from hrms.hr.staff_pro_sidebars import filter_removed_sidebar_items
 
 WORKSPACE_FIXTURES = [
 	("Workforce", "hr/workspace/workforce/workforce.json"),
@@ -83,7 +84,7 @@ def _load_fixture(relative_path: str) -> dict:
 
 
 def _rows_from_fixture(data: dict, fieldname: str) -> list[dict]:
-	return apply_bpo_labels([dict(row) for row in (data.get(fieldname) or [])])
+	return filter_removed_sidebar_items(apply_bpo_labels([dict(row) for row in (data.get(fieldname) or [])]))
 
 
 def _import_fixture_doc(doctype: str, fixture_path: str, rows_field: str):
@@ -98,7 +99,9 @@ def _import_fixture_doc(doctype: str, fixture_path: str, rows_field: str):
 		data["type"] = "Workspace"
 		data["is_hidden"] = 0
 		data["public"] = 1
-	data[rows_field] = apply_bpo_labels([dict(row) for row in (data.get(rows_field) or [])])
+	data[rows_field] = filter_removed_sidebar_items(
+		apply_bpo_labels([dict(row) for row in (data.get(rows_field) or [])])
+	)
 	if frappe.db.exists(doctype, data["name"]):
 		doc = frappe.get_doc(doctype, data["name"])
 		doc.update(data)

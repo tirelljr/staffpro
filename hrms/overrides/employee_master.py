@@ -27,6 +27,33 @@ class EmployeeMaster(Employee):
 
 		self.employee = self.name
 
+	def before_delete(self):
+		self._unlink_blocking_records()
+		self.flags.ignore_links = True
+
+	def on_trash(self):
+		self._unlink_blocking_records()
+		parent_on_trash = getattr(super(), "on_trash", None)
+		if parent_on_trash:
+			parent_on_trash()
+
+	def delete(self, ignore_permissions=False, force=False, *, delete_permanently=False):
+		self._unlink_blocking_records()
+		self.flags.ignore_links = True
+		return super().delete(
+			ignore_permissions=ignore_permissions,
+			force=True,
+			delete_permanently=delete_permanently,
+		)
+
+	def _unlink_blocking_records(self):
+		if self.flags.get("employee_unlinked") or not self.name:
+			return
+		self.flags.employee_unlinked = True
+		from hrms.hr.employee_cleanup import unlink_employee_records
+
+		unlink_employee_records(self.name, skip_permission=True)
+
 
 def validate_onboarding_process(doc, method=None):
 	"""Validates Employee Creation for linked Employee Onboarding"""

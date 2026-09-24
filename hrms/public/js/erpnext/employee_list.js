@@ -9,6 +9,7 @@ frappe.listview_settings["Employee"] = Object.assign({}, existing_employee_listv
 		existing_onload?.(listview);
 		hide_employee_list_menu(listview);
 		ensure_employee_image_fields(listview);
+		setup_employee_bulk_delete(listview);
 	},
 	refresh(listview) {
 		existing_refresh?.(listview);
@@ -47,6 +48,54 @@ function is_garbage_field(field) {
 	const parts = text.split(".");
 	const parent = (parts[0] || "").replace(/^tab/i, "");
 	return parts.length === 2 && parent.length <= 1;
+}
+
+function delete_employees_with_unlink(listview, names) {
+	if (!names.length) {
+		frappe.msgprint(__("Select one or more agents first."));
+		return;
+	}
+	frappe.confirm(
+		__(
+			"Delete {0} agent(s) and remove all linked attendance, payroll, leave, and related records? This cannot be undone.",
+			[names.length],
+		),
+		() => {
+			frappe.call({
+				method: "hrms.hr.employee_cleanup.delete_employees_with_unlink",
+				args: { employees: names },
+				freeze: true,
+				freeze_message: __("Removing linked records..."),
+				callback(r) {
+					if (r.exc) return;
+					const count = r.message?.count || 0;
+					const failed = r.message?.errors?.length || 0;
+					frappe.show_alert({
+						message: failed
+							? __("Deleted {0} agent(s). {1} failed.", [count, failed])
+							: __("Deleted {0} agent(s)", [count]),
+						indicator: failed ? "orange" : "green",
+					});
+					listview.refresh();
+				},
+			});
+		},
+	);
+}
+
+function setup_employee_bulk_delete(listview) {
+	if (!listview?.page || listview._sp_delete_hooked) return;
+	listview._sp_delete_hooked = true;
+
+	if (typeof listview.delete_items === "function") {
+		listview.delete_items = function () {
+			delete_employees_with_unlink(listview, listview.get_checked_items(true));
+		};
+	}
+
+	listview.page.add_action_item(__("Delete selected (unlink all)"), () => {
+		delete_employees_with_unlink(listview, listview.get_checked_items(true));
+	});
 }
 
 function hide_employee_list_menu(listview) {
@@ -135,6 +184,24 @@ function patch_employee_image_view() {
 			return original_details.call(this, item);
 		}
 		return employee_image_details_html(item);
+	};
+
+	ImageView.prototype.get_attached_images = function () {
+		const names = (this.items || [])
+			.map((item) => item && item.name)
+			.filter((name) => typeof name === "string" && name);
+		if (!names.length) {
+			this.images_map = this.images_map || {};
+			return Promise.resolve();
+		}
+		return frappe
+			.call({
+				method: "hrms.overrides.attached_images.get_attached_images",
+				args: { doctype: this.doctype, names },
+			})
+			.then((r) => {
+				this.images_map = Object.assign(this.images_map || {}, r.message);
+			});
 	};
 }
 

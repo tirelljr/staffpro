@@ -173,9 +173,9 @@ def enforce_bpo_block_modules(doc, method=None):
 
 
 def apply_bpo_user_permissions():
-	"""Disable leftover ERPNext roles and hide Module Profile on User."""
+	"""Remove leftover ERPNext roles and hide Module Profile on User."""
 	ensure_user_fields()
-	disable_unused_erpnext_roles()
+	remove_unused_erpnext_roles()
 	hide_user_module_profile_field()
 	block_unused_modules_for_all_users()
 
@@ -201,19 +201,30 @@ def ensure_user_fields():
 
 
 def disable_unused_erpnext_roles():
+	remove_unused_erpnext_roles()
+
+
+def remove_unused_erpnext_roles():
 	if not frappe.db.exists("DocType", "Role"):
 		return
-	if not frappe.get_meta("Role").has_field("disabled"):
-		return
 
-	for role in frappe.get_all("Role", fields=["name", "disabled"]):
-		name = role.name
-		if name in NEVER_DISABLE_ROLES:
+	from hrms.hr.force_delete import install_force_delete_patch, unlink_role
+
+	install_force_delete_patch()
+	keep = NEVER_DISABLE_ROLES | BPO_ROLES
+	for name in frappe.get_all("Role", pluck="name"):
+		if name in keep:
+			if frappe.get_meta("Role").has_field("disabled"):
+				if cint(frappe.db.get_value("Role", name, "disabled")):
+					frappe.db.set_value("Role", name, "disabled", 0, update_modified=False)
 			continue
-		should_disable = 0 if name in BPO_ROLES else 1
-		if cint(role.disabled) == should_disable:
-			continue
-		frappe.db.set_value("Role", name, "disabled", should_disable, update_modified=False)
+		try:
+			unlink_role(name)
+			frappe.delete_doc("Role", name, force=True, ignore_permissions=True)
+		except Exception:
+			if frappe.db.exists("Role", name):
+				unlink_role(name)
+				frappe.db.delete("Role", {"name": name})
 
 
 def hide_user_module_profile_field():

@@ -216,34 +216,20 @@ def run(company=None):
 
 
 def clear(company=None):
+	from hrms.hr.employee_cleanup import delete_demo_employees
+
 	company = company or _get_company()
-	frappe.only_for("System Manager")
+	result = delete_demo_employees(company)
 
-	for doctype in (
-		"Employee Checkin",
-		"Attendance",
-		"Leave Application",
-		"Leave Allocation",
-		"Job Applicant",
-		"Job Opening",
-		"Employee",
-	):
-		names = frappe.get_all(doctype, pluck="name")
-		if frappe.get_meta(doctype).has_field("company"):
-			names = frappe.get_all(doctype, filters={"company": company}, pluck="name")
-		for name in names:
-			if doctype == "Employee" and frappe.db.get_value("Employee", name, "company_email") not in {
-				e["email"] for e in EMPLOYEES
-			}:
-				continue
-			frappe.delete_doc(doctype, name, force=True, ignore_permissions=True)
-
-	for email in [e["email"] for e in EMPLOYEES]:
-		if frappe.db.exists("User", email):
-			frappe.delete_doc("User", email, force=True, ignore_permissions=True)
+	for doctype in ("Job Applicant", "Job Opening"):
+		if not frappe.db.exists("DocType", doctype):
+			continue
+		filters = {"company": company} if frappe.get_meta(doctype).has_field("company") else {}
+		for name in frappe.get_all(doctype, filters=filters, pluck="name"):
+			_force_delete_doc(doctype, name)
 
 	frappe.db.commit()
-	print(f"Cleared HR demo data for {company}.")
+	print(f"Cleared HR demo data for {company}: removed {result.get('count', 0)} agents.")
 
 
 PAYROLL_RUN_DOCTYPES = (

@@ -13,6 +13,30 @@ import frappe
 
 from hrms.hr.bpo_sidebar_labels import apply_bpo_labels
 
+# Company/Branch live on Work Site. Expense claims are not part of this app.
+REMOVED_SIDEBAR_LABELS = frozenset(
+	{
+		"Company",
+		"Branch",
+		"Reimbursements",
+		"Cash Advances",
+		"Pay Register",
+		"Salary Register",
+		"Unpaid Reimbursements",
+		"Unpaid Expense Claim",
+	}
+)
+REMOVED_SIDEBAR_LINKS = frozenset(
+	{
+		"Company",
+		"Branch",
+		"Expense Claim",
+		"Employee Advance",
+		"Salary Register",
+		"Unpaid Expense Claim",
+	}
+)
+
 SIDEBAR_ITEM_FIELDS = (
 	"type",
 	"label",
@@ -125,9 +149,41 @@ def _clean_item(row: dict) -> dict:
 	return item
 
 
+def _is_removed_sidebar_item(row: dict) -> bool:
+	label = (row.get("label") or "").strip()
+	link_to = (row.get("link_to") or "").strip()
+	return label in REMOVED_SIDEBAR_LABELS or link_to in REMOVED_SIDEBAR_LINKS
+
+
+def _drop_empty_sections(items: list[dict]) -> list[dict]:
+	kept: list[dict] = []
+	index = 0
+	while index < len(items):
+		row = items[index]
+		if row.get("type") == "Section Break" and (row.get("label") or "").strip() == "Reports":
+			index += 1
+			children = []
+			while index < len(items) and items[index].get("child"):
+				children.append(items[index])
+				index += 1
+			if children:
+				kept.append(row)
+				kept.extend(children)
+			continue
+		kept.append(row)
+		index += 1
+	return kept
+
+
+def filter_removed_sidebar_items(items: list[dict]) -> list[dict]:
+	return _drop_empty_sections([row for row in items if not _is_removed_sidebar_item(row)])
+
+
 def sidebar_doc_from_source(spec: dict) -> dict:
 	data = _load_json(spec["source"])
-	items = apply_bpo_labels([_clean_item(dict(row)) for row in (data.get("items") or [])])
+	items = apply_bpo_labels(
+		filter_removed_sidebar_items([_clean_item(dict(row)) for row in (data.get("items") or [])])
+	)
 	return {
 		"doctype": "Sidebar",
 		"name": spec["title"],

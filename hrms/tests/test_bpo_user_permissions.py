@@ -27,13 +27,13 @@ class TestBpoUserPermissions(HRMSTestSuite):
 		if frappe.db.exists("Role", "HR Manager"):
 			self.assertIn("HR Manager", roles)
 
-	def test_disable_unused_erpnext_roles(self):
+	def test_unused_erpnext_roles_are_removed(self):
+		if not frappe.db.exists("Role", "Academics User"):
+			frappe.get_doc({"doctype": "Role", "role_name": "Academics User"}).insert(ignore_permissions=True)
 		apply_bpo_user_permissions()
-		if frappe.get_meta("Role").has_field("disabled"):
-			if frappe.db.exists("Role", "Academics User"):
-				self.assertEqual(frappe.db.get_value("Role", "Academics User", "disabled"), 1)
-			if frappe.db.exists("Role", "HR Manager"):
-				self.assertEqual(frappe.db.get_value("Role", "HR Manager", "disabled"), 0)
+		self.assertFalse(frappe.db.exists("Role", "Academics User"))
+		if frappe.db.exists("Role", "HR Manager"):
+			self.assertTrue(frappe.db.exists("Role", "HR Manager"))
 
 	def test_user_onload_hides_frappe_module_defs(self):
 		user = frappe.get_doc("User", "Administrator")

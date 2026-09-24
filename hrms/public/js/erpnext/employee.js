@@ -212,6 +212,7 @@ frappe.ui.form.on("Employee", {
 		setup_employee_form_chrome(frm);
 		setup_employee_password_panel(frm);
 		setup_employee_profile_stats(frm);
+		setup_employee_delete_action(frm);
 		set_employee_salary_defaults(frm);
 		refresh_user_bonus_status(frm);
 	},
@@ -663,6 +664,40 @@ function open_apply_hourly_rate_dialog(frm) {
 			},
 		});
 	}
+}
+
+function setup_employee_delete_action(frm) {
+	if (frm.is_new() || !frappe.model.can_delete("Employee")) return;
+
+	frm.page.add_inner_button(
+		__("Delete Agent"),
+		() => {
+			const label = frm.doc.employee_name || frm.doc.name;
+			frappe.confirm(
+				__(
+					"Delete {0} and remove all linked attendance, payroll, leave, and related records? This cannot be undone.",
+					[label],
+				),
+				() => {
+					frappe.call({
+						method: "hrms.hr.employee_cleanup.delete_employee_with_unlink",
+						args: { employee: frm.doc.name },
+						freeze: true,
+						freeze_message: __("Removing linked records..."),
+						callback(r) {
+							if (r.exc) return;
+							frappe.show_alert({
+								message: __("Agent deleted"),
+								indicator: "green",
+							});
+							frappe.set_route("List", "Employee");
+						},
+					});
+				},
+			);
+		},
+		__("Actions"),
+	);
 }
 
 function setup_employee_form_chrome(frm) {

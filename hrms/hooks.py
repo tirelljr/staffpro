@@ -311,7 +311,11 @@ doc_events = {
 			"hrms.payroll.doctype.salary_structure_assignment.salary_structure_assignment.assign_structure_from_agent_hourly",
 		],
 		"after_insert": "hrms.overrides.employee_master.update_job_applicant_and_offer",
-		"on_trash": "hrms.overrides.employee_master.update_employee_transfer",
+		"before_delete": "hrms.hr.employee_cleanup.on_employee_delete",
+		"on_trash": [
+			"hrms.hr.employee_cleanup.on_employee_delete",
+			"hrms.overrides.employee_master.update_employee_transfer",
+		],
 		"after_delete": "hrms.overrides.employee_master.publish_update",
 	},
 	"Project": {"validate": "hrms.controllers.employee_boarding_controller.update_employee_boarding_status"},
@@ -413,6 +417,8 @@ override_whitelisted_methods = {
 	"frappe.desk.doctype.dashboard.dashboard.get_permitted_cards": "hrms.boot.get_permitted_cards",
 	"frappe.desk.doctype.dashboard.dashboard.get_permitted_charts": "hrms.boot.get_permitted_charts",
 	"frappe.core.doctype.user.user.get_all_roles": "hrms.hr.bpo_user_permissions.get_all_roles",
+	"frappe.core.api.file.get_attached_images": "hrms.overrides.attached_images.get_attached_images",
+	"frappe.desk.reportview.delete_items": "hrms.hr.force_delete.delete_items",
 }
 #
 # each overriding function accepts a `data` argument;

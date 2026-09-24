@@ -55,9 +55,14 @@ class LeaveLedgerEntry(Document):
 	def on_cancel(self):
 		# allow cancellation of expiry leaves
 		if self.is_expired:
-			frappe.db.set_value("Leave Allocation", self.transaction_name, "expired", 0)
-		elif self.transaction_type != "Leave Adjustment":
-			frappe.throw(_("Only expired allocation can be cancelled"))
+			if self.transaction_name:
+				frappe.db.set_value("Leave Allocation", self.transaction_name, "expired", 0)
+			return
+		if self.transaction_type == "Leave Adjustment":
+			return
+		if frappe.flags.get("in_employee_cleanup") or frappe.flags.get("force_delete_depth"):
+			return
+		frappe.throw(_("Only expired allocation can be cancelled"))
 
 
 def validate_leave_allocation_against_leave_application(ledger):
