@@ -6,8 +6,7 @@ import { userResource } from "./user"
 import { employeeResource } from "./employee"
 import router from "@/router"
 
-const PORTAL_HOME = { name: "AttendanceDashboard" }
-const PORTAL_HOME_URL = "/agents/dashboard/attendance"
+export const PORTAL_HOME_URL = "/agents/dashboard/attendance"
 
 export function sessionUser() {
 	let cookies = new URLSearchParams(document.cookie.split("; ").join("&"))
@@ -18,19 +17,18 @@ export function sessionUser() {
 	return _sessionUser
 }
 
-async function handleLogin(response, usr) {
-	if (response?.message !== "Logged In") return
+function shouldEnterPortal(response) {
+	if (!response || response.verification) return false
+	if (response.message === "Password Reset") return false
+	if (response.message === "Logged In") return true
+	// Some Frappe builds only return home_page on success.
+	return Boolean(response.home_page)
+}
 
+function enterPortalAfterLogin(usr) {
 	session.user = sessionUser() || usr
-	await Promise.all([userResource.reload(), employeeResource.reload()])
-	if (userResource.data?.name) {
-		session.user = userResource.data.name
-	}
-
-	await router.replace(PORTAL_HOME)
-	if (router.currentRoute.value.name === "Login") {
-		window.location.assign(PORTAL_HOME_URL)
-	}
+	// Full navigation so session cookies and router guards load cleanly (Ionic + Frappe).
+	window.location.assign(PORTAL_HOME_URL)
 }
 
 async function resolveKioskLoginUsername(username) {
@@ -58,7 +56,9 @@ export const session = reactive({
 			pwd: password,
 			device_id: deviceId || getDeviceId(),
 		})
-		await handleLogin(response, usr)
+		if (shouldEnterPortal(response)) {
+			enterPortalAfterLogin(usr)
+		}
 		return response
 	},
 	otp: async (tmp_id, otp, deviceId) => {
@@ -67,7 +67,9 @@ export const session = reactive({
 			otp,
 			device_id: deviceId || getDeviceId(),
 		})
-		await handleLogin(response, session.user)
+		if (shouldEnterPortal(response)) {
+			enterPortalAfterLogin(session.user)
+		}
 		return response
 	},
 	logout: createResource({

@@ -16,7 +16,7 @@ import EmptyState from "@/components/EmptyState.vue"
 
 import { IonicVue } from "@ionic/vue"
 
-import { session } from "@/data/session"
+import { session, sessionUser } from "@/data/session"
 import { userResource } from "@/data/user"
 import { employeeResource } from "@/data/employee"
 import { syncNotificationResources } from "@/data/notifications"
@@ -129,7 +129,8 @@ router.beforeEach(async (to, _, next) => {
 			syncNotificationResources()
 		}
 	} catch (error) {
-		isLoggedIn = false
+		// Keep kiosk portal entry working when reload races the new session cookie.
+		isLoggedIn = Boolean(session.user || sessionUser())
 	}
 
 	if (!isLoggedIn) {

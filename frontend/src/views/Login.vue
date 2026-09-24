@@ -87,10 +87,8 @@
 							@keydown.enter.prevent
 						/>
 
-						<ErrorMessage :message="clockErrorMessage || errorMessage" />
-						<div v-if="clockSuccessMessage || successMessage" class="text-sm text-green-700 text-center">
-							{{ clockSuccessMessage || successMessage }}
-						</div>
+						<ErrorMessage :message="clockErrorMessage" />
+						<div v-if="clockSuccessMessage" class="text-sm text-green-700 text-center">{{ clockSuccessMessage }}</div>
 
 						<div class="flex flex-col sm:flex-row sm:items-center gap-3 my-2">
 							<div class="text-4xl sm:text-5xl font-semibold text-gray-400 tracking-wide text-center sm:text-left tabular-nums shrink-0">
@@ -101,7 +99,7 @@
 									v-if="showClockAction"
 									type="button"
 									class="w-full py-3 text-white text-lg font-semibold disabled:opacity-60"
-									:class="clockAction === 'OUT' ? 'kiosk-clock-out' : 'kiosk-clock-in'"
+									:class="clockAction === 'OUT' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'"
 									:disabled="clocking || signingIn"
 									@click="submitClock"
 								>
@@ -116,60 +114,6 @@
 								<div v-if="activityLabels.length" class="mt-2 text-sm text-[#11a5dd] text-center sm:text-left">
 									<div v-for="(label, idx) in activityLabels" :key="idx">{{ label }}</div>
 								</div>
-							</div>
-						</div>
-
-						<div
-							v-if="holidayElections.length"
-							class="w-full mt-4 flex flex-col gap-3"
-						>
-							<div
-								v-for="holiday in holidayElections"
-								:key="holiday.holiday_date"
-								class="w-full border border-gray-300 rounded-md p-3 text-left"
-							>
-								<div class="flex items-start justify-between gap-3">
-									<div class="min-w-0">
-										<div class="text-sm font-semibold text-gray-900">
-											{{ holiday.description }}
-										</div>
-										<div class="text-xs text-gray-500">
-											{{ formatHolidayDate(holiday.holiday_date) }}
-										</div>
-									</div>
-									<div
-										v-if="holiday.response_deadline"
-										class="text-xs text-gray-500 text-right shrink-0"
-									>
-										{{ holiday.deadline_passed ? __("Deadline passed") : __("Reply by") }}
-										<div class="font-medium text-gray-700">
-											{{ formatHolidayDeadline(holiday.response_deadline) }}
-										</div>
-									</div>
-								</div>
-								<div class="mt-2 inline-flex w-full overflow-hidden rounded-full border border-gray-300">
-									<button
-										type="button"
-										class="flex-1 py-2 text-sm font-semibold disabled:opacity-60"
-										:class="holiday.will_work ? 'bg-green-600 text-white' : 'bg-white text-gray-700'"
-										:disabled="!holiday.can_toggle || holidaySaving === holiday.holiday_date"
-										@click="setHolidayWorking(holiday, true)"
-									>
-										{{ __("Working") }}
-									</button>
-									<button
-										type="button"
-										class="flex-1 py-2 text-sm font-semibold disabled:opacity-60"
-										:class="!holiday.will_work ? 'bg-red-600 text-white' : 'bg-white text-gray-700'"
-										:disabled="!holiday.can_toggle || holidaySaving === holiday.holiday_date"
-										@click="setHolidayWorking(holiday, false)"
-									>
-										{{ __("Not Working") }}
-									</button>
-								</div>
-								<p class="mt-2 text-xs text-gray-500">
-									{{ holidayHint(holiday) }}
-								</p>
 							</div>
 						</div>
 
@@ -246,7 +190,7 @@
 							v-model="otp.code"
 							autocomplete="one-time-code"
 						/>
-						<ErrorMessage :message="errorMessage" />
+						<ErrorMessage :message="portalErrorMessage" />
 						<Button
 							:loading="session.otp.loading"
 							variant="solid"
@@ -263,7 +207,7 @@
 
 <script setup>
 import { IonPage, IonContent } from "@ionic/vue"
-import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
+import { computed, inject, onBeforeUnmount, onMounted, reactive, ref } from "vue"
 import { Input, Button, ErrorMessage, Dialog, createResource, call, debounce } from "frappe-ui"
 import { STAFF_PRO_LOGO_URL } from "@/utils/branding"
 import { canOpenDesk } from "@/utils/deskAccess"
@@ -283,8 +227,6 @@ const logoUrl = STAFF_PRO_LOGO_URL
 const username = ref(getLastUsername())
 const password = ref("")
 const rememberPassword = ref(false)
-const errorMessage = ref("")
-const successMessage = ref("")
 const clockErrorMessage = ref("")
 const clockSuccessMessage = ref("")
 const portalErrorMessage = ref("")
@@ -315,8 +257,9 @@ const otp = reactive({
 const session = inject("$session")
 const userResource = inject("$user")
 const __ = inject("$translate")
-const portalBlocked = computed(() => canOpenDesk(userResource?.data))
 const dayjs = inject("$dayjs")
+const portalBlocked = computed(() => canOpenDesk(userResource?.data))
+
 const liveProfile = ref(null)
 const selectedRemembered = computed(() => getRememberedUser(username.value))
 const activeProfile = computed(() => liveProfile.value || selectedRemembered.value)
@@ -334,12 +277,6 @@ const activityLabels = computed(() => {
 	}
 	return [user.last_in_label, user.last_pair_label].filter(Boolean)
 })
-const holidayElections = computed(() =>
-	(activeProfile.value?.holidays || []).filter(
-		(holiday) => holiday.response_deadline && !holiday.deadline_passed,
-	),
-)
-const holidaySaving = ref("")
 const wifiLabel = computed(() => navigator.onLine ? "online" : "na")
 const gpsLabel = computed(() => {
 	if (latitude.value == null || longitude.value == null) return "na"
@@ -389,23 +326,8 @@ const showClockAction = computed(() => {
 	return clockAction.value === "OUT"
 })
 
-let clockOffsetMs = 0
-
-watch(
-	() => kioskContext.data,
-	(data) => {
-		if (data?.server_now) {
-			const parsed = dayjs(data.server_now)
-			if (parsed.isValid()) {
-				clockOffsetMs = parsed.valueOf() - Date.now()
-			}
-		}
-	},
-	{ immediate: true }
-)
-
 function tickClock() {
-	clockLabel.value = dayjs(Date.now() + clockOffsetMs).format("h:mm:ss A")
+	clockLabel.value = dayjs().format("hh:mm:ss A")
 }
 
 function applyRememberedUser() {
@@ -494,59 +416,6 @@ function persistCurrentCredentials() {
 	})
 }
 
-function formatHolidayDate(value) {
-	return value ? dayjs(value).format("ddd, D MMM YYYY") : ""
-}
-
-function formatHolidayDeadline(value) {
-	return value ? dayjs(value).format("ddd, D MMM h:mm A") : ""
-}
-
-function holidayHint(holiday) {
-	if (holiday.deadline_passed) {
-		return holiday.will_work
-			? __("You are counted as working because the deadline has passed.")
-			: __("You chose not to work on this holiday.")
-	}
-	if (holiday.response_deadline) {
-		return __("Choose Not Working before the deadline if you will not work.")
-	}
-	return __("Choose whether you will work on this holiday.")
-}
-
-async function setHolidayWorking(holiday, willWork) {
-	if (!holiday?.can_toggle || holidaySaving.value === holiday.holiday_date) {
-		return
-	}
-	if (Boolean(holiday.will_work) === Boolean(willWork)) {
-		return
-	}
-	const login = requireCredentials()
-	if (!login) return
-
-	errorMessage.value = ""
-	successMessage.value = ""
-	holidaySaving.value = holiday.holiday_date
-	try {
-		const profile = await call("hrms.api.kiosk.set_holiday_work_election", {
-			username: login,
-			password: password.value,
-			holiday_date: holiday.holiday_date,
-			will_work: willWork ? 1 : 0,
-		})
-		applyLiveProfile(profile)
-		persistProfile(profile)
-		successMessage.value = willWork
-			? __("Saved: working on {0}", [holiday.description])
-			: __("Saved: not working on {0}", [holiday.description])
-	} catch (error) {
-		errorMessage.value =
-			error.messages?.join("\n") || error.message || __("Could not save holiday choice")
-	} finally {
-		holidaySaving.value = ""
-	}
-}
-
 function onRememberPasswordChange() {
 	persistCurrentCredentials()
 }
@@ -556,29 +425,21 @@ function readFieldValue(selector) {
 	return (el?.value || "").trim()
 }
 
-function requireCredentials() {
+function requireCredentials(messageRef = portalErrorMessage) {
 	const login = (username.value || "").trim() || readFieldValue('input[autocomplete="username"]')
 	const pass = password.value || readFieldValue('input[autocomplete="current-password"]')
 	if (login && login !== username.value) username.value = login
 	if (pass && pass !== password.value) password.value = pass
 	if (!login || !pass) {
-		errorMessage.value = __("Enter your username and password")
+		messageRef.value = __("Enter your username and password")
 		return null
 	}
 	return login
 }
 
-function kioskLoginDeviceId() {
-	return getKioskLoginDeviceId({
-		profileDeviceId: activeProfile.value?.device_id,
-		contextDeviceId: kioskContext.data?.device_id,
-		fallbackDeviceId: localDeviceId,
-	})
-}
-
 async function submitClock() {
 	if (!showClockAction.value) return
-	const login = requireCredentials()
+	const login = requireCredentials(clockErrorMessage)
 	if (!login) return
 
 	clockErrorMessage.value = ""
@@ -605,6 +466,14 @@ async function submitClock() {
 	} finally {
 		clocking.value = false
 	}
+}
+
+function kioskLoginDeviceId() {
+	return getKioskLoginDeviceId({
+		profileDeviceId: activeProfile.value?.device_id,
+		contextDeviceId: kioskContext.data?.device_id,
+		fallbackDeviceId: localDeviceId,
+	})
 }
 
 async function submitLogin() {
@@ -635,6 +504,10 @@ async function submitLogin() {
 				today_labels: activeProfile.value?.today_labels || [],
 				next_action: activeProfile.value?.next_action || "IN",
 			})
+		}
+
+		if (response.message === "Logged In" || (response.home_page && !response.verification)) {
+			return
 		}
 
 		if (response.message === "Password Reset") {
@@ -712,18 +585,3 @@ onBeforeUnmount(() => {
 	clearTimeout(rememberedTimer)
 })
 </script>
-
-<style scoped>
-.kiosk-clock-in {
-	background-color: #16a34a;
-}
-.kiosk-clock-in:hover:not(:disabled) {
-	background-color: #15803d;
-}
-.kiosk-clock-out {
-	background-color: #dc2626;
-}
-.kiosk-clock-out:hover:not(:disabled) {
-	background-color: #b91c1c;
-}
-</style>
