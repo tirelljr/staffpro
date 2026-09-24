@@ -382,10 +382,11 @@ def set_holiday_work_election(
 	return _profile(employee, frappe.db.get_value("User", user, "username") or username, _request_ip())
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
 def resolve_login(username: str | None = None) -> str:
 	"""Map a typed username or email to the User name Frappe login expects."""
-	return resolve_user_from_login(username) or (username or "").strip()
+	login = (username or frappe.form_dict.get("username") or "").strip()
+	return resolve_user_from_login(login) or login
 
 
 @frappe.whitelist(allow_guest=True)

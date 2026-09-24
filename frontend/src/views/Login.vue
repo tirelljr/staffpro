@@ -623,8 +623,10 @@ async function submitLogin() {
 		} else {
 			const login = requireCredentials()
 			if (!login) return
+			const portalLogin =
+				(activeProfile.value?.username || "").trim() || login
 			markKioskPortalLoginIntent()
-			response = await session.login(login, password.value, deviceId)
+			response = await session.login(portalLogin, password.value, deviceId)
 			persistProfile({
 				username: login,
 				employee_name: activeProfile.value?.employee_name || "",

@@ -1,5 +1,5 @@
 import { computed, reactive } from "vue"
-import { createResource, call } from "frappe-ui"
+import { createResource, call, frappeRequest } from "frappe-ui"
 import { getDeviceId } from "@/utils/rememberedUsers"
 import { userResource } from "./user"
 import { employeeResource } from "./employee"
@@ -14,34 +14,49 @@ export function sessionUser() {
 	return _sessionUser
 }
 
-function isLoggedInResponse(response) {
-	if (response === "Logged In") return true
-	return response?.message === "Logged In"
+async function handleLogin(response) {
+	if (response.message === "Logged In") {
+		session.user = sessionUser()
+		await Promise.all([userResource.reload(), employeeResource.reload()])
+		await router.replace({ path: "/" })
+	}
 }
 
-function handleLogin(response) {
-	if (!isLoggedInResponse(response)) return
-	// Full navigation so the new session boots the agent portal, even if an
-	// admin cookie was active on this computer.
-	window.location.assign("/agents/")
+async function resolveKioskLoginUsername(username) {
+	const value = (username || "").trim()
+	if (!value) return value
+	try {
+		const response = await frappeRequest({
+			url: "/api/method/hrms.api.kiosk.resolve_login",
+			method: "GET",
+			params: { username: value },
+		})
+		if (typeof response === "string" && response) return response
+		if (response?.message) return response.message
+		return value
+	} catch {
+		return value
+	}
 }
 
 export const session = reactive({
-	login: async (username, password) => {
-		let usr = username
-		try {
-			const resolved = await call("hrms.api.kiosk.resolve_login", { username })
-			if (resolved) usr = resolved
-		} catch {
-			// Fall back to the typed value; Frappe login still accepts email.
-		}
-		const response = await call("login", { usr, pwd: password, device_id: getDeviceId() })
-		handleLogin(response)
+	login: async (username, password, deviceId) => {
+		const usr = await resolveKioskLoginUsername(username)
+		const response = await call("login", {
+			usr,
+			pwd: password,
+			device_id: deviceId || getDeviceId(),
+		})
+		await handleLogin(response)
 		return response
 	},
-	otp: async (tmp_id, otp) => {
-		const response = await call("login", { tmp_id, otp, device_id: getDeviceId() })
-		handleLogin(response)
+	otp: async (tmp_id, otp, deviceId) => {
+		const response = await call("login", {
+			tmp_id,
+			otp,
+			device_id: deviceId || getDeviceId(),
+		})
+		await handleLogin(response)
 		return response
 	},
 	logout: createResource({
