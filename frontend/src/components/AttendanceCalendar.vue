@@ -104,7 +104,6 @@ import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { createResource } from "frappe-ui"
 
 import AttendanceHoursView from "@/components/AttendanceHoursView.vue"
-import { employeeUpcomingPay } from "@/data/hours"
 
 const dayjs = inject("$dayjs")
 const __ = inject("$translate")
@@ -243,7 +242,6 @@ watch(
 function onHoursListUpdate(data) {
 	if (data.doctype === "Attendance" || data.doctype === "Employee Checkin") {
 		if (activeView.value !== "calendar") fetchHours()
-		employeeUpcomingPay.reload()
 	}
 }
 
