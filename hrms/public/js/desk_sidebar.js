@@ -20,6 +20,8 @@ html, body {
 	position: sticky !important;
 	top: 0 !important;
 	bottom: 0 !important;
+	left: auto !important;
+	right: auto !important;
 	flex: 0 0 72px !important;
 	width: 72px !important;
 	height: 100% !important;
@@ -32,6 +34,22 @@ html, body {
 	background: #ffffff !important;
 	border-right: 1px solid #ececec !important;
 	padding: 10px 0 12px !important;
+	transform: none !important;
+	translate: none !important;
+	visibility: visible !important;
+	opacity: 1 !important;
+	pointer-events: auto !important;
+	z-index: 2 !important;
+}
+.workspace-dock.hidden,
+.dock.hidden,
+.dock[aria-hidden="true"],
+.workspace-dock[aria-hidden="true"] {
+	display: flex !important;
+	visibility: visible !important;
+	opacity: 1 !important;
+	transform: none !important;
+	translate: none !important;
 }
 body.staff-pro-has-topbar .workspace-dock,
 body.staff-pro-has-topbar .dock {
@@ -145,26 +163,6 @@ body.staff-pro-has-topbar .dock {
 .workspace-dock button.workspace-dock-item::after,
 .dock button.dock-item::after,
 .dock button.workspace-dock-item::after {
-	content: attr(aria-label) !important;
-	display: block !important;
-	width: 100% !important;
-	max-width: 64px !important;
-	margin-top: 2px !important;
-	font-size: 11px !important;
-	font-weight: 500 !important;
-	line-height: 1.15 !important;
-	letter-spacing: 0 !important;
-	color: #000000 !important;
-	text-align: center !important;
-	white-space: normal !important;
-	word-break: break-word !important;
-	text-transform: none !important;
-}
-.workspace-dock button.workspace-dock-item:has(.workspace-dock-label)::after,
-.dock button.dock-item:has(.workspace-dock-label)::after,
-.dock button.dock-item:has(.dock-label)::after,
-.dock button.dock-item:has(.dock-item-label)::after,
-.dock button.workspace-dock-item:has(.workspace-dock-label)::after {
 	content: none !important;
 	display: none !important;
 }
@@ -404,6 +402,12 @@ body.staff-pro-has-topbar .body-sidebar-container {
 	text-transform: uppercase !important;
 	color: #2c2e30 !important;
 	line-height: 1.3 !important;
+}
+.body-sidebar .standard-items-band,
+.body-sidebar .navbar-modal-search-mobile,
+.body-sidebar .sidebar-notification,
+.body-sidebar .sidebar-background-tasks {
+	display: none !important;
 }
 .body-sidebar .sidebar-items {
 	padding: 0 2px 8px !important;
@@ -1118,10 +1122,22 @@ function hidden_has(list, value) {
 }
 
 function is_hidden_sidebar_item($item) {
+	if (
+		$item.closest(".standard-items-band").length ||
+		$item.hasClass("navbar-modal-search-mobile") ||
+		$item.hasClass("sidebar-notification") ||
+		$item.hasClass("sidebar-background-tasks") ||
+		$item.closest(".navbar-modal-search-mobile, .sidebar-notification, .sidebar-background-tasks").length
+	) {
+		return true;
+	}
 	const maps = bpo_sidebar_maps();
 	const hiddenLabels = maps.hidden_labels || [];
 	const hiddenLinks = maps.hidden_links || [];
 	const label = sidebar_item_label($item);
+	if (/^(search|notification|notifications|background tasks)$/i.test(label)) {
+		return true;
+	}
 	const href = ($item.find(".item-anchor").attr("href") || "").trim();
 
 	// Section headers stay so nested BPO links (Clients, Posted Invoices) remain visible
@@ -2045,6 +2061,68 @@ function label_workspace_dock() {
 
 function remove_sidebar_search() {
 	$(".body-sidebar .staff-pro-sidebar-search").remove();
+	$(".body-sidebar .standard-items-band").remove();
+	$(".body-sidebar .navbar-modal-search-mobile, .body-sidebar .sidebar-notification, .body-sidebar .sidebar-background-tasks")
+		.closest(".sidebar-item-container, .standard-sidebar-item")
+		.addBack()
+		.remove();
+}
+
+function patch_standard_items_band() {
+	const Sidebar = frappe.ui && frappe.ui.Sidebar;
+	if (!Sidebar?.prototype || Sidebar.prototype._staff_pro_no_standard_band) return;
+	Sidebar.prototype._staff_pro_no_standard_band = true;
+
+	const original = Sidebar.prototype.add_standard_items;
+	Sidebar.prototype.add_standard_items = function () {
+		if (should_use_staff_pro_desk_home()) {
+			this.standard_items_setup = true;
+			this.wrapper?.find(".standard-items-band").remove();
+			return;
+		}
+		return typeof original === "function" ? original.apply(this, arguments) : undefined;
+	};
+}
+
+function pin_staff_pro_dock() {
+	if (!should_use_staff_pro_desk_home()) return;
+
+	const Dock = staff_pro_dock_class();
+	if (Dock?.prototype && !Dock.prototype._staff_pro_always_visible) {
+		Dock.prototype._staff_pro_always_visible = true;
+
+		const original_apply = Dock.prototype.apply_open_state;
+		Dock.prototype.apply_open_state = function () {
+			this.enabled = true;
+			this.is_open = true;
+			$("body").addClass("dock-open dock-active");
+			this.$dock?.removeClass("hidden").attr("aria-hidden", "false").prop("inert", false);
+			if (typeof original_apply === "function") {
+				try {
+					original_apply.call(this);
+				} catch (e) {
+					/* overlay dock apply can assume a closed state */
+				}
+			}
+			this.$dock?.removeClass("hidden").attr("aria-hidden", "false").prop("inert", false);
+		};
+
+		Dock.prototype.close = function () {
+			this.is_open = true;
+			this.apply_open_state();
+		};
+	}
+
+	const dock = staff_pro_dock_instance();
+	if (dock) {
+		dock.enabled = true;
+		dock.is_open = true;
+		dock.apply_open_state?.();
+	}
+	$(".dock, .workspace-dock")
+		.removeClass("hidden")
+		.attr("aria-hidden", "false")
+		.prop("inert", false);
 }
 
 function patch_workspace_dock() {
@@ -2053,6 +2131,8 @@ function patch_workspace_dock() {
 	patch_sidebar_header_branding();
 	patch_sidebar_workspace_switch();
 	patch_sidebar_expand_guard();
+	patch_standard_items_band();
+	pin_staff_pro_dock();
 
 	const Dock = staff_pro_dock_class();
 	if (!Dock || Dock.prototype._staff_pro_labeled) return;
@@ -2212,6 +2292,7 @@ function watch_workspace_dock() {
 	label_workspace_dock();
 	render_staff_pro_dock_integrations();
 	remove_sidebar_search();
+	pin_staff_pro_dock();
 	enhance_sidebar_menus();
 	style_sidebar_collapse_toggle();
 	keep_staff_pro_sidebar_expanded();
@@ -2231,6 +2312,7 @@ function watch_workspace_dock() {
 			label_workspace_dock();
 			render_staff_pro_dock_integrations();
 			remove_sidebar_search();
+			pin_staff_pro_dock();
 			enhance_sidebar_menus();
 			style_sidebar_collapse_toggle();
 			disable_app_onboarding();
