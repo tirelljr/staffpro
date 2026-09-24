@@ -83,6 +83,19 @@ CLEAR_ONLY_DOCTYPES = frozenset(
 # Leave Ledger Entry.on_cancel rejects anything that is not an expired allocation.
 SKIP_CANCEL_DOCTYPES = frozenset({"Leave Ledger Entry"})
 
+# Always drop these, even when Employee is not a required field.
+ALWAYS_DELETE_DOCTYPES = frozenset(
+	{
+		"Leave Ledger Entry",
+		"Leave Application",
+		"Leave Allocation",
+		"Leave Adjustment",
+		"Leave Policy Assignment",
+		"Leave Encashment",
+		"Compensatory Leave Request",
+	}
+)
+
 
 def _force_delete_doc(doctype, name):
 	try:
@@ -195,6 +208,29 @@ def _purge_attendance(employee: str) -> int:
 	return len(names)
 
 
+def _purge_leave_ledger(employee: str) -> int:
+	"""Drop ledger rows first so Frappe cannot block Employee delete/cancel."""
+	if not frappe.db.exists("DocType", "Leave Ledger Entry"):
+		return 0
+	if not frappe.db.table_exists("Leave Ledger Entry"):
+		return 0
+
+	names = frappe.get_all(
+		"Leave Ledger Entry",
+		filters={"employee": employee},
+		pluck="name",
+		ignore_permissions=True,
+	)
+	if not names:
+		return 0
+
+	frappe.db.sql(
+		"delete from `tabLeave Ledger Entry` where employee = %s",
+		employee,
+	)
+	return len(names)
+
+
 def _purge_holiday_list_assignments(employee: str) -> None:
 	if not frappe.db.exists("DocType", "Holiday List Assignment"):
 		return
@@ -241,13 +277,22 @@ def _delete_or_clear_links(doctype: str, fieldname: str, employee: str) -> int:
 		frappe.db.delete(doctype, {fieldname: employee})
 		return 1
 
-	names = frappe.get_all(doctype, filters={fieldname: employee}, pluck="name")
+	names = frappe.get_all(
+		doctype, filters={fieldname: employee}, pluck="name", ignore_permissions=True
+	)
 	if not names:
 		return 0
 
 	field = meta.get_field(fieldname)
-	if doctype in CLEAR_ONLY_DOCTYPES or (field and not field.reqd):
+	clear_optional = doctype in CLEAR_ONLY_DOCTYPES or (
+		field and not field.reqd and doctype not in ALWAYS_DELETE_DOCTYPES
+	)
+	if clear_optional:
 		frappe.db.set_value(doctype, {fieldname: employee}, fieldname, None, update_modified=False)
+		return len(names)
+
+	if doctype == "Leave Ledger Entry":
+		frappe.db.sql("delete from `tabLeave Ledger Entry` where employee = %s", employee)
 		return len(names)
 
 	for name in names:
@@ -261,30 +306,47 @@ def unlink_employee_records(employee: str, skip_permission: bool = False) -> dic
 		frappe.has_permission("Employee", "delete", employee, throw=True)
 
 	deleted: dict[str, int] = {}
+	was_cleanup = frappe.flags.get("in_employee_cleanup")
+	frappe.flags.in_employee_cleanup = True
+	try:
+		_clear_employee_references(employee)
+		_remove_from_child_tables(employee)
+		_purge_holiday_list_assignments(employee)
 
-	_clear_employee_references(employee)
-	_remove_from_child_tables(employee)
-	_purge_holiday_list_assignments(employee)
+		ledger_count = _purge_leave_ledger(employee)
+		if ledger_count:
+			deleted["Leave Ledger Entry"] = ledger_count
 
-	attendance_count = _purge_attendance(employee)
-	if attendance_count:
-		deleted["Attendance"] = attendance_count
+		attendance_count = _purge_attendance(employee)
+		if attendance_count:
+			deleted["Attendance"] = attendance_count
 
-	handled = {("Attendance", "employee"), ("Employee", "reports_to")}
-	for doctype, fieldname, _cancel_submitted in EMPLOYEE_LINKED_DOCTYPES:
-		if (doctype, fieldname) in handled:
-			continue
-		count = _delete_or_clear_links(doctype, fieldname, employee)
-		handled.add((doctype, fieldname))
-		if count:
-			deleted[doctype] = deleted.get(doctype, 0) + count
+		handled = {
+			("Attendance", "employee"),
+			("Employee", "reports_to"),
+			("Leave Ledger Entry", "employee"),
+		}
+		for doctype, fieldname, _cancel_submitted in EMPLOYEE_LINKED_DOCTYPES:
+			if (doctype, fieldname) in handled:
+				continue
+			count = _delete_or_clear_links(doctype, fieldname, employee)
+			handled.add((doctype, fieldname))
+			if count:
+				deleted[doctype] = deleted.get(doctype, 0) + count
 
-	for doctype, fieldname in _employee_link_fields():
-		if (doctype, fieldname) in handled:
-			continue
-		count = _delete_or_clear_links(doctype, fieldname, employee)
-		if count:
-			deleted[doctype] = deleted.get(doctype, 0) + count
+		for doctype, fieldname in _employee_link_fields():
+			if (doctype, fieldname) in handled:
+				continue
+			count = _delete_or_clear_links(doctype, fieldname, employee)
+			if count:
+				deleted[doctype] = deleted.get(doctype, 0) + count
+
+		# Allocation cancel can recreate ledger rows; drop any leftovers.
+		ledger_count = _purge_leave_ledger(employee)
+		if ledger_count:
+			deleted["Leave Ledger Entry"] = deleted.get("Leave Ledger Entry", 0) + ledger_count
+	finally:
+		frappe.flags.in_employee_cleanup = was_cleanup
 
 	return deleted
 

@@ -98,7 +98,7 @@ def _cancel_if_submitted(doctype: str, name: str) -> None:
 	if cint(frappe.db.get_value(doctype, name, "docstatus")) != 1:
 		return
 	if doctype == "Leave Ledger Entry":
-		frappe.db.set_value(doctype, name, "docstatus", 2, update_modified=False)
+		frappe.db.sql("delete from `tabLeave Ledger Entry` where name = %s", name)
 		return
 	try:
 		doc = frappe.get_doc(doctype, name)
@@ -118,6 +118,9 @@ def _clear_or_drop_links(doctype: str, fieldname: str, name: str) -> None:
 	if not meta.has_field(fieldname):
 		return
 	if meta.istable:
+		frappe.db.delete(doctype, {fieldname: name})
+		return
+	if doctype == "Leave Ledger Entry":
 		frappe.db.delete(doctype, {fieldname: name})
 		return
 	field = meta.get_field(fieldname)
@@ -153,6 +156,9 @@ def unlink_blocking_links(doctype: str, name: str) -> None:
 		from hrms.hr.employee_cleanup import unlink_employee_records
 
 		unlink_employee_records(name, skip_permission=True)
+		return
+	if doctype == "Leave Ledger Entry":
+		frappe.db.sql("delete from `tabLeave Ledger Entry` where name = %s", name)
 		return
 	if doctype == "Role":
 		unlink_role(name)
@@ -206,6 +212,24 @@ def install_force_delete_patch() -> None:
 	delete_mod.delete_doc = patched_delete_doc
 	frappe.delete_doc = patched_delete_doc
 	_PATCHED = True
+
+
+@frappe.whitelist()
+def client_delete(doctype: str, name: str):
+	"""Standard form delete also unlinks leftovers, including leave ledger rows."""
+	install_force_delete_patch()
+	if doctype == "Employee":
+		from hrms.hr.employee_cleanup import delete_employee_with_unlink
+
+		return delete_employee_with_unlink(name)
+	if doctype == "Leave Ledger Entry":
+		frappe.db.sql("delete from `tabLeave Ledger Entry` where name = %s", name)
+		if not frappe.flags.in_test:
+			frappe.db.commit()
+		return
+	frappe.delete_doc(doctype, name, ignore_missing=False)
+	if not frappe.flags.in_test:
+		frappe.db.commit()
 
 
 @frappe.whitelist()

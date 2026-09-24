@@ -156,7 +156,10 @@ after_migrate = [
 	"hrms.hr.bpo_user_permissions.apply_bpo_user_permissions",
 	"hrms.boot.prepare_staff_pro_first_login",
 	"hrms.overrides.bpo_dashboards.hide_non_bpo_dashboard_records",
+	"hrms.hr.force_delete.install_force_delete_patch",
 ]
+
+before_request = ["hrms.hr.force_delete.install_force_delete_patch"]
 
 setup_wizard_requires = "assets/hrms/js/setup_wizard.js"
 setup_wizard_complete = "hrms.hr.staff_pro_sidebars.after_setup_wizard"
@@ -419,6 +422,7 @@ override_whitelisted_methods = {
 	"frappe.core.doctype.user.user.get_all_roles": "hrms.hr.bpo_user_permissions.get_all_roles",
 	"frappe.core.api.file.get_attached_images": "hrms.overrides.attached_images.get_attached_images",
 	"frappe.desk.reportview.delete_items": "hrms.hr.force_delete.delete_items",
+	"frappe.client.delete": "hrms.hr.force_delete.client_delete",
 }
 #
 # each overriding function accepts a `data` argument;
@@ -437,7 +441,7 @@ override_doctype_dashboards = {
 #
 # auto_cancel_exempted_doctypes = ["Auto Repeat"]
 
-ignore_links_on_delete = ["PWA Notification"]
+ignore_links_on_delete = ["PWA Notification", "Leave Ledger Entry"]
 
 # User Data Protection
 # --------------------
