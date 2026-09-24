@@ -112,9 +112,11 @@ def is_staff_pro_desk_admin(user=None):
 
 
 def get_staff_pro_home_page(user):
-	"""Send desk admins to the People dashboard after login."""
+	"""Desk admins open the People dashboard. Agents open the employee portal."""
 	if is_staff_pro_desk_admin(user):
 		return STAFF_PRO_DESK_HOME
+	if is_employee_self_service_user(user):
+		return "/agents"
 	return None
 
 
@@ -131,6 +133,9 @@ def on_staff_pro_login(login_manager=None):
 	user = getattr(login_manager, "user", None) or frappe.session.user
 	validate_or_bind_login_device(user)
 	if not is_staff_pro_desk_admin(user):
+		if is_employee_self_service_user(user):
+			frappe.local.response["home_page"] = "/agents"
+			frappe.local.response["redirect_to"] = "/agents"
 		return
 
 	frappe.local.flags.home_page = STAFF_PRO_DESK_HOME

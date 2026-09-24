@@ -193,14 +193,11 @@
 							<button
 								type="button"
 								class="w-full py-3 text-white text-lg font-semibold bg-[#2f6fdb] hover:bg-[#2558b0] disabled:opacity-60 disabled:cursor-not-allowed"
-								:disabled="clocking || signingIn || portalBlocked"
+								:disabled="clocking || signingIn"
 								@click="submitLogin"
 							>
 								{{ signingIn ? __("Opening portal...") : __("Open my portal") }}
 							</button>
-							<p v-if="portalBlocked" class="text-xs text-gray-500 text-center">
-								{{ __("An admin is signed in on this computer. Use Clock In/Out only.") }}
-							</p>
 						</div>
 					</form>
 
@@ -260,7 +257,6 @@ import { IonPage, IonContent } from "@ionic/vue"
 import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { Input, Button, ErrorMessage, Dialog, createResource, call, debounce } from "frappe-ui"
 import { STAFF_PRO_LOGO_URL } from "@/utils/branding"
-import { canOpenDesk } from "@/utils/deskAccess"
 import { scanClientIpv4, isPlaceholderPeerIpv4 } from "@/utils/clientIp"
 import {
 	forgetPassword,
@@ -303,11 +299,8 @@ const otp = reactive({
 })
 
 const session = inject("$session")
-const userResource = inject("$user")
 const __ = inject("$translate")
 const dayjs = inject("$dayjs")
-const portalBlocked = computed(() => canOpenDesk(userResource?.data))
-
 const liveProfile = ref(null)
 const selectedRemembered = computed(() => getRememberedUser(username.value))
 const activeProfile = computed(() => liveProfile.value || selectedRemembered.value)
@@ -596,8 +589,6 @@ async function submitClock() {
 }
 
 async function submitLogin() {
-	if (portalBlocked.value && !otp.showDialog) return
-
 	signingIn.value = true
 	errorMessage.value = ""
 	successMessage.value = ""

@@ -14,14 +14,16 @@ export function sessionUser() {
 	return _sessionUser
 }
 
-function handleLogin(response) {
-	if (response.message === "Logged In") {
-		userResource.reload()
-		employeeResource.reload()
+function isLoggedInResponse(response) {
+	if (response === "Logged In") return true
+	return response?.message === "Logged In"
+}
 
-		session.user = sessionUser()
-		router.replace({ path: "/" })
-	}
+function handleLogin(response) {
+	if (!isLoggedInResponse(response)) return
+	// Full navigation so the new session boots the agent portal, even if an
+	// admin cookie was active on this computer.
+	window.location.assign("/agents/")
 }
 
 export const session = reactive({
