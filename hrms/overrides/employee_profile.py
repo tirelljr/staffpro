@@ -63,7 +63,9 @@ def get_employee_profile_stats(employee: str) -> dict:
 	billed_company = _convert_amount(billed["amount"], billed["currency"], company_currency)
 	agent_profit = flt(billed_company) - flt(income["gross_pay"])
 
-	return {
+	from hrms.hr.staff_pro_desk_permissions import filter_profile_stats_payload
+
+	payload = {
 		"employee": emp.name,
 		"employee_name": emp.employee_name,
 		"user_id": emp.user_id or "",
@@ -77,6 +79,7 @@ def get_employee_profile_stats(employee: str) -> dict:
 		"agent_profit": flt(agent_profit, 2),
 		"leave_remaining": leave_remaining,
 	}
+	return filter_profile_stats_payload(payload)
 
 
 def _leave_remaining(employee: str) -> float:

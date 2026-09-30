@@ -212,6 +212,7 @@ frappe.ui.form.on("Employee", {
 		setup_employee_form_chrome(frm);
 		setup_employee_password_panel(frm);
 		setup_employee_profile_stats(frm);
+		apply_staff_pro_employee_field_restrictions(frm);
 		set_employee_salary_defaults(frm);
 		refresh_user_bonus_status(frm);
 	},
@@ -821,6 +822,33 @@ function setup_employee_password_panel(frm) {
 	});
 }
 
+function staff_pro_profile_visibility() {
+	return frappe.boot?.staff_pro_profile_stats || {};
+}
+
+function apply_staff_pro_employee_field_restrictions(frm) {
+	const vis = staff_pro_profile_visibility();
+	const hideBilling =
+		vis.total_billed === false && vis.agent_profit === false && !frappe.user.has_role("Administrator");
+	for (const fieldname of [
+		"billing_section",
+		"bill_to_customer",
+		"billing_currency",
+		"billing_rate",
+	]) {
+		if (frm.fields_dict[fieldname]) {
+			frm.toggle_display(fieldname, !hideBilling);
+		}
+	}
+	if (vis.payroll_totals === false && !frappe.user.has_role("Administrator")) {
+		for (const fieldname of ["user_bonus", "user_bonus_period_months", "user_bonus_attendance_target", "user_bonus_if_below", "user_bonus_attendance", "user_bonus_missed_days", "user_bonus_status"]) {
+			if (frm.fields_dict[fieldname]) {
+				frm.toggle_display(fieldname, false);
+			}
+		}
+	}
+}
+
 function setup_employee_profile_stats(frm) {
 	const $sidebar = (frm.page?.wrapper || frm.$wrapper)?.find(".form-sidebar");
 	if (!$sidebar?.length || frm.is_new()) {
@@ -858,6 +886,7 @@ function setup_employee_profile_stats(frm) {
 	}).then((r) => {
 		if ($stats.data("request-id") !== request_id) return;
 		const stats = r.message || {};
+		const visibility = stats.visibility || staff_pro_profile_visibility();
 		const company_currency = stats.company_currency || "BZD";
 		const billing_currency = stats.billing_currency || "USD";
 		const money = (value, currency) => {
@@ -872,21 +901,44 @@ function setup_employee_profile_stats(frm) {
 		};
 		const hours = Number(stats.total_hours || 0);
 		const leave_remaining = Number(stats.leave_remaining || 0);
-		const rows = [
-			{ label: __("Total SS contributions"), value: money(stats.total_ss, company_currency) },
-			{ label: __("Total income"), value: money(stats.total_income, company_currency) },
-			{ label: __("Total Billed to Client"), value: money(stats.total_billed, billing_currency) },
-			{ label: __("Agent Profit"), value: money(stats.agent_profit, company_currency) },
-			{ label: __("Tax total"), value: money(stats.total_tax, company_currency) },
-			{
+		const rows = [];
+		if (visibility.payroll_totals !== false) {
+			rows.push(
+				{ label: __("Total SS contributions"), value: money(stats.total_ss, company_currency) },
+				{ label: __("Total income"), value: money(stats.total_income, company_currency) },
+				{ label: __("Tax total"), value: money(stats.total_tax, company_currency) },
+			);
+		}
+		if (visibility.total_billed !== false) {
+			rows.push({
+				label: __("Total Billed to Client"),
+				value: money(stats.total_billed, billing_currency),
+			});
+		}
+		if (visibility.agent_profit !== false) {
+			rows.push({
+				label: __("Agent Profit"),
+				value: money(stats.agent_profit, company_currency),
+			});
+		}
+		if (visibility.total_hours !== false) {
+			rows.push({
 				label: __("Total hours worked"),
 				value: hours ? `${hours.toLocaleString(undefined, { maximumFractionDigits: 1 })}h` : "—",
-			},
-			{
+			});
+		}
+		if (visibility.leave_remaining !== false) {
+			rows.push({
 				label: __("Leave remaining"),
 				value: `${leave_remaining.toLocaleString(undefined, { maximumFractionDigits: 1 })} days`,
-			},
-		];
+			});
+		}
+		if (!rows.length) {
+			$stats.find(".sp-emp-stats__list").removeClass("is-loading").html(
+				`<div class="sp-emp-stats__empty">${frappe.utils.escape_html(__("No totals available for your access level."))}</div>`,
+			);
+			return;
+		}
 		$stats.find(".sp-emp-stats__list").removeClass("is-loading").html(
 			rows
 				.map(

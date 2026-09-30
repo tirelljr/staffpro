@@ -769,6 +769,39 @@ def get_custom_fields():
 				"insert_after": "scan_bpo_ipv4",
 			},
 		],
+		"User": [
+			{
+				"fieldname": "staff_pro_desk_restrictions_section",
+				"fieldtype": "Section Break",
+				"label": _("Staff Pro Desk Restrictions"),
+				"insert_after": "roles",
+				"collapsible": 1,
+			},
+			{
+				"default": "0",
+				"description": _("Hide Agent Profit on employee profiles and totals."),
+				"fieldname": "sp_restrict_agent_profit",
+				"fieldtype": "Check",
+				"label": _("Hide Agent Profit"),
+				"insert_after": "staff_pro_desk_restrictions_section",
+			},
+			{
+				"default": "0",
+				"description": _("Hide billed-to-client totals on employee profiles."),
+				"fieldname": "sp_restrict_billed_to_client",
+				"fieldtype": "Check",
+				"label": _("Hide Billed to Client"),
+				"insert_after": "sp_restrict_agent_profit",
+			},
+			{
+				"default": "0",
+				"description": _("Hide payroll income, SS, and tax totals on employee profiles."),
+				"fieldname": "sp_restrict_payroll_totals",
+				"fieldtype": "Check",
+				"label": _("Hide Payroll Totals"),
+				"insert_after": "sp_restrict_billed_to_client",
+			},
+		],
 	}
 
 

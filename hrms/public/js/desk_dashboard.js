@@ -1280,20 +1280,45 @@ function collect_chart_colors(args) {
 	return values.map(sanitize_chart_color).filter(Boolean);
 }
 
-function sanitize_chart_data(data, colors) {
-	if (!data || typeof data !== "object") return data;
-	if (!Array.isArray(data.datasets)) return data;
-	return Object.assign({}, data, {
-		datasets: data.datasets.map((dataset, index) => {
-			if (!dataset || typeof dataset !== "object") return dataset;
-			const color = sanitize_chart_color(dataset.color);
-			if (color) return Object.assign({}, dataset, { color });
-			const next = Object.assign({}, dataset);
-			delete next.color;
-			if (colors[index]) next.color = colors[index];
-			return next;
-		}),
+function sanitize_chart_series(values) {
+	if (!Array.isArray(values)) return [];
+	return values.map((value) => {
+		const num = Number(value);
+		return Number.isFinite(num) ? num : 0;
 	});
+}
+
+function sanitize_chart_labels(labels) {
+	if (!Array.isArray(labels)) return [];
+	return labels.map((label) => (label == null ? "" : String(label)));
+}
+
+function sanitize_chart_data(data, colors) {
+	if (!data || typeof data !== "object") {
+		return { labels: [], datasets: [] };
+	}
+	const next = Object.assign({}, data);
+	next.labels = sanitize_chart_labels(next.labels);
+	if (!Array.isArray(next.datasets)) {
+		next.datasets = [];
+		return next;
+	}
+	next.datasets = next.datasets.map((dataset, index) => {
+		if (!dataset || typeof dataset !== "object") {
+			return { values: [] };
+		}
+		const color = sanitize_chart_color(dataset.color);
+		const values = sanitize_chart_series(dataset.values);
+		const row = Object.assign({}, dataset, { values });
+		if (color) {
+			row.color = color;
+		} else {
+			delete row.color;
+			if (colors[index]) row.color = colors[index];
+		}
+		return row;
+	});
+	return next;
 }
 
 function apply_sp_chart_args(args) {
@@ -1385,6 +1410,7 @@ function harden_chart_instance(chart) {
 				return origDraw(...drawArgs);
 			} catch (error) {
 				if (error && error.name === "NotFoundError") return;
+				if (error instanceof TypeError) return;
 				throw error;
 			}
 		};

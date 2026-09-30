@@ -272,6 +272,7 @@ def extend_bootinfo(bootinfo):
 	_filter_bpo_workspace_sidebars(bootinfo)
 	_filter_bpo_module_sidebars(bootinfo)
 	_filter_bpo_app_workspaces(bootinfo)
+	_apply_staff_pro_desk_permissions(bootinfo)
 
 
 def apply_payroll_frequency_translations(bootinfo):
@@ -370,6 +371,33 @@ def _filter_bpo_app_workspaces(bootinfo):
 		pages = workspaces.get("pages")
 		if isinstance(pages, list):
 			workspaces["pages"] = [page for page in pages if _is_bpo_workspace_name(page)]
+
+
+def _apply_staff_pro_desk_permissions(bootinfo):
+	from hrms.hr.staff_pro_desk_permissions import (
+		filter_boot_sidebar_payload,
+		filter_dock_entries,
+		get_profile_stat_visibility,
+	)
+
+	user = frappe.session.user
+	bootinfo["staff_pro_profile_stats"] = get_profile_stat_visibility(user)
+	filter_boot_sidebar_payload(bootinfo.get("workspace_sidebar_item"), user=user)
+	filter_boot_sidebar_payload(bootinfo.get("module_sidebars"), user=user)
+
+	dock = bootinfo.get("dock")
+	if isinstance(dock, dict):
+		for app_name, entries in list(dock.items()):
+			if isinstance(entries, list):
+				dock[app_name] = filter_dock_entries(entries, user=user)
+
+	app_data = bootinfo.get("app_data")
+	if isinstance(app_data, list):
+		for app in app_data:
+			if not isinstance(app, dict):
+				continue
+			if isinstance(app.get("dock"), list):
+				app["dock"] = filter_dock_entries(app["dock"], user=user)
 
 
 def _disable_app_onboarding_bootinfo(bootinfo):
