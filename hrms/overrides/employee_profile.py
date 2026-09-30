@@ -29,7 +29,9 @@ def update_employee_user_password(employee: str, new_password: str, logout_all_s
 	# HR/System Manager, or the employee changing their own login.
 	roles = set(frappe.get_roles())
 	is_self = frappe.session.user == user
-	is_hr = bool(roles.intersection({"System Manager", "HR Manager", "HR User", "Administrator"}))
+	from hrms.hr.staff_pro_roles import STAFF_PRO_HR_DESK_ROLES
+
+	is_hr = bool(roles.intersection(STAFF_PRO_HR_DESK_ROLES))
 	if not (is_self or is_hr):
 		frappe.throw(_("Not permitted to change this password."), frappe.PermissionError)
 

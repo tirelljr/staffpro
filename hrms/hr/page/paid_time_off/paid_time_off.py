@@ -10,7 +10,7 @@ from hrms.hr.report.employee_leave_balance.employee_leave_balance import get_dat
 from hrms.hr.utils import get_leave_period
 
 
-HR_ROLES = ("HR Manager", "HR User", "System Manager", "Administrator")
+HR_ROLES = ("HR Manager", "HR User", "HR Assistant", "System Manager", "Administrator")
 
 
 def _ensure_hr():

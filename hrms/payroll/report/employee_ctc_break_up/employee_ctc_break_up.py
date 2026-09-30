@@ -367,7 +367,7 @@ def execute(filters: dict | None = None):
 	return columns, data, message, None, None
 
 
-ROLES_ALLOWED_TO_VIEW_ANY_EMPLOYEE = ("System Manager", "HR Manager", "HR User")
+ROLES_ALLOWED_TO_VIEW_ANY_EMPLOYEE = ("System Manager", "HR Manager", "HR User", "HR Assistant")
 
 
 def validate_employee_access(employee: str):

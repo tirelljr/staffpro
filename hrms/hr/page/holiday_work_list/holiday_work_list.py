@@ -10,7 +10,7 @@ from hrms.hr.doctype.holiday_work_election.holiday_work_election import (
 	get_holiday_work_roster,
 )
 
-HR_ROLES = ("HR Manager", "HR User", "System Manager", "Administrator")
+HR_ROLES = ("HR Manager", "HR User", "HR Assistant", "System Manager", "Administrator")
 
 
 def _assert_hr():

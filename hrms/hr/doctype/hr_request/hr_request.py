@@ -8,7 +8,7 @@ from frappe.utils import today
 
 from hrms.mixins.pwa_notifications import PWANotificationsMixin
 
-HR_ROLES = frozenset({"HR User", "HR Manager", "System Manager"})
+HR_ROLES = frozenset({"HR User", "HR Manager", "HR Assistant", "System Manager"})
 EMPLOYEE_ALLOWED_STATUSES = frozenset({"Open", "Cancelled"})
 CLOSED_STATUSES = frozenset({"Resolved", "Rejected"})
 

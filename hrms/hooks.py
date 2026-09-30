@@ -197,6 +197,7 @@ before_app_uninstall = "hrms.setup.before_app_uninstall"
 # Permissions evaluated in scripted ways
 
 permission_query_conditions = {
+	"Employee": "hrms.overrides.employee_master.get_permission_query_conditions",
 	"Dashboard Chart": "hrms.overrides.bpo_dashboards.get_chart_permission_query_conditions",
 	"Number Card": "hrms.overrides.bpo_dashboards.get_card_permission_query_conditions",
 	"Dashboard": "hrms.overrides.bpo_dashboards.get_dashboard_permission_query_conditions",

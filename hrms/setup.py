@@ -36,6 +36,9 @@ def after_install():
 	create_default_role_profiles()
 	run_post_install_patches()
 	add_default_hr_permissions()
+	from hrms.hr.staff_pro_roles import sync_hr_assistant_permissions
+
+	sync_hr_assistant_permissions()
 
 
 def before_uninstall():
@@ -1284,6 +1287,9 @@ DEFAULT_ROLE_PROFILES = {
 		"HR Manager",
 		"Leave Approver",
 		"Expense Approver",
+	],
+	"HR Assistant": [
+		"HR Assistant",
 	],
 }
 

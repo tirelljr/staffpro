@@ -42,6 +42,8 @@ STAFF_PRO_BRAND = {
 	"title": "Staff Pro BPO",
 	"logo_url": "/assets/hrms/images/staff-pro-bpo-logo.png",
 }
+from hrms.hr.staff_pro_roles import is_agent_portal_user
+
 EMPLOYEE_ONLY_ROLES = frozenset({"Employee Self Service"})
 # Unified workspaces may be opened as dashboards by title/name; map to real Dashboard docs.
 WORKSPACE_DASHBOARD_ALIASES = {
@@ -88,24 +90,16 @@ def get_permitted_charts(dashboard_name: str):
 
 def is_employee_self_service_user(user=None):
 	"""True when the user is an employee portal user, not a desk admin."""
-	user = user or frappe.session.user
-	if user == "Guest":
-		return False
-
-	if frappe.get_cached_value("User", user, "user_type") == "Website User":
-		return True
-
-	roles = set(frappe.get_roles(user)) - {"All"}
-	return roles.issubset(EMPLOYEE_ONLY_ROLES)
+	return is_agent_portal_user(user)
 
 
 def is_staff_pro_desk_admin(user=None):
-	"""Desk admins land in the HRM hub; employee-only users keep their existing flow."""
+	"""Desk admins land in the HRM hub; agent portal users keep their existing flow."""
 	user = user or frappe.session.user
 	if user == "Guest":
 		return False
 
-	if is_employee_self_service_user(user):
+	if is_agent_portal_user(user):
 		return False
 
 	return frappe.get_cached_value("User", user, "user_type") == "System User"

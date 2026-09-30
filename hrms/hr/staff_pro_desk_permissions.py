@@ -8,6 +8,7 @@ from __future__ import annotations
 import frappe
 
 from hrms.hr.bpo_sidebar_labels import apply_bpo_labels, _drop_empty_sections
+from hrms.hr.staff_pro_roles import is_staff_pro_hr_desk_user
 
 USER_STAT_RESTRICTION_FIELDS = {
 	"agent_profit": "sp_restrict_agent_profit",
@@ -46,7 +47,9 @@ def get_profile_stat_visibility(user=None) -> dict[str, bool]:
 	if user == "Guest":
 		return {key: False for key in USER_STAT_RESTRICTION_FIELDS}
 
-	if user == "Administrator" or "System Manager" in frappe.get_roles(user):
+	if is_staff_pro_hr_desk_user(user) and user != "Guest":
+		flags = {key: True for key in USER_STAT_RESTRICTION_FIELDS}
+	elif user == "Administrator" or "System Manager" in frappe.get_roles(user):
 		flags = {key: True for key in USER_STAT_RESTRICTION_FIELDS}
 	else:
 		flags = {}
@@ -124,6 +127,10 @@ def filter_sidebar_rows(rows: list | None, user=None) -> list:
 	"""Drop sidebar links the user cannot open; remove empty section headers."""
 	if not rows:
 		return []
+
+	user = _session_user(user)
+	if is_staff_pro_hr_desk_user(user):
+		return _drop_empty_sections(apply_bpo_labels([dict(row) for row in rows if isinstance(row, dict)]))
 
 	filtered: list[dict] = []
 	for row in rows:

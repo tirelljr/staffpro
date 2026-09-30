@@ -423,3 +423,13 @@ def get_retirement_date(date_of_birth: str | None = None):
 		except ValueError:
 			# invalid date
 			return
+
+
+def get_permission_query_conditions(user: str | None = None) -> str | None:
+	"""HR desk roles see every employee; agents keep default user-permission scoping."""
+	from hrms.hr.staff_pro_roles import is_staff_pro_hr_desk_user
+
+	user = user or frappe.session.user
+	if is_staff_pro_hr_desk_user(user):
+		return ""
+	return None

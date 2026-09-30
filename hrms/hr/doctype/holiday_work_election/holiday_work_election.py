@@ -12,7 +12,7 @@ from frappe.utils import cint, getdate, strip_html
 
 from hrms.utils.holiday_list import get_holiday_list_for_employee
 
-HR_ROLES = frozenset({"HR User", "HR Manager", "System Manager", "Administrator"})
+HR_ROLES = frozenset({"HR User", "HR Manager", "HR Assistant", "System Manager", "Administrator"})
 
 
 class HolidayWorkElection(Document):

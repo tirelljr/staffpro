@@ -376,7 +376,7 @@ def get_calendar_day_roster(attendance_date: str):
 
 
 def _today_live_payload(day):
-	hr_roles = {"HR Manager", "HR User", "System Manager", "Administrator"}
+	hr_roles = {"HR Manager", "HR User", "HR Assistant", "System Manager", "Administrator"}
 	if not hr_roles.intersection(frappe.get_roles()):
 		return None
 	from hrms.hr.page.in_out_today.in_out_today import get_in_out_today
