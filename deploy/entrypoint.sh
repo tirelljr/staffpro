@@ -153,12 +153,22 @@ bench worker --queue short,default,long &
 bench schedule &
 
 echo "Staff Pro is running on port ${PORT}"
-# Keep the container alive while any core service runs (do not exit when one job stops).
+# Gunicorn --preload can take a while; do not treat "not in ps yet" as a crash.
 set +e
+for _ in $(seq 1 90); do
+	if pgrep -f "frappe.app:application" >/dev/null 2>&1; then
+		break
+	fi
+	sleep 2
+done
+if ! pgrep -f "frappe.app:application" >/dev/null 2>&1; then
+	echo "Gunicorn failed to start within 3 minutes" >&2
+	exit 1
+fi
 while true; do
-	if ! pgrep -f "gunicorn.*frappe.app:application" >/dev/null 2>&1; then
+	sleep 30
+	if ! pgrep -f "frappe.app:application" >/dev/null 2>&1; then
 		echo "Gunicorn stopped; exiting container" >&2
 		exit 1
 	fi
-	sleep 30
 done
