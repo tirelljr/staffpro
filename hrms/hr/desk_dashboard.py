@@ -353,6 +353,231 @@ def get_upcoming_absences(period: str = "monthly", company: str | None = None) -
 	}
 
 
+ATTENDANCE_PRESENT_STATUSES = {"Present", "Half Day", "Work From Home"}
+
+
+@frappe.whitelist()
+def get_attendance_board(attendance_date: str | None = None, department: str | None = None) -> dict:
+	"""Daily attendance roster for the People dashboard. Always the present day."""
+	from hrms.hr.page.in_out_today.in_out_today import get_in_out_today
+
+	day = getdate()
+	department = department or None
+	current = get_in_out_today(department=department, attendance_date=str(day))
+	previous = get_in_out_today(department=department, attendance_date=str(add_days(day, -1)))
+	rows = _attendance_board_rows(current.get("details") or [], day)
+	prev_rows = _attendance_board_rows(previous.get("details") or [], add_days(day, -1))
+	paid_leave = _paid_leave_request_count([row["employee"] for row in rows], day)
+	prev_paid_leave = _paid_leave_request_count([row["employee"] for row in prev_rows], add_days(day, -1))
+	return {
+		"date": str(day),
+		"date_label": day.strftime("%d %b, %Y").lstrip("0").replace(" 0", " "),
+		"departments": current.get("departments") or [],
+		"kpis": _attendance_board_kpis(rows, paid_leave, prev_rows, prev_paid_leave),
+		"rows": rows,
+	}
+
+
+def _attendance_board_status(row: dict) -> str:
+	clocked_in = bool(
+		row.get("in_time")
+		or row.get("status") == "IN"
+		or (row.get("attendance_status") or "") in ATTENDANCE_PRESENT_STATUSES
+	)
+	if clocked_in and row.get("late"):
+		return "late"
+	if clocked_in:
+		return "present"
+	return "absent"
+
+
+def _format_overtime_label(hours) -> str:
+	value = flt(hours)
+	if value <= 0:
+		return "0h"
+	if abs(value - round(value)) < 0.05:
+		return f"{int(round(value))}h"
+	return f"{flt(value, 1)}h"
+
+
+def _attendance_board_rows(details: list[dict], day) -> list[dict]:
+	if not details:
+		return []
+
+	employee_ids = [row["employee"] for row in details if row.get("employee")]
+	extra = _employee_board_fields(employee_ids)
+	day_stats = _day_checkin_stats_by_employee(employee_ids, day)
+	date_label = getdate(day).strftime("%d/%m")
+	rows = []
+	for detail in details:
+		employee = detail.get("employee")
+		info = extra.get(employee) or {}
+		stats = day_stats.get(employee) or {}
+		worked = flt(stats.get("hours"))
+		ot_hours = _daily_overtime_hours(worked)
+		status = _attendance_board_status(detail)
+		rows.append(
+			{
+				"employee": employee,
+				"employee_name": detail.get("employee_name") or employee,
+				"image": detail.get("image") or "",
+				"designation": info.get("designation") or "",
+				"department": detail.get("department") or "",
+				"hours_worked": worked,
+				"hours_worked_label": _format_overtime_label(worked),
+				"status": status,
+				"status_label": _(status.upper()),
+				"date": str(getdate(day)),
+				"date_label": date_label,
+				"in_time": _format_board_clock(stats.get("first_in")) or detail.get("in_time") or "",
+				"out_time": _format_board_clock(stats.get("last_out")) or detail.get("out_time") or "",
+				"overtime_hours": ot_hours,
+				"overtime_label": _format_overtime_label(ot_hours),
+				"attendance": detail.get("attendance") or "",
+			}
+		)
+	return rows
+
+
+def _employee_board_fields(employee_ids: list[str]) -> dict:
+	if not employee_ids:
+		return {}
+	rows = frappe.get_all("Employee", filters={"name": ["in", employee_ids]}, fields=["name", "designation"])
+	return {row.name: row for row in rows}
+
+
+def _format_board_clock(value) -> str:
+	if not value:
+		return ""
+	text = str(value).strip()
+	if text and any(token in text.upper() for token in ("AM", "PM")) and ":" in text:
+		return text
+	from hrms.hr.clock_format import format_clock
+
+	return format_clock(value)
+
+
+def _day_checkin_stats_by_employee(employee_ids: list[str], day) -> dict[str, dict]:
+	"""Hours plus first IN and last recorded OUT for the calendar day."""
+	if not employee_ids:
+		return {}
+
+	from hrms.payroll.daily_pay import _as_datetime, _hours_between, _log_time, _log_type, pair_checkin_logs
+
+	day = getdate(day)
+	attendance_fields = ["employee", "in_time", "out_time"]
+	if frappe.db.has_column("Attendance", "working_hours"):
+		attendance_fields.append("working_hours")
+	attendance_by_employee = {
+		row.employee: row
+		for row in frappe.get_all(
+			"Attendance",
+			filters={
+				"employee": ["in", employee_ids],
+				"attendance_date": day,
+				"docstatus": ["<", 2],
+			},
+			fields=attendance_fields,
+		)
+	}
+
+	start = get_datetime(day)
+	end = get_datetime(add_days(day, 1))
+	punches_by_employee: dict[str, list] = {}
+	for punch in frappe.get_all(
+		"Employee Checkin",
+		fields=["name", "employee", "log_type", "time"],
+		filters=[
+			["employee", "in", employee_ids],
+			["time", ">=", start],
+			["time", "<", end],
+		],
+		order_by="time asc",
+	):
+		punches_by_employee.setdefault(punch.employee, []).append(punch)
+
+	now = now_datetime()
+	if getdate(now) == day:
+		as_of = now
+	elif getdate(now) < day:
+		as_of = start
+	else:
+		as_of = end
+
+	out = {}
+	for employee in employee_ids:
+		logs = punches_by_employee.get(employee) or []
+		result = pair_checkin_logs(logs)
+		live = flt(result.get("working_hours"))
+		open_pairs = [pair for pair in result.get("pairs") or [] if pair.get("open") and pair.get("in_time")]
+		if open_pairs:
+			for pair in open_pairs:
+				live = flt(live + _hours_between(pair["in_time"], as_of), 2)
+			hours = live
+		else:
+			stored = flt((attendance_by_employee.get(employee) or {}).get("working_hours"))
+			hours = stored if stored else live
+
+		first_in = _as_datetime(result.get("in_time"))
+		out_times = [
+			_as_datetime(_log_time(log))
+			for log in logs
+			if _log_type(log) == "OUT" and _log_time(log)
+		]
+		out_times = [when for when in out_times if when]
+		last_out = max(out_times) if out_times else None
+
+		attendance = attendance_by_employee.get(employee)
+		if not first_in and attendance and attendance.in_time:
+			first_in = _as_datetime(attendance.in_time)
+		if not last_out and attendance and attendance.out_time:
+			last_out = _as_datetime(attendance.out_time)
+
+		out[employee] = {"hours": hours, "first_in": first_in, "last_out": last_out}
+	return out
+
+
+def _daily_overtime_hours(worked) -> float:
+	"""Hours past 8 on the day. Payroll overtime still uses the 80-hour pay-period threshold."""
+	from hrms.hr.doctype.overtime_slip.overtime_slip import REGULAR_DAY_HOURS
+
+	return flt(max(flt(worked) - REGULAR_DAY_HOURS, 0.0), 2)
+
+
+def _paid_leave_request_count(employee_ids: list[str], day) -> int:
+	if not employee_ids:
+		return 0
+	return len(
+		frappe.get_all(
+			"Leave Application",
+			filters=[
+				["employee", "in", employee_ids],
+				["from_date", "<=", day],
+				["to_date", ">=", day],
+				["docstatus", "<", 2],
+				["status", "in", ["Open", "Approved"]],
+			],
+			pluck="name",
+		)
+	)
+
+
+def _attendance_board_kpis(rows, paid_leave, prev_rows, prev_paid_leave) -> dict:
+	def counts(items):
+		present = sum(1 for row in items if row["status"] in {"present", "late"})
+		absent = sum(1 for row in items if row["status"] == "absent")
+		return len(items), present, absent
+
+	total, present, absent = counts(rows)
+	prev_total, prev_present, prev_absent = counts(prev_rows)
+	return {
+		"total": {"value": total, "change": _percent_change(total, prev_total)},
+		"present": {"value": present, "change": _percent_change(present, prev_present)},
+		"absent": {"value": absent, "change": _percent_change(absent, prev_absent)},
+		"paid_leave": {"value": cint(paid_leave), "change": _percent_change(paid_leave, prev_paid_leave)},
+	}
+
+
 def _payroll_period_bounds(period: str):
 	today = getdate()
 	if period == "weekly":

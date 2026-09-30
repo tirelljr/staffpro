@@ -54,12 +54,6 @@
 			.page-container[data-page-route="dashboard-view"] {
 				background: #f4f4f4 !important;
 			}
-			#page-dashboard-view:not(:has(.sp-dash-pills)) .dashboard-graph,
-			#page-dashboard:not(:has(.sp-dash-pills)) .dashboard-graph,
-			.page-container[data-page-route="dashboard-view"]:not(:has(.sp-dash-pills)) .dashboard-graph,
-			#page-dashboard-view:not(:has(.sp-dash-pills)) .dashboard-view > .widget-group,
-			#page-dashboard-view:not(:has(.sp-dash-pills)) .number-widget-area,
-			#page-dashboard-view:not(:has(.sp-dash-pills)) .number-card-container,
 			#page-desktop,
 			#page-apps,
 			.page-container[data-page-route="desktop"],
@@ -71,25 +65,124 @@
 				min-height: 100vh !important;
 				min-height: 100dvh !important;
 			}
-			.dock,
-			.workspace-dock,
-			.body-sidebar-container {
-				align-self: stretch !important;
-				height: 100% !important;
-				min-height: 100vh !important;
-				min-height: 100dvh !important;
-				max-height: none !important;
+			.body-sidebar-container .overlay,
+			.body-sidebar-container.expanded .overlay {
+				display: none !important;
+				pointer-events: none !important;
+				background: transparent !important;
 			}
-			.body-sidebar-container.expanded .body-sidebar,
-			.body-sidebar {
-				height: 100% !important;
-				min-height: 100% !important;
-				max-height: none !important;
-			}
-			.body-sidebar-container:not(.expanded),
-			.body-sidebar-container:not(.expanded) .body-sidebar {
-				height: 0 !important;
-				min-height: 0 !important;
+			@media (min-width: 768px) {
+				.dock:not(.hidden),
+				.workspace-dock:not(.hidden) {
+					position: sticky !important;
+					left: auto !important;
+					right: auto !important;
+					transform: none !important;
+					display: flex !important;
+					visibility: visible !important;
+					opacity: 1 !important;
+					flex: 0 0 72px !important;
+					width: 72px !important;
+					height: 100% !important;
+					min-height: calc(100vh - 64px) !important;
+					min-height: calc(100dvh - 64px) !important;
+					background: #ffffff !important;
+				}
+				body.dock-active .dock:not(.hidden),
+				body.dock-pinned .dock:not(.hidden) {
+					display: flex !important;
+					visibility: visible !important;
+					opacity: 1 !important;
+				}
+				.dock-item,
+				.dock button.dock-item,
+				.workspace-dock button.workspace-dock-item {
+					height: auto !important;
+					min-height: 64px !important;
+					overflow: visible !important;
+					color: #111111 !important;
+				}
+				.dock-item .dock-item-label,
+				.dock .dock-label,
+				.workspace-dock .workspace-dock-label {
+					display: block !important;
+					opacity: 1 !important;
+					visibility: visible !important;
+					color: #111111 !important;
+				}
+				.dock-item,
+				.dock-item svg,
+				.dock-item use,
+				.dock-item .icon,
+				.dock-item img {
+					opacity: 1 !important;
+					visibility: visible !important;
+					--icon-motion-opacity: 1 !important;
+					--icon-stroke: #111111;
+					color: #111111 !important;
+				}
+				.dock .dock-item-label {
+					display: block !important;
+				}
+				.body-sidebar-container:not(.expanded) .body-sidebar .sidebar-item-label,
+				.body-sidebar-container.sidebar-hidden .body-sidebar .sidebar-item-label,
+				.body-sidebar-container:not(.expanded) .body-sidebar .avatar-name-email,
+				.body-sidebar-container.sidebar-hidden .body-sidebar .avatar-name-email {
+					flex: 1 1 auto !important;
+					min-width: 0 !important;
+					width: auto !important;
+					overflow: visible !important;
+					opacity: 1 !important;
+					visibility: visible !important;
+					color: #111111 !important;
+				}
+				.body-sidebar-container,
+				.body-sidebar-container:not(.expanded),
+				.body-sidebar-container.sidebar-hidden {
+					display: flex !important;
+					flex: 0 0 260px !important;
+					width: 260px !important;
+					height: auto !important;
+					min-height: calc(100vh - 64px) !important;
+					min-height: calc(100dvh - 64px) !important;
+					overflow: visible !important;
+					visibility: visible !important;
+					opacity: 1 !important;
+				}
+				.body-sidebar,
+				.body-sidebar-container:not(.expanded) .body-sidebar,
+				.body-sidebar-container.sidebar-hidden .body-sidebar {
+					left: 0 !important;
+					right: auto !important;
+					width: 260px !important;
+					height: 100% !important;
+					min-height: 100% !important;
+					opacity: 1 !important;
+					visibility: visible !important;
+					background: #ffffff !important;
+					pointer-events: auto !important;
+				}
+				.body-sidebar-container .body-sidebar > *,
+				.body-sidebar-container:not(.expanded) .body-sidebar > *,
+				.body-sidebar-container.sidebar-hidden .body-sidebar > *,
+				.body-sidebar .sidebar-item-label,
+				.body-sidebar .avatar-name-email,
+				.body-sidebar .title-container,
+				.body-sidebar .header-title {
+					opacity: 1 !important;
+					visibility: visible !important;
+					transform: none !important;
+					width: auto !important;
+					color: #111111 !important;
+				}
+				.body-sidebar .body-sidebar-top,
+				.body-sidebar .sidebar-items {
+					opacity: 1 !important;
+					visibility: visible !important;
+					flex: 1 1 auto !important;
+					min-height: 0 !important;
+					overflow: auto !important;
+				}
 			}
 		`;
 		(document.head || document.documentElement).appendChild(style);
@@ -101,12 +194,41 @@
 		}
 	}
 
+	/** Keep dock + workspace menu visible when Frappe boots collapsed (v17). */
+	function pin_staff_pro_sidebar_dom() {
+		mark_staff_pro_alive();
+		document.body.classList.add("dock-pinned", "dock-open", "dock-active");
+		document.querySelectorAll(".body-sidebar-container").forEach((el) => {
+			el.classList.add("expanded");
+			el.classList.remove("sidebar-hidden");
+		});
+		document.querySelectorAll(".dock, .workspace-dock").forEach((el) => {
+			el.classList.remove("hidden");
+			el.setAttribute("aria-hidden", "false");
+		});
+		try {
+			localStorage.setItem("sidebar-expanded", "true");
+		} catch (e) {
+			/* ignore */
+		}
+	}
+
 	hide_default_frappe_view_css();
 	mark_staff_pro_alive();
+	pin_staff_pro_sidebar_dom();
 	document.addEventListener("DOMContentLoaded", () => {
 		hide_default_frappe_view_css();
 		mark_staff_pro_alive();
+		pin_staff_pro_sidebar_dom();
 	});
+	if (typeof MutationObserver !== "undefined" && document.body) {
+		new MutationObserver(() => pin_staff_pro_sidebar_dom()).observe(document.body, {
+			childList: true,
+			subtree: true,
+			attributes: true,
+			attributeFilter: ["class"],
+		});
+	}
 
 	function staff_pro_home_route() {
 		const home = frappe.boot?.staff_pro_desk_home;
@@ -167,6 +289,12 @@
 		});
 	}
 
-	$(document).on("app_ready", redirect_staff_pro_home);
-	$(document).on("page-change", redirect_staff_pro_home);
+	$(document).on("app_ready", () => {
+		pin_staff_pro_sidebar_dom();
+		redirect_staff_pro_home();
+	});
+	$(document).on("page-change", () => {
+		pin_staff_pro_sidebar_dom();
+		redirect_staff_pro_home();
+	});
 })();

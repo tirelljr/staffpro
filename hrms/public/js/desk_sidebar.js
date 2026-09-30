@@ -20,18 +20,33 @@ html, body {
 	position: sticky !important;
 	top: 0 !important;
 	bottom: 0 !important;
+	left: auto !important;
+	right: auto !important;
 	flex: 0 0 72px !important;
 	width: 72px !important;
 	height: 100% !important;
 	min-height: 100vh !important;
 	min-height: 100dvh !important;
 	max-height: none !important;
-	display: flex !important;
 	flex-direction: column !important;
 	align-items: center !important;
 	background: #ffffff !important;
 	border-right: 1px solid #ececec !important;
 	padding: 10px 0 12px !important;
+	transform: none !important;
+	translate: none !important;
+	z-index: 2 !important;
+}
+.workspace-dock:not(.hidden),
+.dock:not(.hidden) {
+	display: flex !important;
+	visibility: visible !important;
+	opacity: 1 !important;
+	pointer-events: auto !important;
+}
+.workspace-dock.hidden,
+.dock.hidden {
+	display: none !important;
 }
 body.staff-pro-has-topbar .workspace-dock,
 body.staff-pro-has-topbar .dock {
@@ -145,26 +160,6 @@ body.staff-pro-has-topbar .dock {
 .workspace-dock button.workspace-dock-item::after,
 .dock button.dock-item::after,
 .dock button.workspace-dock-item::after {
-	content: attr(aria-label) !important;
-	display: block !important;
-	width: 100% !important;
-	max-width: 64px !important;
-	margin-top: 2px !important;
-	font-size: 11px !important;
-	font-weight: 500 !important;
-	line-height: 1.15 !important;
-	letter-spacing: 0 !important;
-	color: #000000 !important;
-	text-align: center !important;
-	white-space: normal !important;
-	word-break: break-word !important;
-	text-transform: none !important;
-}
-.workspace-dock button.workspace-dock-item:has(.workspace-dock-label)::after,
-.dock button.dock-item:has(.workspace-dock-label)::after,
-.dock button.dock-item:has(.dock-label)::after,
-.dock button.dock-item:has(.dock-item-label)::after,
-.dock button.workspace-dock-item:has(.workspace-dock-label)::after {
 	content: none !important;
 	display: none !important;
 }
@@ -190,6 +185,29 @@ body.staff-pro-has-topbar .dock {
 	min-width: 22px !important;
 	min-height: 22px !important;
 	color: #000000 !important;
+}
+/* Filesystem dock glyph — same filled folder as the filesystem cards, darker. */
+.workspace-dock .sp-dock-folder,
+.dock .sp-dock-folder {
+	display: block !important;
+	position: relative !important;
+	width: 20px !important;
+	height: 16px !important;
+	margin-top: 3px !important;
+	border-radius: 3px 3px 2px 2px !important;
+	background: #312e81 !important;
+	flex-shrink: 0 !important;
+}
+.workspace-dock .sp-dock-folder::before,
+.dock .sp-dock-folder::before {
+	content: "" !important;
+	position: absolute !important;
+	top: -3px !important;
+	left: 0 !important;
+	width: 9px !important;
+	height: 4px !important;
+	border-radius: 2px 2px 0 0 !important;
+	background: #1e1b4b !important;
 }
 .workspace-dock .staff-pro-dock-integrations .workspace-dock-item img,
 .workspace-dock .staff-pro-dock-integrations .workspace-dock-item svg,
@@ -262,6 +280,36 @@ body.staff-pro-has-topbar .dock {
 .dock .dock-shortcuts:empty + .dock-divider {
 	display: none !important;
 }
+.workspace-dock .expand-sidebar-link,
+.workspace-dock .expand-sidebar-link.dock-toggle-btn,
+.dock .expand-sidebar-link,
+.dock .expand-sidebar-link.dock-toggle-btn {
+	order: -10 !important;
+	flex: 0 0 auto !important;
+	align-self: center !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	width: 24px !important;
+	height: 24px !important;
+	margin: 0 0 8px !important;
+	padding: 0 !important;
+	border: 0 !important;
+	background: transparent !important;
+	color: #000000 !important;
+	box-shadow: none !important;
+	cursor: pointer !important;
+}
+.workspace-dock .expand-sidebar-link svg,
+.workspace-dock .expand-sidebar-link .icon,
+.dock .expand-sidebar-link svg,
+.dock .expand-sidebar-link .icon {
+	width: 16px !important;
+	height: 16px !important;
+	color: #000000 !important;
+	stroke: #000000 !important;
+	fill: none !important;
+}
 .dock .dock-user {
 	width: 32px !important;
 	height: 32px !important;
@@ -289,10 +337,8 @@ body.staff-pro-has-topbar .dock {
 	--sidebar-width: 260px;
 }
 
-/* Pin workspace submenus next to the dock — Frappe overlays .body-sidebar
-   (position: absolute) over a 100vh placeholder. Forcing relative put the
-   panel back in a column flex, so the placeholder stacked above it and the
-   submenu landed at the bottom of the page. */
+/* Keep Frappe's overlay sidebar: the placeholder reserves width so the
+   submenu sits next to the dock instead of being clipped behind main content. */
 .body-sidebar-container {
 	align-self: stretch !important;
 	position: sticky !important;
@@ -306,36 +352,102 @@ body.staff-pro-has-topbar .dock {
 	min-height: 100vh !important;
 	min-height: 100dvh !important;
 	max-height: none !important;
-	overflow: hidden !important;
+	overflow: visible !important;
+	background: transparent !important;
 }
 body.staff-pro-has-topbar .body-sidebar-container {
 	min-height: calc(100vh - var(--staff-pro-topbar-height, 56px)) !important;
 	min-height: calc(100dvh - var(--staff-pro-topbar-height, 56px)) !important;
 }
+.body-sidebar-container.expanded {
+	flex: 0 0 var(--sidebar-width, 260px) !important;
+	width: var(--sidebar-width, 260px) !important;
+	overflow: visible !important;
+}
 
 /* Body sidebar */
 .body-sidebar {
-	position: relative !important;
+	position: absolute !important;
+	left: 0 !important;
+	right: auto !important;
 	top: 0 !important;
 	bottom: 0 !important;
+	z-index: 1020 !important;
 	align-self: stretch !important;
 	height: 100% !important;
 	min-height: 100% !important;
 	max-height: none !important;
-	overflow-x: hidden !important;
-	overflow-y: auto !important;
+	display: flex !important;
+	flex-direction: column !important;
+	overflow: visible !important;
 	background: #ffffff !important;
 	border-right: 1px solid #ececec !important;
 	padding: 8px 8px 10px !important;
+	pointer-events: auto !important;
+}
+.body-sidebar-container.expanded .body-sidebar-placeholder {
+	display: block !important;
+	width: var(--sidebar-width, 260px) !important;
+	height: 100% !important;
+	min-height: 100% !important;
+	flex: 0 0 var(--sidebar-width, 260px) !important;
 }
 .body-sidebar-container.expanded .body-sidebar {
 	width: var(--sidebar-width, 260px) !important;
+	opacity: 1 !important;
+	pointer-events: auto !important;
 }
-.body-sidebar-container.expanded .body-sidebar-placeholder {
+.body-sidebar-container.expanded .body-sidebar > * {
+	opacity: 1 !important;
+	transform: none !important;
+}
+.body-sidebar-container .overlay,
+.body-sidebar-container.expanded .overlay {
 	display: none !important;
+	pointer-events: none !important;
+	background: transparent !important;
 	width: 0 !important;
 	height: 0 !important;
-	flex: 0 0 0 !important;
+}
+.dock-item,
+.dock-item svg,
+.dock-item use,
+.dock-item .icon,
+.dock-item img,
+.workspace-dock-item svg,
+.workspace-dock-item .icon {
+	opacity: 1 !important;
+	visibility: visible !important;
+	--icon-motion-opacity: 1;
+	--icon-stroke: currentColor;
+}
+.body-sidebar .body-sidebar-top,
+.body-sidebar .sidebar-items {
+	display: flex !important;
+	flex-direction: column !important;
+	flex: 1 1 auto !important;
+	min-height: 0 !important;
+	opacity: 1 !important;
+	visibility: visible !important;
+	overflow-x: hidden !important;
+	overflow-y: auto !important;
+}
+.body-sidebar-container:not(.expanded) .body-sidebar > *,
+.body-sidebar-container.sidebar-hidden .body-sidebar > * {
+	opacity: 1 !important;
+	transform: none !important;
+	visibility: visible !important;
+}
+.body-sidebar-container:not(.expanded) .body-sidebar .sidebar-item-label,
+.body-sidebar-container.sidebar-hidden .body-sidebar .sidebar-item-label,
+.body-sidebar-container:not(.expanded) .body-sidebar .avatar-name-email,
+.body-sidebar-container.sidebar-hidden .body-sidebar .avatar-name-email {
+	opacity: 1 !important;
+	visibility: visible !important;
+	width: auto !important;
+	flex: 1 1 auto !important;
+	overflow: visible !important;
+	color: #111111 !important;
 }
 .body-sidebar .sidebar-header {
 	display: flex !important;
@@ -361,8 +473,28 @@ body.staff-pro-has-topbar .body-sidebar-container {
 	color: #2c2e30 !important;
 	line-height: 1.3 !important;
 }
+.body-sidebar .standard-items-band,
+.body-sidebar .navbar-modal-search-mobile,
+.body-sidebar .sidebar-notification,
+.body-sidebar .sidebar-background-tasks {
+	display: none !important;
+}
 .body-sidebar .sidebar-items {
+	flex: 1 1 auto !important;
+	min-height: 0 !important;
+	overflow-x: hidden !important;
+	overflow-y: auto !important;
 	padding: 0 2px 8px !important;
+}
+.body-sidebar-bottom,
+.body-sidebar .dropdown-navbar-user {
+	flex: 0 0 auto !important;
+	overflow: visible !important;
+	position: relative !important;
+	z-index: 1080 !important;
+}
+.body-sidebar .dropdown-navbar-user .dropdown-menu {
+	z-index: 1200 !important;
 }
 .body-sidebar .standard-sidebar-item {
 	margin: 0 !important;
@@ -585,7 +717,8 @@ body.staff-pro-has-topbar .body-sidebar-container {
 .body-sidebar .collapse-sidebar-link.sidebar-toggle-btn {
 	position: absolute !important;
 	top: 12px !important;
-	right: 6px !important;
+	left: auto !important;
+	right: 8px !important;
 	z-index: 3 !important;
 	display: inline-flex !important;
 	align-items: center !important;
@@ -609,27 +742,62 @@ body.staff-pro-has-topbar .body-sidebar-container {
 	stroke: #000000 !important;
 	fill: none !important;
 }
-.body-sidebar-container:not(.expanded) {
-	width: 0 !important;
-	height: 0 !important;
-	min-height: 0 !important;
-	max-height: none !important;
-	overflow: visible !important;
+/* Frappe can boot with the desk sidebar collapsed or sidebar-hidden. Staff Pro
+   uses the dock + menu as permanent navigation, so keep both visible. */
+@media (min-width: 768px) {
+	body.staff-pro-alive .body-sidebar-container,
+	body.staff-pro-alive .body-sidebar-container:not(.expanded),
+	body.staff-pro-alive .body-sidebar-container.sidebar-hidden {
+		display: flex !important;
+		flex: 0 0 var(--sidebar-width, 260px) !important;
+		width: var(--sidebar-width, 260px) !important;
+		height: auto !important;
+		min-height: calc(100vh - 64px) !important;
+		min-height: calc(100dvh - 64px) !important;
+		overflow: visible !important;
+		visibility: visible !important;
+		opacity: 1 !important;
+	}
+	body.staff-pro-alive .body-sidebar-container:not(.expanded) .body-sidebar-placeholder {
+		display: block !important;
+		width: var(--sidebar-width, 260px) !important;
+		height: 100% !important;
+	}
+	body.staff-pro-alive .body-sidebar-container:not(.expanded) .body-sidebar {
+		width: var(--sidebar-width, 260px) !important;
+		height: 100% !important;
+		min-height: 100% !important;
+		background: #ffffff !important;
+		border-right-color: #ececec !important;
+		pointer-events: auto !important;
+	}
 }
-.body-sidebar-container:not(.expanded) .body-sidebar-placeholder {
-	width: 0 !important;
-	height: 0 !important;
-}
-.body-sidebar-container:not(.expanded) .body-sidebar {
-	width: 0 !important;
-	height: 0 !important;
-	min-height: 0 !important;
-	background: transparent !important;
-	border-right-color: transparent !important;
-	pointer-events: none;
-}
-.body-sidebar-container:not(.expanded) .body-sidebar .collapse-sidebar-link {
+/* Frappe pinned dock adds sidebar-hidden while the panel is open; labels stay opacity 0. */
+body.staff-pro-alive .body-sidebar-container.sidebar-hidden .body-sidebar,
+body.staff-pro-alive .body-sidebar-container.expanded .body-sidebar {
+	width: var(--sidebar-width, 260px) !important;
+	height: 100% !important;
+	min-height: 100% !important;
+	opacity: 1 !important;
 	pointer-events: auto !important;
+}
+body.staff-pro-alive .body-sidebar-container.sidebar-hidden .body-sidebar > *,
+body.staff-pro-alive .body-sidebar-container.sidebar-hidden .sidebar-item-label,
+body.staff-pro-alive .body-sidebar-container.sidebar-hidden .avatar-name-email,
+body.staff-pro-alive .body-sidebar-container.sidebar-hidden .title-container {
+	opacity: 1 !important;
+	visibility: visible !important;
+	transform: none !important;
+}
+body.staff-pro-alive.dock-pinned .dock,
+body.staff-pro-alive.dock-open .dock,
+body.staff-pro-alive.dock-pinned .workspace-dock,
+body.staff-pro-alive.dock-open .workspace-dock {
+	position: sticky !important;
+	left: auto !important;
+	transform: none !important;
+	translate: none !important;
+	visibility: visible !important;
 }
 
 body.staff-pro-hide-form-sidebar .layout-side-section.right,
@@ -975,7 +1143,8 @@ function apply_bpo_sidebar_label($item) {
 
 	const current = ($label.text() || "").trim();
 	if (!current) return;
-	if (current.toLowerCase() === "past pay stubs") return;
+	const preserved = current.toLowerCase();
+	if (preserved === "past pay stubs" || preserved === "floor workers") return;
 
 	const href = ($item.find(".item-anchor").attr("href") || "").trim();
 	const next = bpo_sidebar_label(current, href);
@@ -1073,11 +1242,32 @@ function hidden_has(list, value) {
 }
 
 function is_hidden_sidebar_item($item) {
+	if (
+		$item.closest(".standard-items-band").length ||
+		$item.hasClass("navbar-modal-search-mobile") ||
+		$item.hasClass("sidebar-notification") ||
+		$item.hasClass("sidebar-background-tasks") ||
+		$item.closest(".navbar-modal-search-mobile, .sidebar-notification, .sidebar-background-tasks").length
+	) {
+		return true;
+	}
 	const maps = bpo_sidebar_maps();
 	const hiddenLabels = maps.hidden_labels || [];
 	const hiddenLinks = maps.hidden_links || [];
 	const label = sidebar_item_label($item);
+	if (/^(search|notification|notifications|background tasks)$/i.test(label)) {
+		return true;
+	}
 	const href = ($item.find(".item-anchor").attr("href") || "").trim();
+	const currentSidebar = String(
+		frappe.app?.sidebar?.current_module || frappe.app?.sidebar?.sidebar_title || "",
+	).toLowerCase();
+	if (
+		currentSidebar !== "filesystem" &&
+		(href.toLowerCase().includes("td4-form") || /^td4 forms?$/i.test(label))
+	) {
+		return true;
+	}
 
 	// Section headers stay so nested BPO links (Clients, Posted Invoices) remain visible
 	// until migrate replaces the Finance sidebar. Leaf ERP items are removed immediately.
@@ -1100,13 +1290,130 @@ function is_hidden_sidebar_item($item) {
 	if (hidden_has(hiddenLinks, last) || hidden_has(hiddenLinks, last.replace(/-/g, " "))) {
 		return true;
 	}
-	return /\/query-report\/(General Ledger|Accounts Payable)\/?$/i.test(path);
+	if (/\/query-report\/(General Ledger|Accounts Payable)\/?$/i.test(path)) {
+		return true;
+	}
+	return is_unpermitted_sidebar_item($item, href, path);
+}
+
+function unslug_sidebar_name(value) {
+	return String(value || "")
+		.replace(/-/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+function can_read_sidebar_doctype(name) {
+	if (!name || frappe.session?.user === "Administrator") {
+		return true;
+	}
+	if (typeof frappe.model?.can_read === "function") {
+		try {
+			return Boolean(frappe.model.can_read(name));
+		} catch (e) {
+			/* fall through */
+		}
+	}
+	const allowed = frappe.boot?.user?.can_read;
+	return !Array.isArray(allowed) || allowed.includes(name);
+}
+
+function is_allowed_sidebar_page(name) {
+	const pages = frappe.boot?.allowed_pages || [];
+	return pages.includes(name) || pages.includes(unslug_sidebar_name(name));
+}
+
+function is_unpermitted_sidebar_item($item, href, path) {
+	if (is_section_header($item) || frappe.session?.user === "Administrator") {
+		return false;
+	}
+	const linkType = String(
+		$item.data("link-type") || $item.find(".item-anchor").data("link-type") || ""
+	).toLowerCase();
+	const linkTo = String(
+		$item.data("link-to") || $item.find(".item-anchor").data("link-to") || ""
+	).trim();
+	if (linkType === "doctype" && linkTo) {
+		return !can_read_sidebar_doctype(linkTo);
+	}
+	if ((linkType === "page" || linkType === "report") && linkTo) {
+		return !(is_allowed_sidebar_page(linkTo) || can_read_sidebar_doctype(linkTo));
+	}
+
+	const parts = String(path || href || "")
+		.replace(/\/$/, "")
+		.split("/")
+		.filter(Boolean);
+	if (parts.length < 2) {
+		return false;
+	}
+	const root = parts[0].toLowerCase();
+	if (root !== "app" && root !== "desk") {
+		return false;
+	}
+	if (["dashboard-view", "dashboard", "workspaces", "query-report"].includes(parts[1].toLowerCase())) {
+		return false;
+	}
+	const target = unslug_sidebar_name(parts[1] === "List" || parts[1] === "list" ? parts[2] : parts[1]);
+	if (!target) {
+		return false;
+	}
+	if (is_allowed_sidebar_page(target) || is_allowed_sidebar_page(parts[1])) {
+		return false;
+	}
+	if (can_read_sidebar_doctype(target)) {
+		return false;
+	}
+	return /\/list\//i.test(path) || linkType === "doctype";
+}
+
+function pin_sidebar_user_menu() {
+	const $user = $(".body-sidebar .dropdown-navbar-user, .body-sidebar-bottom .dropdown-navbar-user");
+	if (!$user.length) {
+		return;
+	}
+	$user.each(function () {
+		const $dropdown = $(this);
+		if ($dropdown.data("spUserMenuPinned")) {
+			return;
+		}
+		$dropdown.data("spUserMenuPinned", true);
+		$dropdown.on("shown.bs.dropdown show.bs.dropdown", function () {
+			const $menu = $dropdown.children(".dropdown-menu");
+			const btn = $dropdown.find(".sidebar-user-button").get(0);
+			if (!$menu.length || !btn) {
+				return;
+			}
+			const rect = btn.getBoundingClientRect();
+			$menu.css({
+				position: "fixed",
+				left: `${Math.max(8, rect.left)}px`,
+				bottom: `${Math.max(8, window.innerHeight - rect.top + 8)}px`,
+				top: "auto",
+				right: "auto",
+				display: "block",
+				zIndex: 2200,
+			});
+		});
+	});
 }
 
 const SIDEBAR_COLLAPSE_ICON = `<svg class="icon icon-sm" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5" stroke="#000000" stroke-width="1.5"/><path d="M6.25 2.5v11" stroke="#000000" stroke-width="1.5"/><path d="M11.2 6.15 8.7 8l2.5 1.85" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const SIDEBAR_EXPAND_ICON = `<svg class="icon icon-sm" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5" stroke="#000000" stroke-width="1.5"/><path d="M6.25 2.5v11" stroke="#000000" stroke-width="1.5"/><path d="M8.7 6.15 11.2 8l-2.5 1.85" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
+function reposition_sidebar_toggles() {
+	const dock = document.querySelector(".dock, .workspace-dock");
+	if (dock) {
+		const expandBtn = dock.querySelector("button.expand-sidebar-link");
+		if (expandBtn?.parentElement === dock && dock.firstElementChild !== expandBtn) {
+			dock.insertBefore(expandBtn, dock.firstElementChild);
+		}
+	}
+}
+
 function style_sidebar_collapse_toggle() {
+	reposition_sidebar_toggles();
+
 	const sidebar = document.querySelector(".body-sidebar");
 	if (!sidebar) return;
 
@@ -1161,6 +1468,7 @@ function enhance_sidebar_menus() {
 
 		prefer_employee_image_sidebar_link($anchor);
 		bind_pay_stubs_sidebar_item($item, $anchor, label);
+		bind_employee_roster_sidebar_item($item, $anchor, label);
 
 		const $wrapper = $item.parent();
 		const $nested = $wrapper.children(".nested-container");
@@ -1195,6 +1503,49 @@ function bind_pay_stubs_sidebar_item($item, $anchor, label) {
 		e.stopPropagation();
 		open_pay_stubs_list(mode);
 	});
+}
+
+const EMPLOYEE_ROSTER_KEY = "staff_pro_employee_roster";
+
+function employee_roster_mode(label) {
+	const key = (label || "").trim().toLowerCase();
+	if (key === "floor workers") return "floor";
+	if (key === "agents") return "all";
+	return "";
+}
+
+function bind_employee_roster_sidebar_item($item, $anchor, label) {
+	const mode = employee_roster_mode(label);
+	if (!mode || !$anchor?.length) return;
+
+	$anchor.attr("data-sp-employee-roster", mode);
+	$anchor.off("click.floorworkers").on("click.floorworkers", function (e) {
+		e.preventDefault();
+		e.stopPropagation();
+		open_employee_roster(mode);
+	});
+}
+
+function open_employee_roster(mode) {
+	try {
+		sessionStorage.setItem(EMPLOYEE_ROSTER_KEY, mode);
+	} catch (err) {
+		/* ignore */
+	}
+	frappe.route_options = mode === "floor" ? { is_floor_worker: 1 } : {};
+
+	const route = frappe.get_route() || [];
+	const on_list = route[0] === "List" && route[1] === "Employee";
+	if (on_list && window.cur_list?.doctype === "Employee" && window.cur_list.filter_area) {
+		window.cur_list.filter_area.remove("is_floor_worker");
+		if (mode === "floor") {
+			window.cur_list.filter_area.add([["Employee", "is_floor_worker", "=", 1]]);
+		}
+		window.cur_list.refresh();
+		return;
+	}
+
+	frappe.set_route("List", "Employee");
 }
 
 function open_pay_stubs_list(mode) {
@@ -1297,6 +1648,7 @@ const HR_SIDEBARS = [
 	"payroll",
 	"ss and taxes",
 	"talent",
+	"filesystem",
 	"floor",
 	"finance",
 	"finance & admin",
@@ -1354,6 +1706,10 @@ function staff_pro_current_portal() {
 	}
 
 	const routes = frappe.boot?.staff_pro_portal_routes || {};
+	const adminRoute = (routes.admin || "/desk/admin").replace(/\/$/, "");
+	if (path === adminRoute || path.startsWith(`${adminRoute}/`)) {
+		return "admin";
+	}
 	const accountingRoute = (routes.accounting || "/desk/finance").replace(/\/$/, "");
 	if (path === accountingRoute || path.startsWith(`${accountingRoute}/`)) {
 		return "accounting";
@@ -1403,6 +1759,13 @@ function inject_my_work_sidebar_link() {
 		e.preventDefault();
 		staff_pro_open_my_work_portal();
 	});
+}
+
+function staff_pro_is_admin_sidebar(name) {
+	const key = String(name || "")
+		.toLowerCase()
+		.replace(/[-_]/g, " ");
+	return key === "admin";
 }
 
 function shortcut_label($item) {
@@ -1457,17 +1820,105 @@ function staff_pro_remember_sidebar(name) {
 	}
 }
 
+function sidebar_can_toggle_width(sidebar) {
+	return Boolean(sidebar?.sidebar_header && typeof sidebar.sidebar_header.toggle_width === "function");
+}
+
+function patch_sidebar_pinned_visibility() {
+	const Sidebar = frappe.ui && frappe.ui.Sidebar;
+	if (!Sidebar?.prototype || Sidebar.prototype._staff_pro_pinned_visibility) return;
+	Sidebar.prototype._staff_pro_pinned_visibility = true;
+
+	const originalApply = Sidebar.prototype.apply_expanded_state;
+	if (typeof originalApply === "function") {
+		Sidebar.prototype.apply_expanded_state = function () {
+			if (should_use_staff_pro_desk_home() && !(typeof frappe.is_mobile === "function" && frappe.is_mobile())) {
+				this.sidebar_expanded = true;
+			}
+			const result = originalApply.apply(this, arguments);
+			if (should_use_staff_pro_desk_home()) {
+				this.wrapper?.removeClass("sidebar-hidden").addClass("expanded");
+				document.body.classList.add("dock-open", "dock-pinned", "dock-active");
+			}
+			return result;
+		};
+	}
+}
+
+function patch_sidebar_expand_guard() {
+	const Sidebar = frappe.ui && frappe.ui.Sidebar;
+	if (!Sidebar?.prototype || Sidebar.prototype._staff_pro_expand_guard) return;
+
+	const original = Sidebar.prototype.expand_sidebar;
+	if (typeof original !== "function") return;
+	Sidebar.prototype._staff_pro_expand_guard = true;
+
+	Sidebar.prototype.expand_sidebar = function () {
+		if (!sidebar_can_toggle_width(this)) {
+			this.wrapper?.toggleClass("expanded", !!this.sidebar_expanded);
+			$("body").toggleClass("sidebar-collapsed", !this.sidebar_expanded);
+			return;
+		}
+		return original.apply(this, arguments);
+	};
+}
+
+let _staff_pro_sidebar_lock = false;
+
+function keep_staff_pro_sidebar_expanded() {
+	patch_sidebar_expand_guard();
+	if (!should_use_staff_pro_desk_home()) return;
+	if (typeof frappe.is_mobile === "function" && frappe.is_mobile()) return;
+	if (_staff_pro_sidebar_lock) return;
+	_staff_pro_sidebar_lock = true;
+	requestAnimationFrame(() => {
+		_staff_pro_sidebar_lock = false;
+	});
+	try {
+		localStorage.setItem("sidebar-expanded", "true");
+	} catch (e) {
+		/* ignore */
+	}
+	document.body.classList.add("dock-open", "dock-pinned", "dock-active");
+	document.querySelectorAll(".body-sidebar-container").forEach((el) => {
+		el.classList.add("expanded");
+		el.classList.remove("sidebar-hidden");
+	});
+	const sidebar = frappe.app?.sidebar;
+	if (!sidebar) return;
+	sidebar.sidebar_expanded = true;
+	if (sidebar.wrapper?.length) {
+		sidebar.wrapper.removeClass("sidebar-hidden").addClass("expanded");
+	}
+	if (typeof sidebar.open === "function") {
+		try {
+			sidebar.open();
+		} catch (e) {
+			/* header is created later in refresh_header() */
+		}
+	}
+}
+
+function staff_pro_select_shell(sidebar, name) {
+	if (!sidebar || !name) return;
+	if (typeof sidebar.select_shell === "function") {
+		sidebar.select_shell(name);
+	} else if (typeof sidebar.select_module === "function") {
+		sidebar.select_module(name);
+	} else if (typeof sidebar.setup === "function") {
+		sidebar.setup(name);
+	} else if (typeof sidebar.select_sidebar === "function") {
+		sidebar.select_sidebar(name);
+	}
+}
+
 function staff_pro_activate_sidebar(name) {
 	const sidebar = frappe.app?.sidebar;
 	staff_pro_remember_sidebar(name);
 	if (!sidebar || !name) return;
 	sidebar._staff_pro_pinned_sidebar = name;
-	sidebar.open?.();
-	if (typeof sidebar.select_module === "function") {
-		sidebar.select_module(name);
-	} else if (staff_pro_sidebar_payload(name) && typeof sidebar.select_sidebar === "function") {
-		sidebar.select_sidebar(name);
-	}
+	keep_staff_pro_sidebar_expanded();
+	staff_pro_select_shell(sidebar, name);
 	sidebar.refresh_header?.();
 	sidebar.refresh_dock?.();
 }
@@ -1766,6 +2217,27 @@ function patch_sidebar_workspace_switch() {
 	if (!Sidebar || Sidebar.prototype._staff_pro_workspace_switch) return;
 	Sidebar.prototype._staff_pro_workspace_switch = true;
 
+	// Dock clicks go through select_module, then a route change. set_workspace_sidebar
+	// runs on that route change and restores _staff_pro_pinned_sidebar. If the pin is
+	// still the previous workspace, the new submenu is built and immediately replaced,
+	// so the user has to click the dock icon again once the route is already current.
+	const originalSelectModule = Sidebar.prototype.select_module || Sidebar.prototype.select_shell;
+	if (typeof originalSelectModule === "function") {
+		const patched = function (module) {
+			if (should_use_staff_pro_desk_home() && module) {
+				this._staff_pro_pinned_sidebar = module;
+				staff_pro_remember_sidebar(module);
+			}
+			return originalSelectModule.call(this, module);
+		};
+		if (Sidebar.prototype.select_module) {
+			Sidebar.prototype.select_module = patched;
+		}
+		if (Sidebar.prototype.select_shell) {
+			Sidebar.prototype.select_shell = patched;
+		}
+	}
+
 	const originalOpenWorkspace = Sidebar.prototype.open_workspace;
 	Sidebar.prototype.open_workspace = function (name) {
 		if (!should_use_staff_pro_desk_home()) {
@@ -1773,7 +2245,9 @@ function patch_sidebar_workspace_switch() {
 		}
 
 		this._staff_pro_pinned_sidebar = name;
-		this.open?.();
+		if (sidebar_can_toggle_width(this)) {
+			this.open?.();
+		}
 		if (typeof this.select_module === "function" && staff_pro_sidebar_payload(name)) {
 			this.select_module(name);
 		} else if (staff_pro_sidebar_payload(name) && typeof this.select_sidebar === "function") {
@@ -1796,46 +2270,43 @@ function patch_sidebar_workspace_switch() {
 
 	const originalSetWorkspaceSidebar = Sidebar.prototype.set_workspace_sidebar;
 	Sidebar.prototype.set_workspace_sidebar = function () {
-		if (should_use_staff_pro_desk_home()) {
-			const portal = staff_pro_current_portal();
-			let pinned = this._staff_pro_pinned_sidebar;
-			const current = this.current_module || this.sidebar_title;
+		const result = originalSetWorkspaceSidebar.call(this);
+		if (!should_use_staff_pro_desk_home()) return result;
 
-			if (portal === "hr" && pinned && !staff_pro_is_hr_sidebar(pinned)) {
-				this._staff_pro_pinned_sidebar = null;
-				pinned = null;
-			}
-
-			if (
-				pinned &&
-				staff_pro_sidebar_payload(pinned) &&
-				(portal !== "hr" || staff_pro_is_hr_sidebar(pinned))
-			) {
-				if (typeof this.select_module === "function") {
-					this.select_module(pinned);
-				} else {
-					this.select_sidebar?.(pinned);
-				}
-				this.set_active_workspace_item?.();
-				this.refresh_dock?.();
-				return;
-			}
-
-			if (portal === "hr" && !staff_pro_is_hr_sidebar(current)) {
-				const home = staff_pro_hr_home_sidebar();
-				staff_pro_remember_sidebar(home);
-				if (typeof this.select_module === "function") {
-					this.select_module(home);
-				} else {
-					this.select_sidebar?.(home);
-				}
-				this.set_active_workspace_item?.();
-				this.refresh_header?.();
-				this.refresh_dock?.();
-				return;
-			}
+		const portal = staff_pro_current_portal();
+		let pinned = this._staff_pro_pinned_sidebar;
+		if (portal === "hr" && pinned && !staff_pro_is_hr_sidebar(pinned)) {
+			this._staff_pro_pinned_sidebar = null;
+			pinned = null;
 		}
-		return originalSetWorkspaceSidebar.call(this);
+		if (portal === "admin" && pinned && !staff_pro_is_admin_sidebar(pinned)) {
+			this._staff_pro_pinned_sidebar = null;
+			pinned = null;
+		}
+
+		let target = null;
+		const pinned_ok =
+			pinned &&
+			staff_pro_sidebar_payload(pinned) &&
+			(portal !== "hr" || staff_pro_is_hr_sidebar(pinned)) &&
+			(portal !== "admin" || staff_pro_is_admin_sidebar(pinned));
+		if (pinned_ok) {
+			target = pinned;
+		} else if (portal === "hr" && !staff_pro_is_hr_sidebar(this.current_module)) {
+			target = staff_pro_hr_home_sidebar();
+			staff_pro_remember_sidebar(target);
+		} else if (portal === "admin" && !staff_pro_is_admin_sidebar(this.current_module)) {
+			target = staff_pro_admin_home_sidebar();
+			staff_pro_remember_sidebar(target);
+		}
+
+		if (target && staff_pro_sidebar_payload(target) && target !== this.current_module) {
+			staff_pro_select_shell(this, target);
+			this.set_active_workspace_item?.();
+			this.refresh_header?.();
+			this.refresh_dock?.();
+		}
+		return result;
 	};
 }
 
@@ -1893,6 +2364,7 @@ const DOCK_ICONS = {
 	"ss and taxes": "/assets/hrms/images/belize-ssb-logo.png",
 	time: "clock",
 	talent: "user-plus",
+	filesystem: "folder",
 	floor: "layout-grid",
 	finance: "/assets/hrms/images/integrations/quickbooks.svg",
 	"finance & admin": "/assets/hrms/images/integrations/quickbooks.svg",
@@ -1936,8 +2408,11 @@ function apply_dock_icon($item, label) {
 	if ($item.attr("data-sp-dock-icon") === iconName) return;
 
 	const isImage = is_dock_image_icon(iconName);
+	const isFolder = iconName === "folder";
 	let html = "";
-	if (isImage) {
+	if (isFolder) {
+		html = '<span class="sp-dock-folder" aria-hidden="true"></span>';
+	} else if (isImage) {
 		html = `<img src="${frappe.utils.escape_html(iconName)}" alt="" />`;
 	} else {
 		html = dock_icon_html(iconName);
@@ -1992,6 +2467,112 @@ function label_workspace_dock() {
 
 function remove_sidebar_search() {
 	$(".body-sidebar .staff-pro-sidebar-search").remove();
+	$(".body-sidebar .standard-items-band").remove();
+	$(".body-sidebar .navbar-modal-search-mobile, .body-sidebar .sidebar-notification, .body-sidebar .sidebar-background-tasks")
+		.closest(".sidebar-item-container, .standard-sidebar-item")
+		.addBack()
+		.remove();
+}
+
+function patch_standard_items_band() {
+	const Sidebar = frappe.ui && frappe.ui.Sidebar;
+	if (!Sidebar?.prototype || Sidebar.prototype._staff_pro_no_standard_band) return;
+	Sidebar.prototype._staff_pro_no_standard_band = true;
+
+	const original = Sidebar.prototype.add_standard_items;
+	Sidebar.prototype.add_standard_items = function () {
+		if (should_use_staff_pro_desk_home()) {
+			this.standard_items_setup = true;
+			this.wrapper?.find(".standard-items-band").remove();
+			return;
+		}
+		return typeof original === "function" ? original.apply(this, arguments) : undefined;
+	};
+}
+
+function patch_staff_pro_sidebar_app() {
+	const Sidebar = frappe.ui && frappe.ui.Sidebar;
+	if (!Sidebar?.prototype || Sidebar.prototype._staff_pro_app_fallback) return;
+	Sidebar.prototype._staff_pro_app_fallback = true;
+
+	const originalApp = Sidebar.prototype.get_sidebar_app;
+	Sidebar.prototype.get_sidebar_app = function () {
+		const app = typeof originalApp === "function" ? originalApp.apply(this, arguments) : null;
+		if (app) return app;
+		const data = frappe.boot?.app_data || [];
+		return data.find((entry) => entry?.app_name === "hrms") || data[0] || null;
+	};
+
+	const originalEnabled = Sidebar.prototype.dock_enabled;
+	if (typeof originalEnabled === "function") {
+		Sidebar.prototype.dock_enabled = function () {
+			if (originalEnabled.apply(this, arguments)) return true;
+			if (!should_use_staff_pro_desk_home()) return false;
+			const data = frappe.boot?.app_data || [];
+			const hrms = data.find((entry) => entry?.app_name === "hrms");
+			return this.collect_dock_entries(hrms).length > 0;
+		};
+	}
+}
+
+function pin_staff_pro_dock() {
+	if (!should_use_staff_pro_desk_home()) return;
+	patch_staff_pro_sidebar_app();
+
+	if (frappe.boot) {
+		frappe.boot.desk_settings = frappe.boot.desk_settings || {};
+		frappe.boot.desk_settings.dock_mode = "Pinned";
+	}
+
+	const Dock = staff_pro_dock_class();
+	if (Dock?.prototype && !Dock.prototype._staff_pro_always_visible) {
+		Dock.prototype._staff_pro_always_visible = true;
+
+		const original_apply = Dock.prototype.apply_open_state;
+		Dock.prototype.apply_open_state = function () {
+			this.enabled = true;
+			this.is_open = true;
+			this.is_pinned = true;
+			this.pinned = true;
+			$("body").addClass("dock-open dock-pinned dock-active");
+			this.$dock?.removeClass("hidden").attr("aria-hidden", "false").prop("inert", false);
+			if (typeof original_apply === "function") {
+				try {
+					original_apply.call(this);
+				} catch (e) {
+					/* overlay dock apply can assume a closed state */
+				}
+			}
+			this.$dock?.removeClass("hidden").attr("aria-hidden", "false").prop("inert", false);
+		};
+
+		Dock.prototype.close = function () {
+			this.is_open = true;
+			this.apply_open_state();
+		};
+	}
+
+	const dock = staff_pro_dock_instance();
+	if (dock) {
+		dock.enabled = true;
+		dock.is_open = true;
+		dock.is_pinned = true;
+		dock.pinned = true;
+		dock.$dock?.removeClass("hidden").attr("aria-hidden", "false").prop("inert", false);
+		if (!dock.$items?.children()?.length) {
+			try {
+				dock.refresh?.();
+			} catch (e) {
+				/* sidebar app may not be resolved yet */
+			}
+		}
+		dock.apply_pin?.();
+		dock.apply_open_state?.();
+	}
+	$("body").addClass("dock-open dock-pinned dock-active");
+	$(".dock:not(.hidden), .workspace-dock:not(.hidden)")
+		.attr("aria-hidden", "false")
+		.prop("inert", false);
 }
 
 function patch_workspace_dock() {
@@ -1999,6 +2580,9 @@ function patch_workspace_dock() {
 	patch_workspace_dock_logo();
 	patch_sidebar_header_branding();
 	patch_sidebar_workspace_switch();
+	patch_sidebar_expand_guard();
+	patch_standard_items_band();
+	pin_staff_pro_dock();
 
 	const Dock = staff_pro_dock_class();
 	if (!Dock || Dock.prototype._staff_pro_labeled) return;
@@ -2151,6 +2735,7 @@ function watch_workspace_dock() {
 	inject_sidebar_css();
 	disable_app_onboarding();
 	disable_sidebar_help();
+	patch_sidebar_pinned_visibility();
 	patch_workspace_dock();
 	patch_form_sidebar_policy();
 	apply_form_sidebar_policy();
@@ -2158,9 +2743,15 @@ function watch_workspace_dock() {
 	label_workspace_dock();
 	render_staff_pro_dock_integrations();
 	remove_sidebar_search();
+	pin_staff_pro_dock();
+	pin_sidebar_user_menu();
 	enhance_sidebar_menus();
 	style_sidebar_collapse_toggle();
 	inject_my_work_sidebar_link();
+	keep_staff_pro_sidebar_expanded();
+	if (should_use_staff_pro_desk_home() && frappe.app?.sidebar && !frappe.app.sidebar.current_module) {
+		staff_pro_activate_sidebar(staff_pro_hr_home_sidebar());
+	}
 
 	const dock = document.querySelector(".dock, .workspace-dock");
 	const sidebar = document.querySelector(".body-sidebar");
@@ -2177,6 +2768,8 @@ function watch_workspace_dock() {
 			label_workspace_dock();
 			render_staff_pro_dock_integrations();
 			remove_sidebar_search();
+			pin_staff_pro_dock();
+			keep_staff_pro_sidebar_expanded();
 			enhance_sidebar_menus();
 			style_sidebar_collapse_toggle();
 			inject_my_work_sidebar_link();
@@ -2187,7 +2780,7 @@ function watch_workspace_dock() {
 		}
 	});
 	if (dock) observer.observe(dock, { childList: true, subtree: true });
-	if (container) observer.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+	if (container) observer.observe(container, { childList: true, subtree: true });
 	else if (sidebar) observer.observe(sidebar, { childList: true, subtree: true });
 }
 
@@ -2250,6 +2843,7 @@ const STAFF_PRO_WORKSPACE_DASHBOARDS = {
 	payroll: ["dashboard-view", "Payroll"],
 	talent: ["dashboard-view", "Recruitment"],
 	recruitment: ["dashboard-view", "Recruitment"],
+	filesystem: ["agent-filesystem"],
 	floor: ["floor-map"],
 	"ss and taxes": ["dashboard-view", "SS and Taxes"],
 };
@@ -2450,7 +3044,80 @@ function patch_list_page_chrome() {
 	};
 }
 
+function is_td4_desk_route() {
+	const route = frappe.get_route?.() || [];
+	const path = (window.location.pathname || "").toLowerCase();
+	return (
+		((route[0] === "List" || route[0] === "Form") && route[1] === "TD4 Form") ||
+		path.includes("/td4-form")
+	);
+}
+
+function remove_td4_sidebar_items() {
+	document.querySelectorAll('.body-sidebar a.item-anchor[href*="td4-form"]').forEach((anchor) => {
+		anchor.closest(".sidebar-item-container")?.remove();
+	});
+}
+
+function staff_pro_can_see_td4() {
+	const access = frappe.boot?.staff_pro_access;
+	if (!access || !("see_td4_forms" in access)) return true;
+	return !!access.see_td4_forms;
+}
+
+function pin_td4_forms_under_filesystem(attempt) {
+	if (!staff_pro_can_see_td4()) {
+		remove_td4_sidebar_items();
+		return;
+	}
+	const tries = typeof attempt === "number" ? attempt : 0;
+	const route = frappe.get_route?.() || [];
+	const onFilesystemPage = route[0] === "agent-filesystem";
+	const onTd4 = is_td4_desk_route();
+	const sidebar = frappe.app?.sidebar;
+	const current = String(sidebar?.current_module || sidebar?.sidebar_title || "");
+	const onFilesystemSidebar = current.toLowerCase() === "filesystem";
+
+	if (!onFilesystemSidebar) {
+		remove_td4_sidebar_items();
+		if ((onFilesystemPage || onTd4) && sidebar && typeof sidebar.select_module === "function" && tries < 5) {
+			sidebar.select_module("Filesystem");
+			setTimeout(() => pin_td4_forms_under_filesystem(tries + 1), 60);
+		}
+		return;
+	}
+
+	const items = document.querySelector(".body-sidebar .sidebar-items");
+	if (!items) return;
+	let anchor = items.querySelector('a.item-anchor[href*="td4-form"]');
+	if (!anchor) {
+		const container = document.createElement("div");
+		container.className = "sidebar-item-container sp-afs-td4";
+		container.innerHTML = `
+			<div class="standard-sidebar-item">
+				<a href="/desk/td4-form" class="item-anchor">
+					<span class="sidebar-item-icon" aria-hidden="true"></span>
+					<span class="sidebar-item-label">${frappe.utils.escape_html(__("TD4 Forms"))}</span>
+				</a>
+			</div>`;
+		const first = items.querySelector(":scope > .sidebar-item-container");
+		if (first) first.after(container);
+		else items.prepend(container);
+		anchor = container.querySelector("a.item-anchor");
+	} else if (!anchor.closest(".sp-afs-td4") && items.querySelector(".sp-afs-nav")) {
+		const container = anchor.closest(".sidebar-item-container");
+		const first = items.querySelector(":scope > .sidebar-item-container");
+		if (container && first && container !== first && container.previousElementSibling !== first) {
+			first.after(container);
+		}
+	}
+
+	const item = anchor.closest(".standard-sidebar-item");
+	if (item) item.classList.toggle("active-sidebar", onTd4);
+}
+
 $(document).on("app_ready", patch_staff_pro_desktop_redirect);
+$(document).on("app_ready", () => pin_td4_forms_under_filesystem());
 $(document).on("app_ready", () => redirect_staff_pro_desk_home({ includeWorkforceBootstrap: true }));
 $(document).on("app_ready", prefer_employee_image_view);
 $(document).on("app_ready", patch_form_sidebar_policy);
@@ -2460,8 +3127,11 @@ $(document).on("app_ready", hide_page_menu);
 $(document).on("app_ready", hide_list_page_chrome);
 $(document).on("page-change", () => redirect_staff_pro_desk_home());
 $(document).on("page-change", refresh_staff_pro_dock_shortcuts);
+$(document).on("page-change", pin_sidebar_user_menu);
 $(document).on("page-change", enhance_sidebar_menus);
+$(document).on("page-change", keep_staff_pro_sidebar_expanded);
 $(document).on("page-change", prefer_employee_image_view);
 $(document).on("page-change", hide_page_menu);
 $(document).on("page-change", hide_list_page_chrome);
 $(document).on("page-change", apply_form_sidebar_policy);
+$(document).on("page-change", pin_td4_forms_under_filesystem);

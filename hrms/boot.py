@@ -254,6 +254,11 @@ def extend_bootinfo(bootinfo):
 		bootinfo["staff_pro_portal_routes"] = STAFF_PRO_PORTAL_ROUTES
 		bootinfo["staff_pro_brand"] = STAFF_PRO_BRAND
 		bootinfo["staff_pro_integrations"] = STAFF_PRO_INTEGRATIONS
+		desk_settings = bootinfo.get("desk_settings")
+		if not isinstance(desk_settings, dict):
+			desk_settings = {}
+			bootinfo["desk_settings"] = desk_settings
+		desk_settings["dock_mode"] = "Pinned"
 
 	_disable_app_onboarding_bootinfo(bootinfo)
 
