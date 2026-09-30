@@ -30,7 +30,7 @@ COPY --chown=frappe:frappe . /home/frappe/frappe-bench/apps/hrms
 WORKDIR /home/frappe/frappe-bench
 
 RUN ./env/bin/pip install -e apps/hrms --quiet && \
-	grep -qx "hrms" sites/apps.txt || echo hrms >> sites/apps.txt && \
+	python3 apps/hrms/deploy/ensure_hrms_in_apps_txt.py && \
 	yarn --cwd apps/hrms install && \
 	yarn --cwd apps/hrms build && \
 	bench build --app hrms
