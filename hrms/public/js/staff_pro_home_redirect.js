@@ -71,6 +71,12 @@
 				min-height: 100vh !important;
 				min-height: 100dvh !important;
 			}
+			.body-sidebar-container .overlay,
+			.body-sidebar-container.expanded .overlay {
+				display: none !important;
+				pointer-events: none !important;
+				background: transparent !important;
+			}
 			@media (min-width: 768px) {
 				.dock,
 				.workspace-dock {
@@ -112,6 +118,15 @@
 					visibility: visible !important;
 					color: #111111 !important;
 				}
+				.dock-item,
+				.dock-item svg,
+				.dock-item .icon,
+				.dock-item img {
+					opacity: 1 !important;
+					visibility: visible !important;
+					--icon-motion-opacity: 1;
+					color: #111111 !important;
+				}
 				.body-sidebar-container,
 				.body-sidebar-container:not(.expanded),
 				.body-sidebar-container.sidebar-hidden {
@@ -150,6 +165,14 @@
 					transform: none !important;
 					width: auto !important;
 					color: #111111 !important;
+				}
+				.body-sidebar .body-sidebar-top,
+				.body-sidebar .sidebar-items {
+					opacity: 1 !important;
+					visibility: visible !important;
+					flex: 1 1 auto !important;
+					min-height: 0 !important;
+					overflow: auto !important;
 				}
 			}
 		`;

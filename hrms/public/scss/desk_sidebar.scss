@@ -274,6 +274,15 @@ body.staff-pro-has-topbar .body-sidebar-container {
 	transform: none !important;
 }
 
+.body-sidebar-container .overlay,
+.body-sidebar-container.expanded .overlay {
+	display: none !important;
+	pointer-events: none !important;
+	background: transparent !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
 /* —— Body sidebar (menus + submenus) —— */
 .body-sidebar {
 	position: absolute;

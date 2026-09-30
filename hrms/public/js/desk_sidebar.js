@@ -404,6 +404,52 @@ body.staff-pro-has-topbar .body-sidebar-container {
 	opacity: 1 !important;
 	transform: none !important;
 }
+.body-sidebar-container .overlay,
+.body-sidebar-container.expanded .overlay {
+	display: none !important;
+	pointer-events: none !important;
+	background: transparent !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+.dock-item,
+.dock-item svg,
+.dock-item .icon,
+.dock-item img,
+.workspace-dock-item svg,
+.workspace-dock-item .icon {
+	opacity: 1 !important;
+	visibility: visible !important;
+	--icon-motion-opacity: 1;
+}
+.body-sidebar .body-sidebar-top,
+.body-sidebar .sidebar-items {
+	display: flex !important;
+	flex-direction: column !important;
+	flex: 1 1 auto !important;
+	min-height: 0 !important;
+	opacity: 1 !important;
+	visibility: visible !important;
+	overflow-x: hidden !important;
+	overflow-y: auto !important;
+}
+.body-sidebar-container:not(.expanded) .body-sidebar > *,
+.body-sidebar-container.sidebar-hidden .body-sidebar > * {
+	opacity: 1 !important;
+	transform: none !important;
+	visibility: visible !important;
+}
+.body-sidebar-container:not(.expanded) .body-sidebar .sidebar-item-label,
+.body-sidebar-container.sidebar-hidden .body-sidebar .sidebar-item-label,
+.body-sidebar-container:not(.expanded) .body-sidebar .avatar-name-email,
+.body-sidebar-container.sidebar-hidden .body-sidebar .avatar-name-email {
+	opacity: 1 !important;
+	visibility: visible !important;
+	width: auto !important;
+	flex: 1 1 auto !important;
+	overflow: visible !important;
+	color: #111111 !important;
+}
 .body-sidebar .sidebar-header {
 	display: flex !important;
 	align-items: center !important;
@@ -1770,10 +1816,17 @@ function patch_sidebar_expand_guard() {
 	};
 }
 
+let _staff_pro_sidebar_lock = false;
+
 function keep_staff_pro_sidebar_expanded() {
 	patch_sidebar_expand_guard();
 	if (!should_use_staff_pro_desk_home()) return;
 	if (typeof frappe.is_mobile === "function" && frappe.is_mobile()) return;
+	if (_staff_pro_sidebar_lock) return;
+	_staff_pro_sidebar_lock = true;
+	requestAnimationFrame(() => {
+		_staff_pro_sidebar_lock = false;
+	});
 	try {
 		localStorage.setItem("sidebar-expanded", "true");
 	} catch (e) {
@@ -2611,7 +2664,7 @@ function watch_workspace_dock() {
 		}
 	});
 	if (dock) observer.observe(dock, { childList: true, subtree: true });
-	if (container) observer.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+	if (container) observer.observe(container, { childList: true, subtree: true });
 	else if (sidebar) observer.observe(sidebar, { childList: true, subtree: true });
 }
 
