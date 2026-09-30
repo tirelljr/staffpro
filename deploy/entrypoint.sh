@@ -81,6 +81,21 @@ start_nginx() {
 	fi
 }
 
+start_realtime_service() {
+	local socketio="$BENCH/apps/frappe/socketio.js"
+	if [ ! -f "$socketio" ]; then
+		echo "Frappe socketio.js not found; desk realtime disabled" >&2
+		return 0
+	fi
+	(
+		while true; do
+			echo "Starting Frappe realtime on port 9000..." >&2
+			node "$socketio" || echo "Frappe realtime exited; restarting in 3s..." >&2
+			sleep 3
+		done
+	) &
+}
+
 create_or_migrate_site() {
 	if [ ! -f "sites/${SITE_NAME}/site_config.json" ]; then
 		echo "Creating site ${SITE_NAME}..."
@@ -132,13 +147,18 @@ fi
 	--preload \
 	frappe.app:application &
 
-if [ -f "$BENCH/apps/frappe/socketio.js" ]; then
-	node "$BENCH/apps/frappe/socketio.js" &
-fi
+start_realtime_service
 
 bench worker --queue short,default,long &
 bench schedule &
 
 echo "Staff Pro is running on port ${PORT}"
-wait -n
-exit 1
+# Keep the container alive while any core service runs (do not exit when one job stops).
+set +e
+while true; do
+	if ! pgrep -f "gunicorn.*frappe.app:application" >/dev/null 2>&1; then
+		echo "Gunicorn stopped; exiting container" >&2
+		exit 1
+	fi
+	sleep 30
+done
