@@ -115,7 +115,9 @@ create_or_migrate_site() {
 refresh_desk_assets() {
 	# bench build during the Docker image build has no Redis; assets.json may be stale.
 	echo "Refreshing desk assets (Redis is available at runtime)..."
+	yarn --cwd apps/hrms build || true
 	bench build --app hrms || true
+	bench --site "$SITE_NAME" execute hrms.branding.repair_desk_ltr_bundles || true
 	bench --site "$SITE_NAME" execute hrms.branding.apply_branding || true
 	bench --site "$SITE_NAME" clear-cache || true
 }

@@ -277,7 +277,8 @@ body.staff-pro-has-topbar .body-sidebar-container {
 /* —— Body sidebar (menus + submenus) —— */
 .body-sidebar {
 	position: absolute;
-	left: 0;
+	left: 0 !important;
+	right: auto !important;
 	top: 0;
 	bottom: 0;
 	z-index: 1020;

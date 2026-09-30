@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 from pathlib import Path
 
@@ -56,13 +57,18 @@ def update_website_context(context):
 
 def ensure_desk_bundles():
 	"""Publish hashed desk CSS/JS so first login can load the custom BPO UI."""
-	ensure_hashed_bundle("hrms.bundle.css", ("css", "css-rtl"))
-	ensure_hashed_bundle("hrms.bundle.js", ("js", "js-rtl"))
+	repair_desk_ltr_bundles()
 
 
 def ensure_ltr_bundle_css():
-	"""Copy the RTL bundle to the LTR path when Docker/Windows skips dist/css."""
-	ensure_hashed_bundle("hrms.bundle.css", ("css", "css-rtl"))
+	"""Publish the LTR desk stylesheet only (never the rtlcss mirror)."""
+	ensure_hashed_bundle("hrms.bundle.css", ("css",))
+
+
+def repair_desk_ltr_bundles():
+	"""Rebuild-safe publish: desk CSS must come from dist/css, not dist/css-rtl."""
+	ensure_hashed_bundle("hrms.bundle.css", ("css",))
+	ensure_hashed_bundle("hrms.bundle.js", ("js",))
 
 
 def ensure_hashed_bundle(manifest_key: str, folders: tuple[str, ...]):
@@ -86,17 +92,25 @@ def publish_hashed_bundle(
 	manifest_key: str,
 	folders: tuple[str, ...],
 ):
-	"""If the hashed bundle is missing, copy the newest matching file onto that name."""
+	"""Copy the newest bundle from ``folders[0]`` onto the hashed name in assets.json.
+
+	Only the primary folder is used. ``css-rtl`` / ``js-rtl`` mirrors must never be
+	published as the LTR assets the desk loads — that mirrors the sidebar to
+	``right: 0`` and the menu appears blank.
+	"""
+	if not folders:
+		return None
+	directory = app_dist / folders[0]
+	pattern = f"{Path(manifest_key).stem}.*{Path(manifest_key).suffix}"
 	sources = []
-	for folder in folders:
-		directory = app_dist / folder
-		if directory.exists():
-			pattern = f"{Path(manifest_key).stem}.*{Path(manifest_key).suffix}"
-			sources.extend(
-				path
-				for path in directory.glob(pattern)
-				if path.is_file() and path.stat().st_size and not path.name.endswith(".map")
-			)
+	if directory.exists():
+		sources = [
+			path
+			for path in directory.glob(pattern)
+			if path.is_file() and path.stat().st_size and not path.name.endswith(".map")
+		]
+	if manifest_key.endswith(".css"):
+		sources = [path for path in sources if css_bundle_is_ltr(path)]
 
 	if not sources:
 		return None
@@ -115,7 +129,30 @@ def publish_hashed_bundle(
 			if map_src.exists():
 				shutil.copy2(map_src, dest.with_name(dest.name + ".map"))
 
+	if dest.exists() and manifest_key.endswith(".css") and not css_bundle_is_ltr(dest):
+		frappe.log_error(
+			title="Staff Pro desk CSS is RTL",
+			message=f"Refusing to publish mirrored stylesheet: {dest}",
+		)
+		return None
+
 	return dest
+
+
+def css_bundle_is_ltr(path: Path) -> bool:
+	"""Detect rtlcss output mistakenly published as hrms.bundle.css."""
+	try:
+		text = path.read_text(encoding="utf-8", errors="replace")[:400_000]
+	except OSError:
+		return False
+	compact = re.sub(r"\s+", "", text)
+	if "direction:rtl" in compact:
+		return False
+	# rtlcss mirrors the desk sidebar onto the right edge of its container.
+	if re.search(r"\.body-sidebar\{[^}]*position:absolute[^}]*right:0", compact):
+		if not re.search(r"\.body-sidebar\{[^}]*left:0", compact):
+			return False
+	return True
 
 
 def _wanted_bundle_name(manifest: Path, manifest_key: str) -> str:

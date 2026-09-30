@@ -372,6 +372,7 @@ body.staff-pro-has-topbar .body-sidebar-container {
 .body-sidebar {
 	position: absolute !important;
 	left: 0 !important;
+	right: auto !important;
 	top: 0 !important;
 	bottom: 0 !important;
 	z-index: 1020 !important;
