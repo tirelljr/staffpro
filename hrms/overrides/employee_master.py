@@ -370,8 +370,14 @@ def _can_assign_user_roles() -> bool:
 
 
 @frappe.whitelist()
-def create_user_login(username: str, first_name: str, roles=None, last_name: str | None = None) -> dict:
-	"""Create a desk user from a username and Role records."""
+def create_user_login(
+	username: str,
+	first_name: str | None = None,
+	roles: str | list | None = None,
+	last_name: str | None = None,
+	new_password: str | None = None,
+) -> dict:
+	"""Create a desk user from a username, password, and Role records."""
 	frappe.has_permission("User", "create", throw=True)
 	login = clean_username(username)
 	if frappe.db.exists("User", {"username": login}) or frappe.db.exists("User", local_login_email(login)):
@@ -384,6 +390,7 @@ def create_user_login(username: str, first_name: str, roles=None, last_name: str
 	if chosen and not _can_assign_user_roles():
 		frappe.throw(_("You do not have permission to assign roles."), frappe.PermissionError)
 
+	password = _checked_password(new_password)
 	user = frappe.get_doc(
 		{
 			"doctype": "User",
@@ -397,8 +404,65 @@ def create_user_login(username: str, first_name: str, roles=None, last_name: str
 			"roles": [{"doctype": "Has Role", "role": role} for role in chosen],
 		}
 	)
+	user.flags.ignore_password_policy = True
 	user.insert()
+	_store_login_password(user.name, password)
 	return user.as_dict()
+
+
+@frappe.whitelist()
+def get_user_password(user: str) -> dict:
+	"""Return the saved login password for an admin. Empty until a password is set here or the user signs in."""
+	login = _password_target(user)
+	frappe.has_permission("User", "read", login, throw=True)
+	_require_password_admin()
+	from hrms.overrides.employee_profile import read_viewable_password
+
+	return {"password": read_viewable_password(login), "user": login}
+
+
+@frappe.whitelist()
+def set_user_password(user: str, new_password: str, logout_all_sessions: int = 0) -> dict:
+	"""Set a desk user's login password without emailing a reset link."""
+	login = _password_target(user)
+	frappe.has_permission("User", "write", login, throw=True)
+	_require_password_admin()
+	password = _checked_password(new_password)
+	_store_login_password(login, password, logout_all_sessions=cint(logout_all_sessions))
+	return {"ok": True, "user": login}
+
+
+def _password_target(user: str) -> str:
+	login = (user or "").strip()
+	if login in {"", "Administrator", "Guest"} or not frappe.db.exists("User", login):
+		frappe.throw(_("User {0} was not found.").format(frappe.bold(login or _("Unknown"))))
+	return login
+
+
+def _require_password_admin() -> None:
+	from hrms.overrides.employee_profile import PASSWORD_ROLES
+
+	if not set(frappe.get_roles()).intersection(PASSWORD_ROLES):
+		frappe.throw(_("Not permitted to change this password."), frappe.PermissionError)
+
+
+def _checked_password(new_password: str | None) -> str:
+	password = new_password or ""
+	if len(password) < 8:
+		frappe.throw(_("Password must be at least 8 characters."))
+	return password
+
+
+def _store_login_password(user: str, password: str, logout_all_sessions: int = 0) -> None:
+	from frappe.utils import today
+	from frappe.utils.password import update_password
+
+	from hrms.overrides.employee_profile import remember_viewable_password
+
+	update_password(user, password, logout_all_sessions=cint(logout_all_sessions))
+	remember_viewable_password(user, password)
+	if frappe.get_meta("User").has_field("last_password_reset_date"):
+		frappe.db.set_value("User", user, "last_password_reset_date", today(), update_modified=False)
 
 
 def clean_username(value: str | None) -> str:

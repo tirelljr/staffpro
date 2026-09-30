@@ -341,7 +341,7 @@
 		});
 	}
 
-	const USER_ACTION_LABELS = new Set(["Impersonate", "Create User Email"]);
+	const USER_ACTION_LABELS = new Set(["Impersonate", "Create User Email", "Reset Password"]);
 
 	function strip_user_buttons(root) {
 		if (!root) return;

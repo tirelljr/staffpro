@@ -184,12 +184,18 @@ def _decode_signature(signature: str | None) -> bytes:
 	return raw
 
 
+def _employee_columns() -> set[str]:
+	"""Read the live table. The column cache can still list fields that were dropped."""
+	return set(frappe.db.sql("SHOW COLUMNS FROM `tabEmployee`", pluck="Field") or [])
+
+
 def employee_identity(employee: str) -> dict:
 	meta = frappe.get_meta("Employee")
+	columns = _employee_columns()
 	fields = ["employee_name", "company", "current_address", "permanent_address"]
-	if meta.has_field("pan_number") and frappe.db.has_column("Employee", "pan_number"):
+	if meta.has_field("pan_number") and "pan_number" in columns:
 		fields.append("pan_number")
-	if meta.has_field("social_security_number") and frappe.db.has_column("Employee", "social_security_number"):
+	if meta.has_field("social_security_number") and "social_security_number" in columns:
 		fields.append("social_security_number")
 	row = frappe.db.get_value("Employee", employee, fields, as_dict=True)
 	if not row:

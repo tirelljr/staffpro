@@ -245,11 +245,231 @@ function hide_unused_user_settings(frm) {
 }
 
 function strip_unused_user_actions(frm) {
-	["Impersonate", "Create User Email"].forEach((label) => {
+	["Impersonate", "Create User Email", "Reset Password"].forEach((label) => {
+		frm.remove_custom_button(__(label), __("Password"));
 		frm.remove_custom_button(__(label));
 		frm.page?.remove_inner_button?.(__(label));
+		frm.page?.remove_inner_button?.(__(label), __("Password"));
 	});
 	window.hrms?.role_access?.strip_user_buttons?.(frm.page?.wrapper || frm.$wrapper);
+	ensure_set_password_button(frm);
+}
+
+const USER_PASSWORD_ADMIN_ROLES = ["System Manager", "HR Manager", "HR User", "Administrator"];
+
+function is_user_password_admin() {
+	return (frappe.user_roles || []).some((role) => USER_PASSWORD_ADMIN_ROLES.includes(role));
+}
+
+function can_change_user_password(frm) {
+	const can_write =
+		typeof frappe.model.can_write === "function" ? frappe.model.can_write("User") : true;
+	return (
+		can_write &&
+		!frm.is_new() &&
+		!!frm.doc?.name &&
+		!["Administrator", "Guest"].includes(frm.doc.name) &&
+		is_user_password_admin()
+	);
+}
+
+function ensure_set_password_button(frm) {
+	if (!can_change_user_password(frm)) return;
+	const label = __("Set Password");
+	const $actions = $(frm.page?.wrapper).find(".page-actions, .custom-actions");
+	const exists = $actions.find("button, a").filter(function () {
+		return $(this).text().replace(/\s+/g, " ").trim() === label;
+	}).length;
+	if (exists) return;
+	frm.add_custom_button(label, () => open_set_password_dialog(frm), __("Password"));
+}
+
+function setup_user_password_panel(frm) {
+	const $page = frm.page?.wrapper || frm.$wrapper;
+	if (!$page?.length) return;
+
+	if (!can_change_user_password(frm)) {
+		$page.find(".sp-user-password").remove();
+		return;
+	}
+
+	const mount = () => {
+		const $section = $page.find('.form-section[data-fieldname="section_break_3"]').first();
+		if (!$section.length) return false;
+		const $body = $section.children(".section-body");
+		const $host = $body.length ? $body : $section;
+		$page.find(".sp-user-password").not($host.children(".sp-user-password")).remove();
+		if ($host.children(".sp-user-password").length) return true;
+
+		const $panel = $(`
+			<div class="sp-user-password sp-emp-password" style="clear:both;width:100%;flex:0 0 100%;max-width:100%;margin-top:12px">
+				<div class="sp-emp-password__title">${frappe.utils.escape_html(__("Password"))}</div>
+				<p class="sp-emp-password__help">${frappe.utils.escape_html(
+					__("Set or change this person's login password."),
+				)}</p>
+				<label class="sp-emp-password__label">
+					<span>${frappe.utils.escape_html(__("Current password"))}</span>
+					<div class="sp-emp-password__reveal">
+						<input type="password" class="form-control sp-user-password__current" readonly autocomplete="off" placeholder="${frappe.utils.escape_html(__("Hidden"))}" />
+						<button type="button" class="btn btn-default btn-sm sp-user-password__toggle">${frappe.utils.escape_html(__("Show"))}</button>
+					</div>
+					<div class="sp-user-password__note text-muted"></div>
+				</label>
+				<label class="sp-emp-password__label">
+					<span>${frappe.utils.escape_html(__("New password"))}</span>
+					<input type="password" class="form-control sp-user-password__input" autocomplete="new-password" />
+				</label>
+				<label class="sp-emp-password__label">
+					<span>${frappe.utils.escape_html(__("Confirm password"))}</span>
+					<input type="password" class="form-control sp-user-password__confirm" autocomplete="new-password" />
+				</label>
+				<label class="sp-emp-password__check">
+					<input type="checkbox" class="sp-user-password__logout" />
+					<span>${frappe.utils.escape_html(__("Log out of all sessions"))}</span>
+				</label>
+				<button type="button" class="btn btn-primary btn-sm sp-emp-password__save sp-user-password__save">${frappe.utils.escape_html(
+					__("Update Password"),
+				)}</button>
+			</div>
+		`).appendTo($host);
+
+		$panel.on("click", ".sp-user-password__toggle", () => {
+			const $input = $panel.find(".sp-user-password__current");
+			const $note = $panel.find(".sp-user-password__note");
+			const $button = $panel.find(".sp-user-password__toggle");
+			if ($input.attr("type") === "text") {
+				$input.attr("type", "password").val("");
+				$note.text("");
+				$button.text(__("Show"));
+				return;
+			}
+			frappe.call({
+				method: "hrms.overrides.employee_master.get_user_password",
+				args: { user: frm.doc.name },
+				freeze: true,
+				freeze_message: __("Loading password..."),
+			}).then((r) => {
+				const password = r.message?.password || "";
+				if (!password) {
+					$input.attr("type", "password").val("");
+					$note.text(
+						__(
+							"No saved password yet. It is stored when you set one here, or the next time this person signs in.",
+						),
+					);
+					return;
+				}
+				$input.attr("type", "text").val(password);
+				$note.text("");
+				$button.text(__("Hide"));
+			});
+		});
+
+		$panel.on("click", ".sp-user-password__save", () => {
+			const password = String($panel.find(".sp-user-password__input").val() || "");
+			const confirm = String($panel.find(".sp-user-password__confirm").val() || "");
+			if (password.length < 8) {
+				frappe.msgprint(__("Password must be at least 8 characters."));
+				return;
+			}
+			if (password !== confirm) {
+				frappe.msgprint(__("Passwords do not match."));
+				return;
+			}
+			const $save = $panel.find(".sp-user-password__save").prop("disabled", true);
+			frappe.call({
+				method: "hrms.overrides.employee_master.set_user_password",
+				args: {
+					user: frm.doc.name,
+					new_password: password,
+					logout_all_sessions: $panel.find(".sp-user-password__logout").is(":checked") ? 1 : 0,
+				},
+				freeze: true,
+				freeze_message: __("Updating password..."),
+				callback(r) {
+					$save.prop("disabled", false);
+					if (!r?.message) return;
+					$panel.find(".sp-user-password__input, .sp-user-password__confirm").val("");
+					$panel.find(".sp-user-password__logout").prop("checked", false);
+					$panel.find(".sp-user-password__current").attr("type", "password").val("");
+					$panel.find(".sp-user-password__note").text("");
+					$panel.find(".sp-user-password__toggle").text(__("Show"));
+					frappe.show_alert({
+						message: __("Password updated"),
+						indicator: "green",
+					});
+				},
+				error() {
+					$save.prop("disabled", false);
+				},
+			});
+		});
+		return true;
+	};
+
+	if (mount() || frm._user_password_waiting) return;
+	frm._user_password_waiting = true;
+	let tries = 0;
+	const timer = setInterval(() => {
+		tries += 1;
+		if (mount() || tries > 20) {
+			clearInterval(timer);
+			frm._user_password_waiting = false;
+		}
+	}, 150);
+}
+
+function open_set_password_dialog(frm) {
+	const dialog = new frappe.ui.Dialog({
+		title: __("Set Password"),
+		fields: [
+			{
+				fieldname: "new_password",
+				fieldtype: "Password",
+				label: __("New Password"),
+				reqd: 1,
+			},
+			{
+				fieldname: "confirm_password",
+				fieldtype: "Password",
+				label: __("Confirm Password"),
+				reqd: 1,
+			},
+		],
+		primary_action_label: __("Save"),
+		primary_action(values) {
+			const password = String(values.new_password || "");
+			const confirm = String(values.confirm_password || "");
+			if (password.length < 8) {
+				frappe.msgprint(__("Password must be at least 8 characters."));
+				return;
+			}
+			if (password !== confirm) {
+				frappe.msgprint(__("Passwords do not match."));
+				return;
+			}
+			dialog.get_primary_btn().prop("disabled", true);
+			frappe.call({
+				method: "hrms.overrides.employee_master.set_user_password",
+				args: {
+					user: frm.doc.name,
+					new_password: password,
+				},
+				callback(r) {
+					if (!r?.message) return;
+					dialog.hide();
+					frappe.show_alert({
+						message: __("Password updated"),
+						indicator: "green",
+					});
+				},
+				error() {
+					dialog.get_primary_btn().prop("disabled", false);
+				},
+			});
+		},
+	});
+	dialog.show();
 }
 
 function use_username_for_new_user(frm) {
@@ -269,6 +489,7 @@ function apply_bpo_user_form(frm) {
 	lock_belize_user_timezone(frm);
 	hide_unused_user_settings(frm);
 	strip_unused_user_actions(frm);
+	setup_user_password_panel(frm);
 }
 
 function watch_user_pickers(frm) {

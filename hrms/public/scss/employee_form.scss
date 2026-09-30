@@ -112,6 +112,14 @@
 	font-size: 11px;
 }
 
+#page-User .form-section[data-fieldname="section_break_3"] .sp-user-password {
+	clear: both;
+	width: 100%;
+	flex: 0 0 100%;
+	max-width: 100%;
+	margin-top: 12px;
+}
+
 .sp-emp-stats {
 	padding: 12px 0 4px !important;
 	border-top: 1px solid var(--border-color, #eef1f4);

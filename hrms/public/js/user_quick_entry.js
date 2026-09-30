@@ -15,12 +15,26 @@ frappe.ui.form.UserQuickEntryForm = class UserQuickEntryForm extends frappe.ui.f
 		const fields = this.docfields.filter(
 			(df) => !["email", "first_name", "role_profiles"].includes(df.fieldname)
 		);
-		fields.unshift({
-			fieldname: "login_name",
-			fieldtype: "Data",
-			label: __("Username"),
-			reqd: 1,
-		});
+		fields.unshift(
+			{
+				fieldname: "login_name",
+				fieldtype: "Data",
+				label: __("Username"),
+				reqd: 1,
+			},
+			{
+				fieldname: "new_password",
+				fieldtype: "Password",
+				label: __("Password"),
+				reqd: 1,
+			},
+			{
+				fieldname: "confirm_password",
+				fieldtype: "Password",
+				label: __("Confirm Password"),
+				reqd: 1,
+			}
+		);
 		fields.push({
 			fieldname: "desk_roles",
 			fieldtype: "Table MultiSelect",
@@ -39,9 +53,21 @@ frappe.ui.form.UserQuickEntryForm = class UserQuickEntryForm extends frappe.ui.f
 		}
 
 		const username = (data.login_name || "").trim();
+		const password = String(data.new_password || "");
+		const confirm = String(data.confirm_password || "");
 		if (!username || username.includes("@")) {
 			this.dialog.working = false;
 			frappe.msgprint(__("Use a username, not an email address."));
+			return Promise.resolve();
+		}
+		if (password.length < 8) {
+			this.dialog.working = false;
+			frappe.msgprint(__("Password must be at least 8 characters."));
+			return Promise.resolve();
+		}
+		if (password !== confirm) {
+			this.dialog.working = false;
+			frappe.msgprint(__("Passwords do not match."));
 			return Promise.resolve();
 		}
 
@@ -53,6 +79,7 @@ frappe.ui.form.UserQuickEntryForm = class UserQuickEntryForm extends frappe.ui.f
 					first_name: data.first_name,
 					last_name: data.last_name,
 					roles: data.desk_roles || [],
+					new_password: password,
 				},
 				callback(r) {
 					if (r?.message) {
