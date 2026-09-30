@@ -773,29 +773,54 @@ body.staff-pro-has-topbar .body-sidebar-container {
 	display: none !important;
 }
 
-/* Collapsed submenu — let Frappe hide the panel instead of leaving a white strip */
-.body-sidebar-container:not(.expanded) {
-	width: 0 !important;
-	height: 0 !important;
-	min-height: 0 !important;
-	max-height: none !important;
-	overflow: visible !important;
-
-	.body-sidebar-placeholder {
-		width: 0 !important;
-		height: 0 !important;
+/* Staff Pro uses the dock + workspace menu as permanent navigation. Frappe can
+   boot with the panel collapsed/sidebar-hidden, so keep it visible on desktop. */
+@media (min-width: 768px) {
+	body.staff-pro-alive .body-sidebar-container,
+	body.staff-pro-alive .body-sidebar-container:not(.expanded),
+	body.staff-pro-alive .body-sidebar-container.sidebar-hidden {
+		display: flex !important;
+		flex: 0 0 var(--sidebar-width, 260px) !important;
+		width: var(--sidebar-width, 260px) !important;
+		height: auto !important;
+		min-height: calc(100vh - 64px) !important;
+		min-height: calc(100dvh - 64px) !important;
+		overflow: visible !important;
+		visibility: visible !important;
+		opacity: 1 !important;
 	}
 
-	.body-sidebar {
-		width: 0 !important;
-		height: 0 !important;
-		background: transparent !important;
-		border-right-color: transparent !important;
-		pointer-events: none;
+	body.staff-pro-alive .body-sidebar-container:not(.expanded) .body-sidebar-placeholder {
+		display: block !important;
+		width: var(--sidebar-width, 260px) !important;
+		height: 100% !important;
 	}
 
-	.body-sidebar .collapse-sidebar-link {
-		display: none !important;
+	body.staff-pro-alive .body-sidebar-container:not(.expanded) .body-sidebar,
+	body.staff-pro-alive .body-sidebar-container.sidebar-hidden .body-sidebar {
+		width: var(--sidebar-width, 260px) !important;
+		height: 100% !important;
+		min-height: 100% !important;
+		background: #ffffff !important;
+		border-right-color: var(--sp-sidebar-border) !important;
+		pointer-events: auto !important;
+		opacity: 1 !important;
+		visibility: visible !important;
+	}
+
+	body.staff-pro-alive .body-sidebar-container:not(.expanded) .body-sidebar > *,
+	body.staff-pro-alive .body-sidebar-container.sidebar-hidden .body-sidebar > *,
+	body.staff-pro-alive .body-sidebar-container:not(.expanded) .sidebar-item-label,
+	body.staff-pro-alive .body-sidebar-container.sidebar-hidden .sidebar-item-label,
+	body.staff-pro-alive .body-sidebar-container:not(.expanded) .avatar-name-email,
+	body.staff-pro-alive .body-sidebar-container.sidebar-hidden .avatar-name-email,
+	body.staff-pro-alive .body-sidebar-container:not(.expanded) .title-container,
+	body.staff-pro-alive .body-sidebar-container.sidebar-hidden .title-container {
+		opacity: 1 !important;
+		visibility: visible !important;
+		transform: none !important;
+		width: auto !important;
+		overflow: visible !important;
 	}
 }
 

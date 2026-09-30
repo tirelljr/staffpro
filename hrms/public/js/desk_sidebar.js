@@ -697,32 +697,42 @@ body.staff-pro-has-topbar .body-sidebar-container {
 	stroke: #000000 !important;
 	fill: none !important;
 }
-.body-sidebar-container:not(.expanded) {
-	width: 0 !important;
-	height: 0 !important;
-	min-height: 0 !important;
-	max-height: none !important;
-	overflow: visible !important;
-}
-.body-sidebar-container:not(.expanded) .body-sidebar-placeholder {
-	width: 0 !important;
-	height: 0 !important;
-}
-.body-sidebar-container:not(.expanded) .body-sidebar {
-	width: 0 !important;
-	height: 0 !important;
-	min-height: 0 !important;
-	background: transparent !important;
-	border-right-color: transparent !important;
-	pointer-events: none;
-}
-.body-sidebar-container:not(.expanded) .body-sidebar .collapse-sidebar-link {
-	display: none !important;
+/* Frappe can boot with the desk sidebar collapsed or sidebar-hidden. Staff Pro
+   uses the dock + menu as permanent navigation, so keep both visible. */
+@media (min-width: 768px) {
+	body.staff-pro-alive .body-sidebar-container,
+	body.staff-pro-alive .body-sidebar-container:not(.expanded),
+	body.staff-pro-alive .body-sidebar-container.sidebar-hidden {
+		display: flex !important;
+		flex: 0 0 var(--sidebar-width, 260px) !important;
+		width: var(--sidebar-width, 260px) !important;
+		height: auto !important;
+		min-height: calc(100vh - 64px) !important;
+		min-height: calc(100dvh - 64px) !important;
+		overflow: visible !important;
+		visibility: visible !important;
+		opacity: 1 !important;
+	}
+	body.staff-pro-alive .body-sidebar-container:not(.expanded) .body-sidebar-placeholder {
+		display: block !important;
+		width: var(--sidebar-width, 260px) !important;
+		height: 100% !important;
+	}
+	body.staff-pro-alive .body-sidebar-container:not(.expanded) .body-sidebar {
+		width: var(--sidebar-width, 260px) !important;
+		height: 100% !important;
+		min-height: 100% !important;
+		background: #ffffff !important;
+		border-right-color: #ececec !important;
+		pointer-events: auto !important;
+	}
 }
 /* Frappe pinned dock adds sidebar-hidden while the panel is open; labels stay opacity 0. */
 body.staff-pro-alive .body-sidebar-container.sidebar-hidden .body-sidebar,
 body.staff-pro-alive .body-sidebar-container.expanded .body-sidebar {
 	width: var(--sidebar-width, 260px) !important;
+	height: 100% !important;
+	min-height: 100% !important;
 	opacity: 1 !important;
 	pointer-events: auto !important;
 }
