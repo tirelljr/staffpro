@@ -75,6 +75,9 @@ if [ -d "/home/frappe/frappe-bench/apps/frappe" ]; then
     if [ -f ./Procfile ]; then
         sed -i '/^watch:/d' ./Procfile
     fi
+    # Socket.io runs inside the container, so auth callbacks must use the
+    # in-container web port (8000), not the host-published port (8001).
+    bench set-config -g webserver_host 127.0.0.1
     bench start
     exit 0
 fi
@@ -97,6 +100,7 @@ bench set-mariadb-host mariadb
 bench set-redis-cache-host redis://redis:6379
 bench set-redis-queue-host redis://redis:6379
 bench set-redis-socketio-host redis://redis:6379
+bench set-config -g webserver_host 127.0.0.1
 
 # Redis runs in a separate container. Skip `watch` — it overwrites production bundles.
 sed -i '/redis/d' ./Procfile

@@ -14,7 +14,7 @@ from hrms.payroll.doctype.salary_structure_assignment.salary_structure_assignmen
 	get_assigned_salary_structure,
 )
 
-DEFAULT_OVERTIME_THRESHOLD_HOURS = 80.0
+DEFAULT_OVERTIME_THRESHOLD_HOURS = 90.0
 DEFAULT_OVERTIME_PAY_MULTIPLIER = 1.5
 REGULAR_DAY_HOURS = 8.0
 
@@ -46,7 +46,7 @@ def get_overtime_pay_multiplier() -> float:
 
 
 def ordinary_overtime_hours(day_hours, hours_before: float, threshold: float) -> float:
-	"""Hours on this day that sit past the pay-period threshold (default 80)."""
+	"""Hours on this day that sit past the pay-period threshold (default 90)."""
 	day_hours = flt(day_hours)
 	period_over = max(flt(hours_before) + day_hours - flt(threshold), 0.0)
 	return flt(min(day_hours, period_over), 2)
@@ -59,8 +59,9 @@ def get_pay_period_overtime(
 	*,
 	ensure_holidays: bool = True,
 ) -> dict:
-	"""Hours past the pay-period threshold (10 working days / 80 hours by default)."""
+	"""Hours past the pay-period threshold (90 hours by default)."""
 	from hrms.payroll.daily_pay import (
+		apply_approved_week_hours,
 		ensure_paid_holiday_attendance,
 		ensure_working_hours_from_times,
 		get_public_holiday_pay_context,
@@ -87,6 +88,7 @@ def get_pay_period_overtime(
 		fields=fields,
 		order_by="attendance_date asc, creation asc, name asc",
 	)
+	apply_approved_week_hours(employee, rows)
 
 	threshold = get_employee_overtime_threshold(employee)
 	running_hours = 0.0
@@ -103,7 +105,7 @@ def get_pay_period_overtime(
 		if (row.status or "") == "Absent" and not is_holiday:
 			continue
 		hours = flt(row.working_hours) or flt(ensure_working_hours_from_times(row))
-		if is_holiday and hours <= 0 and flt(row.get("daily_pay")) > 0:
+		if is_holiday and hours <= 0 and flt(row.get("daily_pay")) > 0 and not row.get("_week_override"):
 			hours = REGULAR_DAY_HOURS
 		if hours <= 0:
 			continue

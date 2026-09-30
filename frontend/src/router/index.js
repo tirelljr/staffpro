@@ -65,6 +65,16 @@ const routes = [
 		component: () => import("@/views/Profile.vue"),
 	},
 	{
+		path: "/my-documents",
+		name: "MyDocuments",
+		component: () => import("@/views/MyDocuments.vue"),
+	},
+	{
+		path: "/td4/:id",
+		name: "TD4FormDetailView",
+		component: () => import("@/views/td4/Form.vue"),
+	},
+	{
 		path: "/notifications",
 		name: "Notifications",
 		component: () => import("@/views/Notifications.vue"),

@@ -16,6 +16,7 @@ from langgraph.graph.message import add_messages
 
 from frappe.utils import add_days, getdate
 
+from hrms.ai.permissions import PERMISSION_DENIED, denied_capability_labels, user_can_run_call
 from hrms.ai.settings import get_assistant_settings
 from hrms.ai.tools import get_enabled_tools
 from hrms.ai.tools.actions import WRITE_TOOL_NAMES, action_preview, bulk_action_preview
@@ -26,6 +27,7 @@ from hrms.hr.clock_format import parse_work_date
 class AgentState(TypedDict, total=False):
 	messages: Annotated[list[BaseMessage], add_messages]
 	pending_action: dict[str, Any] | None
+	permission_denied: bool
 
 
 SYSTEM_PROMPT = """You are Staff Pro Ask AI, an HR and payroll assistant inside Frappe.
@@ -35,7 +37,13 @@ This conversation and memory belong only to that user. Never recall or mix in an
 Private memory for this user:
 {memory}
 
-Use tools for all facts about employees, attendance, hours, overtime, time-off, payroll, agent queries, and floors.
+Your permissions are the signed-in user's permissions. If they can edit hours, run payroll, or open a screen, you can do that too. If an admin has not granted it, you cannot.
+Denied for this user: {denied}.
+When they ask for a denied capability, or a tool result says "{permission_denied}", reply with exactly: {permission_denied}
+Do not ask them to confirm a denied action and do not suggest a workaround.
+Use tools for all facts about employees, attendance, hours, overtime, time-off, payroll, agent queries, job letters, documents, and floors.
+When asked to show a job letter or an agent document, call show_documents and include the preview it returns.
+When asked to edit, approve, or reject a job letter or office print request, call edit_job_letter or review_job_letter. Do not change the letter in chat without that tool.
 Never invent records, totals, IDs, dates, or action outcomes.
 Keep answers concise and explain any chart or table returned by a tool.
 Use navigation tools when a user asks to open an area.
@@ -91,6 +99,8 @@ def _history_messages(history: list[dict], memory: str = "") -> list[BaseMessage
 				today_iso=str(today),
 				user=frappe.session.user,
 				memory=(memory or "").strip() or "None yet.",
+				denied=", ".join(denied_capability_labels()) or "None",
+				permission_denied=PERMISSION_DENIED,
 			)
 		)
 	]
@@ -256,6 +266,30 @@ def _pending_from_calls(calls: list[dict]) -> dict | None:
 	return preview
 
 
+def _result_denied(content: str) -> bool:
+	payload = _tool_payload(content)
+	data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+	if data.get("permission_denied"):
+		return True
+	return str(payload.get("summary") or "").strip() == PERMISSION_DENIED
+
+
+def _permission_denied_state(calls: list[dict]) -> dict | None:
+	named = [call for call in calls if call.get("name")]
+	if not named or all(user_can_run_call(call["name"], call.get("args") or {}) for call in named):
+		return None
+	outputs = [
+		ToolMessage(
+			content=tool_result(PERMISSION_DENIED, {"permission_denied": True}),
+			tool_call_id=str(call.get("id") or call.get("name") or ""),
+			name=call.get("name"),
+		)
+		for call in named
+	]
+	outputs.append(AIMessage(content=PERMISSION_DENIED))
+	return {"messages": outputs, "pending_action": None, "permission_denied": True}
+
+
 def build_graph(model, tools=None):
 	tools = list(tools if tools is not None else get_enabled_tools())
 	write_names = {tool.name for tool in tools if tool.name in WRITE_TOOL_NAMES}
@@ -291,8 +325,13 @@ def build_graph(model, tools=None):
 		message = state["messages"][-1] if state.get("messages") else None
 		outputs: list[ToolMessage] = []
 		by_name = {tool.name: tool for tool in read_tools}
-		write_calls = [call for call in _tool_calls(message) if call.get("name") in write_names]
-		for call in _tool_calls(message):
+		calls = _tool_calls(message)
+		blocked = _permission_denied_state(calls)
+		if blocked:
+			return blocked
+		write_calls = [call for call in calls if call.get("name") in write_names]
+		denied = False
+		for call in calls:
 			name = call.get("name")
 			tool_call_id = str(call.get("id") or name or "")
 			if name in write_names:
@@ -311,15 +350,26 @@ def build_graph(model, tools=None):
 			try:
 				result = _invoke_tool(tool, call.get("args") or {})
 				content = result if isinstance(result, str) else json.dumps(result, default=str)
+			except frappe.PermissionError:
+				content = tool_result(PERMISSION_DENIED, {"permission_denied": True})
+				denied = True
 			except Exception as exc:
 				content = json.dumps({"summary": str(exc), "error": True}, default=str)
+			if _result_denied(content):
+				denied = True
 			outputs.append(ToolMessage(content=content, tool_call_id=tool_call_id, name=name))
+		if denied:
+			outputs.append(AIMessage(content=PERMISSION_DENIED))
+			return {"messages": outputs, "pending_action": None, "permission_denied": True}
 		employees = employee_ids_from_messages(outputs)
 		user_text = user_text_from_messages(state.get("messages") or [])
-		if not write_calls:
+		if not write_calls and user_can_run_call("set_clock_times"):
 			inferred = infer_clock_write((state.get("messages") or []) + outputs, employees)
 			write_calls = [inferred] if inferred else []
 		hydrated = [hydrate_write_call(call, employees, user_text) for call in write_calls]
+		if hydrated and not all(user_can_run_call(call.get("name") or "", call.get("args") or {}) for call in hydrated):
+			outputs.append(AIMessage(content=PERMISSION_DENIED))
+			return {"messages": outputs, "pending_action": None, "permission_denied": True}
 		pending = _pending_from_calls(hydrated) if writes_are_ready(hydrated) else None
 		return {"messages": outputs, "pending_action": pending}
 
@@ -331,10 +381,18 @@ def build_graph(model, tools=None):
 			if raw:
 				break
 		calls = [hydrate_write_call(call, employees, user_text_from_messages(state.get("messages") or [])) for call in raw]
+		if calls and not all(user_can_run_call(call.get("name") or "", call.get("args") or {}) for call in calls):
+			return {
+				"messages": [AIMessage(content=PERMISSION_DENIED)],
+				"pending_action": None,
+				"permission_denied": True,
+			}
 		return {"pending_action": _pending_from_calls(calls)}
 
 	def route_after_tools(state: AgentState) -> str:
-		return "done" if state.get("pending_action") else "assistant"
+		if state.get("permission_denied") or state.get("pending_action"):
+			return "done"
+		return "assistant"
 
 	graph = StateGraph(AgentState)
 	graph.add_node("assistant", call_model)
@@ -395,6 +453,8 @@ def run_agent(
 	except Exception as exc:
 		_raise_agent_error(exc)
 		raise
+	if result.get("permission_denied"):
+		return {"content": PERMISSION_DENIED, "blocks": [], "pending_action": None}
 	pending = result.get("pending_action")
 	last_ai = next(
 		(message for message in reversed(result["messages"]) if isinstance(message, AIMessage)),

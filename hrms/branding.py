@@ -10,6 +10,12 @@ APP_LOGO = "/assets/hrms/images/staff-pro-bpo-logo.png"
 APP_ICON = "/assets/hrms/images/staff-pro-bpo-icon.png"
 FOOTER_POWERED = "Staff Pro BPO<br>developed by Tirell Arzu"
 STAFF_PRO_TIMEZONE = "America/Belize"
+USER_HIDDEN_SETTINGS_FIELDS = (
+	"app_section",
+	"default_app",
+	"third_party_authentication",
+	"social_logins",
+)
 _LOGO_DATA_URI = None
 
 
@@ -40,6 +46,7 @@ def apply_branding():
 	_set_if_field("System Settings", "app_name", APP_TITLE)
 	ensure_belize_timezone()
 	hide_system_settings_app_tab()
+	hide_user_settings_fields()
 
 
 def update_website_context(context):
@@ -219,6 +226,36 @@ def hide_system_settings_app_tab() -> None:
 			validate_fields_for_doctype=False,
 		)
 	frappe.clear_cache(doctype="System Settings")
+
+
+def hide_user_settings_fields() -> None:
+	"""Keep every user on HRMS and drop unused login settings from the User form."""
+	if not frappe.db.exists("DocType", "User"):
+		return
+
+	meta = frappe.get_meta("User")
+	for fieldname in USER_HIDDEN_SETTINGS_FIELDS:
+		if not meta.has_field(fieldname):
+			continue
+		make_property_setter(
+			"User",
+			fieldname,
+			"hidden",
+			1,
+			"Check",
+			validate_fields_for_doctype=False,
+		)
+
+	if meta.has_field("default_app") and frappe.db.has_column("User", "default_app"):
+		frappe.db.sql(
+			"""
+			UPDATE `tabUser`
+			SET default_app = 'hrms'
+			WHERE IFNULL(default_app, '') != 'hrms'
+			"""
+		)
+
+	frappe.clear_cache(doctype="User")
 
 
 def _set_if_field(doctype: str, fieldname: str, value: str) -> None:

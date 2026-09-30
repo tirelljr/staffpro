@@ -79,6 +79,21 @@
 	color: var(--text-muted);
 }
 
+.sp-emp-password__reveal {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.sp-emp-password__reveal .form-control {
+	flex: 1;
+}
+
+.sp-emp-password__current-note {
+	margin-top: 4px;
+	font-size: 11px;
+}
+
 .sp-emp-password__check {
 	display: flex;
 	align-items: center;
@@ -144,6 +159,108 @@
 .sp-emp-stats__empty {
 	font-size: 12px;
 	color: var(--text-muted, #6b7280);
+}
+
+.sp-emp-docs-field .control-label,
+.sp-emp-docs-field .help-box {
+	display: none;
+}
+
+.sp-emp-docs {
+	max-width: 720px;
+	padding: 4px 0 16px;
+}
+
+.sp-emp-docs__help,
+.sp-emp-docs__empty,
+.sp-emp-docs__file-meta {
+	margin: 0 0 12px;
+	font-size: 12px;
+	color: var(--text-muted, #6b7280);
+}
+
+.sp-emp-docs__folder {
+	margin-bottom: 8px;
+	border: 1px solid var(--border-color, #e5e7eb);
+	border-radius: 10px;
+	background: var(--fg-color, #fff);
+}
+
+.sp-emp-docs__folder-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	width: 100%;
+	padding: 12px 14px;
+	border: 0;
+	background: transparent;
+	text-align: left;
+	cursor: pointer;
+}
+
+.sp-emp-docs__folder-name {
+	font-size: 14px;
+	font-weight: 650;
+	color: var(--text-color, #111827);
+}
+
+.sp-emp-docs__folder-count {
+	font-size: 12px;
+	font-weight: 600;
+	color: #4338ca;
+}
+
+.sp-emp-docs__folder-body {
+	padding: 0 14px 12px;
+	border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.sp-emp-docs__upload {
+	display: flex;
+	justify-content: flex-end;
+	padding: 10px 0;
+}
+
+.sp-emp-docs__files {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.sp-emp-docs__file {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px 0;
+	border-top: 1px solid var(--border-color, #f3f4f6);
+}
+
+.sp-emp-docs__file-name {
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.sp-emp-docs__actions {
+	display: flex;
+	gap: 10px;
+	flex-shrink: 0;
+}
+
+.sp-emp-docs__link {
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: #4338ca;
+	font: inherit;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.sp-emp-docs__link.is-danger {
+	color: #b91c1c;
 }
 
 .sp-bank-picker {

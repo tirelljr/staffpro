@@ -160,3 +160,17 @@ hrms.patches.v16_0.remove_demo_employees #2026-09-23-remove-demo-agents
 hrms.patches.v16_0.remove_unused_sidebar_items #2026-09-23-trim-unused-sidebar
 hrms.patches.v16_0.remove_unused_erpnext_roles #2026-09-23-delete-unused-roles
 hrms.patches.v16_0.lock_agent_users_to_portal #2026-09-23-agent-portal-only
+hrms.patches.v16_0.add_agent_filesystem #2026-09-29-agent-filesystem
+hrms.patches.v16_0.add_filesystem_dock #2026-09-29-filesystem-dock
+hrms.patches.v16_0.add_employee_documents_tab #2026-09-29-employee-documents-tab
+hrms.patches.v16_0.set_overtime_threshold_90 #2026-09-29-ot-threshold-90
+hrms.patches.v16_0.add_paid_holiday_pto #2026-09-29-paid-holiday-pto
+hrms.patches.v16_0.enable_late_entry_system_defaults #2026-09-29-late-entry-defaults
+hrms.patches.v16_0.add_floor_workers #2026-09-29-floor-workers
+hrms.patches.v16_0.add_job_letters #2026-09-29-job-letters
+hrms.patches.v16_0.add_td4_form #2026-09-29-td4-form
+hrms.patches.v16_0.remove_td4_from_people_sidebar #2026-09-30-td4-not-people
+hrms.patches.v16_0.remove_expenses_and_default_approvers #2026-09-29-hide-expenses
+hrms.patches.v16_0.add_role_access_toggles #2026-09-29-role-access-toggles
+hrms.patches.v16_0.hide_user_app_and_social_login #2026-09-29-hide-user-app-social
+hrms.patches.v16_0.remove_two_factor_auth #2026-09-30-remove-two-factor

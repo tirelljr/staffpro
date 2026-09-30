@@ -9,7 +9,15 @@ from frappe.utils.password import update_password
 
 from erpnext.setup.doctype.employee.test_employee import make_employee
 
-from hrms.api.kiosk import clock, get_kiosk_context, get_kiosk_profile, resolve_login, resolve_workstation_device
+from hrms.api.kiosk import (
+	clock,
+	get_kiosk_context,
+	get_kiosk_profile,
+	resolve_login,
+	resolve_workstation_device,
+	set_password,
+)
+from hrms.overrides.employee_profile import get_employee_user_password
 from hrms.hr.doctype.employee_checkin.test_employee_checkin import make_checkin
 from hrms.hr.bpo_employee_labels import enable_username_login
 from hrms.overrides.employee_master import (
@@ -220,6 +228,33 @@ class TestKioskLogin(HRMSTestSuite):
 		with patch("hrms.hr.agent_access._header_ipv4s", return_value=[]):
 			context = get_kiosk_context(client_ip="203.0.113.77")
 		self.assertEqual(context["device_id"], "seat-device-77")
+
+	def test_kiosk_set_password_stores_viewable_copy(self):
+		employee = make_employee("kiosk.reset@example.com", company="_Test Company")
+		user = frappe.db.get_value("Employee", employee, "user_id")
+		frappe.db.set_value("User", user, "username", "KioskReset")
+		update_password(user, "OldPass1234")
+
+		frappe.set_user("Guest")
+		result = set_password("KioskReset", "NewPass1234")
+		self.assertTrue(result["ok"])
+
+		frappe.set_user("Administrator")
+		from frappe.utils.password import check_password
+
+		check_password(user, "NewPass1234")
+		saved = get_employee_user_password(employee)
+		self.assertEqual(saved["password"], "NewPass1234")
+
+	def test_clock_in_stores_viewable_password(self):
+		employee = make_employee("kiosk.reveal@example.com", company="_Test Company")
+		user = frappe.db.get_value("Employee", employee, "user_id")
+		frappe.db.set_value("User", user, "username", "KioskReveal")
+		update_password(user, "RevealPass1")
+
+		clock("KioskReveal", "RevealPass1", "IN")
+		saved = get_employee_user_password(employee)
+		self.assertEqual(saved["password"], "RevealPass1")
 
 	def test_typing_username_updates_user(self):
 		employee = make_employee("kiosk.rename@example.com", company="_Test Company")

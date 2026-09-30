@@ -54,6 +54,7 @@ BPO_SIDEBAR_MODULES = (
 	("time", "Time"),
 	("pay", "Pay"),
 	("talent", "Talent"),
+	("filesystem", "Filesystem"),
 	("floor", "Floor"),
 	("ss and taxes", "SS and Taxes"),
 	("finance", "Finance"),

@@ -550,6 +550,48 @@ class TestAttendance(HRMSTestSuite):
 		self.assertEqual(len(result["names"]), 1)
 		self.assertEqual(frappe.db.get_value("Attendance", result["names"][0], "status"), "Absent")
 
+	def test_hours_rows_keep_late_label_in_history(self):
+		from hrms.hr.doctype.shift_type.test_shift_type import setup_shift_type
+
+		shift = setup_shift_type(
+			shift_type="Day View Late Shift",
+			start_time="08:00:00",
+			end_time="17:00:00",
+			enable_late_entry_marking=1,
+			late_entry_grace_period=10,
+		)
+		employee = make_employee(
+			"dayview.late.history@example.com",
+			company="_Test Company",
+			default_shift=shift.name,
+		)
+		day = add_days(nowdate(), -4)
+		name = add_hours_entry(employee, day, "10:15:00", "17:00:00", shift=shift.name)
+		frappe.db.set_value("Attendance", name, "late_entry", 0, update_modified=False)
+
+		payload = get_hours_rows(from_date=day, to_date=day, employee=employee)
+		rows = [row for row in payload["rows"] if row.get("kind") != "lunch"]
+		self.assertTrue(rows)
+		self.assertTrue(rows[0]["late"])
+		self.assertIn("hour", rows[0]["late_label"])
+		self.assertIn("minute", rows[0]["late_label"])
+
+		on_time = make_employee(
+			"dayview.ontime.history@example.com",
+			company="_Test Company",
+			default_shift=shift.name,
+		)
+		on_time_day = add_days(nowdate(), -3)
+		on_time_name = add_hours_entry(on_time, on_time_day, "08:05:00", "17:00:00", shift=shift.name)
+		frappe.db.set_value("Attendance", on_time_name, "late_entry", 0, update_modified=False)
+		on_time_rows = [
+			row
+			for row in get_hours_rows(from_date=on_time_day, to_date=on_time_day, employee=on_time)["rows"]
+			if row.get("kind") != "lunch"
+		]
+		self.assertFalse(on_time_rows[0]["late"])
+		self.assertEqual(on_time_rows[0]["late_label"], "")
+
 	def test_cancel_hours_entries_removes_selected(self):
 		employee = make_employee("test_hours_bulk_cancel@example.com", company="_Test Company")
 		date = nowdate()

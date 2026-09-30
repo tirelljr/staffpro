@@ -341,7 +341,7 @@
                               "label":  "HR Settings",
                               "link_to":  "HR Settings",
                               "link_type":  "DocType",
-                              "navigate_to_tab":  "expenses_tab",
+                              "navigate_to_tab":  "employee_tab",
                               "open_in_new_tab":  0,
                               "show_arrow":  0,
                               "type":  "Link"

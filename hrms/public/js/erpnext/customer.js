@@ -99,6 +99,11 @@ function apply_bpo_customer_layout(frm) {
 
 	hide_customer_tabs(frm);
 	relabel_customer_page(frm);
+	if (window.hrms?.role_access?.can && !hrms.role_access.can("see_bill_to_client")) {
+		["default_billing_rate", "billing_currency"].forEach((fieldname) => {
+			if (frm.fields_dict[fieldname]) frm.set_df_property(fieldname, "hidden", 1);
+		});
+	}
 }
 
 function hide_customer_tabs(frm) {

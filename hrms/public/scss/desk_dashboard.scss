@@ -3883,6 +3883,34 @@ body.staff-pro-alive .sp-hours__field .awesomplete mark {
 	min-width: 0;
 }
 
+.sp-entry__start::placeholder,
+.sp-entry__end::placeholder {
+	color: #98a2ad;
+}
+
+.sp-entry__start.is-invalid,
+.sp-entry__end.is-invalid {
+	border-color: #c0392b;
+	background: #fff6f6;
+}
+
+.sp-entry__ampm {
+	flex: 0 0 62px;
+	width: 62px;
+	height: 28px;
+	padding: 0 4px 0 6px;
+	border: 1px solid #cfd6de;
+	border-radius: 4px;
+	background: #fff;
+	color: #333;
+	font: inherit;
+	cursor: pointer;
+}
+
+.sp-entry__ampm:disabled {
+	cursor: default;
+}
+
 .sp-entry__icon-btn {
 	display: inline-flex;
 	align-items: center;

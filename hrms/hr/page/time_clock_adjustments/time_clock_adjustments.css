@@ -42,6 +42,21 @@ body.staff-pro-alive .page-container[data-page-route="time-clock-adjustments"] .
 	z-index: 30;
 }
 
+.sp-tca__history-btn {
+	flex: 0 0 auto;
+	white-space: nowrap;
+}
+
+.sp-tca__history-btn.is-active {
+	border-color: #111827;
+	background: #111827;
+	color: #fff;
+}
+
+.sp-tca__history-btn.is-active svg {
+	color: #fff;
+}
+
 .sp-tca__date {
 	padding-right: 8px;
 }
@@ -87,11 +102,11 @@ body.staff-pro-alive .page-container[data-page-route="time-clock-adjustments"] .
 	display: grid;
 	grid-template-columns:
 		64px minmax(190px, 1.5fr) minmax(115px, 0.85fr) 120px 92px
-		105px 105px 66px minmax(146px, 0.9fr);
+		105px 105px 66px minmax(108px, 0.7fr) minmax(146px, 0.9fr);
 	align-items: center;
 	gap: 12px;
 	width: 100%;
-	min-width: 1120px;
+	min-width: 1240px;
 }
 
 .sp-tca__table-head {
@@ -241,6 +256,26 @@ body.staff-pro-alive .page-container[data-page-route="time-clock-adjustments"] .
 	font-weight: 600;
 }
 
+.sp-tca__change {
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.sp-tca__change.is-plus {
+	color: #15803d;
+}
+
+.sp-tca__change.is-minus {
+	color: #dc2626;
+}
+
+.sp-tca__change.is-zero,
+.sp-tca__change.is-none {
+	color: var(--sp-muted, #6b7280);
+	font-weight: 600;
+}
+
 .sp-tca__actions,
 .sp-tca__actions .sp-tca-banner__actions {
 	display: inline-flex;
@@ -286,6 +321,25 @@ body.staff-pro-alive .page-container[data-page-route="time-clock-adjustments"] .
 .sp-tca-page .sp-tca-btn:disabled {
 	cursor: wait;
 	opacity: 0.55;
+}
+
+.sp-tca__reviewed {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.sp-tca__reviewed strong,
+.sp-tca__reviewed-on {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.sp-tca__reviewed-on {
+	color: var(--sp-muted, #6b7280);
+	font-size: 11px;
 }
 
 .sp-tca__no-action {

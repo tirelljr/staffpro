@@ -48,33 +48,13 @@
 							<input
 								v-model="username"
 								type="text"
-								autocomplete="username"
+								name="login-username"
+								autocomplete="off"
 								:placeholder="__('Username')"
-								list="remembered-usernames"
 								class="w-full border border-gray-400 bg-white px-3 py-2 text-base text-gray-900"
-								@focus="showRemembered = true"
-								@blur="hideRememberedSoon"
 								@input="onUsernameInput"
 								@keydown.enter.prevent
 							/>
-							<datalist id="remembered-usernames">
-								<option v-for="user in rememberedUsers" :key="user.username" :value="user.username" />
-							</datalist>
-							<div
-								v-if="showRemembered && rememberedUsers.length"
-								class="absolute z-10 mt-1 w-full border border-gray-200 bg-white shadow-sm"
-							>
-								<button
-									v-for="user in rememberedUsers"
-									:key="user.username"
-									type="button"
-									class="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50"
-									@mousedown.prevent="selectRemembered(user)"
-								>
-									<span class="font-medium text-gray-800">{{ user.username }}</span>
-									<span class="text-xs text-gray-500">{{ user.employee_name }}</span>
-								</button>
-							</div>
 						</div>
 
 						<input
@@ -97,8 +77,14 @@
 								{{ clockLabel }}
 							</div>
 							<div class="flex-1 min-w-0">
+								<div
+									v-if="isFloorWorker"
+									class="text-sm text-gray-600 text-center sm:text-left"
+								>
+									{{ __("Floor workers do not clock in. Hours are added automatically.") }}
+								</div>
 								<button
-									v-if="showClockAction"
+									v-else-if="showClockAction"
 									type="button"
 									class="w-full py-3 text-white text-lg font-semibold disabled:opacity-60"
 									:class="clockAction === 'OUT' ? 'kiosk-clock-out' : 'kiosk-clock-in'"
@@ -272,15 +258,13 @@ import { scanClientIpv4, isPlaceholderPeerIpv4 } from "@/utils/clientIp"
 import {
 	forgetPassword,
 	getDeviceId,
-	getLastUsername,
 	getRememberedUser,
-	getRememberedUsers,
 	rememberUser,
 } from "@/utils/rememberedUsers"
 
 const logoUrl = STAFF_PRO_LOGO_URL
 
-const username = ref(getLastUsername())
+const username = ref("")
 const password = ref("")
 const rememberPassword = ref(false)
 const errorMessage = ref("")
@@ -290,8 +274,6 @@ const clockSuccessMessage = ref("")
 const portalErrorMessage = ref("")
 const clocking = ref(false)
 const signingIn = ref(false)
-const showRemembered = ref(false)
-const rememberedUsers = ref(getRememberedUsers())
 const localDeviceId = getDeviceId()
 const clockLabel = ref("")
 const scannedIp = ref("")
@@ -299,7 +281,6 @@ const ipScanDone = ref(false)
 const latitude = ref(null)
 const longitude = ref(null)
 let clockTimer = null
-let rememberedTimer = null
 
 const resetPassword = reactive({
 	showDialog: false,
@@ -382,7 +363,9 @@ const clockinBlocked = computed(() => {
 	if (kioskContext.data.clockin_allowed) return false
 	return ipScanDone.value && clockAction.value === "IN"
 })
+const isFloorWorker = computed(() => Boolean(activeProfile.value?.is_floor_worker))
 const showClockAction = computed(() => {
+	if (isFloorWorker.value) return false
 	if (!kioskContext.data) return false
 	if (!clockinRestricted.value) return true
 	if (kioskContext.data.clockin_allowed) return true
@@ -427,7 +410,6 @@ function applyLiveProfile(profile) {
 		password: existing.password,
 		rememberPassword: Boolean(existing.password),
 	})
-	rememberedUsers.value = getRememberedUsers()
 }
 
 const fetchKioskProfile = debounce(async (login) => {
@@ -455,20 +437,6 @@ function onUsernameInput() {
 	fetchKioskProfile(username.value)
 }
 
-function selectRemembered(user) {
-	username.value = user.username
-	showRemembered.value = false
-	applyRememberedUser()
-	fetchKioskProfile(user.username)
-}
-
-function hideRememberedSoon() {
-	clearTimeout(rememberedTimer)
-	rememberedTimer = setTimeout(() => {
-		showRemembered.value = false
-	}, 150)
-}
-
 function persistProfile(profile) {
 	rememberUser(profile, {
 		password: password.value,
@@ -477,7 +445,6 @@ function persistProfile(profile) {
 	if (!rememberPassword.value) {
 		forgetPassword(profile.username)
 	}
-	rememberedUsers.value = getRememberedUsers()
 }
 
 function persistCurrentCredentials() {
@@ -491,6 +458,7 @@ function persistCurrentCredentials() {
 		today_labels: activeProfile.value?.today_labels || [],
 		next_action: activeProfile.value?.next_action || "IN",
 		device_id: activeProfile.value?.device_id || "",
+		is_floor_worker: activeProfile.value?.is_floor_worker || 0,
 	})
 }
 
@@ -557,7 +525,7 @@ function readFieldValue(selector) {
 }
 
 function requireCredentials() {
-	const login = (username.value || "").trim() || readFieldValue('input[autocomplete="username"]')
+	const login = (username.value || "").trim() || readFieldValue('input[name="login-username"]')
 	const pass = password.value || readFieldValue('input[autocomplete="current-password"]')
 	if (login && login !== username.value) username.value = login
 	if (pass && pass !== password.value) password.value = pass

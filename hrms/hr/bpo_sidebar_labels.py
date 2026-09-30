@@ -9,6 +9,9 @@ LINK_LABELS: dict[str, str] = {
 	"day-view": "Day View",
 	"organizational-chart": "Team Structure",
 	"paid-time-off": "Paid Time Off",
+	"agent-filesystem": "Filesystem",
+	"Document Category": "Document Categories",
+	"TD4 Form": "TD4 Forms",
 	"floor-map": "Floor Map",
 	"Office Floor": "Floors",
 	"Cubicle": "Cubicles",
@@ -198,6 +201,7 @@ HIDDEN_SIDEBAR_LINKS = frozenset(
 		"Accrued Earnings Report",
 		"Overtime Type",
 		"Leave Encashment",
+		"Employee Leave Balance",
 	}
 )
 
@@ -256,6 +260,9 @@ HIDDEN_SIDEBAR_LABELS = frozenset(
 		"Accrued Earnings",
 		"PTO Cash-out",
 		"Leave Encashment",
+		"PTO Balance",
+		"Leave Balance",
+		"Employee Leave Balance",
 	}
 )
 
@@ -265,6 +272,9 @@ def apply_bpo_label(row: dict) -> dict:
 	data = dict(row)
 	link_to = (data.get("link_to") or "").strip()
 	label = (data.get("label") or "").strip()
+
+	if label == "Floor Workers":
+		return data
 
 	if link_to and link_to in LINK_LABELS:
 		data["label"] = LINK_LABELS[link_to]

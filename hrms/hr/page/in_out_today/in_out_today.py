@@ -335,7 +335,14 @@ def _late_status(employee, first_in, attendance, leave, shift_map, as_of, attend
 			return True, 0, ""
 		return False, 0, ""
 
-	grace_minutes = cint(shift.late_entry_grace_period) if shift and cint(shift.enable_late_entry_marking) else 0
+	from hrms.hr.late_entry import late_entry_grace_for_shift, system_late_entry_defaults
+
+	shift_name = shift.name if shift else shift_name
+	enabled, grace_minutes = (
+		late_entry_grace_for_shift(shift_name) if shift_name else system_late_entry_defaults()
+	)
+	if not enabled:
+		grace_minutes = 0
 	deadline = baseline + timedelta(minutes=grace_minutes)
 	compare_at = get_datetime(first_in.time) if first_in and first_in.time else as_of
 	if not first_in:

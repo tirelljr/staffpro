@@ -183,6 +183,7 @@ class TestOvertimeSlip(HRMSTestSuite):
 		hr_meta = frappe._dict(has_field=lambda _name: False)
 		with patch("hrms.hr.doctype.overtime_slip.overtime_slip.frappe.get_meta") as get_meta:
 			get_meta.side_effect = lambda doctype: hr_meta if doctype == "HR Settings" else employee_meta
+			self.assertEqual(DEFAULT_OVERTIME_THRESHOLD_HOURS, 90)
 			self.assertEqual(get_employee_overtime_threshold(employee), DEFAULT_OVERTIME_THRESHOLD_HOURS)
 
 	def make_employee(self, email):

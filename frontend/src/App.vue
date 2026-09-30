@@ -2,6 +2,7 @@
 	<ion-app :class="{ 'app-has-topbar': showTopBar }">
 		<TopBar v-if="showTopBar" />
 		<ion-router-outlet id="main-content" />
+		<Td4Prompt />
 		<Toasts />
 
 		<InstallPrompt />
@@ -17,6 +18,7 @@ import { Toasts } from "frappe-ui"
 
 import TopBar from "@/components/TopBar.vue"
 import InstallPrompt from "@/components/InstallPrompt.vue"
+import Td4Prompt from "@/components/Td4Prompt.vue"
 import { showNotification } from "@/utils/pushNotifications"
 
 const route = useRoute()

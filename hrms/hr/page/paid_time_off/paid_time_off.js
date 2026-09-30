@@ -97,6 +97,7 @@ hrms.paid_time_off = {
 						<span>${this.escape(__("Taken"))}</span>
 						<span>${this.escape(__("Expired"))}</span>
 						<span>${this.escape(__("Closing"))}</span>
+						<span>${this.escape(__("PTO Money Value"))}</span>
 					</div>
 					<div class="sp-pto-balance-list"></div>
 				</div>
@@ -289,6 +290,17 @@ hrms.paid_time_off = {
 		return amount.toLocaleString(undefined, { maximumFractionDigits: 2 });
 	},
 
+	money(value) {
+		if (value == null || value === "") return "—";
+		const amount = Number(value);
+		if (!Number.isFinite(amount)) return "—";
+		const currency = this.payload?.currency;
+		if (currency && typeof format_currency === "function") {
+			return format_currency(amount, currency);
+		}
+		return amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+	},
+
 	empty_html(message) {
 		return `<div class="sp-pto-empty"><p>${this.escape(message)}</p></div>`;
 	},
@@ -311,6 +323,7 @@ hrms.paid_time_off = {
 					<span>${this.escape(this.number(row.leaves_taken))}</span>
 					<span>${this.escape(this.number(row.leaves_expired))}</span>
 					<span>${this.escape(this.number(row.closing_balance))}</span>
+					<span>${this.escape(this.money(row.pto_money_value))}</span>
 				</button>`,
 				)
 				.join(""),

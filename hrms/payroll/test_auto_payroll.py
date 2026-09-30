@@ -291,6 +291,39 @@ class TestAutoPayroll(HRMSTestSuite):
 		self.assertFalse(preview["entries"][0]["customer"])
 		self.assertEqual(preview["entries"][0]["customer_label"], "All Agents")
 		self.assertIn(frappe.db.get_value("Employee", employee, "employee_name"), preview["entries"][0]["agent_names"])
+		self.assertTrue(preview.get("simple"))
+		self.assertIn(employee, [row["employee"] for row in preview["entries"][0]["agent_rows"]])
+
+		from hrms.payroll.auto_payroll import _selected_agent_ids
+
+		self.assertEqual(_selected_agent_ids(company, [employee, "HR-MISSING"]), [employee])
+		self.assertEqual(_selected_agent_ids(company, []), [])
+		self.assertIn(employee, _selected_agent_ids(company, None))
+
+	def test_every_agent_preview_ignores_extra_pay_templates(self):
+		frappe.db.set_single_value(
+			"Payroll Settings",
+			{
+				"enable_automatic_payroll": 1,
+				"automatic_payroll_company": "_Test Company",
+				"automatic_payroll_weekly_days": 5,
+				"automatic_payroll_fortnightly_days": 10,
+				"automatic_payroll_monthly_days": 22,
+			},
+			update_modified=False,
+		)
+		preview = plan_payroll(
+			every_agent=True, force=True, start_date="2026-07-18", end_date="2026-07-24"
+		)
+		labels = [entry.get("label") for entry in preview.get("entries") or []]
+		self.assertNotIn("Weekly", labels)
+		self.assertNotIn("2-weeks", labels)
+		if preview.get("entries"):
+			self.assertEqual(len(preview["entries"]), 1)
+			self.assertTrue(preview.get("simple"))
+			self.assertTrue(preview["entries"][0].get("agent_rows"))
+			self.assertEqual(preview["entries"][0]["start_date"], "2026-07-18")
+			self.assertEqual(preview["entries"][0]["end_date"], "2026-07-24")
 
 	def test_automatic_payroll_logs_submit_errors_without_crashing(self):
 		from unittest.mock import patch

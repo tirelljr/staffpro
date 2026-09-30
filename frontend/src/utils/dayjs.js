@@ -24,16 +24,53 @@ function hasExplicitOffset(value) {
 	return /(?:Z|[+-]\d{2}:?\d{2})$/i.test(String(value).trim())
 }
 
+function safeTz(value) {
+	try {
+		const zoned = dayjs.tz(value, STAFF_PRO_TIMEZONE)
+		return zoned?.isValid?.() ? zoned : dayjs(NaN)
+	} catch {
+		return dayjs(NaN)
+	}
+}
+
+const originalFormat = dayjs.prototype.format
+dayjs.prototype.format = function formatWithoutThrow(...args) {
+	try {
+		const formatted = originalFormat.apply(this, args)
+		return formatted == null ? "" : String(formatted)
+	} catch {
+		return ""
+	}
+}
+
 function staffProDayjs(...args) {
 	if (!args.length) {
 		return dayjs.tz()
 	}
 	const value = args[0]
-	if (typeof value === "number" || value instanceof Date) {
-		return dayjs.tz(value, STAFF_PRO_TIMEZONE)
+	if (typeof value === "number") {
+		return Number.isFinite(value) ? safeTz(value) : dayjs(NaN)
 	}
-	if (typeof value === "string" && value && !hasExplicitOffset(value)) {
-		return dayjs.tz(value, STAFF_PRO_TIMEZONE)
+	if (value instanceof Date) {
+		return Number.isNaN(value.getTime()) ? dayjs(value) : safeTz(value)
+	}
+	if (typeof value === "string") {
+		const trimmed = value.trim()
+		if (!trimmed || hasExplicitOffset(trimmed)) {
+			try {
+				return dayjs(...args)
+			} catch {
+				return dayjs(NaN)
+			}
+		}
+		let probe
+		try {
+			probe = dayjs(trimmed)
+		} catch {
+			return dayjs(NaN)
+		}
+		if (!probe?.isValid?.()) return probe || dayjs(NaN)
+		return safeTz(trimmed)
 	}
 	return dayjs(...args)
 }

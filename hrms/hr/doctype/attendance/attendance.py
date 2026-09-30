@@ -69,6 +69,7 @@ class Attendance(Document):
 		hour_rate: DF.Currency
 		hours_paid: DF.Check
 		in_time: DF.Datetime | None
+		manual_hours: DF.Check
 		late_entry: DF.Check
 		leave_application: DF.Link | None
 		leave_type: DF.Link | None
@@ -1002,6 +1003,57 @@ def _resync_day_hours(employee: str, attendance_date, attendance_name: str | Non
 	)
 
 
+def _entry_clocks(doc, in_log: str | None = None, out_log: str | None = None):
+	from hrms.hr.doctype.time_clock_adjustment.time_clock_adjustment import time_to_str
+
+	if in_log or out_log:
+		in_time = frappe.db.get_value("Employee Checkin", in_log, "time") if in_log else None
+		out_time = frappe.db.get_value("Employee Checkin", out_log, "time") if out_log else None
+		return time_to_str(in_time), time_to_str(out_time)
+	return time_to_str(doc.in_time), time_to_str(doc.out_time)
+
+
+def _record_manual_hours_change(**kwargs):
+	if getattr(frappe.flags, "skip_manual_hours_history", False):
+		return
+	from hrms.hr.doctype.time_clock_adjustment.time_clock_adjustment import record_manual_hours_change
+
+	record_manual_hours_change(**kwargs)
+
+
+def _record_hours_edit(
+	doc,
+	attendance_name: str | None,
+	attendance_date,
+	previous_in,
+	previous_out,
+	in_time,
+	out_time,
+	working_now,
+	in_log: str | None = None,
+	out_log: str | None = None,
+):
+	from hrms.hr.doctype.time_clock_adjustment.time_clock_adjustment import _same_time, time_to_str
+
+	new_in = time_to_str(in_time)
+	new_out = None if cint(working_now) else time_to_str(out_time)
+	if _same_time(previous_in, new_in) and _same_time(previous_out, new_out):
+		return
+	_record_manual_hours_change(
+		employee=doc.employee,
+		attendance_date=attendance_date,
+		attendance=attendance_name or doc.name,
+		action="Edit",
+		current_in=previous_in,
+		current_out=previous_out,
+		requested_in=new_in,
+		requested_out=new_out,
+		in_log=in_log,
+		out_log=None if cint(working_now) else out_log,
+		note=_("Edited hours"),
+	)
+
+
 @frappe.whitelist()
 def add_hours_entry(
 	employee: str,
@@ -1042,6 +1094,15 @@ def add_hours_entry(
 	if shift and not frappe.db.get_value("Attendance", attendance_name, "shift"):
 		frappe.db.set_value("Attendance", attendance_name, "shift", shift, update_modified=False)
 	_add_hours_comment(attendance_name, comment)
+	_record_manual_hours_change(
+		employee=employee,
+		attendance_date=attendance_date,
+		attendance=attendance_name,
+		action="Add",
+		requested_in=in_time,
+		requested_out=None if working_now else out_time,
+		note=_("Added hours"),
+	)
 	return attendance_name
 
 
@@ -1130,6 +1191,7 @@ def update_hours_entry(
 	employee = doc.employee
 	working_now = cint(working_now)
 	attendance_date = getdate(attendance_date)
+	previous_in, previous_out = _entry_clocks(doc, in_log, out_log)
 
 	if in_log:
 		if not frappe.db.exists("Employee Checkin", in_log):
@@ -1164,6 +1226,18 @@ def update_hours_entry(
 		attendance_name = _resync_day_hours(employee, attendance_date, attendance_name=name)
 		if comment:
 			_add_hours_comment(attendance_name or name, comment)
+		_record_hours_edit(
+			doc,
+			attendance_name,
+			attendance_date,
+			previous_in,
+			previous_out,
+			in_time,
+			out_time,
+			working_now,
+			in_log=in_log,
+			out_log=out_log,
+		)
 		return attendance_name or name
 
 	# No pair ids: replace the day's punches with this single pair (legacy edit).
@@ -1193,6 +1267,16 @@ def update_hours_entry(
 	attendance_name = _resync_day_hours(employee, attendance_date, attendance_name=name)
 	if comment:
 		_add_hours_comment(attendance_name or name, comment)
+	_record_hours_edit(
+		doc,
+		attendance_name,
+		attendance_date,
+		previous_in,
+		previous_out,
+		in_time,
+		out_time,
+		working_now,
+	)
 	return attendance_name or name
 
 
@@ -1343,12 +1427,14 @@ def _hours_list_fields() -> list[str]:
 	meta = frappe.get_meta("Attendance")
 	for extra in (
 		"hours_paid",
+		"manual_hours",
 		"hour_rate",
 		"daily_pay",
 		"ss_deduction",
 		"tax_deduction",
 		"net_daily_pay",
 		"company",
+		"late_entry",
 	):
 		if meta.has_field(extra) and frappe.db.has_column("Attendance", extra):
 			fields.append(extra)
@@ -1476,10 +1562,13 @@ def _decorate_hours_rows(rows: list) -> list:
 	employee_ids = list({cstr(row.get("employee")) for row in rows if row.get("employee")})
 	emp_map = {}
 	if employee_ids:
+		emp_fields = ["name", "first_name", "last_name", "employee_name"]
+		if frappe.get_meta("Employee").has_field("is_floor_worker"):
+			emp_fields.append("is_floor_worker")
 		for emp in frappe.get_all(
 			"Employee",
 			filters={"name": ["in", employee_ids]},
-			fields=["name", "first_name", "last_name", "employee_name"],
+			fields=emp_fields,
 		):
 			emp_map[emp.name] = emp
 
@@ -1514,9 +1603,9 @@ def _decorate_hours_rows(rows: list) -> list:
 		if data.get("kind") != "lunch":
 			_fill_hours_from_clock(data)
 		_ensure_hours_row_pay(data, holiday_ctx)
-		data["employee_label"] = _employee_hours_label(
-			emp_map.get(data.get("employee")), data.get("employee_name")
-		)
+		emp_row = emp_map.get(data.get("employee"))
+		data["employee_label"] = _employee_hours_label(emp_row, data.get("employee_name"))
+		data["is_floor_worker"] = cint(emp_row.get("is_floor_worker")) if emp_row else 0
 		data.update(_hours_buckets(data, lwp_map, holiday_ctx))
 		if data.get("kind") == "lunch":
 			data["status"] = "Lunch"
@@ -1542,7 +1631,7 @@ def _checkins_by_employee_date(rows: list) -> dict[tuple, list]:
 			"employee": ["in", employees],
 			"time": ["between", [f"{min_day} 00:00:00", f"{add_days(max_day, 1)} 00:00:00"]],
 		},
-		fields=["name", "employee", "log_type", "time", "shift", "attendance"],
+		fields=["name", "employee", "log_type", "time", "shift", "shift_start", "shift_end", "attendance"],
 		order_by="time asc",
 	)
 	grouped: dict[tuple, list] = {}
@@ -1596,7 +1685,12 @@ def _ensure_hours_row_pay(row: dict, holiday_ctx: dict | None = None) -> None:
 
 def _expand_attendance_to_hour_rows(rows: list) -> list:
 	"""Turn each Present Attendance into one UI row per IN/OUT pair."""
-	from hrms.payroll.daily_pay import _hours_between, get_public_holiday_pay_context, pair_checkin_logs
+	from hrms.payroll.daily_pay import (
+		_hours_between,
+		apply_single_pair_lunch,
+		get_public_holiday_pay_context,
+		pair_checkin_logs,
+	)
 
 	if not rows:
 		return []
@@ -1628,6 +1722,7 @@ def _expand_attendance_to_hour_rows(rows: list) -> list:
 			continue
 
 		result = pair_checkin_logs(logs)
+		apply_single_pair_lunch(result, logs, base.get("attendance_date"), base.get("shift"))
 		if not result["pairs"]:
 			base.setdefault("kind", "attendance")
 			base.setdefault("in_log", None)
@@ -1871,6 +1966,7 @@ def get_hours_rows(
 	)
 	expanded = _expand_attendance_to_hour_rows(rows)
 	decorated = _decorate_hours_rows(expanded)
+	_attach_hours_row_late(decorated)
 	_attach_hours_row_notes(decorated, [row.name for row in rows])
 	return {
 		"rows": decorated,
@@ -1896,6 +1992,114 @@ def _add_hours_comment(name: str, comment: str | None, doctype: str = "Attendanc
 			"content": text,
 		}
 	).insert(ignore_permissions=True)
+
+
+def _attach_hours_row_late(decorated: list) -> None:
+	"""Mark hour rows late from the first punch, including past days.
+
+	Day View uses the same shift-start comparison as In/Out Today. A day that was
+	late keeps that label after the employee clocks out, even when Attendance.late_entry
+	was never saved.
+	"""
+	from hrms.hr.page.in_out_today.in_out_today import _get_shift_map, _late_status
+
+	by_attendance: dict[str, dict] = {}
+	for row in decorated:
+		name = row.get("name")
+		if not name or row.get("kind") == "lunch":
+			continue
+		meta = by_attendance.setdefault(
+			name,
+			{
+				"late_entry": 0,
+				"employee": row.get("employee"),
+				"attendance_date": row.get("attendance_date"),
+				"shift": row.get("shift"),
+				"status": row.get("status") or "",
+				"first_in": None,
+			},
+		)
+		if cint(row.get("late_entry")):
+			meta["late_entry"] = 1
+		if row.get("shift") and not meta.get("shift"):
+			meta["shift"] = row.get("shift")
+		in_time = row.get("in_time")
+		if in_time and (not meta["first_in"] or get_datetime(in_time) < get_datetime(meta["first_in"])):
+			meta["first_in"] = in_time
+
+	employee_ids = list({meta["employee"] for meta in by_attendance.values() if meta.get("employee")})
+	emp_shift = {}
+	if employee_ids:
+		for emp in frappe.get_all(
+			"Employee",
+			filters={"name": ["in", employee_ids]},
+			fields=["name", "default_shift"],
+		):
+			emp_shift[emp.name] = emp.default_shift
+
+	stub_rows = [
+		frappe._dict(employee=meta["employee"], attendance_date=meta["attendance_date"])
+		for meta in by_attendance.values()
+		if meta.get("employee") and meta.get("attendance_date")
+	]
+	checkins = _checkins_by_employee_date(stub_rows) if stub_rows else {}
+	punches_by_employee: dict[str, list] = defaultdict(list)
+	prepared: dict[str, tuple] = {}
+	for name, meta in by_attendance.items():
+		emp_id = meta.get("employee") or ""
+		day = getdate(meta["attendance_date"]) if meta.get("attendance_date") else None
+		logs = checkins.get((emp_id, day), []) if emp_id and day else []
+		first_log = next((log for log in logs if (log.log_type or "IN").upper() == "IN"), None)
+		shift_name = (
+			(first_log.shift if first_log and first_log.shift else None)
+			or meta.get("shift")
+			or emp_shift.get(emp_id)
+		)
+		first_in_time = meta.get("first_in") or (first_log.time if first_log else None)
+		shift_start = first_log.shift_start if first_log and first_log.shift_start else None
+		first_in = None
+		if first_in_time:
+			first_in = frappe._dict(time=first_in_time, shift=shift_name, shift_start=shift_start)
+			punches_by_employee[emp_id].append(first_in)
+		prepared[name] = (
+			frappe._dict(default_shift=emp_shift.get(emp_id)),
+			first_in,
+			frappe._dict(shift=shift_name, status=meta.get("status") or "", late_entry=meta["late_entry"]),
+			meta,
+		)
+
+	employees = [frappe._dict(default_shift=emp_shift.get(emp_id)) for emp_id in employee_ids]
+	shift_map = _get_shift_map(employees, punches_by_employee, {})
+	late_meta: dict[str, dict] = {}
+	for name, (employee, first_in, attendance, meta) in prepared.items():
+		as_of = get_datetime(first_in.time) if first_in and first_in.time else now_datetime()
+		late, _minutes, label = _late_status(
+			employee=employee,
+			first_in=first_in,
+			attendance=attendance,
+			leave=None,
+			shift_map=shift_map,
+			as_of=as_of,
+			attendance_date=meta.get("attendance_date"),
+		)
+		# A saved late flag still shows on a past no-show, where the live board
+		# only counts "not clocked in yet" for today.
+		if (
+			not late
+			and cint(meta["late_entry"])
+			and (meta.get("status") or "") != "On Leave"
+			and not first_in
+		):
+			late = True
+		late_meta[name] = {"late": bool(late), "late_label": label or ""}
+
+	for row in decorated:
+		name = row.get("name")
+		if name and name in late_meta and row.get("kind") != "lunch":
+			row.update(late_meta[name])
+		else:
+			row["late"] = False
+			row["late_label"] = ""
 
 
 def _attach_hours_row_notes(decorated: list, attendance_names: list[str]) -> None:
@@ -2185,9 +2389,21 @@ def cancel_hours_entry(name: str, in_log: str | None = None, out_log: str | None
 	doc = frappe.get_doc("Attendance", name)
 	employee = doc.employee
 	attendance_date = doc.attendance_date
+	current_in, current_out = _entry_clocks(doc, in_log, out_log)
 
 	if in_log or out_log:
 		doc.check_permission("write")
+		_record_manual_hours_change(
+			employee=employee,
+			attendance_date=attendance_date,
+			attendance=name,
+			action="Delete",
+			current_in=current_in,
+			current_out=current_out,
+			in_log=in_log,
+			out_log=out_log,
+			note=_("Deleted hours"),
+		)
 		_delete_checkin(in_log)
 		_delete_checkin(out_log)
 		remaining = _resync_day_hours(employee, attendance_date, attendance_name=name)
@@ -2197,10 +2413,21 @@ def cancel_hours_entry(name: str, in_log: str | None = None, out_log: str | None
 
 	if doc.docstatus == 1:
 		doc.check_permission("cancel")
+	else:
+		doc.check_permission("delete")
+	_record_manual_hours_change(
+		employee=employee,
+		attendance_date=attendance_date,
+		attendance=name,
+		action="Delete",
+		current_in=current_in,
+		current_out=current_out,
+		note=_("Deleted hours"),
+	)
+	if doc.docstatus == 1:
 		doc.cancel()
 		return
 
-	doc.check_permission("delete")
 	doc.delete()
 
 
@@ -2237,6 +2464,358 @@ def approve_hours_entries(names: str | list) -> dict:
 			doc.submit()
 		approved.append(name)
 	return {"approved": approved}
+
+
+def _as_record_list(value) -> list:
+	if not value:
+		return []
+	if isinstance(value, str):
+		value = frappe.parse_json(value)
+	if isinstance(value, dict):
+		return [value]
+	if not isinstance(value, (list, tuple)):
+		return []
+	return list(value)
+
+
+def _approved_hours_permission(write: bool = False) -> None:
+	if write:
+		frappe.has_permission("Attendance", "submit", throw=True)
+	else:
+		frappe.has_permission("Attendance", "read", throw=True)
+
+
+@frappe.whitelist()
+def get_approved_hours(
+	from_date: str | date | None = None,
+	to_date: str | date | None = None,
+	employee: str | None = None,
+	department: str | None = None,
+) -> dict:
+	"""Approved attendance grouped by agent and week, with any typed payroll total."""
+	_approved_hours_permission()
+	if not from_date or not to_date:
+		frappe.throw(_("From Date and To Date are required."))
+	if not frappe.db.has_column("Attendance", "hours_paid"):
+		return {"weeks": [], "submitted_slips": []}
+
+	from hrms.payroll.daily_pay import week_bounds
+
+	filters = _hours_filters(from_date, to_date, employee, department)
+	filters["hours_paid"] = 1
+	rows = frappe.get_all(
+		"Attendance",
+		filters=filters,
+		fields=[
+			"name",
+			"employee",
+			"employee_name",
+			"attendance_date",
+			"in_time",
+			"out_time",
+			"working_hours",
+			"manual_hours",
+			"department",
+		]
+		if frappe.db.has_column("Attendance", "manual_hours")
+		else [
+			"name",
+			"employee",
+			"employee_name",
+			"attendance_date",
+			"in_time",
+			"out_time",
+			"working_hours",
+			"department",
+		],
+		order_by="employee_name asc, attendance_date asc, name asc",
+		limit=0,
+	)
+	overrides = _approved_week_override_map(
+		{row.employee for row in rows if row.employee},
+		getdate(from_date),
+		getdate(to_date),
+	)
+	grouped: dict[tuple, dict] = {}
+	for row in rows:
+		start, end = week_bounds(row.attendance_date)
+		key = (row.employee, start)
+		bucket = grouped.get(key)
+		if not bucket:
+			override = overrides.get(key)
+			bucket = {
+				"employee": row.employee,
+				"employee_name": row.employee_name or row.employee,
+				"week_start": str(start),
+				"week_end": str(end),
+				"day_hours": 0.0,
+				"payroll_hours": flt(override) if override is not None else 0.0,
+				"override": 1 if override is not None else 0,
+				"days": [],
+			}
+			grouped[key] = bucket
+		hours = flt(row.working_hours, 2)
+		bucket["day_hours"] = flt(bucket["day_hours"] + hours, 2)
+		bucket["days"].append(
+			{
+				"name": row.name,
+				"attendance_date": str(row.attendance_date),
+				"in_time": _clock_str(row.in_time) or "",
+				"out_time": _clock_str(row.out_time) or "",
+				"working_hours": hours,
+				"manual_hours": cint(row.get("manual_hours")),
+			}
+		)
+	weeks = []
+	for bucket in grouped.values():
+		if not bucket["override"]:
+			bucket["payroll_hours"] = flt(bucket["day_hours"], 2)
+		else:
+			bucket["payroll_hours"] = flt(bucket["payroll_hours"], 2)
+		bucket["day_hours"] = flt(bucket["day_hours"], 2)
+		weeks.append(bucket)
+	weeks.sort(key=lambda week: ((week.get("employee_name") or "").lower(), week.get("week_start") or ""))
+	employees = [week["employee"] for week in weeks]
+	return {
+		"weeks": weeks,
+		"submitted_slips": _submitted_slips_for_range(employees, getdate(from_date), getdate(to_date)),
+	}
+
+
+def _approved_week_override_map(employees: set[str], from_date, to_date) -> dict:
+	from hrms.payroll.daily_pay import week_bounds
+
+	if not employees or not frappe.db.table_exists("Approved Week Hours"):
+		return {}
+	start, _end = week_bounds(from_date)
+	_start, end = week_bounds(to_date)
+	rows = frappe.get_all(
+		"Approved Week Hours",
+		filters={
+			"employee": ["in", list(employees)],
+			"week_start": ["between", [start, end]],
+		},
+		fields=["employee", "week_start", "hours"],
+		limit=0,
+		ignore_permissions=True,
+	)
+	return {(row.employee, getdate(row.week_start)): flt(row.hours) for row in rows}
+
+
+def _submitted_slips_for_range(employees: list[str], from_date, to_date) -> list[dict]:
+	if not employees or not frappe.db.table_exists("Salary Slip"):
+		return []
+	rows = frappe.get_all(
+		"Salary Slip",
+		filters={
+			"employee": ["in", list(set(employees))],
+			"docstatus": 1,
+			"start_date": ["<=", to_date],
+			"end_date": [">=", from_date],
+		},
+		fields=["name", "employee", "employee_name", "start_date", "end_date"],
+		limit=0,
+	)
+	return [
+		{
+			"name": row.name,
+			"employee": row.employee,
+			"employee_name": row.employee_name,
+			"start_date": str(row.start_date),
+			"end_date": str(row.end_date),
+		}
+		for row in rows
+	]
+
+
+@frappe.whitelist()
+def save_approved_hours(
+	days: str | list | dict | None = None,
+	weeks: str | list | dict | None = None,
+	from_date: str | date | None = None,
+	to_date: str | date | None = None,
+	employee: str | None = None,
+	department: str | None = None,
+) -> dict:
+	"""Save edited approved days and typed week totals, then refresh draft slips."""
+	_approved_hours_permission(write=True)
+	touched: set[tuple] = set()
+	for day in _as_record_list(days):
+		span = _set_approved_day_hours(day.get("name"), day.get("hours"))
+		if span:
+			touched.add(span)
+	for week in _as_record_list(weeks):
+		span = _set_approved_week_hours(week.get("employee"), week.get("week_start"), week.get("hours"))
+		if span:
+			touched.add(span)
+
+	submitted = []
+	updated = []
+	for employee_id, start, end in touched:
+		result = _refresh_draft_salary_slips(employee_id, start, end)
+		submitted.extend(result["submitted"])
+		updated.extend(result["updated"])
+
+	payload = {"weeks": [], "submitted_slips": [], "updated_slips": updated}
+	if from_date and to_date:
+		payload = get_approved_hours(from_date, to_date, employee, department)
+		payload["updated_slips"] = updated
+	seen = set()
+	combined = []
+	for row in list(payload.get("submitted_slips") or []) + submitted:
+		if row.get("name") in seen:
+			continue
+		seen.add(row.get("name"))
+		combined.append(row)
+	payload["submitted_slips"] = combined
+	return payload
+
+
+def _set_approved_day_hours(name: str, hours) -> tuple | None:
+	from hrms.payroll.daily_pay import allocate_week_deductions, apply_daily_pay_to_doc, week_bounds
+
+	name = cstr(name).strip()
+	if not name:
+		return None
+	if not frappe.db.exists("Attendance", name):
+		frappe.throw(_("Attendance {0} was not found.").format(name))
+	doc = frappe.get_doc("Attendance", name)
+	doc.check_permission("write")
+	if doc.docstatus == 2:
+		frappe.throw(_("Cancelled attendance cannot be edited."))
+	if doc.meta.has_field("hours_paid") and not cint(doc.hours_paid):
+		frappe.throw(_("Approve these hours before editing them."))
+	if hours is None or cstr(hours).strip() == "":
+		frappe.throw(_("Hours are required."))
+	paid_hours = flt(hours, 2)
+	if paid_hours < 0:
+		frappe.throw(_("Hours cannot be negative."))
+
+	doc.working_hours = paid_hours
+	if doc.meta.has_field("manual_hours"):
+		doc.manual_hours = 1
+	apply_daily_pay_to_doc(doc)
+	values = {
+		"working_hours": flt(doc.working_hours, 2),
+		"hour_rate": doc.hour_rate,
+		"daily_pay": doc.daily_pay,
+	}
+	if doc.meta.has_field("manual_hours"):
+		values["manual_hours"] = 1
+	if doc.docstatus == 1:
+		frappe.db.set_value("Attendance", name, values, update_modified=True)
+	else:
+		doc.save(ignore_permissions=True)
+	allocate_week_deductions(doc.employee, doc.attendance_date)
+	start, end = week_bounds(doc.attendance_date)
+	return (doc.employee, start, end)
+
+
+def _set_approved_week_hours(employee: str, week_start, hours) -> tuple | None:
+	from hrms.payroll.daily_pay import week_bounds
+
+	employee = cstr(employee).strip()
+	if not employee or not week_start:
+		return None
+	if not frappe.db.table_exists("Approved Week Hours"):
+		frappe.throw(_("Approved Week Hours is not installed. Migrate the site and try again."))
+	if hours is None or cstr(hours).strip() == "":
+		frappe.throw(_("Payroll hours are required."))
+	paid_hours = flt(hours, 2)
+	if paid_hours < 0:
+		frappe.throw(_("Hours cannot be negative."))
+
+	start, end = week_bounds(week_start)
+	day_sum = _paid_hours_sum(employee, start, end)
+	existing = frappe.db.get_value(
+		"Approved Week Hours",
+		{"employee": employee, "week_start": start},
+		"name",
+	)
+	if abs(paid_hours - day_sum) < 0.009:
+		if existing:
+			frappe.delete_doc("Approved Week Hours", existing, ignore_permissions=True, force=True)
+		return (employee, start, end)
+
+	if existing:
+		frappe.db.set_value("Approved Week Hours", existing, "hours", paid_hours, update_modified=True)
+	else:
+		frappe.get_doc(
+			{
+				"doctype": "Approved Week Hours",
+				"employee": employee,
+				"week_start": start,
+				"hours": paid_hours,
+			}
+		).insert(ignore_permissions=True)
+	return (employee, start, end)
+
+
+def _paid_hours_sum(employee: str, start, end) -> float:
+	filters = {
+		"employee": employee,
+		"attendance_date": ["between", [start, end]],
+		"docstatus": ["<", 2],
+	}
+	if frappe.db.has_column("Attendance", "hours_paid"):
+		filters["hours_paid"] = 1
+	rows = frappe.get_all("Attendance", filters=filters, fields=["working_hours"], limit=0)
+	return flt(sum(flt(row.working_hours) for row in rows), 2)
+
+
+def _refresh_draft_salary_slips(employee: str, start, end) -> dict:
+	from hrms.payroll.daily_pay import payroll_hours_for_period
+
+	if not employee or not frappe.db.table_exists("Salary Slip"):
+		return {"updated": [], "submitted": []}
+
+	slip_filters = {
+		"employee": employee,
+		"start_date": ["<=", end],
+		"end_date": [">=", start],
+	}
+	submitted_rows = frappe.get_all(
+		"Salary Slip",
+		filters={**slip_filters, "docstatus": 1},
+		fields=["name", "employee", "employee_name", "start_date", "end_date"],
+		limit=0,
+	)
+	submitted = [
+		{
+			"name": row.name,
+			"employee": row.employee,
+			"employee_name": row.employee_name,
+			"start_date": str(row.start_date),
+			"end_date": str(row.end_date),
+		}
+		for row in submitted_rows
+	]
+	updated = []
+	errors = []
+	for name in frappe.get_all(
+		"Salary Slip",
+		filters={**slip_filters, "docstatus": 0},
+		pluck="name",
+		limit=0,
+	):
+		slip = frappe.get_doc("Salary Slip", name)
+		period_end = slip.end_date or end
+		period_start = slip.start_date or start
+		hours = payroll_hours_for_period(employee, period_start, period_end)
+		frappe.db.savepoint("approved_hours_slip")
+		try:
+			slip.total_working_hours = hours
+			slip.flags.ignore_validate = True
+			if hasattr(slip, "calculate_net_pay"):
+				slip.calculate_net_pay()
+			slip.total_working_hours = hours
+			slip.save(ignore_permissions=True)
+		except Exception:
+			frappe.db.rollback(save_point="approved_hours_slip")
+			frappe.db.set_value("Salary Slip", name, "total_working_hours", hours, update_modified=True)
+			errors.append(name)
+		updated.append(name)
+	return {"updated": updated, "submitted": submitted, "errors": errors}
 
 
 @frappe.whitelist()

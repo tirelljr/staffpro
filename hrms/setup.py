@@ -75,6 +75,7 @@ def get_regional_custom_fields():
 
 
 def get_customizations():
+	from hrms.branding import USER_HIDDEN_SETTINGS_FIELDS
 	from hrms.hr.bpo_employee_labels import (
 		EMPLOYEE_FIELD_DEFAULTS,
 		EMPLOYEE_FIELD_LABELS,
@@ -117,6 +118,10 @@ def get_customizations():
 			{"doc_type": "Employee", "property": "default_view"},
 			{"doc_type": "System Settings", "field_name": "default_app", "property": "hidden"},
 			{"doc_type": "System Settings", "field_name": "app_tab", "property": "hidden"},
+			*[
+				{"doc_type": "User", "field_name": fieldname, "property": "hidden"}
+				for fieldname in USER_HIDDEN_SETTINGS_FIELDS
+			],
 			{"doc_type": "System Settings", "field_name": "time_zone", "property": "read_only"},
 			{"doc_type": "System Settings", "field_name": "time_zone", "property": "default"},
 			*[
@@ -197,6 +202,8 @@ def before_app_uninstall(app_name):
 
 def get_custom_fields():
 	"""HR specific custom fields that need to be added to the masters in ERPNext"""
+	from hrms.hr.agent_filesystem import employee_document_tab_fields
+
 	return {
 		"Company": [
 			{
@@ -298,6 +305,7 @@ def get_custom_fields():
 			{
 				"fieldname": "expense_approvers",
 				"fieldtype": "Table",
+				"hidden": 1,
 				"label": _("Expense Approver"),
 				"options": "Department Approver",
 				"insert_after": "leave_approvers",
@@ -328,8 +336,8 @@ def get_custom_fields():
 		],
 		"Employee": [
 			{
-				"default": "80",
-				"description": _("Hours in a 10-working-day pay period before this agent begins earning overtime. Time over this total (80 hours by default) is overtime."),
+				"default": "90",
+				"description": _("Hours in a pay period before this agent begins earning overtime. Time over this total (90 hours by default) is overtime."),
 				"fieldname": "overtime_threshold_hours",
 				"fieldtype": "Float",
 				"insert_after": "ctc",
@@ -361,11 +369,100 @@ def get_custom_fields():
 				"description": _("BPO campaign this agent is assigned to."),
 			},
 			{
+				"fieldname": "working_days_label",
+				"fieldtype": "HTML",
+				"insert_after": "holiday_list",
+				"options": "<label class='control-label' style='padding-top:8px'>Working Days</label>",
+			},
+			{
+				"default": "1",
+				"fieldname": "work_monday",
+				"fieldtype": "Check",
+				"label": _("Monday"),
+				"insert_after": "working_days_label",
+			},
+			{
+				"default": "1",
+				"fieldname": "work_tuesday",
+				"fieldtype": "Check",
+				"label": _("Tuesday"),
+				"insert_after": "work_monday",
+			},
+			{
+				"default": "1",
+				"fieldname": "work_wednesday",
+				"fieldtype": "Check",
+				"label": _("Wednesday"),
+				"insert_after": "work_tuesday",
+			},
+			{
+				"default": "1",
+				"fieldname": "work_thursday",
+				"fieldtype": "Check",
+				"label": _("Thursday"),
+				"insert_after": "work_wednesday",
+			},
+			{
+				"default": "1",
+				"fieldname": "work_friday",
+				"fieldtype": "Check",
+				"label": _("Friday"),
+				"insert_after": "work_thursday",
+			},
+			{
+				"default": "0",
+				"fieldname": "work_saturday",
+				"fieldtype": "Check",
+				"label": _("Saturday"),
+				"insert_after": "work_friday",
+			},
+			{
+				"default": "0",
+				"fieldname": "work_sunday",
+				"fieldtype": "Check",
+				"label": _("Sunday"),
+				"insert_after": "work_saturday",
+			},
+			{
+				"fieldname": "floor_worker_label",
+				"fieldtype": "HTML",
+				"insert_after": "work_sunday",
+				"options": "<label class='control-label' style='padding-top:8px'>Floor Worker</label>",
+			},
+			{
+				"default": "0",
+				"description": _(
+					"Does not clock in. Hours are added from the schedule and are not billed to a client."
+				),
+				"fieldname": "is_floor_worker",
+				"fieldtype": "Check",
+				"label": _("Floor Worker"),
+				"insert_after": "floor_worker_label",
+				"in_list_view": 1,
+				"in_standard_filter": 1,
+			},
+			{
+				"depends_on": "eval:doc.is_floor_worker",
+				"description": _("Leave blank to use the Floor Worker group times in HR Settings."),
+				"fieldname": "floor_worker_start_time",
+				"fieldtype": "Time",
+				"label": _("Start Time"),
+				"insert_after": "is_floor_worker",
+			},
+			{
+				"depends_on": "eval:doc.is_floor_worker",
+				"description": _("Leave blank to use the Floor Worker group times in HR Settings."),
+				"fieldname": "floor_worker_end_time",
+				"fieldtype": "Time",
+				"label": _("End Time"),
+				"insert_after": "floor_worker_start_time",
+			},
+			{
 				"fieldname": "default_shift",
 				"fieldtype": "Link",
 				"label": _("Default Shift"),
 				"options": "Shift Type",
-				"insert_after": "holiday_list",
+				"insert_after": "floor_worker_end_time",
 			},
 			{
 				"collapsible": 1,
@@ -400,6 +497,7 @@ def get_custom_fields():
 			{
 				"fieldname": "expense_approver",
 				"fieldtype": "Link",
+				"hidden": 1,
 				"label": _("Expense Approver"),
 				"options": "User",
 				"insert_after": "approvers_section",
@@ -559,6 +657,7 @@ def get_custom_fields():
 				"label": _("Default IPv4"),
 				"insert_after": "login_device_id",
 			},
+			*employee_document_tab_fields(),
 		],
 		"Customer": [
 			{
@@ -1004,7 +1103,7 @@ def update_hr_defaults():
 	hr_settings = frappe.get_doc("HR Settings")
 	hr_settings.emp_created_by = "Full Name"
 	hr_settings.standard_working_hours = 40
-	hr_settings.overtime_threshold_hours = 80
+	hr_settings.overtime_threshold_hours = 90
 	hr_settings.overtime_pay_multiplier = 1.5
 	hr_settings.send_birthday_reminders = 1
 	hr_settings.leave_approval_notification_template = _("Leave Approval Notification")
@@ -1197,11 +1296,19 @@ def _get_ask_ai_system_settings_fields():
 			"label": _("Floors"),
 		},
 		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_documents",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_allow_floors",
+			"label": _("Job letters and documents"),
+		},
+		{
 			"depends_on": depends,
 			"description": _("Write actions still require a confirmation card in Ask AI."),
 			"fieldname": "ask_ai_write_section",
 			"fieldtype": "Section Break",
-			"insert_after": "ask_ai_allow_floors",
+			"insert_after": "ask_ai_allow_documents",
 			"label": _("What Ask AI can change"),
 		},
 		{
@@ -1267,10 +1374,26 @@ def _get_ask_ai_system_settings_fields():
 			"label": _("Respond to agent queries"),
 		},
 		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_edit_documents",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_allow_respond_queries",
+			"label": _("Edit job letters"),
+		},
+		{
+			"default": "1",
+			"depends_on": depends,
+			"fieldname": "ask_ai_allow_review_documents",
+			"fieldtype": "Check",
+			"insert_after": "ask_ai_allow_edit_documents",
+			"label": _("Approve or reject job letters and print requests"),
+		},
+		{
 			"depends_on": depends,
 			"fieldname": "ask_ai_ops_column",
 			"fieldtype": "Column Break",
-			"insert_after": "ask_ai_allow_respond_queries",
+			"insert_after": "ask_ai_allow_review_documents",
 		},
 		{
 			"default": "1",

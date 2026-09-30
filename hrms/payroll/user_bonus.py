@@ -259,6 +259,15 @@ def get_user_bonus(
 		frappe.throw(_("Employee is required"))
 	if not frappe.has_permission("Employee", "read", employee):
 		frappe.throw(_("Not permitted"), frappe.PermissionError)
+	from hrms.hr.role_access import can_see
+
+	if not can_see("see_agent_salary"):
+		return {
+			"attendance_pct": None,
+			"missed_days": None,
+			"status": "",
+			"amount": 0,
+		}
 	return calculate_user_bonus(
 		employee,
 		bonus_type=bonus_type,

@@ -397,7 +397,7 @@ def delete_employee_with_unlink(employee: str) -> dict:
 
 
 @frappe.whitelist()
-def delete_employees_with_unlink(employees) -> dict:
+def delete_employees_with_unlink(employees: list | str | None = None) -> dict:
 	"""Delete multiple agents after unlinking related records."""
 	frappe.only_for(["System Manager", "HR Manager", "HR User"])
 	if isinstance(employees, str):

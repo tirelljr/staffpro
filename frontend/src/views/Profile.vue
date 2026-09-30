@@ -20,18 +20,40 @@
 
 					<div class="flex flex-col items-center mt-5 p-4">
 						<!-- Profile Image -->
-						<img
-							v-if="user.data.user_image"
-							class="h-24 w-24 rounded-full object-cover"
-							:src="user.data.user_image"
-							:alt="user.data.first_name"
-						/>
-						<div
-							v-else
-							class="flex items-center justify-center bg-gray-200 uppercase text-gray-600 h-24 w-24 rounded-full object-cover"
+						<label
+							class="flex flex-col items-center"
+							:class="uploadingPhoto ? 'pointer-events-none opacity-60' : 'cursor-pointer'"
 						>
-							{{ user.data.first_name[0] }}
-						</div>
+							<span class="relative">
+								<img
+									v-if="profileImage"
+									class="h-24 w-24 rounded-full object-cover"
+									:src="profileImage"
+									:alt="user.data.first_name"
+								/>
+								<div
+									v-else
+									class="flex items-center justify-center bg-gray-200 uppercase text-gray-600 h-24 w-24 rounded-full"
+								>
+									{{ (user.data.first_name || "?").charAt(0) }}
+								</div>
+								<span
+									class="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-gray-900 text-white shadow"
+								>
+									<FeatherIcon name="camera" class="h-4 w-4" />
+								</span>
+							</span>
+							<span class="mt-2 text-sm text-gray-500">
+								{{ uploadingPhoto ? __("Saving photo...") : __("Change photo") }}
+							</span>
+							<input
+								class="hidden"
+								type="file"
+								accept="image/jpeg,image/png,image/webp,image/gif"
+								:aria-label="__('Change profile photo')"
+								@change="onPhotoSelected"
+							/>
+						</label>
 
 						<div class="flex flex-col gap-1.5 items-center mt-2 mb-5">
 							<span v-if="employee" class="text-lg font-bold text-gray-900">{{
@@ -73,6 +95,24 @@
 							class="flex flex-col gap-5 my-4 w-full"
 						>
 							<div class="flex flex-col bg-white rounded">
+								<router-link
+									:to="{ name: 'MyDocuments' }"
+									class="flex flex-row cursor-pointer flex-start p-4 items-center justify-between border-b"
+								>
+									<div class="flex flex-row items-center gap-3 grow">
+										<FeatherIcon
+											name="folder"
+											class="h-5 w-5 text-gray-500"
+										/>
+										<div class="text-base font-normal text-gray-800">
+											{{ __("My Documents") }}
+										</div>
+									</div>
+									<FeatherIcon
+										name="chevron-right"
+										class="h-5 w-5 text-gray-500"
+									/>
+								</router-link>
 								<router-link
 									:to="{ name: 'Settings' }"
 									class="flex flex-row cursor-pointer flex-start p-4 items-center justify-between border-b"
@@ -164,6 +204,8 @@ import { useRouter } from "vue-router"
 import { IonPage, IonContent } from "@ionic/vue"
 import { FeatherIcon, createDocumentResource, createResource, toast } from "frappe-ui"
 
+import { FileAttachment } from "@/composables"
+import { employees } from "@/data/employees"
 import { showErrorAlert } from "@/utils/dialogs"
 import { formatCurrency } from "@/utils/formatters"
 
@@ -183,6 +225,12 @@ const __ = inject("$translate")
 const router = useRouter()
 
 const showDeskLink = computed(() => canOpenDesk(user.data))
+const profileImage = computed(
+	() => user.data?.user_image || employee.data?.image || ""
+)
+const uploadingPhoto = ref(false)
+const MAX_PROFILE_PHOTO_BYTES = 10 * 1024 * 1024
+const PROFILE_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
 
 const profileLinks = [
 	{
@@ -340,6 +388,58 @@ const getFieldValue = (fieldname) => {
 		return formatStatNumber(profileStats.data?.leave_remaining, __("days"))
 	}
 	return employeeDoc.doc[fieldname]
+}
+
+const onPhotoSelected = async (event) => {
+	const file = event.target.files?.[0]
+	event.target.value = ""
+	if (!file || uploadingPhoto.value) return
+
+	if (file.type && !PROFILE_PHOTO_TYPES.includes(file.type)) {
+		toast({
+			title: __("Error"),
+			text: __("Upload a JPG, PNG, WEBP, or GIF photo."),
+			icon: "alert-circle",
+			position: "bottom-center",
+			iconClasses: "text-red-500",
+		})
+		return
+	}
+	if (file.size > MAX_PROFILE_PHOTO_BYTES) {
+		toast({
+			title: __("Error"),
+			text: __("Photo must be 10 MB or smaller."),
+			icon: "alert-circle",
+			position: "bottom-center",
+			iconClasses: "text-red-500",
+		})
+		return
+	}
+
+	uploadingPhoto.value = true
+	try {
+		const attachment = new FileAttachment(file, {
+			url: "hrms.overrides.employee_profile.update_my_profile_image",
+			fields: {},
+		})
+		const result = await attachment.upload()
+		const image = result?.user_image || result?.image
+		if (image) {
+			if (user.data) user.data.user_image = image
+			if (employee?.data) employee.data.image = image
+		}
+		await Promise.all([user.reload(), employee.reload(), employees.reload()])
+		toast({
+			title: __("Profile photo updated"),
+			icon: "check-circle",
+			position: "bottom-center",
+			iconClasses: "text-green-500",
+		})
+	} catch (error) {
+		// FileAttachment already shows the upload error.
+	} finally {
+		uploadingPhoto.value = false
+	}
 }
 
 const logout = async () => {

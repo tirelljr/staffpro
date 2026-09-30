@@ -4,7 +4,12 @@
 			{{ __("Hey, {0} 👋", [employee?.data?.first_name]) }}
 		</h2>
 
-		<template v-if="settings.data?.allow_employee_checkin_from_mobile_app">
+		<template v-if="employee?.data?.is_floor_worker">
+			<div class="font-medium text-sm text-gray-500 mt-1.5">
+				{{ __("Hours are added automatically. Floor workers do not clock in.") }}
+			</div>
+		</template>
+		<template v-else-if="settings.data?.allow_employee_checkin_from_mobile_app">
 			<div class="font-medium text-sm text-gray-500 mt-1.5" v-if="lastLog">
 				<span>{{ __("Last {0} was at {1}", [__(lastLogType), formatTimestamp(lastLog.time)]) }}</span>
 				<span class="whitespace-pre"> &middot; </span>

@@ -122,6 +122,30 @@ class TestAskAIGraph(FrappeTestCase):
 			with self.assertRaises(frappe.PermissionError):
 				assert_tool_allowed("review_time_clock_adjustment")
 
+	def test_job_letter_writes_stop_for_confirmation(self):
+		for tool_name, args in (
+			(
+				"edit_job_letter",
+				{"name": "HR-REQ-1", "addressed_to": "Atlantic Bank Ltd.", "honorific": "Mr."},
+			),
+			("review_job_letter", {"name": "HR-REQ-1", "action": "Approve", "comment": "Issued"}),
+		):
+			model = FakeToolCallingModel(
+				[
+					AIMessage(
+						content="",
+						tool_calls=[{"name": tool_name, "args": args, "id": tool_name}],
+					)
+				]
+			)
+			result = run_agent(
+				[{"role": "user", "content": "Update the job letter"}],
+				model=model,
+				tools=ALL_TOOLS,
+			)
+			self.assertEqual(result["pending_action"]["tool"], tool_name)
+			self.assertEqual(result["blocks"][-1]["status"], "pending")
+
 	def test_new_write_tools_stop_for_confirmation(self):
 		model = FakeToolCallingModel(
 			[
@@ -334,6 +358,64 @@ class TestAskAIGraph(FrappeTestCase):
 		table = next(block for block in data["blocks"] if block.get("type") == "table")
 		self.assertEqual([row["employee_name"] for row in table["rows"]], ["Out Person", "Left Early"])
 		self.assertEqual(table["rows"][1]["out_time"], "1:00 PM")
+
+	def test_hours_tools_follow_the_signed_in_users_permission(self):
+		from hrms.ai.permissions import PERMISSION_DENIED, user_can_use_tool
+
+		with patch("hrms.hr.role_access.can_see", return_value=False):
+			self.assertFalse(user_can_use_tool("set_clock_times", user="hr.limited@example.com"))
+			self.assertFalse(user_can_use_tool("add_hours_adjustment", user="hr.limited@example.com"))
+		with (
+			patch("hrms.hr.role_access.can_see", return_value=True),
+			patch("hrms.ai.permissions._has_perm", return_value=True),
+		):
+			self.assertTrue(user_can_use_tool("set_clock_times", user="hr.limited@example.com"))
+			self.assertTrue(user_can_use_tool("add_hours_adjustment", user="hr.limited@example.com"))
+
+		model = FakeToolCallingModel(
+			[
+				AIMessage(
+					content="",
+					tool_calls=[
+						{
+							"name": "set_clock_times",
+							"args": {
+								"employee": "Diego Lopez",
+								"attendance_date": "2026-09-20",
+								"in_time": "10:00 AM",
+								"out_time": "4:00 PM",
+							},
+							"id": "clock-denied",
+						}
+					],
+				)
+			]
+		)
+		with patch("hrms.ai.graph.user_can_run_call", return_value=False):
+			result = run_agent(
+				[{"role": "user", "content": "Change Diego Lopez to 10 AM - 4 PM today"}],
+				model=model,
+				tools=ALL_TOOLS,
+			)
+		self.assertIsNone(result["pending_action"])
+		self.assertEqual(result["blocks"], [])
+		self.assertEqual(result["content"], PERMISSION_DENIED)
+
+		with patch("hrms.ai.permissions.user_can_run_call", return_value=False):
+			with self.assertRaises(frappe.PermissionError) as denied:
+				execute_write_action(
+					"set_clock_times",
+					{"employee": "Diego Lopez", "in_time": "10:00 AM", "out_time": "4:00 PM"},
+				)
+		self.assertIn(PERMISSION_DENIED, str(denied.exception))
+
+	def test_enabled_tools_omit_actions_the_user_cannot_perform(self):
+		from hrms.ai.tools import get_enabled_tools
+
+		with patch("hrms.ai.tools.user_can_use_tool", side_effect=lambda name: name != "set_clock_times"):
+			names = {item.name for item in get_enabled_tools()}
+		self.assertNotIn("set_clock_times", names)
+		self.assertIn("add_hours_adjustment", names)
 
 	def test_mixed_lookup_and_write_opens_one_confirmation(self):
 		model = FakeToolCallingModel(
@@ -758,7 +840,10 @@ class TestAskAIWriteActions(FrappeTestCase):
 		self.assertTrue(all(flt(value) >= 7 for value in hours))
 
 	def test_run_payroll_is_permission_gated(self):
-		with patch("hrms.ai.settings.allowed_tool_names", return_value=frozenset()):
-			with self.assertRaises(frappe.PermissionError):
+		from hrms.ai.permissions import PERMISSION_DENIED
+
+		with patch("hrms.ai.permissions.user_can_run_call", return_value=False):
+			with self.assertRaises(frappe.PermissionError) as denied:
 				execute_write_action("run_payroll", {"payroll_frequency": "Weekly"})
+		self.assertIn(PERMISSION_DENIED, str(denied.exception))
 

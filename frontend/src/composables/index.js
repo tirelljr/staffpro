@@ -7,16 +7,18 @@ function getFileReader() {
 }
 
 export class FileAttachment {
-	constructor(fileObj) {
+	constructor(fileObj, options = {}) {
 		this.fileObj = fileObj
 		this.fileName = fileObj.name
+		this.uploadUrl = options.url || "hrms.api.upload_base64_file"
+		this.extraFields = options.fields || null
 	}
 
 	async upload(documentType, documentName, fieldName) {
 		return new Promise(async (resolve, reject) => {
 			const reader = getFileReader()
 			const uploader = createResource({
-				url: "hrms.api.upload_base64_file",
+				url: this.uploadUrl,
 				onSuccess: (fileDoc) => resolve(fileDoc),
 				onError: (error) => {
 					toast({
@@ -35,15 +37,23 @@ export class FileAttachment {
 			reader.onload = () => {
 				console.log("Loaded successfully ✅")
 				this.fileContents = reader.result.toString().split(",")[1]
+				const payload = this.extraFields
+					? {
+							...this.extraFields,
+							content: this.fileContents,
+							filename: this.fileName,
+					  }
+					: {
+							content: this.fileContents,
+							dt: documentType,
+							dn: documentName,
+							filename: this.fileName,
+							fieldname: fieldName,
+					  }
 
-				uploader.submit({
-					content: this.fileContents,
-					dt: documentType,
-					dn: documentName,
-					filename: this.fileName,
-					fieldname: fieldName,
-				})
+				uploader.submit(payload)
 			}
+			reader.onerror = () => reject(reader.error)
 			reader.readAsDataURL(this.fileObj)
 		})
 	}

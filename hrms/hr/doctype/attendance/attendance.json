@@ -33,6 +33,7 @@
   "modify_half_day_status",
   "daily_pay_section",
   "hours_paid",
+  "manual_hours",
   "hour_rate",
   "daily_pay",
   "column_break_daily_pay",
@@ -244,6 +245,15 @@
    "fieldname": "hours_paid",
    "fieldtype": "Check",
    "label": "Hours Paid",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Set when an admin edits approved hours. Punch resync keeps this value.",
+   "fieldname": "manual_hours",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Manual Hours",
    "read_only": 1
   },
   {

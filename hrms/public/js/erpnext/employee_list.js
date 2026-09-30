@@ -1,7 +1,14 @@
 const existing_employee_listview = frappe.listview_settings["Employee"] || {};
 const existing_onload = existing_employee_listview.onload;
 const existing_refresh = existing_employee_listview.refresh;
-const EMPLOYEE_IMAGE_FIELDS = ["department", "date_of_joining", "image", "employee_name"];
+const EMPLOYEE_IMAGE_FIELDS = [
+	"name",
+	"department",
+	"date_of_joining",
+	"image",
+	"employee_name",
+	"is_floor_worker",
+];
 
 frappe.listview_settings["Employee"] = Object.assign({}, existing_employee_listview, {
 	add_fields: [...new Set([...field_name_list(existing_employee_listview.add_fields), ...EMPLOYEE_IMAGE_FIELDS])],
@@ -10,6 +17,7 @@ frappe.listview_settings["Employee"] = Object.assign({}, existing_employee_listv
 		hide_employee_list_menu(listview);
 		ensure_employee_image_fields(listview);
 		setup_employee_bulk_delete(listview);
+		apply_employee_roster_filter(listview);
 	},
 	refresh(listview) {
 		existing_refresh?.(listview);
@@ -27,8 +35,22 @@ if (typeof frappe.ready === "function") {
 	});
 }
 
+function is_field_pair(value) {
+	return (
+		Array.isArray(value) &&
+		value.length >= 2 &&
+		typeof value[0] === "string" &&
+		typeof value[1] === "string" &&
+		!value[0].includes(".") &&
+		!value[0].includes("`") &&
+		value[1][0] === value[1][0]?.toUpperCase() &&
+		value[1][0] !== value[1][0]?.toLowerCase()
+	);
+}
+
 function field_name_list(value) {
 	if (Array.isArray(value)) {
+		if (is_field_pair(value)) return field_name_list(value[0]);
 		return value.flatMap(field_name_list);
 	}
 	if (typeof value !== "string") return [];
@@ -98,6 +120,21 @@ function setup_employee_bulk_delete(listview) {
 	});
 }
 
+function apply_employee_roster_filter(listview) {
+	if (!listview?.filter_area) return;
+	let mode = "";
+	try {
+		mode = sessionStorage.getItem("staff_pro_employee_roster") || "";
+	} catch (err) {
+		mode = "";
+	}
+	if (mode !== "floor" && mode !== "all") return;
+	listview.filter_area.remove("is_floor_worker");
+	if (mode === "floor") {
+		listview.filter_area.add([["Employee", "is_floor_worker", "=", 1]]);
+	}
+}
+
 function hide_employee_list_menu(listview) {
 	const page = listview?.page;
 	if (!page) return;
@@ -110,12 +147,30 @@ function hide_employee_list_menu(listview) {
 
 function ensure_employee_image_fields(listview) {
 	if (!listview) return;
-	listview.fields = field_name_list(listview.fields);
-	EMPLOYEE_IMAGE_FIELDS.forEach((fieldname) => {
-		if (!listview.fields.includes(fieldname)) {
-			listview.fields.push(fieldname);
-		}
+	const current = Array.isArray(listview.fields) ? listview.fields : [];
+	const as_pairs = current.some(is_field_pair);
+	const names = new Set(field_name_list(current));
+	EMPLOYEE_IMAGE_FIELDS.forEach((fieldname) => names.add(fieldname));
+
+	if (!as_pairs) {
+		listview.fields = [...names];
+		return;
+	}
+
+	const doctype = listview.doctype || "Employee";
+	const fields = [];
+	const seen = new Set();
+	current.forEach((field) => {
+		if (!is_field_pair(field) || seen.has(field[0])) return;
+		seen.add(field[0]);
+		fields.push(field);
 	});
+	names.forEach((fieldname) => {
+		if (seen.has(fieldname)) return;
+		seen.add(fieldname);
+		fields.push([fieldname, doctype]);
+	});
+	listview.fields = fields;
 }
 
 function format_employee_tenure(date_of_joining) {
@@ -161,6 +216,11 @@ function employee_image_details_html(item) {
 			`<div class="staff-pro-employee-card__meta staff-pro-employee-card__meta--tenure ellipsis" title="${label}">${label}</div>`
 		);
 	}
+	if (cint(item.is_floor_worker)) {
+		lines.push(
+			`<div class="staff-pro-employee-card__meta"><span class="sp-floor-worker-badge" style="display:inline-block;padding:0 6px;border-radius:999px;background:#e7f6ec;color:#146c43;font-size:11px;font-weight:600;line-height:18px;">floorworkers</span></div>`
+		);
+	}
 	if (!lines.length) return "";
 
 	return `<div class="item-info staff-pro-employee-card__info">${lines.join("")}</div>`;
@@ -184,6 +244,33 @@ function patch_employee_image_view() {
 			return original_details.call(this, item);
 		}
 		return employee_image_details_html(item);
+	};
+
+	const original_render = ImageView.prototype.render_image_view;
+	ImageView.prototype.render_image_view = function () {
+		original_render.call(this);
+		if (this.doctype !== "Employee" || !this.$result) return;
+		this.$result.off("click.staff-pro-employee").on(
+			"click.staff-pro-employee",
+			".image-view-item",
+			(event) => {
+				if (event.target.closest(".list-row-checkbox, .like-action, .zoom-view, .list-row-like")) {
+					return;
+				}
+				const link = event.currentTarget.querySelector("a[data-name]");
+				const raw = link?.getAttribute("data-name") || "";
+				let name = raw;
+				try {
+					name = decodeURIComponent(raw);
+				} catch (err) {
+					name = raw;
+				}
+				if (!name || name === "undefined") return;
+				event.preventDefault();
+				frappe.route_options = null;
+				frappe.set_route("Form", "Employee", name);
+			},
+		);
 	};
 
 	ImageView.prototype.get_attached_images = function () {

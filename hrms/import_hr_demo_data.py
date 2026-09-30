@@ -1153,7 +1153,7 @@ def seed_overtime_and_holiday_demo(company=None, ensure_payroll_entry=True):
 	hr_meta = frappe.get_meta("HR Settings")
 	hr_values = {}
 	if hr_meta.has_field("overtime_threshold_hours"):
-		hr_values["overtime_threshold_hours"] = 80
+		hr_values["overtime_threshold_hours"] = 90
 	if hr_meta.has_field("overtime_pay_multiplier"):
 		hr_values["overtime_pay_multiplier"] = 1.5
 	if hr_values:
@@ -1639,7 +1639,7 @@ def _apply_employee_bpo_fields(company, employee_map):
 		if meta.has_field("holiday_list"):
 			values["holiday_list"] = "Staff Pro Holiday List"
 		if meta.has_field("overtime_threshold_hours"):
-			values["overtime_threshold_hours"] = 80
+			values["overtime_threshold_hours"] = 90
 		if values:
 			frappe.db.set_value("Employee", employee, values, update_modified=False)
 	_apply_employee_bank_fields(employee_map)

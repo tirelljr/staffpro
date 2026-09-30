@@ -129,7 +129,7 @@ body.staff-pro-alive .page-container[data-page-route="paid-time-off"] .page-head
 .sp-pto-table-head,
 .sp-pto-balance-row {
 	display: grid;
-	grid-template-columns: minmax(140px, 1.3fr) minmax(140px, 1.2fr) repeat(5, minmax(72px, 0.8fr));
+	grid-template-columns: minmax(140px, 1.3fr) minmax(140px, 1.2fr) repeat(5, minmax(72px, 0.8fr)) minmax(120px, 1fr);
 	gap: 8px;
 	align-items: center;
 	padding: 10px 4px;

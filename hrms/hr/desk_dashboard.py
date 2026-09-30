@@ -356,7 +356,7 @@ def get_payroll_board(
 	currency = frappe.db.get_value("Company", company, "default_currency") if company else None
 	periods = _payroll_board_periods(company) if company else []
 	start_date, end_date = _payroll_board_dates(from_date, to_date, company, periods)
-	prev_start, prev_end = _previous_pay_period(start_date, company, periods)
+	prev_start, prev_end = _previous_pay_period(start_date, company, periods, end_date)
 	trend_periods = _trend_pay_periods(periods, start_date, end_date, months)
 
 	if not company:
@@ -1156,10 +1156,17 @@ def _previous_date_range(start_date, end_date):
 	return prev_start, prev_end
 
 
-def _previous_pay_period(start_date, company=None, periods=None):
+def _previous_pay_period(start_date, company=None, periods=None, end_date=None):
 	from hrms.payroll.auto_payroll import subtract_working_days
 
 	start_date = getdate(start_date)
+	if end_date and periods:
+		end = getdate(end_date)
+		known = any(
+			row["from_date"] == str(start_date) and row["to_date"] == str(end) for row in periods
+		)
+		if not known:
+			return _previous_date_range(start_date, end)
 	if periods:
 		older = [row for row in periods if getdate(row["to_date"]) < start_date]
 		if older:
@@ -1171,11 +1178,23 @@ def _previous_pay_period(start_date, company=None, periods=None):
 
 def _trend_pay_periods(periods, start_date, end_date, count: int | None = None):
 	count = max(3, min(cint(count) or PAYROLL_BOARD_MONTHS, 12))
+	start_date, end_date = getdate(start_date), getdate(end_date)
+	periods = list(periods or [])
+	start_key, end_key = str(start_date), str(end_date)
+	if not any(row["from_date"] == start_key and row["to_date"] == end_key for row in periods):
+		periods.append(
+			{
+				"from_date": start_key,
+				"to_date": end_key,
+				"label": _payroll_board_short_label(end_date),
+			}
+		)
+		periods.sort(key=lambda row: row["from_date"], reverse=True)
 	if not periods:
 		return [
 			{
-				"from_date": str(start_date),
-				"to_date": str(end_date),
+				"from_date": start_key,
+				"to_date": end_key,
 				"label": _payroll_board_short_label(end_date),
 			}
 		]
@@ -1183,7 +1202,7 @@ def _trend_pay_periods(periods, start_date, end_date, count: int | None = None):
 		(
 			i
 			for i, row in enumerate(periods)
-			if row["from_date"] == str(start_date) and row["to_date"] == str(end_date)
+			if row["from_date"] == start_key and row["to_date"] == end_key
 		),
 		0,
 	)

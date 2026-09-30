@@ -233,7 +233,7 @@ def client_delete(doctype: str, name: str):
 
 
 @frappe.whitelist()
-def bulk_delete_documents(doctype: str, names=None) -> dict:
+def bulk_delete_documents(doctype: str, names: str | list | None = None) -> dict:
 	"""Cancel if needed, unlink leftovers, then delete every selected row."""
 	install_force_delete_patch()
 	if not doctype:
@@ -279,7 +279,7 @@ def bulk_delete_documents(doctype: str, names=None) -> dict:
 
 
 @frappe.whitelist()
-def delete_items(doctype=None, items=None):
+def delete_items(doctype: str | None = None, items: str | list | None = None) -> dict:
 	"""Replace Frappe list bulk-delete so submitted invoices and clients can go."""
 	doctype = doctype or frappe.form_dict.get("doctype")
 	items = items if items is not None else frappe.form_dict.get("items")

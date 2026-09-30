@@ -44,6 +44,19 @@
   "attendance_settings_section",
   "allow_employee_checkin_from_mobile_app",
   "allow_geolocation_tracking",
+  "floor_worker_section",
+  "floor_worker_start_time",
+  "floor_worker_end_time",
+  "floor_worker_days_column",
+  "floor_work_monday",
+  "floor_work_tuesday",
+  "floor_work_wednesday",
+  "floor_work_thursday",
+  "floor_work_friday",
+  "floor_work_saturday",
+  "floor_work_sunday",
+  "enable_late_entry_marking",
+  "late_entry_grace_period",
   "overtime_tab",
   "overtime_settings_section",
   "overtime_threshold_hours",
@@ -63,7 +76,16 @@
   "feedback_reminder_notification_template",
   "column_break_4",
   "hiring_sender",
-  "hiring_sender_email"
+  "hiring_sender_email",
+  "job_letter_tab",
+  "job_letter_section",
+  "job_letter_company_name",
+  "job_letter_address",
+  "job_letter_email",
+  "job_letter_column",
+  "job_letter_signatory",
+  "job_letter_signatory_title",
+  "job_letter_signatory_department"
  ],
  "fields": [
   {
@@ -289,6 +311,11 @@
    "label": "Shift Settings"
   },
   {
+   "fieldname": "attendance_settings_section",
+   "fieldtype": "Section Break",
+   "label": "Attendance Settings"
+  },
+  {
    "default": "1",
    "fieldname": "allow_employee_checkin_from_mobile_app",
    "fieldtype": "Check",
@@ -301,9 +328,84 @@
    "label": "Allow Geolocation Tracking"
   },
   {
-   "fieldname": "attendance_settings_section",
+   "fieldname": "floor_worker_section",
    "fieldtype": "Section Break",
-   "label": "Attendance Settings"
+   "label": "Floor Workers",
+   "description": "Default schedule for employees marked as Floor Workers. A time or day set on the employee overrides this."
+  },
+  {
+   "default": "08:00:00",
+   "fieldname": "floor_worker_start_time",
+   "fieldtype": "Time",
+   "label": "Default Start Time"
+  },
+  {
+   "default": "17:00:00",
+   "fieldname": "floor_worker_end_time",
+   "fieldtype": "Time",
+   "label": "Default End Time"
+  },
+  {
+   "fieldname": "floor_worker_days_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "floor_work_monday",
+   "fieldtype": "Check",
+   "label": "Monday"
+  },
+  {
+   "default": "1",
+   "fieldname": "floor_work_tuesday",
+   "fieldtype": "Check",
+   "label": "Tuesday"
+  },
+  {
+   "default": "1",
+   "fieldname": "floor_work_wednesday",
+   "fieldtype": "Check",
+   "label": "Wednesday"
+  },
+  {
+   "default": "1",
+   "fieldname": "floor_work_thursday",
+   "fieldtype": "Check",
+   "label": "Thursday"
+  },
+  {
+   "default": "1",
+   "fieldname": "floor_work_friday",
+   "fieldtype": "Check",
+   "label": "Friday"
+  },
+  {
+   "default": "0",
+   "fieldname": "floor_work_saturday",
+   "fieldtype": "Check",
+   "label": "Saturday"
+  },
+  {
+   "default": "0",
+   "fieldname": "floor_work_sunday",
+   "fieldtype": "Check",
+   "label": "Sunday"
+  },
+  {
+   "default": "1",
+   "description": "When enabled, first check-in after shift start plus the grace period marks Attendance as late and shows in Day View.",
+   "fieldname": "enable_late_entry_marking",
+   "fieldtype": "Check",
+   "label": "Enable Late Entry Marking"
+  },
+  {
+   "default": "10",
+   "depends_on": "enable_late_entry_marking",
+   "description": "Minutes after scheduled shift start before a check-in counts as late (also used as the default for new Shift Types).",
+   "fieldname": "late_entry_grace_period",
+   "fieldtype": "Int",
+   "label": "Late Entry Grace Period (Minutes)",
+   "non_negative": 1
   },
   {
    "fieldname": "overtime_tab",
@@ -316,8 +418,8 @@
    "label": "Overtime Settings"
   },
   {
-   "default": "80",
-   "description": "Hours in a 10-working-day pay period before overtime pay. Time over this total (80 hours by default) is overtime. An employee-specific value takes precedence.",
+   "default": "90",
+   "description": "Hours in a pay period before overtime pay. Time over this total (90 hours by default) is overtime. An employee-specific value takes precedence.",
    "fieldname": "overtime_threshold_hours",
    "fieldtype": "Float",
    "label": "Default OT Threshold (Hours)",
@@ -363,6 +465,7 @@
   {
    "fieldname": "expenses_tab",
    "fieldtype": "Tab Break",
+   "hidden": 1,
    "label": "Expenses"
   },
   {
@@ -413,6 +516,57 @@
    "fieldname": "employee_exit_settings_section",
    "fieldtype": "Section Break",
    "label": "Employee Exit Settings"
+  },
+  {
+   "fieldname": "job_letter_tab",
+   "fieldtype": "Tab Break",
+   "label": "Job Letters"
+  },
+  {
+   "fieldname": "job_letter_section",
+   "fieldtype": "Section Break",
+   "label": "Letterhead"
+  },
+  {
+   "default": "Staff Pro BPO, LLC",
+   "fieldname": "job_letter_company_name",
+   "fieldtype": "Data",
+   "label": "Letterhead Company"
+  },
+  {
+   "default": "33 George Price Highway\nSanta Elena, Cayo",
+   "fieldname": "job_letter_address",
+   "fieldtype": "Small Text",
+   "label": "Letterhead Address"
+  },
+  {
+   "default": "hr@staffprobpo.com",
+   "fieldname": "job_letter_email",
+   "fieldtype": "Data",
+   "label": "HR Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "job_letter_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Myra G Chavez",
+   "fieldname": "job_letter_signatory",
+   "fieldtype": "Data",
+   "label": "Signatory"
+  },
+  {
+   "default": "Vice President",
+   "fieldname": "job_letter_signatory_title",
+   "fieldtype": "Data",
+   "label": "Signatory Title"
+  },
+  {
+   "default": "Human Resources Department",
+   "fieldname": "job_letter_signatory_department",
+   "fieldtype": "Data",
+   "label": "Signatory Department"
   }
  ],
  "icon": "fa fa-cog",

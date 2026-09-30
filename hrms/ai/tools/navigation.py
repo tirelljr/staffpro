@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from langchain_core.tools import tool
 
+from hrms.ai.permissions import PERMISSION_DENIED, user_can_navigate
 from hrms.ai.tools.common import tool_result
 
 ROUTES = {
@@ -24,7 +25,11 @@ ROUTES = {
 def navigate_to_staff_pro(destination: str) -> str:
 	"""Offer a button to open a Staff Pro area. Destinations: employees, attendance, hours, who_is_in, time_clock_adjustments, paid_time_off, overtime, payroll, agent_queries, floors."""
 	key = destination.strip().lower().replace(" ", "_")
-	route, label = ROUTES.get(key, ROUTES["employees"])
+	if key not in ROUTES:
+		key = "employees"
+	if not user_can_navigate(key):
+		return tool_result(PERMISSION_DENIED, {"permission_denied": True})
+	route, label = ROUTES[key]
 	return tool_result(
 		f"Use the button to {label.lower()}.",
 		{"destination": key},

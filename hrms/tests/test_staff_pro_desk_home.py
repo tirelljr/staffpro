@@ -53,6 +53,18 @@ class TestStaffProDeskHome(HRMSTestSuite):
 		if frappe.get_meta("System Settings").has_field("default_app"):
 			self.assertEqual(frappe.db.get_single_value("System Settings", "default_app"), "hrms")
 
+	def test_user_settings_hide_default_app_and_social_login(self):
+		from hrms.branding import USER_HIDDEN_SETTINGS_FIELDS, hide_user_settings_fields
+
+		hide_user_settings_fields()
+		meta = frappe.get_meta("User")
+		for fieldname in USER_HIDDEN_SETTINGS_FIELDS:
+			if not meta.has_field(fieldname):
+				continue
+			self.assertTrue(meta.get_field(fieldname).hidden, fieldname)
+		if meta.has_field("default_app"):
+			self.assertEqual(frappe.db.get_value("User", "Administrator", "default_app"), "hrms")
+
 	def test_branding_locks_belize_timezone(self):
 		from hrms.branding import STAFF_PRO_TIMEZONE, apply_branding, lock_system_timezone
 

@@ -61,6 +61,7 @@ BPO_WORKSPACE_SIDEBARS = frozenset(
 		"pay",
 		"ss and taxes",
 		"talent",
+		"filesystem",
 		"floor",
 		"finance",
 		"admin",
@@ -285,6 +286,20 @@ def extend_bootinfo(bootinfo):
 
 	bootinfo["staff_pro_bpo_roles"] = sorted(BPO_ROLES)
 	bootinfo["staff_pro_bpo_modules"] = sidebar_module_boot_list()
+	from hrms.hr.role_access import access_groups_boot
+
+	bootinfo["staff_pro_access_groups"] = access_groups_boot()
+	if frappe.session.user and frappe.session.user != "Guest":
+		from hrms.hr.role_access import blocked_routes, ensure_role_access_fields, full_access, user_access
+
+		try:
+			ensure_role_access_fields()
+			access = user_access()
+		except Exception:
+			access = full_access()
+			frappe.log_error(title="Role access boot")
+		bootinfo["staff_pro_access"] = access
+		bootinfo["staff_pro_access_blocks"] = blocked_routes(access)
 	from hrms.ai.settings import is_ask_ai_enabled
 
 	bootinfo["staff_pro_ask_ai"] = {
@@ -335,6 +350,10 @@ def _allowed_sidebar_keys():
 
 def _is_allowed_bpo_workspace(name, allowed_keys=None) -> bool:
 	if not _is_bpo_workspace_name(name):
+		return False
+	from hrms.hr.role_access import workspace_allowed
+
+	if not workspace_allowed(name):
 		return False
 	if allowed_keys is None:
 		return True
@@ -417,6 +436,10 @@ def _is_allowed_bpo_dock_entry(entry, allowed_keys=None) -> bool:
 def _can_open_sidebar_item(item) -> bool:
 	if not isinstance(item, dict):
 		return True
+	from hrms.hr.role_access import sidebar_item_allowed
+
+	if not sidebar_item_allowed(item):
+		return False
 	if frappe.session.user in {"Administrator", "Guest"}:
 		return True
 	link_type = str(item.get("link_type") or "").strip().lower()
@@ -438,7 +461,9 @@ def _can_open_sidebar_item(item) -> bool:
 def _filter_sidebar_item_rows(rows):
 	if not isinstance(rows, list):
 		return rows
-	return [row for row in rows if _can_open_sidebar_item(row)]
+	from hrms.hr.role_access import drop_empty_sections
+
+	return drop_empty_sections([row for row in rows if _can_open_sidebar_item(row)])
 
 
 def _filter_unpermitted_sidebar_items(bootinfo):

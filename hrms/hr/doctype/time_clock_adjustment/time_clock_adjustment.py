@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import get_time, getdate, now_datetime, strip_html
+from frappe.utils import cint, get_time, getdate, now_datetime, strip_html
 
 HR_ROLES = frozenset({"HR User", "HR Manager", "System Manager", "Administrator"})
 
@@ -35,7 +35,7 @@ class TimeClockAdjustment(Document):
 	if TYPE_CHECKING:
 		from frappe.types import DF
 
-		action: DF.Literal["Edit", "Add"]
+		action: DF.Literal["Edit", "Add", "Delete"]
 		attendance: DF.Link | None
 		attendance_date: DF.Date
 		company: DF.Link | None
@@ -246,6 +246,32 @@ def _hours_label(hours: float | None) -> str:
 	return f"{hours:g}h"
 
 
+def _hours_change(action, current_in, current_out, new_in, new_out) -> float | None:
+	current_hours = _requested_duration(current_in, current_out)
+	if (action or "") == "Delete":
+		if current_hours is None:
+			return None
+		return -current_hours
+
+	new_hours = _requested_duration(new_in, new_out)
+	if not time_to_str(current_in) and not time_to_str(current_out):
+		return new_hours
+	if current_hours is None or new_hours is None:
+		return None
+	return round(new_hours - current_hours, 2)
+
+
+def _hours_change_label(hours: float | None) -> str:
+	if hours is None:
+		return "—"
+	if hours == 0:
+		return "0 hours"
+	magnitude = abs(hours)
+	unit = "hour" if magnitude == 1 else "hours"
+	sign = "+" if hours > 0 else "-"
+	return f"{sign}{magnitude:g} {unit}"
+
+
 def _employee_summary(employee: str | None) -> dict:
 	if not employee:
 		return {}
@@ -262,9 +288,12 @@ def _employee_summary(employee: str | None) -> dict:
 
 def serialize_adjustment(doc, employee_details: dict | None = None) -> dict:
 	details = employee_details if employee_details is not None else _employee_summary(doc.employee)
-	requested_in = time_to_str(doc.requested_in_time) or time_to_str(doc.current_in_time)
-	requested_out = time_to_str(doc.requested_out_time) or time_to_str(doc.current_out_time)
+	current_in = time_to_str(doc.current_in_time)
+	current_out = time_to_str(doc.current_out_time)
+	requested_in = time_to_str(doc.requested_in_time) or current_in
+	requested_out = time_to_str(doc.requested_out_time) or current_out
 	requested_hours = _requested_duration(requested_in, requested_out)
+	hours_change = _hours_change(doc.action, current_in, current_out, requested_in, requested_out)
 	attendance_date = getdate(doc.attendance_date) if doc.attendance_date else None
 	return {
 		"name": doc.name,
@@ -280,18 +309,21 @@ def serialize_adjustment(doc, employee_details: dict | None = None) -> dict:
 		"action": doc.action,
 		"in_log": doc.in_log,
 		"out_log": doc.out_log,
-		"current_in_time": time_to_str(doc.current_in_time),
-		"current_out_time": time_to_str(doc.current_out_time),
+		"current_in_time": current_in,
+		"current_out_time": current_out,
 		"requested_in_time": time_to_str(doc.requested_in_time),
 		"requested_out_time": time_to_str(doc.requested_out_time),
 		"effective_in_time": requested_in,
 		"effective_out_time": requested_out,
 		"requested_hours": requested_hours,
 		"requested_hours_label": _hours_label(requested_hours),
+		"hours_change": hours_change,
+		"hours_change_label": _hours_change_label(hours_change),
 		"note": doc.note,
 		"status": doc.status,
 		"requested_by": doc.requested_by,
 		"reviewed_by": doc.reviewed_by,
+		"reviewed_by_name": frappe.utils.get_fullname(doc.reviewed_by) if doc.reviewed_by else None,
 		"reviewed_on": str(doc.reviewed_on) if doc.reviewed_on else None,
 	}
 
@@ -487,6 +519,53 @@ def pending_by_employee_date(employees: list[str], on_date) -> dict[str, dict]:
 	return by_employee
 
 
+def record_manual_hours_change(
+	*,
+	employee: str,
+	attendance_date,
+	attendance: str | None,
+	action: str,
+	current_in=None,
+	current_out=None,
+	requested_in=None,
+	requested_out=None,
+	in_log: str | None = None,
+	out_log: str | None = None,
+	note: str | None = None,
+) -> str | None:
+	"""Write an already-applied admin add, edit, or delete into TCA history."""
+	if getattr(frappe.flags, "skip_manual_hours_history", False):
+		return None
+	if not employee or not is_hr_user():
+		return None
+	if not frappe.db.table_exists("Time Clock Adjustment"):
+		return None
+
+	doc = frappe.get_doc(
+		{
+			"doctype": "Time Clock Adjustment",
+			"employee": employee,
+			"attendance_date": getdate(attendance_date),
+			"attendance": attendance,
+			"action": action,
+			"status": "Approved",
+			"current_in_time": time_to_str(current_in),
+			"current_out_time": time_to_str(current_out),
+			"requested_in_time": time_to_str(requested_in),
+			"requested_out_time": time_to_str(requested_out),
+			"in_log": in_log,
+			"out_log": out_log,
+			"note": note,
+			"requested_by": frappe.session.user,
+			"reviewed_by": frappe.session.user,
+			"reviewed_on": now_datetime(),
+		}
+	)
+	doc.flags.ignore_permissions = True
+	doc.insert()
+	return doc.name
+
+
 def apply_time_clock_adjustment(doc) -> str:
 	from hrms.hr.doctype.attendance.attendance import add_hours_entry, update_hours_entry
 
@@ -500,26 +579,31 @@ def apply_time_clock_adjustment(doc) -> str:
 	if doc.note:
 		comment = f"{comment}: {doc.note}"
 
-	if (doc.action or "Edit") == "Add" or not doc.attendance:
-		return add_hours_entry(
-			doc.employee,
+	previous = getattr(frappe.flags, "skip_manual_hours_history", False)
+	frappe.flags.skip_manual_hours_history = True
+	try:
+		if (doc.action or "Edit") == "Add" or not doc.attendance:
+			return add_hours_entry(
+				doc.employee,
+				attendance_date,
+				in_time,
+				out_time=out_time,
+				comment=comment,
+				working_now=working_now,
+			)
+
+		return update_hours_entry(
+			doc.attendance,
 			attendance_date,
 			in_time,
 			out_time=out_time,
 			comment=comment,
 			working_now=working_now,
+			in_log=doc.in_log or None,
+			out_log=doc.out_log or None,
 		)
-
-	return update_hours_entry(
-		doc.attendance,
-		attendance_date,
-		in_time,
-		out_time=out_time,
-		comment=comment,
-		working_now=working_now,
-		in_log=doc.in_log or None,
-		out_log=doc.out_log or None,
-	)
+	finally:
+		frappe.flags.skip_manual_hours_history = previous
 
 
 @frappe.whitelist()
@@ -562,12 +646,16 @@ def get_time_clock_adjustments(
 	department: str | None = None,
 	from_date: str | date | None = None,
 	to_date: str | date | None = None,
+	history: int | str | bool | None = None,
 ) -> dict:
 	frappe.only_for(list(HR_ROLES))
 	filters: dict = {}
-	selected = (status or "Pending").strip()
+	want_history = bool(cint(history))
+	selected = (status or ("All" if want_history else "Pending")).strip()
 	if selected and selected != "All":
 		filters["status"] = selected
+	elif want_history:
+		filters["status"] = ["in", ["Approved", "Rejected"]]
 	if department and department != "__none__":
 		filters["department"] = department
 	elif department == "__none__":
@@ -628,4 +716,5 @@ def get_time_clock_adjustments(
 		"rows": [serialize_adjustment(row, employee_details.get(row.employee, {})) for row in rows],
 		"departments": departments,
 		"status": selected,
+		"history": want_history,
 	}

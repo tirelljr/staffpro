@@ -189,6 +189,29 @@ body.staff-pro-has-topbar .dock {
 	min-height: 22px !important;
 	color: #000000 !important;
 }
+/* Filesystem dock glyph — same filled folder as the filesystem cards, darker. */
+.workspace-dock .sp-dock-folder,
+.dock .sp-dock-folder {
+	display: block !important;
+	position: relative !important;
+	width: 20px !important;
+	height: 16px !important;
+	margin-top: 3px !important;
+	border-radius: 3px 3px 2px 2px !important;
+	background: #312e81 !important;
+	flex-shrink: 0 !important;
+}
+.workspace-dock .sp-dock-folder::before,
+.dock .sp-dock-folder::before {
+	content: "" !important;
+	position: absolute !important;
+	top: -3px !important;
+	left: 0 !important;
+	width: 9px !important;
+	height: 4px !important;
+	border-radius: 2px 2px 0 0 !important;
+	background: #1e1b4b !important;
+}
 .workspace-dock .staff-pro-dock-integrations .workspace-dock-item img,
 .workspace-dock .staff-pro-dock-integrations .workspace-dock-item svg,
 .workspace-dock button.workspace-dock-item.staff-pro-dock-brand-icon img,
@@ -1039,7 +1062,8 @@ function apply_bpo_sidebar_label($item) {
 
 	const current = ($label.text() || "").trim();
 	if (!current) return;
-	if (current.toLowerCase() === "past pay stubs") return;
+	const preserved = current.toLowerCase();
+	if (preserved === "past pay stubs" || preserved === "floor workers") return;
 
 	const href = ($item.find(".item-anchor").attr("href") || "").trim();
 	const next = bpo_sidebar_label(current, href);
@@ -1154,6 +1178,15 @@ function is_hidden_sidebar_item($item) {
 		return true;
 	}
 	const href = ($item.find(".item-anchor").attr("href") || "").trim();
+	const currentSidebar = String(
+		frappe.app?.sidebar?.current_module || frappe.app?.sidebar?.sidebar_title || "",
+	).toLowerCase();
+	if (
+		currentSidebar !== "filesystem" &&
+		(href.toLowerCase().includes("td4-form") || /^td4 forms?$/i.test(label))
+	) {
+		return true;
+	}
 
 	// Section headers stay so nested BPO links (Clients, Posted Invoices) remain visible
 	// until migrate replaces the Finance sidebar. Leaf ERP items are removed immediately.
@@ -1354,6 +1387,7 @@ function enhance_sidebar_menus() {
 
 		prefer_employee_image_sidebar_link($anchor);
 		bind_pay_stubs_sidebar_item($item, $anchor, label);
+		bind_employee_roster_sidebar_item($item, $anchor, label);
 
 		const $wrapper = $item.parent();
 		const $nested = $wrapper.children(".nested-container");
@@ -1388,6 +1422,49 @@ function bind_pay_stubs_sidebar_item($item, $anchor, label) {
 		e.stopPropagation();
 		open_pay_stubs_list(mode);
 	});
+}
+
+const EMPLOYEE_ROSTER_KEY = "staff_pro_employee_roster";
+
+function employee_roster_mode(label) {
+	const key = (label || "").trim().toLowerCase();
+	if (key === "floor workers") return "floor";
+	if (key === "agents") return "all";
+	return "";
+}
+
+function bind_employee_roster_sidebar_item($item, $anchor, label) {
+	const mode = employee_roster_mode(label);
+	if (!mode || !$anchor?.length) return;
+
+	$anchor.attr("data-sp-employee-roster", mode);
+	$anchor.off("click.floorworkers").on("click.floorworkers", function (e) {
+		e.preventDefault();
+		e.stopPropagation();
+		open_employee_roster(mode);
+	});
+}
+
+function open_employee_roster(mode) {
+	try {
+		sessionStorage.setItem(EMPLOYEE_ROSTER_KEY, mode);
+	} catch (err) {
+		/* ignore */
+	}
+	frappe.route_options = mode === "floor" ? { is_floor_worker: 1 } : {};
+
+	const route = frappe.get_route() || [];
+	const on_list = route[0] === "List" && route[1] === "Employee";
+	if (on_list && window.cur_list?.doctype === "Employee" && window.cur_list.filter_area) {
+		window.cur_list.filter_area.remove("is_floor_worker");
+		if (mode === "floor") {
+			window.cur_list.filter_area.add([["Employee", "is_floor_worker", "=", 1]]);
+		}
+		window.cur_list.refresh();
+		return;
+	}
+
+	frappe.set_route("List", "Employee");
 }
 
 function open_pay_stubs_list(mode) {
@@ -1490,6 +1567,7 @@ const HR_SIDEBARS = [
 	"payroll",
 	"ss and taxes",
 	"talent",
+	"filesystem",
 	"floor",
 	"finance",
 	"finance & admin",
@@ -1953,6 +2031,21 @@ function patch_sidebar_workspace_switch() {
 	if (!Sidebar || Sidebar.prototype._staff_pro_workspace_switch) return;
 	Sidebar.prototype._staff_pro_workspace_switch = true;
 
+	// Dock clicks go through select_module, then a route change. set_workspace_sidebar
+	// runs on that route change and restores _staff_pro_pinned_sidebar. If the pin is
+	// still the previous workspace, the new submenu is built and immediately replaced,
+	// so the user has to click the dock icon again once the route is already current.
+	const originalSelectModule = Sidebar.prototype.select_module;
+	if (typeof originalSelectModule === "function") {
+		Sidebar.prototype.select_module = function (module) {
+			if (should_use_staff_pro_desk_home() && module) {
+				this._staff_pro_pinned_sidebar = module;
+				staff_pro_remember_sidebar(module);
+			}
+			return originalSelectModule.call(this, module);
+		};
+	}
+
 	const originalOpenWorkspace = Sidebar.prototype.open_workspace;
 	Sidebar.prototype.open_workspace = function (name) {
 		if (!should_use_staff_pro_desk_home()) {
@@ -2082,6 +2175,7 @@ const DOCK_ICONS = {
 	"ss and taxes": "/assets/hrms/images/belize-ssb-logo.png",
 	time: "clock",
 	talent: "user-plus",
+	filesystem: "folder",
 	floor: "layout-grid",
 	finance: "/assets/hrms/images/integrations/quickbooks.svg",
 	"finance & admin": "/assets/hrms/images/integrations/quickbooks.svg",
@@ -2125,8 +2219,11 @@ function apply_dock_icon($item, label) {
 	if ($item.attr("data-sp-dock-icon") === iconName) return;
 
 	const isImage = is_dock_image_icon(iconName);
+	const isFolder = iconName === "folder";
 	let html = "";
-	if (isImage) {
+	if (isFolder) {
+		html = '<span class="sp-dock-folder" aria-hidden="true"></span>';
+	} else if (isImage) {
 		html = `<img src="${frappe.utils.escape_html(iconName)}" alt="" />`;
 	} else {
 		html = dock_icon_html(iconName);
@@ -2506,6 +2603,7 @@ const STAFF_PRO_WORKSPACE_DASHBOARDS = {
 	payroll: ["dashboard-view", "Payroll"],
 	talent: ["dashboard-view", "Recruitment"],
 	recruitment: ["dashboard-view", "Recruitment"],
+	filesystem: ["agent-filesystem"],
 	floor: ["floor-map"],
 	"ss and taxes": ["dashboard-view", "SS and Taxes"],
 };
@@ -2706,7 +2804,80 @@ function patch_list_page_chrome() {
 	};
 }
 
+function is_td4_desk_route() {
+	const route = frappe.get_route?.() || [];
+	const path = (window.location.pathname || "").toLowerCase();
+	return (
+		((route[0] === "List" || route[0] === "Form") && route[1] === "TD4 Form") ||
+		path.includes("/td4-form")
+	);
+}
+
+function remove_td4_sidebar_items() {
+	document.querySelectorAll('.body-sidebar a.item-anchor[href*="td4-form"]').forEach((anchor) => {
+		anchor.closest(".sidebar-item-container")?.remove();
+	});
+}
+
+function staff_pro_can_see_td4() {
+	const access = frappe.boot?.staff_pro_access;
+	if (!access || !("see_td4_forms" in access)) return true;
+	return !!access.see_td4_forms;
+}
+
+function pin_td4_forms_under_filesystem(attempt) {
+	if (!staff_pro_can_see_td4()) {
+		remove_td4_sidebar_items();
+		return;
+	}
+	const tries = typeof attempt === "number" ? attempt : 0;
+	const route = frappe.get_route?.() || [];
+	const onFilesystemPage = route[0] === "agent-filesystem";
+	const onTd4 = is_td4_desk_route();
+	const sidebar = frappe.app?.sidebar;
+	const current = String(sidebar?.current_module || sidebar?.sidebar_title || "");
+	const onFilesystemSidebar = current.toLowerCase() === "filesystem";
+
+	if (!onFilesystemSidebar) {
+		remove_td4_sidebar_items();
+		if ((onFilesystemPage || onTd4) && sidebar && typeof sidebar.select_module === "function" && tries < 5) {
+			sidebar.select_module("Filesystem");
+			setTimeout(() => pin_td4_forms_under_filesystem(tries + 1), 60);
+		}
+		return;
+	}
+
+	const items = document.querySelector(".body-sidebar .sidebar-items");
+	if (!items) return;
+	let anchor = items.querySelector('a.item-anchor[href*="td4-form"]');
+	if (!anchor) {
+		const container = document.createElement("div");
+		container.className = "sidebar-item-container sp-afs-td4";
+		container.innerHTML = `
+			<div class="standard-sidebar-item">
+				<a href="/desk/td4-form" class="item-anchor">
+					<span class="sidebar-item-icon" aria-hidden="true"></span>
+					<span class="sidebar-item-label">${frappe.utils.escape_html(__("TD4 Forms"))}</span>
+				</a>
+			</div>`;
+		const first = items.querySelector(":scope > .sidebar-item-container");
+		if (first) first.after(container);
+		else items.prepend(container);
+		anchor = container.querySelector("a.item-anchor");
+	} else if (!anchor.closest(".sp-afs-td4") && items.querySelector(".sp-afs-nav")) {
+		const container = anchor.closest(".sidebar-item-container");
+		const first = items.querySelector(":scope > .sidebar-item-container");
+		if (container && first && container !== first && container.previousElementSibling !== first) {
+			first.after(container);
+		}
+	}
+
+	const item = anchor.closest(".standard-sidebar-item");
+	if (item) item.classList.toggle("active-sidebar", onTd4);
+}
+
 $(document).on("app_ready", patch_staff_pro_desktop_redirect);
+$(document).on("app_ready", () => pin_td4_forms_under_filesystem());
 $(document).on("app_ready", () => redirect_staff_pro_desk_home({ includeWorkforceBootstrap: true }));
 $(document).on("app_ready", prefer_employee_image_view);
 $(document).on("app_ready", patch_form_sidebar_policy);
@@ -2723,3 +2894,4 @@ $(document).on("page-change", prefer_employee_image_view);
 $(document).on("page-change", hide_page_menu);
 $(document).on("page-change", hide_list_page_chrome);
 $(document).on("page-change", apply_form_sidebar_policy);
+$(document).on("page-change", pin_td4_forms_under_filesystem);

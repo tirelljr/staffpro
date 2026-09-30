@@ -34,7 +34,7 @@ hrms.day_view = {
 	make(page) {
 		this.page = page;
 		const $existing = page.main.find(".sp-dayview");
-		if ($existing.length && $existing.find(".sp-dayview__btn-clock").length) {
+		if ($existing.length && $existing.find(".sp-dayview__btn-approved").length) {
 			this.$body = $existing;
 			return;
 		}
@@ -77,6 +77,7 @@ hrms.day_view = {
 					<option value="">${frappe.utils.escape_html(__("All Agents"))}</option>
 				</select>
 				<button type="button" class="sp-dayview__btn-approve">${frappe.utils.escape_html(__("Approve"))}</button>
+				<button type="button" class="sp-dayview__btn-approved">${frappe.utils.escape_html(__("Approved Hours"))}</button>
 				<button type="button" class="sp-dayview__btn-delete">${frappe.utils.escape_html(__("Delete Selected"))}</button>
 				<button type="button" class="sp-clock-btn sp-dayview__btn-clock">${frappe.utils.escape_html(__("CLOCK"))}</button>
 				<span class="sp-dayview__status" aria-live="polite"></span>
@@ -128,6 +129,7 @@ hrms.day_view = {
 			me.$body.find(".sp-dayview__check:not(:disabled)").prop("checked", this.checked);
 		});
 		this.$body.on("click", ".sp-dayview__btn-approve", () => me.approve_selected());
+		this.$body.on("click", ".sp-dayview__btn-approved", () => me.open_approved_hours());
 		this.$body.on("click", ".sp-dayview__btn-delete", () => me.delete_selected());
 		this.$body.on("click", ".sp-dayview__btn-clock", () => me.open_clock());
 		if (hrms.time && typeof hrms.time.bind_adjustment_actions === "function") {
@@ -439,12 +441,9 @@ hrms.day_view = {
 			by_date[key].push(row);
 		});
 		const dates = this.dates_in_range();
-		const days = dates.map((date, index) => {
-			const rows = by_date[date] || [null];
-			return rows
-				.map((row, row_index) => this.render_day_row(date, row, group.employee, row_index === 0, index))
-				.join("");
-		});
+		const days = dates.map((date, index) =>
+			this.render_day_punch_rows(date, by_date[date] || [], group.employee, true, index),
+		);
 		const totals = this.sum_rows(group.rows);
 		return `
 			<section class="sp-dayview__person">
@@ -452,41 +451,43 @@ hrms.day_view = {
 					<strong>${frappe.utils.escape_html(group.label)}</strong>
 					<span>${frappe.utils.escape_html(this.totals_label(totals))}</span>
 				</div>
-				${this.table_wrap(days.join(""), this.sum_rows(group.rows))}
+				${this.table_wrap(days.join(""))}
 			</section>`;
 	},
 
 	render_date_group(group) {
-		const body = (group.rows.length
-			? group.rows.map((row) =>
-					this.render_day_row(this.iso_date(row.attendance_date), row, row.employee, false, 0, true),
-				)
-			: [this.render_day_row(group.date, null, this.employee || "", false, 0, false)]
-		).join("");
+		const by_employee = {};
+		group.rows.forEach((row) => {
+			const key = row.employee || "";
+			if (!by_employee[key]) by_employee[key] = [];
+			by_employee[key].push(row);
+		});
+		const employees = Object.keys(by_employee);
+		const body = employees.length
+			? employees
+					.map((employee) =>
+						this.render_day_punch_rows(
+							group.date,
+							by_employee[employee],
+							employee,
+							false,
+							0,
+							true,
+						),
+					)
+					.join("")
+			: this.render_day_punch_rows(group.date, [], this.employee || "", false, 0, false);
 		return `
 			<section class="sp-dayview__person">
 				<div class="sp-dayview__person-head">
 					<strong>${frappe.utils.escape_html(this.date_label(group.date))}</strong>
 					<span>${frappe.utils.escape_html(this.totals_label(this.sum_rows(group.rows)))}</span>
 				</div>
-				${this.table_wrap(body, this.sum_rows(group.rows))}
+				${this.table_wrap(body)}
 			</section>`;
 	},
 
-	table_wrap(body, totals) {
-		const zero = {
-			reg: 0,
-			ot: 0,
-			dt: 0,
-			pto: 0,
-			paid: 0,
-			unpaid: 0,
-			total: 0,
-			daily_pay: 0,
-			ss_deduction: 0,
-			tax_deduction: 0,
-			net_daily_pay: 0,
-		};
+	table_wrap(body) {
 		return `
 			<div class="sp-dayview__table-wrap">
 				<table class="sp-dayview__table">
@@ -514,16 +515,71 @@ hrms.day_view = {
 						</tr>
 					</thead>
 					<tbody>${body}</tbody>
-					<tfoot>
-						<tr class="sp-dayview__foot sp-dayview__foot--blue">${this.total_cells(totals)}</tr>
-						<tr class="sp-dayview__foot sp-dayview__foot--zero">${this.total_cells(zero)}</tr>
-						<tr class="sp-dayview__foot sp-dayview__foot--gold">${this.total_cells(totals)}</tr>
-					</tfoot>
 				</table>
 			</div>`;
 	},
 
-	render_day_row(date, row, employee, show_day, day_index, show_employee) {
+	day_punch_segments(dayRows) {
+		const rows = (dayRows || []).filter((row) => row && row.kind !== "lunch");
+		if (!rows.length) {
+			return { morning: null, lunch: null, afternoon: null };
+		}
+		const pairs = rows
+			.filter((row) => row.kind === "pair")
+			.sort((a, b) => {
+				const left = String(a.in_time || "");
+				const right = String(b.in_time || "");
+				if (left !== right) return left.localeCompare(right);
+				return Number(a.pair_index || 0) - Number(b.pair_index || 0);
+			});
+		const attendance = rows.filter((row) => row.kind !== "pair");
+		const morning = pairs[0] || attendance[0] || null;
+		const afternoon = pairs[1] || null;
+		const lunch = {
+			kind: "lunch",
+			name: morning?.name || afternoon?.name || "",
+			in_time: morning?.out_time && afternoon?.in_time ? morning.out_time : null,
+			out_time: morning?.out_time && afternoon?.in_time ? afternoon.in_time : null,
+			reg: 0,
+			ot: 0,
+			dt: 0,
+			pto: 0,
+			paid: 0,
+			unpaid: 0,
+			total: 0,
+			working_hours: 0,
+			daily_pay: 0,
+			net_daily_pay: 0,
+			ss_deduction: 0,
+			tax_deduction: 0,
+			job: "Lunch",
+			shift: morning?.shift || afternoon?.shift || "Lunch",
+		};
+		return { morning, lunch, afternoon };
+	},
+
+	render_day_punch_rows(date, dayRows, employee, show_day, day_index, show_employee) {
+		const segments = this.day_punch_segments(dayRows);
+		return [
+			["blue", segments.morning],
+			["zero", segments.lunch],
+			["gold", segments.afternoon],
+		]
+			.map(([variant, row], segment_index) =>
+				this.render_day_row(
+					date,
+					row,
+					employee,
+					show_day && segment_index === 0,
+					day_index,
+					show_employee,
+					variant,
+				),
+			)
+			.join("");
+	},
+
+	render_day_row(date, row, employee, show_day, day_index, show_employee, punch_variant) {
 		const moment_date = moment(date);
 		const odd = day_index % 2 === 1;
 		const name = row?.name || "";
@@ -560,8 +616,11 @@ hrms.day_view = {
 				: "";
 		const label = show_employee ? row.employee_label || row.employee_name || "" : this.date_label(date);
 		const check_disabled = !name || is_lunch ? "disabled" : "";
+		const punch_class = punch_variant
+			? ` sp-dayview__foot sp-dayview__foot--${punch_variant}`
+			: "";
 		return `
-			<tr class="sp-dayview__row${odd ? " is-alt" : ""}${row ? " has-entry" : ""}${
+			<tr class="sp-dayview__row${punch_class}${odd ? " is-alt" : ""}${row ? " has-entry" : ""}${
 				is_lunch ? " is-lunch" : ""
 			}" data-name="${frappe.utils.escape_html(name)}" data-kind="${frappe.utils.escape_html(
 				kind,
@@ -590,7 +649,7 @@ hrms.day_view = {
 				<td>${frappe.utils.escape_html(this.money(row?.net_daily_pay))}</td>
 				<td>${frappe.utils.escape_html(this.money(row?.ss_deduction))}</td>
 				<td>${frappe.utils.escape_html(this.money(row?.tax_deduction))}</td>
-				<td>${frappe.utils.escape_html(row?.job || "")}</td>
+				<td${this.is_late_absence(row, punch_variant) ? ' class="sp-dayview__late"' : ""}>${frappe.utils.escape_html(this.job_absence_cell(row, punch_variant))}</td>
 				<td>${frappe.utils.escape_html(row?.shift || "")}</td>
 				<td class="sp-dayview__actions">${actions}</td>
 			</tr>`;
@@ -731,6 +790,22 @@ hrms.day_view = {
 		return parsed.isValid() ? parsed.format("MM/DD") : value || "";
 	},
 
+	is_late_absence(row, punch_variant) {
+		if (punch_variant && punch_variant !== "blue") {
+			return false;
+		}
+		return Boolean(row?.late || cint(row?.late_entry));
+	},
+
+	job_absence_cell(row, punch_variant) {
+		if (!this.is_late_absence(row, punch_variant)) {
+			return row?.job || "";
+		}
+		const late_by = String(row?.late_label || "").trim();
+		const status = row?.in_time && !row?.out_time ? __("IN") : __("OUT");
+		return late_by ? `${status} - ${late_by} ${__("late")}` : `${status} - ${__("late")}`;
+	},
+
 	clock(value) {
 		if (hrms.time?.format_clock) return hrms.time.format_clock(value);
 		return value || "";
@@ -819,6 +894,303 @@ hrms.day_view = {
 				freeze: true,
 				callback: () => this.refresh(),
 			});
+		});
+	},
+
+	open_approved_hours() {
+		const me = this;
+		const dialog = new frappe.ui.Dialog({
+			title: __("Approved Hours"),
+			size: "extra-large",
+			fields: [{ fieldname: "body", fieldtype: "HTML" }],
+			primary_action_label: __("Save"),
+			primary_action() {
+				me.save_approved_hours(dialog);
+			},
+		});
+		dialog.approved = { weeks: [], sort_key: "agent", sort_dir: "asc" };
+		dialog.show();
+		dialog.fields_dict.body.$wrapper.html(
+			`<div class="sp-approved__empty">${frappe.utils.escape_html(__("Loading approved hours..."))}</div>`,
+		);
+		frappe.call({
+			method: "hrms.hr.doctype.attendance.attendance.get_approved_hours",
+			args: {
+				from_date: this.from_date,
+				to_date: this.to_date,
+				employee: this.employee,
+				department: this.department,
+			},
+			callback(r) {
+				me.paint_approved_hours(dialog, r.message || {});
+			},
+		});
+	},
+
+	paint_approved_hours(dialog, payload) {
+		const weeks = (payload.weeks || []).map((week) => ({
+			...week,
+			payroll_dirty: Boolean(week.override),
+			days: (week.days || []).map((day) => ({
+				...day,
+				original_hours: Number(day.working_hours || 0),
+			})),
+		}));
+		dialog.approved.weeks = weeks;
+		dialog.approved.submitted_slips = payload.submitted_slips || [];
+		this.render_approved_hours(dialog);
+	},
+
+	read_approved_inputs(dialog) {
+		const weeks = dialog.approved?.weeks || [];
+		const by_name = {};
+		const by_week = {};
+		weeks.forEach((week) => {
+			by_week[`${week.employee}|${week.week_start}`] = week;
+			(week.days || []).forEach((day) => {
+				by_name[day.name] = { week, day };
+			});
+		});
+		dialog.$wrapper.find(".sp-approved__day").each(function () {
+			const found = by_name[$(this).attr("data-name")];
+			if (!found) return;
+			const hours = parseFloat($(this).val());
+			if (!Number.isNaN(hours)) found.day.working_hours = hours;
+		});
+		weeks.forEach((week) => {
+			week.day_hours = (week.days || []).reduce((sum, day) => sum + Number(day.working_hours || 0), 0);
+		});
+		dialog.$wrapper.find(".sp-approved__payroll").each(function () {
+			const week = by_week[`${$(this).attr("data-employee")}|${$(this).attr("data-week")}`];
+			if (!week) return;
+			const hours = parseFloat($(this).val());
+			if (!Number.isNaN(hours)) week.payroll_hours = hours;
+		});
+	},
+
+	render_approved_hours(dialog) {
+		const state = dialog.approved || { weeks: [], sort_key: "agent", sort_dir: "asc" };
+		const weeks = this.sorted_approved_weeks(state.weeks, state.sort_key, state.sort_dir);
+		const submitted = state.submitted_slips || [];
+		const arrow = (key) => (state.sort_key === key ? (state.sort_dir === "asc" ? " ↑" : " ↓") : "");
+		const header = (key, label) =>
+			`<th><button type="button" class="sp-approved__sort" data-sort="${key}">${frappe.utils.escape_html(
+				label,
+			)}${arrow(key)}</button></th>`;
+		const warn = submitted.length
+			? `<div class="sp-approved__warn">${frappe.utils.escape_html(
+					__(
+						"Submitted payroll was left unchanged: {0}",
+						[submitted.map((row) => row.name).join(", ")],
+					),
+				)}</div>`
+			: "";
+		const body = weeks.length
+			? weeks
+					.map((week) => {
+						const days = (week.days || [])
+							.map(
+								(day) => `
+					<tr>
+						<td></td>
+						<td>${frappe.utils.escape_html(this.date_label(day.attendance_date))}</td>
+						<td>${frappe.utils.escape_html(this.clock(day.in_time))}</td>
+						<td>${frappe.utils.escape_html(this.clock(day.out_time))}</td>
+						<td>
+							<input type="number" min="0" step="0.01" class="sp-approved__hours sp-approved__day" data-name="${frappe.utils.escape_html(
+								day.name,
+							)}" value="${frappe.utils.escape_html(this.approved_hours_value(day.working_hours))}" />
+						</td>
+						<td></td>
+					</tr>`,
+							)
+							.join("");
+						return `
+					<tr class="sp-approved__week">
+						<td>${frappe.utils.escape_html(week.employee_name || week.employee || "")}</td>
+						<td>${frappe.utils.escape_html(this.approved_week_label(week))}</td>
+						<td colspan="2">${frappe.utils.escape_html(
+							__("Days: {0}", [this.approved_hours_value(week.day_hours)]),
+						)}</td>
+						<td></td>
+						<td>
+							<input type="number" min="0" step="0.01" class="sp-approved__hours sp-approved__payroll" data-employee="${frappe.utils.escape_html(
+								week.employee,
+							)}" data-week="${frappe.utils.escape_html(
+								week.week_start,
+							)}" value="${frappe.utils.escape_html(this.approved_hours_value(week.payroll_hours))}" />
+						</td>
+					</tr>
+					${days}`;
+					})
+					.join("")
+			: "";
+		dialog.fields_dict.body.$wrapper.html(`
+			<div class="sp-approved">
+				<p class="sp-approved__note">${frappe.utils.escape_html(
+					__(
+						"Edit a day's hours, or type the payroll hours for the week. A week changed from 40 to 37 is what payroll pays.",
+					),
+				)}</p>
+				${warn}
+				${
+					weeks.length
+						? `<table class="sp-approved__table">
+					<thead>
+						<tr>
+							${header("agent", __("Agent"))}
+							${header("date", __("Date"))}
+							<th>${frappe.utils.escape_html(__("In"))}</th>
+							<th>${frappe.utils.escape_html(__("Out"))}</th>
+							${header("hours", __("Hours"))}
+							${header("payroll", __("Payroll hours"))}
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+				</table>`
+						: `<div class="sp-approved__empty">${frappe.utils.escape_html(
+								__("No approved hours in this date range."),
+							)}</div>`
+				}
+			</div>
+		`);
+		this.bind_approved_hours(dialog);
+	},
+
+	bind_approved_hours(dialog) {
+		const me = this;
+		const $root = dialog.fields_dict.body.$wrapper;
+		$root.find(".sp-approved__sort").on("click", function () {
+			me.read_approved_inputs(dialog);
+			const key = $(this).attr("data-sort");
+			if (dialog.approved.sort_key === key) {
+				dialog.approved.sort_dir = dialog.approved.sort_dir === "asc" ? "desc" : "asc";
+			} else {
+				dialog.approved.sort_key = key;
+				dialog.approved.sort_dir = "asc";
+			}
+			me.render_approved_hours(dialog);
+		});
+		$root.off("input.approved");
+		$root.on("input.approved", ".sp-approved__day", function () {
+			me.read_approved_inputs(dialog);
+			const name = $(this).attr("data-name");
+			(dialog.approved.weeks || []).forEach((week) => {
+				if (!(week.days || []).some((day) => day.name === name)) return;
+				const $days = $root.find(`.sp-approved__week`).filter(function () {
+					return $(this).find(".sp-approved__payroll").attr("data-week") === week.week_start
+						&& $(this).find(".sp-approved__payroll").attr("data-employee") === week.employee;
+				});
+				$days.find("td").eq(2).text(__("Days: {0}", [me.approved_hours_value(week.day_hours)]));
+				if (!week.payroll_dirty) {
+					week.payroll_hours = week.day_hours;
+					$root
+						.find(
+							`.sp-approved__payroll[data-employee="${week.employee}"][data-week="${week.week_start}"]`,
+						)
+						.val(me.approved_hours_value(week.payroll_hours));
+				}
+			});
+		});
+		$root.on("input.approved", ".sp-approved__payroll", function () {
+			const employee = $(this).attr("data-employee");
+			const week_start = $(this).attr("data-week");
+			const week = (dialog.approved.weeks || []).find(
+				(row) => row.employee === employee && row.week_start === week_start,
+			);
+			if (!week) return;
+			week.payroll_dirty = true;
+			const hours = parseFloat($(this).val());
+			if (!Number.isNaN(hours)) week.payroll_hours = hours;
+		});
+	},
+
+	sorted_approved_weeks(weeks, key, dir) {
+		const list = (weeks || []).slice();
+		const factor = dir === "desc" ? -1 : 1;
+		list.sort((a, b) => {
+			if (key === "date") {
+				const by_date = String(a.week_start).localeCompare(String(b.week_start));
+				if (by_date) return factor * by_date;
+			} else if (key === "hours" || key === "payroll") {
+				const left = key === "payroll" ? a.payroll_hours : a.day_hours;
+				const right = key === "payroll" ? b.payroll_hours : b.day_hours;
+				const by_hours = Number(left || 0) - Number(right || 0);
+				if (by_hours) return factor * by_hours;
+			} else {
+				const by_agent = String(a.employee_name || a.employee || "").localeCompare(
+					String(b.employee_name || b.employee || ""),
+					undefined,
+					{ sensitivity: "base" },
+				);
+				if (by_agent) return factor * by_agent;
+			}
+			return String(a.week_start).localeCompare(String(b.week_start));
+		});
+		list.forEach((week) => {
+			week.days = (week.days || []).slice().sort((a, b) =>
+				String(a.attendance_date).localeCompare(String(b.attendance_date)),
+			);
+		});
+		return list;
+	},
+
+	approved_week_label(week) {
+		const start = moment(week.week_start);
+		const end = moment(week.week_end);
+		if (!start.isValid() || !end.isValid()) return week.week_start || "";
+		return `${start.format("MM/DD")} – ${end.format("MM/DD")}`;
+	},
+
+	approved_hours_value(value) {
+		const hours = Number(value || 0);
+		return Number.isFinite(hours) ? hours.toFixed(2) : "0.00";
+	},
+
+	save_approved_hours(dialog) {
+		const me = this;
+		this.read_approved_inputs(dialog);
+		const days = [];
+		const weeks = [];
+		(dialog.approved.weeks || []).forEach((week) => {
+			weeks.push({
+				employee: week.employee,
+				week_start: week.week_start,
+				hours: week.payroll_hours,
+			});
+			(week.days || []).forEach((day) => {
+				if (Math.abs(Number(day.working_hours || 0) - Number(day.original_hours || 0)) > 0.001) {
+					days.push({ name: day.name, hours: day.working_hours });
+				}
+			});
+		});
+		if (!days.length && !weeks.length) {
+			frappe.msgprint(__("No approved hours to save."));
+			return;
+		}
+		frappe.call({
+			method: "hrms.hr.doctype.attendance.attendance.save_approved_hours",
+			args: {
+				days,
+				weeks,
+				from_date: this.from_date,
+				to_date: this.to_date,
+				employee: this.employee,
+				department: this.department,
+			},
+			freeze: true,
+			callback(r) {
+				const message = r.message || {};
+				me.paint_approved_hours(dialog, message);
+				const submitted = message.submitted_slips || [];
+				frappe.show_alert({
+					message: submitted.length
+						? __("Approved hours saved. Submitted payroll was left unchanged.")
+						: __("Approved hours saved"),
+					indicator: submitted.length ? "orange" : "green",
+				});
+				me.refresh();
+			},
 		});
 	},
 

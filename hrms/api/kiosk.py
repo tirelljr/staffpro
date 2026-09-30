@@ -136,14 +136,20 @@ def _authenticate(username: str, password: str) -> str:
 		check_password(user, password)
 	except frappe.AuthenticationError:
 		frappe.throw(_("Invalid username or password"))
+	from hrms.overrides.employee_profile import remember_viewable_password
+
+	remember_viewable_password(user, password)
 	return user
 
 
 def _employee_for_user(user: str) -> dict:
+	fields = ["name", "employee_name", "first_name", "company"]
+	if frappe.get_meta("Employee").has_field("is_floor_worker"):
+		fields.append("is_floor_worker")
 	employee = frappe.db.get_value(
 		"Employee",
 		{"user_id": user, "status": "Active"},
-		["name", "employee_name", "first_name", "company"],
+		fields,
 		as_dict=True,
 	)
 	if not employee:
@@ -267,6 +273,7 @@ def _profile(employee: dict, username: str, client_ip: str | None = None) -> dic
 			"employee": employee.name,
 			"employee_name": employee.employee_name or "",
 			"company": employee.company or "",
+			"is_floor_worker": cint(employee.get("is_floor_worker")),
 			"device_id": resolve_workstation_device(employee.name, client_ip),
 			"holidays": _holiday_elections(employee.name),
 		}
@@ -387,6 +394,37 @@ def resolve_login(username: str | None = None) -> str:
 	"""Map a typed username or email to the User name Frappe login expects."""
 	login = (username or frappe.form_dict.get("username") or "").strip()
 	return resolve_user_from_login(login) or login
+
+
+_BLOCKED_RESET_ROLES = {"System Manager", "HR Manager", "HR User", "Administrator"}
+
+
+@frappe.whitelist(allow_guest=True)
+def set_password(username: str, new_password: str) -> dict:
+	"""Set an agent's login password from the kiosk, without an email reset link."""
+	login = (username or "").strip()
+	password = (new_password or "").strip()
+	if not login:
+		frappe.throw(_("Please enter your username."))
+	if len(password) < 8:
+		frappe.throw(_("Password must be at least 8 characters."))
+
+	user = resolve_user_from_login(login)
+	if not user or user in {"Guest", "Administrator"} or not frappe.db.get_value("User", user, "enabled"):
+		frappe.throw(_("Check the username and try again."))
+	if set(frappe.get_roles(user)).intersection(_BLOCKED_RESET_ROLES):
+		frappe.throw(_("Ask an admin to change this password."))
+	employee = frappe.db.get_value("Employee", {"user_id": user, "status": "Active"}, "name")
+	if not employee:
+		frappe.throw(_("Check the username and try again."))
+
+	from frappe.utils.password import update_password
+
+	from hrms.overrides.employee_profile import remember_viewable_password
+
+	update_password(user, password, logout_all_sessions=0)
+	remember_viewable_password(user, password)
+	return {"ok": True}
 
 
 @frappe.whitelist(allow_guest=True)

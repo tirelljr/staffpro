@@ -24,6 +24,8 @@ REMOVED_SIDEBAR_LABELS = frozenset(
 		"Salary Register",
 		"Unpaid Reimbursements",
 		"Unpaid Expense Claim",
+		"Team Structure",
+		"Organizational Chart",
 	}
 )
 REMOVED_SIDEBAR_LINKS = frozenset(
@@ -34,6 +36,7 @@ REMOVED_SIDEBAR_LINKS = frozenset(
 		"Employee Advance",
 		"Salary Register",
 		"Unpaid Expense Claim",
+		"organizational-chart",
 	}
 )
 
@@ -89,6 +92,14 @@ SIDEBAR_SOURCES = (
 		"header_icon": "users",
 		"dock_title": "Talent",
 		"dock_icon": "user-plus",
+	},
+	{
+		"source": "workspace_sidebar/filesystem.json",
+		"title": "Filesystem",
+		"module": "HR",
+		"header_icon": "folder",
+		"dock_title": "Filesystem",
+		"dock_icon": "folder",
 	},
 	{
 		"source": "workspace_sidebar/floor.json",

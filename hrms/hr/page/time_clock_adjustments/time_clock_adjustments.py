@@ -24,6 +24,7 @@ def get_adjustments(
 	department: str | None = None,
 	from_date: str | date | None = None,
 	to_date: str | date | None = None,
+	history: int | str | bool | None = None,
 ) -> dict:
 	_assert_hr()
 	return get_time_clock_adjustments(
@@ -31,6 +32,7 @@ def get_adjustments(
 		department=department,
 		from_date=from_date,
 		to_date=to_date,
+		history=history,
 	)
 
 

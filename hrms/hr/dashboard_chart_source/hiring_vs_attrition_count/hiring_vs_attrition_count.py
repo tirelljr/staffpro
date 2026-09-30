@@ -16,12 +16,13 @@ def get_data(
 	chart_name: str | None = None,
 	chart: str | None = None,
 	no_cache: str | None = None,
-	filters: str | None = None,
+	filters: str | dict | None = None,
 	from_date: str | None = None,
 	to_date: str | None = None,
 	timespan: str | None = None,
 	time_interval: str | None = None,
 	heatmap_year: str | None = None,
+	refresh: int | str | None = None,
 ) -> dict[str, list]:
 	if filters:
 		filters = frappe.parse_json(filters)
@@ -50,11 +51,12 @@ def get_data(
 		else []
 	)
 
-	hiring_data = get_result(hiring, filters.get("time_interval"), from_date, to_date, "Count")
-	attrition_data = get_result(attrition, filters.get("time_interval"), from_date, to_date, "Count")
+	interval = filters.get("time_interval") or time_interval or "Monthly"
+	hiring_data = get_result(hiring, interval, from_date, to_date, "Count")
+	attrition_data = get_result(attrition, interval, from_date, to_date, "Count")
 
 	return {
-		"labels": [get_period(r[0], filters.get("time_interval")) for r in hiring_data],
+		"labels": [get_period(r[0], interval) for r in hiring_data],
 		"datasets": [
 			{"name": _("Hiring Count"), "values": [r[1] for r in hiring_data]},
 			{"name": _("Attrition Count"), "values": [r[1] for r in attrition_data]},

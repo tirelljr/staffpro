@@ -90,7 +90,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Action",
-   "options": "Edit\nAdd"
+   "options": "Edit\nAdd\nDelete"
   },
   {
    "default": "Pending",
@@ -186,7 +186,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-09 00:00:00.000000",
+ "modified": "2026-09-29 23:40:00.000000",
  "modified_by": "Administrator",
  "module": "HR",
  "name": "Time Clock Adjustment",

@@ -719,6 +719,15 @@ class TestDeskDashboardPayrollBoard(HRMSTestSuite):
 		self.assertEqual(prev_end, getdate("2026-08-10"))
 		self.assertLessEqual(prev_start, prev_end)
 
+		custom_start, custom_end = _previous_pay_period(
+			getdate("2026-09-03"),
+			None,
+			[{"from_date": "2026-08-11", "to_date": "2026-08-24"}],
+			getdate("2026-09-09"),
+		)
+		self.assertEqual(custom_start, getdate("2026-08-27"))
+		self.assertEqual(custom_end, getdate("2026-09-02"))
+
 	def test_upcoming_pay_period_covers_today_or_next(self):
 		today = getdate()
 		start, end = _upcoming_pay_period(self.company)

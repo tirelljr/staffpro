@@ -243,6 +243,15 @@ body.staff-pro-alive #page-dashboard-view.sp-dash--payroll .layout-main-section,
 .sp-paydash__range .sp-dash-select{min-width:0}
 .sp-paydash__range .sp-dash-select__btn{height:36px;min-width:210px;padding:0 10px 0 0;border:0;background:transparent;box-shadow:none;font-size:13px;font-weight:500}
 .sp-paydash__range .sp-dash-select__menu{z-index:1080;min-width:260px;max-height:280px;overflow-y:auto;right:auto}
+.sp-paydash__dates{position:relative}
+.sp-paydash__dates-btn{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;border:1px solid #e3e6ea;border-radius:999px;background:#fff;color:#111;cursor:pointer}
+.sp-paydash__dates-btn svg{width:16px;height:16px}
+.sp-paydash__dates-btn:hover,.sp-paydash__dates.is-open .sp-paydash__dates-btn{background:#f7f8fa}
+.sp-paydash__dates-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:1080;display:flex;flex-direction:column;gap:8px;min-width:220px;padding:12px;border:1px solid #e3e6ea;border-radius:12px;background:#fff;box-shadow:0 8px 24px rgba(16,24,40,.08)}
+.sp-paydash__dates-menu[hidden]{display:none}
+.sp-paydash__dates-field{display:flex;flex-direction:column;gap:4px;margin:0;color:#6b7280;font-size:12px;font-weight:600}
+.sp-paydash__dates-field input{height:34px;padding:0 10px;border:1px solid #e3e6ea;border-radius:8px;background:#fff;color:#111;font:inherit;font-size:13px;font-weight:500}
+.sp-paydash__dates-apply{height:34px;border:0;border-radius:8px;background:#111;color:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
 .sp-paydash__export,.sp-paydash__filter-btn{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 14px;border:1px solid #e3e6ea;border-radius:999px;background:#fff;color:#111;font:inherit;font-size:13px;font-weight:500;cursor:pointer}
 .sp-paydash__export svg,.sp-paydash__new svg{width:14px;height:14px}
 .sp-paydash__new{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 16px;border:0;border-radius:999px;background:#f0c14a;color:#111;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
@@ -484,7 +493,6 @@ const DASHBOARDS = {
 			{ label: __("Import Agents"), icon: "upload", hue: "#11A5DD", action: "import-employee" },
 			{ label: __("Agents"), icon: "users", hue: "#90BA93", route: ["List", "Employee", "Image"] },
 			{ label: __("Who Is In"), icon: "clock", hue: "#11A5DD", route: ["in-out-today"] },
-			{ label: __("Team Structure"), icon: "org", hue: "#90BA93", route: ["organizational-chart"] },
 			{ label: __("New Hire Onboarding"), icon: "spark", hue: "#11A5DD", route: ["List", "Employee Onboarding"] },
 			{ label: __("Offboarding"), icon: "userMinus", hue: "#16678C", route: ["List", "Employee Separation"] },
 			{ label: __("Employee Requests"), icon: "inbox", hue: "#11A5DD", route: ["List", "HR Request"] },
@@ -921,6 +929,7 @@ function bind_dash_selects($root) {
 			close_hours_quick_menus();
 			close_attendance_filter_menus();
 			close_payroll_filter_menus();
+			close_payroll_date_menus();
 			if (!willOpen) return;
 			sync_dash_select_menu($wrap);
 			bind_hours_select_search($wrap);
@@ -3431,7 +3440,11 @@ function render_hours_row(row) {
 			kind,
 		)}" data-in-log="${escape_html(row.in_log || "")}" data-out-log="${escape_html(row.out_log || "")}">
 			<div class="sp-hours__row-main">
-				<span>${escape_html(row.employee_name || row.employee || "")}</span>
+				<span>${escape_html(row.employee_name || row.employee || "")}${
+					row.is_floor_worker
+						? `<span class="sp-floor-worker-badge" style="display:inline-block;margin-left:6px;padding:0 6px;border-radius:999px;background:#e7f6ec;color:#146c43;font-size:11px;font-weight:600;line-height:18px;vertical-align:middle;">floorworkers</span>`
+						: ""
+				}</span>
 				<span>${escape_html(hours_date_label(row.attendance_date))}</span>
 				<span>${escape_html(format_hours_clock(row.in_time))}</span>
 				<span>${escape_html(format_hours_clock(row.out_time))}</span>
@@ -3636,6 +3649,20 @@ function payroll_board_html() {
 						options: [{ value: "", label: __("Pay period") }],
 						value: "",
 					})}
+				</div>
+				<div class="sp-paydash__dates">
+					<button type="button" class="sp-paydash__dates-btn" aria-haspopup="dialog" aria-expanded="false" aria-label="${escape_html(__("Choose dates"))}">${ICONS.calendar}</button>
+					<div class="sp-paydash__dates-menu" hidden>
+						<label class="sp-paydash__dates-field">
+							${escape_html(__("From"))}
+							<input type="date" class="sp-paydash__from" />
+						</label>
+						<label class="sp-paydash__dates-field">
+							${escape_html(__("To"))}
+							<input type="date" class="sp-paydash__to" />
+						</label>
+						<button type="button" class="sp-paydash__dates-apply">${escape_html(__("Apply"))}</button>
+					</div>
 				</div>
 				<button type="button" class="sp-paydash__export">${ICONS.download}<span>${escape_html(__("Export CSV"))}</span></button>
 				<button type="button" class="sp-paydash__new">${ICONS.plus}<span>${escape_html(__("New Payroll"))}</span></button>
@@ -3981,6 +4008,39 @@ function close_payroll_filter_menus() {
 	$(".sp-paydash__filter-btn").attr("aria-expanded", "false");
 }
 
+function close_payroll_date_menus() {
+	$(".sp-paydash__dates").removeClass("is-open");
+	$(".sp-paydash__dates-menu").prop("hidden", true);
+	$(".sp-paydash__dates-btn").attr("aria-expanded", "false");
+}
+
+function apply_payroll_custom_dates($board) {
+	let from = String($board.find(".sp-paydash__from").val() || "");
+	let to = String($board.find(".sp-paydash__to").val() || "");
+	if (!from || !to) {
+		frappe.msgprint(__("Select a From date and a To date"));
+		return;
+	}
+	if (from > to) {
+		const swap = from;
+		from = to;
+		to = swap;
+		$board.find(".sp-paydash__from").val(from);
+		$board.find(".sp-paydash__to").val(to);
+	}
+	const value = payroll_period_value(from, to);
+	const $select = $board.find(".sp-paydash__period");
+	if (!$select.find("option").filter(function () { return this.value === value; }).length) {
+		const label = `${frappe.datetime.str_to_user(from)} – ${frappe.datetime.str_to_user(to)}`;
+		$select.append(`<option value="${escape_html(value)}">${escape_html(label)}</option>`);
+	}
+	$select.val(value);
+	const $wrap = $select.closest(".sp-dash-select");
+	if ($wrap.length) sync_dash_select_menu($wrap);
+	close_payroll_date_menus();
+	load_payroll_board($board);
+}
+
 function set_payroll_status_filter($board, status, { rerender = true } = {}) {
 	const next = PAYROLL_STATUS_FILTERS.some((opt) => opt.value === status) ? status : "all";
 	$board.data("payroll-status", next);
@@ -4003,7 +4063,36 @@ function bind_payroll_board($board) {
 
 	const reload = () => load_payroll_board($board);
 	bind_dash_selects($board);
-	$board.find(".sp-paydash__period").on("change", reload);
+	$board.find(".sp-paydash__period").on("change", () => {
+		close_payroll_date_menus();
+		reload();
+	});
+	$board.find(".sp-paydash__dates-btn").on("click", function (event) {
+		event.preventDefault();
+		event.stopPropagation();
+		const $wrap = $board.find(".sp-paydash__dates");
+		const $menu = $board.find(".sp-paydash__dates-menu");
+		const willOpen = $menu.prop("hidden");
+		close_dash_selects();
+		close_payroll_filter_menus();
+		close_payroll_date_menus();
+		if (!willOpen) return;
+		const selected = selected_payroll_period($board);
+		if (selected.from_date) $board.find(".sp-paydash__from").val(selected.from_date);
+		if (selected.to_date) $board.find(".sp-paydash__to").val(selected.to_date);
+		$wrap.addClass("is-open");
+		$menu.prop("hidden", false);
+		$(this).attr("aria-expanded", "true");
+	});
+	$board.find(".sp-paydash__dates-menu").on("click", (event) => event.stopPropagation());
+	$board.find(".sp-paydash__from, .sp-paydash__to").on("click", function () {
+		open_hours_date_picker(this);
+	});
+	$board.find(".sp-paydash__dates-apply").on("click", (event) => {
+		event.preventDefault();
+		event.stopPropagation();
+		apply_payroll_custom_dates($board);
+	});
 	$board.find(".sp-paydash__new").on("click", () => new_doc("Payroll Entry"));
 	$board.find(".sp-paydash__export").on("click", () => export_payroll_board_csv($board));
 	$board.find(".sp-paydash__search-input").on("input", function () {
@@ -4025,6 +4114,7 @@ function bind_payroll_board($board) {
 		close_dash_selects();
 		close_attendance_filter_menus();
 		close_payroll_filter_menus();
+		close_payroll_date_menus();
 		if (!willOpen) return;
 		$wrap.addClass("is-open");
 		$menu.prop("hidden", false);
@@ -4077,7 +4167,10 @@ function bind_payroll_board($board) {
 		else selected.delete(key);
 		$board.data("payroll-selected", Array.from(selected));
 	});
-	$(document).off("click.sp-paydash-filter").on("click.sp-paydash-filter", close_payroll_filter_menus);
+	$(document).off("click.sp-paydash-filter").on("click.sp-paydash-filter", () => {
+		close_payroll_filter_menus();
+		close_payroll_date_menus();
+	});
 	load_payroll_board($board);
 }
 
@@ -4164,7 +4257,7 @@ function inject_payroll_board($root) {
 
 	$root.addClass("sp-dash--payroll");
 	const $existing = $root.find(".sp-payroll-board");
-	if ($existing.length && $existing.data("sp-payroll-board-v3")) {
+	if ($existing.length && $existing.data("sp-payroll-board-v4")) {
 		return;
 	}
 	$existing.remove();
@@ -4173,7 +4266,7 @@ function inject_payroll_board($root) {
 	if (!$pills.length) return;
 
 	const $board = $(payroll_board_html());
-	$board.data("sp-payroll-board-v3", true);
+	$board.data("sp-payroll-board-v4", true);
 	$pills.after($board);
 	bind_payroll_board($board);
 }

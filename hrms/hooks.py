@@ -43,6 +43,7 @@ update_website_context = ["hrms.branding.update_website_context"]
 app_include_js = [
 	"/assets/hrms/js/staff_pro_home_redirect.js",
 	"/assets/hrms/js/client_ip.js",
+	"/assets/hrms/js/role_access.js",
 	"hrms.bundle.js",
 ]
 app_include_css = "hrms.bundle.css"
@@ -76,6 +77,7 @@ doctype_js = {
 	"Sales Invoice": "public/js/erpnext/sales_invoice.js",
 	"Customer": "public/js/erpnext/customer.js",
 	"User": "public/js/erpnext/user.js",
+	"Role": "public/js/erpnext/role.js",
 }
 doctype_list_js = {
 	"Employee": "public/js/erpnext/employee_list.js",
@@ -85,6 +87,7 @@ doctype_list_js = {
 	"Number Card": "public/js/bpo_dashboard_list.js",
 	"Dashboard": "public/js/bpo_dashboard_list.js",
 	"Time Clock Adjustment": "hr/doctype/time_clock_adjustment/time_clock_adjustment_list.js",
+	"TD4 Form": "hr/doctype/td4_form/td4_form_list.js",
 }
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -149,11 +152,14 @@ after_migrate = [
 	"hrms.patches.v16_0.split_finance_and_admin.execute",
 	"hrms.hr.staff_pro_sidebars.sync_staff_pro_sidebars",
 	"hrms.payroll.doctype.bonus_type.bonus_type.seed_bonus_types",
+	"hrms.hr.doctype.document_category.document_category.seed_document_categories",
+	"hrms.hr.agent_filesystem.ensure_employee_documents_tab",
 	"hrms.hr.staff_pro_holiday_list.ensure_staff_pro_holiday_list",
 	"hrms.hr.staff_pro_shift_locations.ensure_staff_pro_shift_locations",
 	"hrms.hr.doctype.office_floor.office_floor.seed_office_floors",
 	"hrms.boot.hide_unused_erpnext_workspaces",
 	"hrms.hr.bpo_user_permissions.apply_bpo_user_permissions",
+	"hrms.hr.role_access.ensure_role_access_fields",
 	"hrms.boot.prepare_staff_pro_first_login",
 	"hrms.overrides.bpo_dashboards.hide_non_bpo_dashboard_records",
 	"hrms.hr.force_delete.install_force_delete_patch",
@@ -162,6 +168,7 @@ after_migrate = [
 before_request = [
 	"hrms.hr.force_delete.install_force_delete_patch",
 	"hrms.hr.timezone.apply_request_timezone",
+	"hrms.hr.role_access.install_list_redaction",
 ]
 
 setup_wizard_requires = "assets/hrms/js/setup_wizard.js"
@@ -213,6 +220,8 @@ permission_query_conditions = {
 	"Dashboard": "hrms.overrides.bpo_dashboards.get_dashboard_permission_query_conditions",
 	"Holiday Work Election": "hrms.hr.doctype.holiday_work_election.holiday_work_election.get_permission_query_conditions",
 	"Time Clock Adjustment": "hrms.hr.doctype.time_clock_adjustment.time_clock_adjustment.get_permission_query_conditions",
+	"Agent Document": "hrms.hr.doctype.agent_document.agent_document.get_permission_query_conditions",
+	"TD4 Form": "hrms.hr.doctype.td4_form.td4_form.get_permission_query_conditions",
 }
 
 has_permission = {
@@ -220,7 +229,14 @@ has_permission = {
 	"AI User Memory": "hrms.hr.doctype.ai_user_memory.ai_user_memory.has_permission",
 	"Holiday Work Election": "hrms.hr.doctype.holiday_work_election.holiday_work_election.has_permission",
 	"Time Clock Adjustment": "hrms.hr.doctype.time_clock_adjustment.time_clock_adjustment.has_permission",
+	"Agent Document": "hrms.hr.doctype.agent_document.agent_document.has_permission",
+	"TD4 Form": "hrms.hr.doctype.td4_form.td4_form.has_permission",
 }
+
+from hrms.hr.role_access import HOOK_HAS_PERMISSION, HOOK_QUERY_CONDITIONS
+
+has_permission.update(HOOK_HAS_PERMISSION)
+permission_query_conditions.update(HOOK_QUERY_CONDITIONS)
 
 has_upload_permission = {"Employee": "erpnext.setup.doctype.employee.employee.has_upload_permission"}
 
@@ -240,6 +256,9 @@ override_doctype_class = {
 # Hook on document methods and events
 
 doc_events = {
+	"File": {
+		"validate": "hrms.hr.job_letter.reject_agent_job_letter_attachment",
+	},
 	"User": {
 		"onload": "hrms.hr.bpo_user_permissions.filter_user_modules_onload",
 		"validate": [
@@ -272,6 +291,8 @@ doc_events = {
 		],
 	},
 	"Customer": {
+		"onload": "hrms.hr.role_access.redact_customer",
+		"before_validate": "hrms.hr.role_access.restore_customer_fields",
 		"validate": "hrms.payroll.bpo_client_accounts.set_client_billing_defaults",
 		"after_insert": "hrms.payroll.bpo_client_accounts.after_insert_customer",
 	},
@@ -311,12 +332,17 @@ doc_events = {
 	},
 	"Loan": {"validate": "hrms.hr.utils.validate_loan_repay_from_salary"},
 	"Employee": {
-		"before_validate": "hrms.overrides.employee_master.sync_employee_username",
+		"onload": "hrms.hr.role_access.redact_employee",
+		"before_validate": [
+			"hrms.hr.role_access.restore_employee_fields",
+			"hrms.overrides.employee_master.sync_employee_username",
+		],
 		"validate": "hrms.overrides.employee_master.validate_onboarding_process",
 		"on_update": [
 			"hrms.overrides.employee_master.update_approver_role",
 			"hrms.overrides.employee_master.publish_update",
 			"hrms.payroll.doctype.salary_structure_assignment.salary_structure_assignment.assign_structure_from_agent_hourly",
+			"hrms.overrides.employee_master.ensure_td4_request_for_account",
 		],
 		"after_insert": "hrms.overrides.employee_master.update_job_applicant_and_offer",
 		"before_delete": "hrms.hr.employee_cleanup.on_employee_delete",
@@ -362,8 +388,10 @@ scheduler_events = {
 		"hrms.hr.doctype.job_opening.job_opening.close_expired_job_openings",
 		"hrms.payroll.auto_payroll.run_scheduled_payroll",
 		"hrms.payroll.auto_client_invoice.run_scheduled_invoices",
+		"hrms.hr.floor_workers.run_scheduled_floor_worker_hours",
 	],
 	"daily_long": [
+		"hrms.hr.pto_anniversary.process_pto_anniversaries",
 		"hrms.hr.doctype.leave_ledger_entry.leave_ledger_entry.process_expired_allocation",
 		"hrms.hr.utils.generate_leave_encashment",
 		"hrms.hr.utils.allocate_earned_leaves",
@@ -446,7 +474,7 @@ override_doctype_dashboards = {
 #
 # auto_cancel_exempted_doctypes = ["Auto Repeat"]
 
-ignore_links_on_delete = ["PWA Notification", "Leave Ledger Entry"]
+ignore_links_on_delete = ["PWA Notification", "Leave Ledger Entry", "Time Clock Adjustment"]
 
 # User Data Protection
 # --------------------

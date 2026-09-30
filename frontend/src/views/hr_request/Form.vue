@@ -1,13 +1,17 @@
 <template>
 	<ion-page>
 		<ion-content :fullscreen="true">
+			<div v-if="props.id && requestKind.loading" class="p-4 text-sm text-gray-500">
+				{{ __("Loading...") }}
+			</div>
+			<JobLetter v-else-if="isJobLetter" :id="props.id" />
 			<FormView
-				v-if="formFields.data"
+				v-else-if="formFields.data"
 				doctype="HR Request"
 				v-model="hrRequest"
 				:fields="formFields.data"
 				:id="props.id"
-				:showAttachmentView="true"
+				:showAttachmentView="allowAttachments"
 				:showDownloadPDFButton="showDownloadPDF"
 				@validateForm="validateForm"
 			/>
@@ -22,6 +26,7 @@ import { computed, ref, watch, inject } from "vue"
 import { useRoute } from "vue-router"
 
 import FormView from "@/components/FormView.vue"
+import JobLetter from "@/views/hr_request/JobLetter.vue"
 
 const employee = inject("$employee")
 const route = useRoute()
@@ -62,9 +67,31 @@ const READONLY_ON_DETAIL = [
 	"resolved_on",
 ]
 
-const JOB_LETTER_FIELDS = ["letter_purpose", "addressed_to", "job_letter_section"]
+const JOB_LETTER_FIELDS = [
+	"letter_purpose",
+	"addressed_to",
+	"job_letter_section",
+	"recipient_address",
+	"honorific",
+	"annual_salary",
+	"biweekly_salary",
+	"letter_preview",
+]
 
 const hrRequest = ref({})
+
+const requestKind = createResource({
+	url: "hrms.hr.job_letter.get_request_kind",
+	params: props.id ? { name: props.id } : {},
+	auto: Boolean(props.id),
+})
+
+const isJobLetter = computed(() => {
+	if (props.id) return requestKind.data?.request_type === "Job Letter"
+	return route.query.request_type === "Job Letter" || hrRequest.value.request_type === "Job Letter"
+})
+
+const allowAttachments = computed(() => !isJobLetter.value)
 
 const showDownloadPDF = computed(
 	() => hrRequest.value.request_type === "Job Letter" && ["Resolved", "Approved"].includes(hrRequest.value.status)
@@ -82,6 +109,9 @@ const formFields = createResource({
 					field.hidden = true
 				}
 				if (props.id && READONLY_ON_DETAIL.includes(field.fieldname)) {
+					field.read_only = true
+				}
+				if (field.fieldname === "annual_salary" || field.fieldname === "biweekly_salary") {
 					field.read_only = true
 				}
 				if (JOB_LETTER_FIELDS.includes(field.fieldname)) {

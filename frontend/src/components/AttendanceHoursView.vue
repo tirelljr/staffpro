@@ -312,7 +312,7 @@ const presetOptions = [
 ]
 
 const filteredRows = computed(() => {
-	const rows = props.rows || []
+	const rows = Array.isArray(props.rows) ? props.rows : []
 	if (props.mode !== "day" || !props.jobFilter) return rows
 	return rows.filter((row) => (row.job || "") === props.jobFilter)
 })
@@ -398,14 +398,22 @@ function datesInRange(from, to) {
 }
 
 function dayLabel(value) {
-	const parsed = dayjs(value)
-	return parsed.isValid() ? parsed.format("ddd") : ""
+	try {
+		const parsed = dayjs(value)
+		return parsed?.isValid?.() ? parsed.format("ddd") : ""
+	} catch {
+		return ""
+	}
 }
 
 function dateLabel(value, mode) {
-	const parsed = dayjs(value)
-	if (!parsed.isValid()) return value || ""
-	return mode === "list" ? parsed.format("MM/DD") : `${parsed.format("MM-DD")}, ${parsed.format("ddd")}`
+	try {
+		const parsed = dayjs(value)
+		if (!parsed?.isValid?.()) return value || ""
+		return mode === "list" ? parsed.format("MM/DD") : `${parsed.format("MM-DD")}, ${parsed.format("ddd")}`
+	} catch {
+		return value || ""
+	}
 }
 
 function entryHours(row) {
@@ -459,10 +467,7 @@ function toClock(value) {
 
 function formatTimeOnly(value) {
 	if (!value) return "—"
-	const clock = formatClock(value)
-	if (clock) return clock
-	const parsed = dayjs(`2000-01-01 ${value}`)
-	return parsed.isValid() ? parsed.format("h:mm A") : String(value)
+	return formatClock(value) || String(value)
 }
 
 function saveNote(row) {

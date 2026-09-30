@@ -23,6 +23,7 @@ frappe.time_clock_adjustments = {
 	$body: null,
 	payload: null,
 	status: "Pending",
+	history: false,
 	department: "",
 	date: "",
 	query: "",
@@ -78,6 +79,11 @@ frappe.time_clock_adjustments = {
 				<rect x="3.5" y="5" width="17" height="15" rx="2" stroke="currentColor" stroke-width="1.6"></rect>
 				<path d="M8 3v4M16 3v4M3.5 9h17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
 			</svg>`;
+		const history_icon = `
+			<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+				<circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.6"></circle>
+				<path d="M12 8v4.2L15 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+			</svg>`;
 
 		this.$body.html(`
 			<section class="sp-tca-panel" aria-label="${this.escape(__("Time Clock Adjustment"))}">
@@ -108,6 +114,11 @@ frappe.time_clock_adjustments = {
 							</div>
 						</div>
 						<div class="sp-attendance__toolbar-end">
+							<button type="button" class="sp-attendance__filter-btn sp-tca__history-btn"
+								aria-pressed="false">
+								${history_icon}
+								<span class="sp-tca__history-label">${this.escape(__("TCA History"))}</span>
+							</button>
 							<div class="sp-attendance__field">${this.select_html()}</div>
 							<label class="sp-attendance__date sp-tca__date">
 								<span class="sp-attendance__date-icon">${calendar_icon}</span>
@@ -128,6 +139,7 @@ frappe.time_clock_adjustments = {
 							<span>${this.escape(__("Check In"))}</span>
 							<span>${this.escape(__("Check Out"))}</span>
 							<span>${this.escape(__("Hours"))}</span>
+							<span>${this.escape(__("Change"))}</span>
 							<span>${this.escape(__("Actions"))}</span>
 						</div>
 						<div class="sp-tca__list"></div>
@@ -169,12 +181,15 @@ frappe.time_clock_adjustments = {
 		this.$body.on("click", ".sp-tca__filter-option", function () {
 			me.status = $(this).data("value") || "Pending";
 			me.current_page = 1;
-			me.$body.find(".sp-tca__filter-label").text(__(me.status));
-			me.$body.find(".sp-tca__filter-option").removeClass("is-selected");
-			$(this).addClass("is-selected");
+			me.sync_filter_ui();
 			me.$body.find(".sp-tca__filter-menu").prop("hidden", true);
 			me.$body.find(".sp-tca__filter-btn").attr("aria-expanded", "false");
 			me.refresh();
+		});
+		this.$body.on("click", ".sp-tca__history-btn", () => {
+			this.$body.find(".sp-tca__filter-menu").prop("hidden", true);
+			this.$body.find(".sp-tca__filter-btn").attr("aria-expanded", "false");
+			this.set_history(!this.history);
 		});
 		this.$body.on("change", ".sp-tca__department", function () {
 			me.department = $(this).val() || "";
@@ -231,8 +246,43 @@ frappe.time_clock_adjustments = {
 		$select.val(this.department);
 	},
 
+	set_history(on) {
+		const next = !!on;
+		if (next === this.history) {
+			this.refresh();
+			return;
+		}
+		this.history = next;
+		this.current_page = 1;
+		this.status = this.history ? "All" : "Pending";
+		this.sync_filter_ui();
+		this.sync_history_btn();
+		this.refresh();
+	},
+
+	sync_filter_ui() {
+		this.$body.find(".sp-tca__filter-label").text(__(this.status));
+		this.$body.find(".sp-tca__filter-option").removeClass("is-selected").each((_, el) => {
+			if ($(el).data("value") === this.status) {
+				$(el).addClass("is-selected");
+			}
+		});
+	},
+
+	sync_history_btn() {
+		this.$body
+			.find(".sp-tca__history-btn")
+			.toggleClass("is-active", this.history)
+			.attr("aria-pressed", this.history ? "true" : "false");
+	},
+
+	showing_history() {
+		return this.history && this.status !== "Pending";
+	},
+
 	refresh() {
 		if (!this.$body) return;
+		this.sync_history_btn();
 		const $list = this.$body.find(".sp-tca__list");
 		$list.addClass("is-loading");
 		frappe.call({
@@ -242,6 +292,7 @@ frappe.time_clock_adjustments = {
 				department: this.department || undefined,
 				from_date: this.date || undefined,
 				to_date: this.date || undefined,
+				history: this.history ? 1 : 0,
 			},
 			callback: (response) => {
 				$list.removeClass("is-loading");
@@ -268,6 +319,9 @@ frappe.time_clock_adjustments = {
 				row.employment_type,
 				row.department,
 				row.note,
+				row.status,
+				row.reviewed_by_name,
+				row.reviewed_by,
 			]
 				.filter(Boolean)
 				.join(" ")
@@ -300,6 +354,35 @@ frappe.time_clock_adjustments = {
 		return value || "—";
 	},
 
+	reviewed_cell(row) {
+		const who = row.reviewed_by_name || row.reviewed_by || "";
+		const when = row.reviewed_on ? frappe.datetime.str_to_user(row.reviewed_on) : "";
+		if (!who && !when) {
+			return '<span class="sp-tca__no-action">—</span>';
+		}
+		return `
+			<span class="sp-tca__reviewed">
+				${who ? `<strong>${this.escape(who)}</strong>` : ""}
+				${when ? `<span class="sp-tca__reviewed-on">${this.escape(when)}</span>` : ""}
+			</span>`;
+	},
+
+	change_cell(row) {
+		const label = row.hours_change_label || "—";
+		const value = row.hours_change;
+		let tone = "is-none";
+		if (typeof value === "number") {
+			if (value > 0) {
+				tone = "is-plus";
+			} else if (value < 0) {
+				tone = "is-minus";
+			} else {
+				tone = "is-zero";
+			}
+		}
+		return `<span class="sp-tca__change ${tone}">${this.escape(label)}</span>`;
+	},
+
 	time_cell(requested, current) {
 		const primary = this.clock(requested || current);
 		const changed = requested && this.clock(requested) !== this.clock(current);
@@ -320,9 +403,15 @@ frappe.time_clock_adjustments = {
 		const visible = rows.slice(start, start + TCA_PAGE_SIZE);
 		const pending = rows.filter((row) => row.status === "Pending").length;
 
-		this.$body
-			.find(".sp-tca__summary")
-			.text(__("{0} requests · {1} pending", [rows.length, pending]));
+		const history_view = this.showing_history();
+		this.$body.find(".sp-tca__table-head span:last-child").text(
+			history_view ? __("Reviewed") : __("Actions"),
+		);
+		this.$body.find(".sp-tca__summary").text(
+			history_view
+				? __("{0} adjustments in history", [rows.length])
+				: __("{0} requests · {1} pending", [rows.length, pending]),
+		);
 		this.$body
 			.find(".sp-tca__pager-label")
 			.text(__("Page {0} of {1}", [this.current_page, pages]));
@@ -333,7 +422,11 @@ frappe.time_clock_adjustments = {
 		if (!visible.length) {
 			this.$body.find(".sp-tca__list").html(`
 				<div class="sp-attendance__empty sp-tca__empty">
-					<p>${this.escape(__("No time clock adjustments for this filter."))}</p>
+					<p>${this.escape(
+						history_view
+							? __("No time clock adjustment history for this filter.")
+							: __("No time clock adjustments for this filter."),
+					)}</p>
 				</div>`);
 			return;
 		}
@@ -348,7 +441,9 @@ frappe.time_clock_adjustments = {
 					const actions =
 						status === "Pending" && hrms.time?.render_adjustment_actions
 							? hrms.time.render_adjustment_actions(row)
-							: '<span class="sp-tca__no-action">—</span>';
+							: history_view
+								? this.reviewed_cell(row)
+								: '<span class="sp-tca__no-action">—</span>';
 					return `
 						<div class="sp-tca__row" data-name="${this.escape(row.name)}">
 							<span class="sp-tca__date-cell">${this.escape(row.date_label || "")}</span>
@@ -373,6 +468,7 @@ frappe.time_clock_adjustments = {
 							<span class="sp-tca__time">${this.time_cell(row.requested_in_time, row.current_in_time)}</span>
 							<span class="sp-tca__time">${this.time_cell(row.requested_out_time, row.current_out_time)}</span>
 							<span class="sp-tca__hours">${this.escape(row.requested_hours_label || "—")}</span>
+							<span class="sp-tca__change-cell">${this.change_cell(row)}</span>
 							<span class="sp-tca__actions">${actions}</span>
 						</div>`;
 				})

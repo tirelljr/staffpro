@@ -23,6 +23,8 @@ class HRSettings(Document):
 		allow_employee_checkin_from_mobile_app: DF.Check
 		allow_geolocation_tracking: DF.Check
 		allow_multiple_shift_assignments: DF.Check
+		enable_late_entry_marking: DF.Check
+		late_entry_grace_period: DF.Int
 		auto_leave_encashment: DF.Check
 		check_vacancies: DF.Check
 		emp_created_by: DF.Literal["Naming Series", "Employee Number", "Full Name"]
@@ -59,8 +61,11 @@ class HRSettings(Document):
 	# end: auto-generated types
 
 	def validate(self):
+		from hrms.hr.job_letter import fill_letterhead_on_settings
+
+		fill_letterhead_on_settings(self)
 		if not self.overtime_threshold_hours:
-			self.overtime_threshold_hours = 80
+			self.overtime_threshold_hours = 90
 		if not self.overtime_pay_multiplier:
 			self.overtime_pay_multiplier = 1.5
 

@@ -48,9 +48,19 @@ COLUMNS = (
 	{"fieldname": "employment_type", "label": "Employment Type", "required": False, "example": "Full-time", "aliases": (), "kind": "link", "options": "Employment Type"},
 	{"fieldname": "default_shift", "label": "Default Shift", "required": False, "example": "Day Shift", "aliases": ("shift", "shift_type"), "kind": "link", "options": "Shift Type"},
 	{"fieldname": "holiday_list", "label": "Holiday List", "required": False, "example": "Staff Pro Holidays", "aliases": (), "kind": "link", "options": "Holiday List"},
+	{"fieldname": "is_floor_worker", "label": "Floor Worker", "required": False, "example": "No", "aliases": ("floor_worker", "floorworkers"), "kind": "check"},
+	{"fieldname": "floor_worker_start_time", "label": "Floor Worker Start", "required": False, "example": "08:00:00", "aliases": ("floor_start", "floor_start_time"), "kind": "time"},
+	{"fieldname": "floor_worker_end_time", "label": "Floor Worker End", "required": False, "example": "17:00:00", "aliases": ("floor_end", "floor_end_time"), "kind": "time"},
+	{"fieldname": "work_monday", "label": "Works Monday", "required": False, "example": "Yes", "aliases": ("monday",), "kind": "check"},
+	{"fieldname": "work_tuesday", "label": "Works Tuesday", "required": False, "example": "Yes", "aliases": ("tuesday",), "kind": "check"},
+	{"fieldname": "work_wednesday", "label": "Works Wednesday", "required": False, "example": "Yes", "aliases": ("wednesday",), "kind": "check"},
+	{"fieldname": "work_thursday", "label": "Works Thursday", "required": False, "example": "Yes", "aliases": ("thursday",), "kind": "check"},
+	{"fieldname": "work_friday", "label": "Works Friday", "required": False, "example": "Yes", "aliases": ("friday",), "kind": "check"},
+	{"fieldname": "work_saturday", "label": "Works Saturday", "required": False, "example": "No", "aliases": ("saturday",), "kind": "check"},
+	{"fieldname": "work_sunday", "label": "Works Sunday", "required": False, "example": "No", "aliases": ("sunday",), "kind": "check"},
 	{"fieldname": "reports_to", "label": "Reports To", "required": False, "example": "James Rivera", "aliases": ("manager", "supervisor"), "kind": "employee"},
 	{"fieldname": "ctc", "label": "Agent Hourly", "required": False, "example": "8.50", "aliases": ("hourly", "hourly_rate", "agent_hourly", "pay_rate"), "kind": "float"},
-	{"fieldname": "overtime_threshold_hours", "label": "OT Threshold (Hours)", "required": False, "example": "80", "aliases": ("ot_threshold", "ot_threshold_hours", "overtime_threshold"), "kind": "float"},
+	{"fieldname": "overtime_threshold_hours", "label": "OT Threshold (Hours)", "required": False, "example": "90", "aliases": ("ot_threshold", "ot_threshold_hours", "overtime_threshold"), "kind": "float"},
 	{"fieldname": "salary_mode", "label": "Salary Mode", "required": False, "example": "Bank", "aliases": ("pay_mode",)},
 	{"fieldname": "bank_name", "label": "Bank Name", "required": False, "example": "Belize Bank", "aliases": ("bank",)},
 	{"fieldname": "bank_ac_no", "label": "Bank Account No", "required": False, "example": "1234567890", "aliases": ("bank_account_no", "account_no", "account_number", "bank_account")},
@@ -362,6 +372,10 @@ def normalize_agent_row(values: dict, file_names: set[str] | None = None) -> tup
 				errors.append(_("{0} must be a date (YYYY-MM-DD).").format(column["label"]))
 		elif kind == "float":
 			out[fieldname] = flt(raw)
+		elif kind == "check":
+			out[fieldname] = 1 if raw.strip().lower() in {"1", "yes", "y", "true", "on"} else 0
+		elif kind == "time":
+			out[fieldname] = raw
 		elif fieldname == "gender":
 			out[fieldname] = _resolve_gender(raw)
 			if not out[fieldname]:

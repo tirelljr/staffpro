@@ -187,7 +187,7 @@
                       "icon":  "settings",
                       "link_to":  "HR Settings",
                       "link_type":  "DocType",
-                      "navigate_to_tab":  "expenses_tab"
+                      "navigate_to_tab":  "employee_tab"
                   }
               ],
     "modified":  "2026-08-14 14:30:00.000000",

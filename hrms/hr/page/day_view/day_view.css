@@ -88,6 +88,7 @@
 }
 
 .sp-dayview__btn-approve,
+.sp-dayview__btn-approved,
 .sp-dayview__btn-delete {
 	height: 32px;
 	padding: 0 14px;
@@ -103,8 +104,16 @@
 	background: #2f80ed;
 }
 
+.sp-dayview__btn-approved {
+	background: #16678c;
+}
+
 .sp-dayview__btn-approve:hover {
 	background: #2569c7;
+}
+
+.sp-dayview__btn-approved:hover {
+	background: #125a7a;
 }
 
 .sp-dayview__btn-delete {
@@ -296,6 +305,13 @@
 	background: #c5def0;
 }
 
+.sp-dayview__table td.sp-dayview__late {
+	color: #d97706;
+	font-weight: 700;
+	white-space: normal;
+	min-width: 9rem;
+}
+
 .sp-dayview__foot--zero td {
 	background: #fff;
 }
@@ -365,4 +381,69 @@
 	.sp-dayview__group {
 		margin-left: 0;
 	}
+}
+
+.sp-approved__note {
+	margin: 0 0 12px;
+	color: #555;
+	font-size: 13px;
+}
+
+.sp-approved__warn {
+	margin: 0 0 12px;
+	padding: 8px 10px;
+	border: 1px solid #f3d19e;
+	border-radius: 6px;
+	background: #fff7ed;
+	color: #9a3412;
+	font-size: 13px;
+}
+
+.sp-approved__empty {
+	padding: 18px 4px;
+	color: #555;
+}
+
+.sp-approved__table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.sp-approved__table th,
+.sp-approved__table td {
+	padding: 6px 8px;
+	border-bottom: 1px solid #ececec;
+	text-align: left;
+	white-space: nowrap;
+	vertical-align: middle;
+}
+
+.sp-approved__table th {
+	background: #f7f7f7;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.sp-approved__sort {
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.sp-approved__week td {
+	background: #eef6fb;
+	font-weight: 600;
+}
+
+.sp-approved__hours {
+	width: 88px;
+	height: 28px;
+	padding: 0 8px;
+	border: 1px solid #c9c9c9;
+	border-radius: 3px;
 }

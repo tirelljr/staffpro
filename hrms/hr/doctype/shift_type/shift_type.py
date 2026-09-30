@@ -73,6 +73,10 @@ class ShiftType(Document):
 	# end: auto-generated types
 
 	def validate(self):
+		from hrms.hr.late_entry import DEFAULT_LATE_GRACE_MINUTES
+
+		if cint(self.enable_late_entry_marking) and not cint(self.late_entry_grace_period):
+			self.late_entry_grace_period = DEFAULT_LATE_GRACE_MINUTES
 		start = get_time(self.start_time)
 		end = get_time(self.end_time)
 		self.validate_same_start_and_end(start, end)
@@ -269,17 +273,37 @@ class ShiftType(Document):
 		total_working_hours, in_time, out_time = calculate_working_hours(
 			logs, self.determine_check_in_and_check_out, self.working_hours_calculation_based_on
 		)
+		resolved_start = resolved_end = None
+		if logs:
+			from hrms.payroll.daily_pay import credited_hours_for_pairs, pair_checkin_logs, shift_window_on_day
+
+			paired = pair_checkin_logs(logs)
+			resolved_start = getattr(logs[0], "shift_start", None)
+			resolved_end = getattr(logs[0], "shift_end", None)
+			if not resolved_start or not resolved_end:
+				log_day = getdate(getattr(logs[0], "time", None))
+				resolved_start, resolved_end = shift_window_on_day(log_day, self.start_time, self.end_time)
+			pairs = paired["pairs"]
+			if in_time and out_time and not any(not pair.get("open") for pair in pairs):
+				pairs = [{"hours": total_working_hours, "open": False}]
+			total_working_hours = credited_hours_for_pairs(
+				pairs, total_working_hours, resolved_start, resolved_end
+			)
 		if (
 			cint(self.enable_late_entry_marking)
 			and in_time
-			and in_time > logs[0].shift_start + timedelta(minutes=cint(self.late_entry_grace_period))
+			and resolved_start
+			and get_datetime(in_time)
+			> get_datetime(resolved_start) + timedelta(minutes=cint(self.late_entry_grace_period))
 		):
 			late_entry = True
 
 		if (
 			cint(self.enable_early_exit_marking)
 			and out_time
-			and out_time < logs[0].shift_end - timedelta(minutes=cint(self.early_exit_grace_period))
+			and resolved_end
+			and get_datetime(out_time)
+			< get_datetime(resolved_end) - timedelta(minutes=cint(self.early_exit_grace_period))
 		):
 			early_exit = True
 

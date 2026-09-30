@@ -41,6 +41,20 @@
                       "default_workspace":  0,
                       "indent":  0,
                       "keep_closed":  0,
+                      "label":  "Floor Workers",
+                      "open_in_new_tab":  0,
+                      "show_arrow":  0,
+                      "type":  "Link",
+                      "icon":  "hard-hat",
+                      "link_to":  "Employee",
+                      "link_type":  "DocType"
+                  },
+                  {
+                      "child":  0,
+                      "collapsible":  1,
+                      "default_workspace":  0,
+                      "indent":  0,
+                      "keep_closed":  0,
                       "label":  "Paid Time Off",
                       "open_in_new_tab":  0,
                       "show_arrow":  0,
@@ -62,20 +76,6 @@
                       "icon":  "bar-chart-2",
                       "link_to":  "Data Analytics",
                       "link_type":  "Dashboard"
-                  },
-                  {
-                      "child":  0,
-                      "collapsible":  1,
-                      "default_workspace":  0,
-                      "indent":  0,
-                      "keep_closed":  0,
-                      "label":  "Team Structure",
-                      "open_in_new_tab":  0,
-                      "show_arrow":  0,
-                      "type":  "Link",
-                      "icon":  "building-2",
-                      "link_to":  "organizational-chart",
-                      "link_type":  "Page"
                   },
                   {
                       "child":  0,

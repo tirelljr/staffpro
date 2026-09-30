@@ -109,6 +109,26 @@ def update_floor_settings(
 
 
 @tool
+def edit_job_letter(
+	name: str,
+	addressed_to: str = "",
+	recipient_address: str = "",
+	honorific: str = "",
+	annual_salary: float = 0,
+	biweekly_salary: float = 0,
+	letter_text: str = "",
+) -> str:
+	"""Edit an open job letter: recipient, title, yearly salary, biweekly salary, or letter text. This always requires user confirmation."""
+	return "Confirmation required."
+
+
+@tool
+def review_job_letter(name: str, action: str, comment: str = "") -> str:
+	"""Approve or reject a job letter or an office print request. action is Approve or Reject. This always requires user confirmation."""
+	return "Confirmation required."
+
+
+@tool
 def export_information(
 	dataset: str,
 	file_format: str = "csv",
@@ -135,6 +155,8 @@ WRITE_TOOLS = [
 	run_payroll,
 	respond_to_agent_query,
 	update_floor_settings,
+	edit_job_letter,
+	review_job_letter,
 	export_information,
 ]
 WRITE_TOOL_NAMES = {item.name for item in WRITE_TOOLS} | {BULK_ACTIONS_TOOL}
@@ -149,6 +171,8 @@ ACTION_LABELS = {
 	"run_payroll": _("Run new payroll"),
 	"respond_to_agent_query": _("Respond to agent query"),
 	"update_floor_settings": _("Change floor settings"),
+	"edit_job_letter": _("Edit job letter"),
+	"review_job_letter": _("Review job letter"),
 	"export_information": _("Export information"),
 	BULK_ACTIONS_TOOL: _("Apply bulk changes"),
 }
@@ -201,6 +225,10 @@ def bulk_action_preview(steps: list[dict[str, Any]]) -> dict:
 def execute_write_action(name: str, arguments: dict[str, Any], conversation: str | None = None):
 	if name == BULK_ACTIONS_TOOL:
 		return _execute_bulk_actions(arguments.get("actions") or [], conversation=conversation)
+
+	from hrms.ai.permissions import assert_user_can_run_call
+
+	assert_user_can_run_call(name, arguments)
 
 	unlocked = False
 	try:
@@ -277,6 +305,16 @@ def execute_write_action(name: str, arguments: dict[str, Any], conversation: str
 		from hrms.ai.tools.queries import execute_respond_to_agent_query
 
 		result = execute_respond_to_agent_query(arguments)
+
+	elif name == "edit_job_letter":
+		from hrms.ai.tools.documents import execute_edit_job_letter
+
+		result = execute_edit_job_letter(arguments)
+
+	elif name == "review_job_letter":
+		from hrms.ai.tools.documents import execute_review_job_letter
+
+		result = execute_review_job_letter(arguments)
 
 	elif name == "update_floor_settings":
 		from hrms.ai.tools.floors import execute_update_floor_settings

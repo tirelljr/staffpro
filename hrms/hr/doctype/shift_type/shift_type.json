@@ -98,6 +98,7 @@
    "non_negative": 1
   },
   {
+   "default": "10",
    "depends_on": "enable_late_entry_marking",
    "description": "The time after the shift start time when check-in is considered as late (in minutes).",
    "fieldname": "late_entry_grace_period",
@@ -167,7 +168,7 @@
    "label": "Mark Auto Attendance on Holidays"
   },
   {
-   "default": "0",
+   "default": "1",
    "fieldname": "enable_late_entry_marking",
    "fieldtype": "Check",
    "label": "Enable Late Entry Marking"

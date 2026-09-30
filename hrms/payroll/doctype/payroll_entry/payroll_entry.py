@@ -1713,13 +1713,21 @@ def get_employees_for_client(
 	offset=None,
 	ignore_match_conditions=False,
 ) -> list:
-	"""Agents billed to the selected client. Currency and pay period are not used."""
+	"""Agents billed to the selected client who were employed during the pay period."""
 	Employee = frappe.qb.DocType("Employee")
 
 	query = (
 		frappe.qb.from_(Employee)
 		.where((Employee.status != "Inactive") & (Employee.company == filters.company))
 	)
+	if filters.get("end_date"):
+		query = query.where(
+			(Employee.date_of_joining <= filters.end_date) | (Employee.date_of_joining.isnull())
+		)
+	if filters.get("start_date"):
+		query = query.where(
+			(Employee.relieving_date >= filters.start_date) | (Employee.relieving_date.isnull())
+		)
 
 	query = set_fields_to_select(query, fields)
 	query = set_searchfield(query, searchfield, search_string, qb_object=Employee)
@@ -2001,6 +2009,11 @@ def log_payroll_failure(process, payroll_entry, error):
 	payroll_entry.db_set({"error_message": error_message, "status": "Failed"})
 
 
+def _is_outside_payroll_period_error(error) -> bool:
+	message = str(error).lower()
+	return "joining after payroll period" in message or "left before payroll period" in message
+
+
 def _is_missing_salary_structure_error(error) -> bool:
 	message = str(error).lower()
 	if "salary structure" not in message:
@@ -2055,14 +2068,26 @@ def create_salary_slips_for_employees(employees, args, publish_progress=True):
 		salary_slips_exist_for = get_existing_salary_slips(employees, args)
 		count = 0
 		skipped = []
+		skipped_period = []
 
 		employees = list(set(employees) - set(salary_slips_exist_for))
+		use_employee_frequency = bool(getattr(frappe.flags, "payroll_use_employee_frequency", False))
+		employee_frequency = None
+		if use_employee_frequency:
+			from hrms.payroll.auto_payroll import payroll_frequency_for_employee
+
+			employee_frequency = payroll_frequency_for_employee
 		for emp in employees:
+			frequency = args.get("payroll_frequency")
+			if employee_frequency:
+				frequency = (
+					employee_frequency(emp, args.get("start_date"), args.get("end_date")) or frequency
+				)
 			slip_args = {
 				"doctype": "Salary Slip",
 				"employee": emp,
 				"salary_slip_based_on_timesheet": args.get("salary_slip_based_on_timesheet"),
-				"payroll_frequency": args.get("payroll_frequency"),
+				"payroll_frequency": frequency,
 				"start_date": args.get("start_date"),
 				"end_date": args.get("end_date"),
 				"company": args.get("company"),
@@ -2079,10 +2104,13 @@ def create_salary_slips_for_employees(employees, args, publish_progress=True):
 				frappe.get_doc(slip_args).insert()
 			except Exception as e:
 				frappe.db.rollback(save_point="before_salary_slip")
-				if _is_missing_salary_structure_error(e):
+				if _is_missing_salary_structure_error(e) or _is_outside_payroll_period_error(e):
 					if frappe.message_log:
 						frappe.message_log.pop()
-					skipped.append(emp)
+					if _is_outside_payroll_period_error(e):
+						skipped_period.append(emp)
+					else:
+						skipped.append(emp)
 					continue
 				raise
 
@@ -2093,7 +2121,16 @@ def create_salary_slips_for_employees(employees, args, publish_progress=True):
 					title=_("Creating Salary Slips..."),
 				)
 
-		skip_message = _skipped_salary_structure_message(skipped) if skipped else ""
+		skip_parts = []
+		if skipped:
+			skip_parts.append(_skipped_salary_structure_message(skipped))
+		if skipped_period:
+			skip_parts.append(
+				_("Skipped {0}. They joined after this pay period or left before it.").format(
+					comma_and(_employee_skip_labels(skipped_period))
+				)
+			)
+		skip_message = " ".join(skip_parts)
 		payroll_entry.db_set(
 			{
 				"status": "Submitted",
@@ -2104,6 +2141,14 @@ def create_salary_slips_for_employees(employees, args, publish_progress=True):
 
 		if skipped:
 			_notify_skipped_salary_structures(payroll_entry, skipped)
+		if skipped_period:
+			frappe.msgprint(
+				_("Skipped {0}. They joined after this pay period or left before it.").format(
+					comma_and([frappe.bold(label) for label in _employee_skip_labels(skipped_period)])
+				),
+				title=_("Outside Pay Period"),
+				indicator="orange",
+			)
 
 		if salary_slips_exist_for:
 			frappe.msgprint(
@@ -2610,7 +2655,7 @@ def save_payroll_excel_cell(
 	name: str | None = None,
 	employee: str | None = None,
 	field: str | None = None,
-	value=None,
+	value: str | int | float | None = None,
 ) -> dict:
 	"""Persist one editable spreadsheet cell to the agent's draft salary slip."""
 	name = name or frappe.form_dict.get("name")
@@ -3014,19 +3059,26 @@ def _excel_hours_for_employee(
 ) -> tuple[float, float]:
 	"""Return (overtime_hours, regular_hours) for the spreadsheet row.
 
-	Attendance is the source of truth so a stale 8-hour slip cannot hide a full
-	10-working-day period. Slip hours win only when they are higher (manual edits).
+	Attendance is the source of truth, including an approved-hours cut. A typed
+	week total of 37 replaces a slip that still says 40.
 	"""
-	from hrms.hr.doctype.overtime_slip.overtime_slip import get_employee_overtime_threshold
+	from hrms.hr.doctype.overtime_slip.overtime_slip import (
+		DEFAULT_OVERTIME_THRESHOLD_HOURS,
+		get_employee_overtime_threshold,
+	)
 
 	overtime_hours = flt(overtime_by_employee.get(employee))
 	attendance_hours = flt(working_by_employee.get(employee))
 	slip_hours = flt(slip_total_hours)
-	if prefer_attendance:
-		total_hours = max(attendance_hours, slip_hours)
+	if prefer_attendance and attendance_hours:
+		total_hours = attendance_hours
+	elif prefer_attendance:
+		total_hours = slip_hours
 	else:
 		total_hours = slip_hours or attendance_hours
-	threshold = flt(get_employee_overtime_threshold(employee)) if employee else 80.0
+	threshold = (
+		flt(get_employee_overtime_threshold(employee)) if employee else DEFAULT_OVERTIME_THRESHOLD_HOURS
+	)
 	if total_hours <= threshold:
 		return 0.0, total_hours
 	overtime_hours = min(overtime_hours, max(total_hours - threshold, 0.0))
@@ -3224,18 +3276,31 @@ def _belize_weekly_tax(weekly_pay: float) -> float:
 	return flt(flt(annual_tax) / 52.0, 2)
 
 
+def _scaled_period_attendance(entry, fields: list[str]) -> list:
+	from hrms.payroll.daily_pay import apply_approved_week_hours
+
+	rows = _period_attendance(entry, fields, include_draft=True)
+	grouped: dict[str, list] = {}
+	for row in rows:
+		if row.get("employee"):
+			grouped.setdefault(row.employee, []).append(row)
+	for employee, emp_rows in grouped.items():
+		apply_approved_week_hours(employee, emp_rows)
+	return rows
+
+
 def _holiday_hours_by_employee(entry) -> dict[str, float]:
 	from hrms.payroll.daily_pay import ensure_working_hours_from_times, get_public_holiday_pay_context
 
 	hours: dict[str, float] = {}
-	fields = ["employee", "attendance_date", "working_hours", "status", "daily_pay"]
+	fields = ["name", "employee", "attendance_date", "working_hours", "status", "daily_pay"]
 	if frappe.db.has_column("Attendance", "in_time"):
 		fields += ["in_time", "out_time"]
-	for row in _period_attendance(entry, fields, include_draft=True):
+	for row in _scaled_period_attendance(entry, fields):
 		if not get_public_holiday_pay_context(row.employee, row.attendance_date):
 			continue
 		worked = flt(row.working_hours) or flt(ensure_working_hours_from_times(row))
-		if worked <= 0 and flt(row.get("daily_pay")) > 0:
+		if worked <= 0 and flt(row.get("daily_pay")) > 0 and not row.get("_week_override"):
 			worked = 8.0
 		hours[row.employee] = hours.get(row.employee, 0) + worked
 	return hours
@@ -3246,15 +3311,15 @@ def _working_hours_by_employee(entry) -> dict[str, float]:
 	from hrms.payroll.daily_pay import ensure_working_hours_from_times, get_public_holiday_pay_context
 
 	hours: dict[str, float] = {}
-	fields = ["employee", "attendance_date", "working_hours", "status", "daily_pay"]
+	fields = ["name", "employee", "attendance_date", "working_hours", "status", "daily_pay"]
 	if frappe.db.has_column("Attendance", "in_time"):
 		fields += ["in_time", "out_time"]
-	for row in _period_attendance(entry, fields, include_draft=True):
+	for row in _scaled_period_attendance(entry, fields):
 		is_holiday = bool(get_public_holiday_pay_context(row.employee, row.attendance_date))
 		if (row.get("status") or "") == "Absent" and not is_holiday:
 			continue
 		worked = flt(row.working_hours) or flt(ensure_working_hours_from_times(row))
-		if is_holiday and worked <= 0 and flt(row.get("daily_pay")) > 0:
+		if is_holiday and worked <= 0 and flt(row.get("daily_pay")) > 0 and not row.get("_week_override"):
 			worked = 8.0
 		hours[row.employee] = hours.get(row.employee, 0) + worked
 	return hours

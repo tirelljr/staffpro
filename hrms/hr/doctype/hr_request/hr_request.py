@@ -4,7 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import today
+from frappe.utils import flt, today
 
 from hrms.mixins.pwa_notifications import PWANotificationsMixin
 
@@ -15,6 +15,12 @@ CLOSED_STATUSES = frozenset({"Resolved", "Rejected"})
 
 def is_hr_user(user: str | None = None) -> bool:
 	return bool(HR_ROLES.intersection(frappe.get_roles(user or frappe.session.user)))
+
+
+def flt_changed(previous, current) -> bool:
+	if previous in (None, "") and current in (None, ""):
+		return False
+	return flt(previous) != flt(current)
 
 
 class HRRequest(Document, PWANotificationsMixin):
@@ -49,8 +55,11 @@ class HRRequest(Document, PWANotificationsMixin):
 
 	def validate(self):
 		self._set_defaults()
-		self._restrict_employee_updates()
 		self._set_resolved_on()
+		from hrms.hr.job_letter import prepare_request
+
+		prepare_request(self)
+		self._restrict_employee_updates()
 
 	def after_insert(self):
 		self.notify_hr_request_created()
@@ -60,6 +69,31 @@ class HRRequest(Document, PWANotificationsMixin):
 			return
 		self.notify_hr_request_assignee()
 		self.notify_hr_request_status()
+		if self.request_type == "Job Letter" and self.status == "Resolved" and self.has_value_changed("status"):
+			from hrms.hr.job_letter import file_approved_letter
+
+			file_approved_letter(self)
+
+	def _lock_letter_fields(self, previous):
+		if self.request_type not in {"Job Letter", "Office Print"}:
+			return
+		locked = (
+			"addressed_to",
+			"recipient_address",
+			"honorific",
+			"letter_html",
+			"letter_paragraphs",
+			"letter_custom",
+			"source_request",
+			"letter_document",
+		)
+		for fieldname in locked:
+			if (previous.get(fieldname) or "") != (self.get(fieldname) or ""):
+				frappe.throw(_("You cannot change this letter after it is submitted"))
+		if flt_changed(previous.get("annual_salary"), self.get("annual_salary")) or flt_changed(
+			previous.get("biweekly_salary"), self.get("biweekly_salary")
+		):
+			frappe.throw(_("You cannot change this letter after it is submitted"))
 
 	def _set_defaults(self):
 		if not self.priority:
@@ -88,6 +122,7 @@ class HRRequest(Document, PWANotificationsMixin):
 					frappe.throw(_("You cannot update the resolution"))
 				if previous.status not in EMPLOYEE_ALLOWED_STATUSES and previous.status != self.status:
 					frappe.throw(_("You cannot change the status of this request"))
+				self._lock_letter_fields(previous)
 
 	def _set_resolved_on(self):
 		if self.status in CLOSED_STATUSES and not self.resolved_on:

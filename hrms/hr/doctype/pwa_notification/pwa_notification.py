@@ -56,5 +56,7 @@ class PWANotification(Document):
 			return f"{base_url}/leave-applications/{self.reference_document_name}"
 		elif self.reference_document_type == "Expense Claim":
 			return f"{base_url}/expense-claims/{self.reference_document_name}"
+		elif self.reference_document_type == "TD4 Form":
+			return f"{base_url}/td4/{self.reference_document_name}"
 
 		return base_url

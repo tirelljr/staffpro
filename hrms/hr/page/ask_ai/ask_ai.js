@@ -497,6 +497,14 @@ hrms.ai.ask_ai = {
 		if (block.type === "navigate") {
 			return `<button type="button" class="sp-ai__navigate" data-route='${this.escape(JSON.stringify(block.route || []))}'>${this.escape(block.label || __("Open in Staff Pro"))} →</button>`;
 		}
+		if (block.type === "document") {
+			const srcdoc = String(block.html || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+			const route = block.route ? this.escape(JSON.stringify(block.route)) : "";
+			const open = route
+				? `<button type="button" class="sp-ai__navigate" data-route='${route}'>${this.escape(block.title || __("Open letter"))} →</button>`
+				: "";
+			return `<div class="sp-ai__document-card"><iframe class="sp-ai__document" sandbox="" srcdoc="${srcdoc}"></iframe>${open}</div>`;
+		}
 		if (block.type === "download") {
 			const href = this.escape(block.file_url || "");
 			const filename = this.escape(block.file_name || "");

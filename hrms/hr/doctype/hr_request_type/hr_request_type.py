@@ -6,6 +6,7 @@ from frappe.model.document import Document
 
 DEFAULT_HR_REQUEST_TYPES = (
 	("Job Letter", "Request an employment or job letter for banks, visas, or other official use."),
+	("Office Print", "Print an approved job letter at the office."),
 	("Employment Verification", "Ask HR to confirm employment details for a third party."),
 	("Address / Personal Details Update", "Request a change to address, name, or other personal details."),
 	("General Inquiry", "Send a general question or request to the HR team."),

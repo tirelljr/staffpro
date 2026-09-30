@@ -58,24 +58,47 @@ export const formatHours = (value, keepZero = false) => {
 	return `${sign}${hours}h ${minutes}m`
 }
 
+const TIME_PART = /(\d{1,2}):(\d{2})(?::(\d{2}))?/
+
+function formatWallClock(hours, minutes) {
+	const hour = Number(hours)
+	const minute = Number(minutes)
+	if (!Number.isFinite(hour) || !Number.isFinite(minute)) return ""
+	if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return ""
+	const suffix = hour >= 12 ? "PM" : "AM"
+	const hour12 = hour % 12 || 12
+	return `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`
+}
+
 export const formatClock = (value) => {
-	if (!value) return ""
-	const raw = String(value).trim()
-	const asDate = dayjs(raw)
-	if (asDate.isValid() && (raw.includes("-") || raw.includes("T"))) {
-		return asDate.format(CLOCK_FORMAT)
+	try {
+		if (value === null || value === undefined || value === "") return ""
+		const raw = String(value).trim()
+		if (!raw) return ""
+		const match = raw.match(TIME_PART)
+		if (!match) return ""
+		return formatWallClock(match[1], match[2])
+	} catch {
+		return ""
 	}
-	const asTime = dayjs(`2000-01-01 ${raw}`)
-	return asTime.isValid() ? asTime.format(CLOCK_FORMAT) : ""
 }
 
 export const formatHoursNote = (comment) => {
-	if (!comment) return ""
-	const when = dayjs(comment.creation)
-	const time = when.isValid() ? when.format(CLOCK_FORMAT) : ""
-	const date = when.isValid() ? when.format("MM/DD/YYYY") : ""
-	const author = comment.comment_by || "Admin"
-	const text = comment.content || ""
-	if (time && date) return `Note (${author}, ${time}, ${date}): ${text}`
-	return text ? `Note (${author}): ${text}` : ""
+	try {
+		if (!comment) return ""
+		if (typeof comment === "string") return comment
+		const when = dayjs(comment.creation)
+		let time = ""
+		let date = ""
+		if (when?.isValid?.()) {
+			time = when.format(CLOCK_FORMAT)
+			date = when.format("MM/DD/YYYY")
+		}
+		const author = comment.comment_by || "Admin"
+		const text = comment.content || ""
+		if (time && date) return `Note (${author}, ${time}, ${date}): ${text}`
+		return text ? `Note (${author}): ${text}` : ""
+	} catch {
+		return comment?.content || ""
+	}
 }

@@ -54,6 +54,7 @@ class EmployeeCheckin(Document):
 
 	def validate(self):
 		validate_active_employee(self.employee)
+		self.validate_floor_worker_clockin()
 		self.validate_duplicate_log()
 		self.validate_time_change()
 		self.fetch_shift()
@@ -158,6 +159,14 @@ class EmployeeCheckin(Document):
 				_("You must be within {0} meters of your shift location to check in.").format(checkin_radius),
 				exc=CheckinRadiusExceededError,
 			)
+
+	def validate_floor_worker_clockin(self):
+		if cint(self.skip_auto_attendance) or self.flags.get("ignore_floor_worker_clock_block"):
+			return
+		from hrms.hr.floor_workers import is_floor_worker
+
+		if is_floor_worker(self.employee):
+			frappe.throw(_("Floor workers do not clock in. Hours are added automatically."))
 
 	def validate_office_clockin_ip(self):
 		if self.flags.get("ignore_ip_restriction"):

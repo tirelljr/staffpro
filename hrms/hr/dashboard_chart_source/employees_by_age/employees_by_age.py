@@ -16,12 +16,13 @@ def get_data(
 	chart_name: str | None = None,
 	chart: str | None = None,
 	no_cache: str | None = None,
-	filters: str | None = None,
+	filters: str | dict | None = None,
 	from_date: str | None = None,
 	to_date: str | None = None,
 	timespan: str | None = None,
 	time_interval: str | None = None,
 	heatmap_year: str | None = None,
+	refresh: int | str | None = None,
 ) -> dict[str, list]:
 	if filters:
 		filters = frappe.parse_json(filters)

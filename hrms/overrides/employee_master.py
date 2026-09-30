@@ -12,6 +12,13 @@ from erpnext.setup.doctype.employee.employee import Employee
 
 
 class EmployeeMaster(Employee):
+	def validate(self):
+		apply_default_approvers(self)
+		super().validate()
+		from hrms.hr.floor_workers import apply_employee_floor_worker_rules
+
+		apply_employee_floor_worker_rules(self)
+
 	def autoname(self):
 		naming_method = frappe.db.get_single_value("HR Settings", "emp_created_by")
 		if not naming_method:
@@ -112,6 +119,59 @@ def update_job_applicant_and_offer(doc, method=None):
 			msg += "<br>" + _("You may add additional details, if any, and submit the offer.")
 
 		frappe.msgprint(msg)
+
+
+@frappe.whitelist()
+def get_default_hr_approver() -> str | None:
+	"""Enabled user who should approve leave and shift requests by default.
+
+	Prefers an active employee whose designation is HR Manager. Otherwise uses
+	the first enabled user with the HR Manager role.
+	"""
+	designated = frappe.get_all(
+		"Employee",
+		filters={"status": "Active", "designation": "HR Manager", "user_id": ["is", "set"]},
+		pluck="user_id",
+		order_by="creation asc",
+	)
+	for user in designated:
+		if _is_usable_approver(user):
+			return user
+
+	candidates = frappe.get_all(
+		"Has Role",
+		filters={"role": "HR Manager", "parenttype": "User"},
+		pluck="parent",
+	)
+	enabled = sorted({user for user in candidates if _is_usable_approver(user)})
+	if enabled:
+		return enabled[0]
+
+	# Sites that have not created a separate HR user still grant the role to Administrator.
+	if frappe.db.exists(
+		"Has Role", {"parent": "Administrator", "parenttype": "User", "role": "HR Manager"}
+	) and frappe.db.get_value("User", "Administrator", "enabled"):
+		return "Administrator"
+	return None
+
+
+def _is_usable_approver(user: str) -> bool:
+	if not user or user in ("Administrator", "Guest"):
+		return False
+	return bool(frappe.db.get_value("User", user, "enabled"))
+
+
+def apply_default_approvers(doc, method=None):
+	"""Fill a blank leave or shift approver with the HR manager."""
+	if doc.get("leave_approver") and doc.get("shift_request_approver"):
+		return
+	approver = get_default_hr_approver()
+	if not approver:
+		return
+	if not doc.get("leave_approver"):
+		doc.leave_approver = approver
+	if not doc.get("shift_request_approver"):
+		doc.shift_request_approver = approver
 
 
 def update_approver_role(doc, method=None):
@@ -404,7 +464,14 @@ def set_employee_username(employee: str, username: str) -> dict:
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def user_username_query(doctype, txt, searchfield, start, page_len, filters):
+def user_username_query(
+	doctype: str,
+	txt: str,
+	searchfield: str,
+	start: int,
+	page_len: int,
+	filters: str | dict | None = None,
+):
 	"""Link search that prefers username over email."""
 	txt = f"%{txt or ''}%"
 	return frappe.db.sql(
@@ -447,6 +514,27 @@ def create_employee_username_user(employee: str, username: str | None = None, em
 	sync_employee_username(emp)
 	emp.db_set("user_id", emp.user_id)
 	return {"user": emp.user_id, "username": _login_username(emp.user_id) or login, "created": True}
+
+
+def ensure_td4_request_for_account(doc, method=None):
+	"""Open a TD4 request when an agent gets a portal login, so sign-in can prompt them."""
+	if not doc or not getattr(doc, "name", None):
+		return
+	if getattr(doc, "status", None) != "Active":
+		return
+	user_id = (getattr(doc, "user_id", None) or "").strip()
+	if not user_id or user_id in ("Guest", "Administrator"):
+		return
+	if not frappe.db.table_exists("TD4 Form"):
+		return
+	try:
+		from hrms.hr.doctype.td4_form.td4_form import create_requested, has_submitted, pending_name
+
+		if has_submitted(doc.name) or pending_name(doc.name):
+			return
+		create_requested(doc.name, notify=False)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "TD4 request for new agent")
 
 
 @frappe.whitelist()

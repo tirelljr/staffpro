@@ -7,7 +7,12 @@ from frappe.utils import getdate, nowdate
 from erpnext.setup.doctype.employee.test_employee import make_employee
 
 from hrms.api import add_employee_hours_note, get_employee_hours
-from hrms.hr.doctype.attendance.attendance import add_hours_entry, get_hours_rows
+from hrms.hr.doctype.attendance.attendance import (
+	add_hours_entry,
+	cancel_hours_entry,
+	get_hours_rows,
+	update_hours_entry,
+)
 from hrms.hr.doctype.time_clock_adjustment.time_clock_adjustment import (
 	get_time_clock_adjustments,
 	parse_requested_times,
@@ -153,6 +158,50 @@ class TestTimeClockAdjustment(HRMSTestSuite):
 		self.assertEqual(row["date_label"], getdate(nowdate()).strftime("%d/%m"))
 		self.assertEqual(row["requested_hours"], 9.0)
 		self.assertEqual(row["requested_hours_label"], "9h")
+		self.assertEqual(row["hours_change"], 1.0)
+		self.assertEqual(row["hours_change_label"], "+1 hour")
+
+	def test_manual_edit_and_delete_show_hours_change(self):
+		frappe.reload_doc("hr", "doctype", "time_clock_adjustment")
+		employee = make_employee("tca.manual.change@example.com", company="_Test Company")
+		day = nowdate()
+		attendance = add_hours_entry(employee, day, "09:00:00", "17:00:00")
+
+		update_hours_entry(attendance, day, "09:00:00", "17:00:00")
+		unchanged = [
+			row
+			for row in get_time_clock_adjustments(history=1)["rows"]
+			if row["employee"] == employee and row["action"] == "Edit"
+		]
+		self.assertEqual(unchanged, [])
+
+		update_hours_entry(attendance, day, "09:00:00", "16:30:00")
+		edited = next(
+			row
+			for row in get_time_clock_adjustments(history=1)["rows"]
+			if row["employee"] == employee and row["action"] == "Edit"
+		)
+		self.assertEqual(edited["status"], "Approved")
+		self.assertEqual(edited["hours_change"], -0.5)
+		self.assertEqual(edited["hours_change_label"], "-0.5 hours")
+
+		logs = frappe.get_all(
+			"Employee Checkin",
+			filters={"employee": employee, "time": ["between", [f"{day} 00:00:00", f"{day} 23:59:59"]]},
+			fields=["name", "log_type"],
+			order_by="time asc",
+		)
+		in_log = next(row.name for row in logs if row.log_type == "IN")
+		out_log = next(row.name for row in logs if row.log_type == "OUT")
+		cancel_hours_entry(attendance, in_log, out_log)
+		deleted = next(
+			row
+			for row in get_time_clock_adjustments(history=1)["rows"]
+			if row["employee"] == employee and row["action"] == "Delete"
+		)
+		self.assertEqual(deleted["status"], "Approved")
+		self.assertEqual(deleted["hours_change"], -7.5)
+		self.assertEqual(deleted["hours_change_label"], "-7.5 hours")
 
 	def test_employee_hours_include_pending_adjustment(self):
 		employee = make_employee("tca.pwa.rows@example.com", company="_Test Company")

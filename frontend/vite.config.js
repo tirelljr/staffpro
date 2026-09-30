@@ -1,7 +1,6 @@
 import { defineConfig } from "vite"
 import vue from "@vitejs/plugin-vue"
 import { VitePWA } from "vite-plugin-pwa"
-import frappeui from "frappe-ui/vite"
 
 import path from "path"
 import fs from "fs"
@@ -14,10 +13,11 @@ export default defineConfig({
 	},
 	plugins: [
 		vue(),
-		frappeui(),
 		VitePWA({
 			registerType: "autoUpdate",
 			strategies: "injectManifest",
+			srcDir: "public",
+			filename: "sw.js",
 			injectRegister: null,
 			devOptions: {
 				enabled: true,

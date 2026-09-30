@@ -44,19 +44,24 @@ def get_current_user_info() -> dict:
 @frappe.whitelist()
 def get_current_employee_info() -> dict:
 	current_user = frappe.session.user
+	fields = [
+		"name",
+		"first_name",
+		"employee_name",
+		"designation",
+		"department",
+		"company",
+		"reports_to",
+		"user_id",
+	]
+	if frappe.get_meta("Employee").has_field("is_floor_worker"):
+		fields.append("is_floor_worker")
+	if frappe.get_meta("Employee").has_field("image"):
+		fields.append("image")
 	employee = frappe.db.get_value(
 		"Employee",
 		{"user_id": current_user, "status": "Active"},
-		[
-			"name",
-			"first_name",
-			"employee_name",
-			"designation",
-			"department",
-			"company",
-			"reports_to",
-			"user_id",
-		],
+		fields,
 		as_dict=True,
 	)
 	return employee
@@ -1022,7 +1027,12 @@ def _download_pdf(doctype: str, docname: str, print_format: str | None = None) -
 		default_print_format = "Job Letter"
 
 	try:
-		download_pdf(doctype, docname, format=default_print_format)
+		download_pdf(
+			doctype,
+			docname,
+			format=default_print_format,
+			no_letterhead=1 if doctype == "HR Request" else 0,
+		)
 	except Exception as e:
 		frappe.throw(_("Failed to download PDF: {0}").format(str(e)))
 

@@ -17,9 +17,9 @@
 					</header>
 
 					<div class="bg-white grow overflow-y-auto">
-						<form class="flex flex-col space-y-4 p-4" @submit.prevent="sendPasswordReset">
+						<form class="flex flex-col space-y-4 p-4" @submit.prevent="submitPassword">
 							<p class="text-sm leading-5 text-gray-600">
-								{{ __("Enter your username and we'll send a reset link to the email on your account.") }}
+								{{ __("Enter your username and a new password. It updates your Staff Pro login immediately.") }}
 							</p>
 							<Input
 								:label="__('Username') + ' *'"
@@ -27,6 +27,20 @@
 								placeholder="TArzu"
 								v-model="username"
 								autocomplete="username"
+								required
+							/>
+							<Input
+								:label="__('New Password') + ' *'"
+								type="password"
+								v-model="newPassword"
+								autocomplete="new-password"
+								required
+							/>
+							<Input
+								:label="__('Confirm Password') + ' *'"
+								type="password"
+								v-model="confirmPassword"
+								autocomplete="new-password"
 								required
 							/>
 						</form>
@@ -38,11 +52,11 @@
 						<ErrorMessage class="mb-2" :message="errorMessage" />
 						<Button
 							class="w-full rounded py-5 text-base disabled:bg-gray-700 disabled:text-white"
-							:loading="forgotPasswordResource.loading"
+							:loading="setPasswordResource.loading"
 							variant="solid"
-							@click="sendPasswordReset"
+							@click="submitPassword"
 						>
-							{{ __("Send Reset Link") }}
+							{{ __("Update Password") }}
 						</Button>
 					</div>
 				</div>
@@ -67,15 +81,17 @@ const username = ref(
 		? route.query.username[0]
 		: route.query.username || route.query.email || "",
 )
+const newPassword = ref("")
+const confirmPassword = ref("")
 const errorMessage = ref("")
 
-const forgotPasswordResource = createResource({
-	url: "hrms.api.kiosk.send_password_reset",
+const setPasswordResource = createResource({
+	url: "hrms.api.kiosk.set_password",
 	method: "POST",
 	onSuccess() {
 		toast({
 			title: __("Success"),
-			text: __("If that username exists, a password reset link has been sent to the account email."),
+			text: __("Your password has been updated."),
 			icon: "check-circle",
 			position: "bottom-center",
 			iconClasses: "text-green-500",
@@ -84,7 +100,7 @@ const forgotPasswordResource = createResource({
 		router.replace({ name: "Login" })
 	},
 	onError(error) {
-		errorMessage.value = error.messages?.[0] || __("Failed to send reset link")
+		errorMessage.value = error.messages?.[0] || __("Failed to update password")
 	},
 })
 
@@ -97,15 +113,27 @@ function goBack() {
 	router.replace({ name: "Login" })
 }
 
-function sendPasswordReset() {
+function submitPassword() {
 	const usernameValue = (username.value || "").trim()
+	const passwordValue = newPassword.value || ""
 
 	if (!usernameValue) {
 		errorMessage.value = __("Please enter your username")
 		return
 	}
+	if (passwordValue.length < 8) {
+		errorMessage.value = __("Password must be at least 8 characters.")
+		return
+	}
+	if (passwordValue !== confirmPassword.value) {
+		errorMessage.value = __("Passwords do not match.")
+		return
+	}
 
 	errorMessage.value = ""
-	forgotPasswordResource.submit({ username: usernameValue })
+	setPasswordResource.submit({
+		username: usernameValue,
+		new_password: passwordValue,
+	})
 }
 </script>

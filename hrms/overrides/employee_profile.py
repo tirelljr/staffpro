@@ -9,6 +9,50 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, getdate
 
+VIEWABLE_PASSWORD_FIELD = "hrms_login_password"
+PASSWORD_ROLES = {"System Manager", "HR Manager", "HR User", "Administrator"}
+
+
+def remember_viewable_password(user: str, password: str) -> None:
+	"""Keep an encrypted copy so HR can show the password set for this login."""
+	login = (user or "").strip()
+	secret = (password or "").strip()
+	if not login or login in {"Guest", "Administrator"} or not secret:
+		return
+	from frappe.utils.password import set_encrypted_password
+
+	set_encrypted_password("User", login, secret, fieldname=VIEWABLE_PASSWORD_FIELD)
+
+
+def read_viewable_password(user: str) -> str:
+	login = (user or "").strip()
+	if not login:
+		return ""
+	from frappe.utils.password import get_decrypted_password
+
+	try:
+		return get_decrypted_password(
+			"User", login, VIEWABLE_PASSWORD_FIELD, raise_exception=False
+		) or ""
+	except Exception:
+		return ""
+
+
+def _can_manage_passwords() -> bool:
+	return bool(set(frappe.get_roles()).intersection(PASSWORD_ROLES))
+
+
+@frappe.whitelist()
+def get_employee_user_password(employee: str) -> dict:
+	"""Return the saved login password for HR. Empty until a password is set or the agent signs in."""
+	frappe.has_permission("Employee", "read", employee, throw=True)
+	if not _can_manage_passwords():
+		frappe.throw(_("Not permitted to view this password."), frappe.PermissionError)
+	user = (frappe.db.get_value("Employee", employee, "user_id") or "").strip()
+	if not user:
+		return {"password": "", "user": ""}
+	return {"password": read_viewable_password(user), "user": user}
+
 
 @frappe.whitelist()
 def update_employee_user_password(employee: str, new_password: str, logout_all_sessions: int = 0) -> dict:
@@ -36,7 +80,116 @@ def update_employee_user_password(employee: str, new_password: str, logout_all_s
 	from frappe.utils.password import update_password
 
 	update_password(user, password, logout_all_sessions=cint(logout_all_sessions))
+	remember_viewable_password(user, password)
 	return {"ok": True, "user": user}
+
+
+MAX_PROFILE_IMAGE_BYTES = 10 * 1024 * 1024
+PROFILE_IMAGE_EDGE = 1024
+
+
+@frappe.whitelist()
+def update_my_profile_image(filename: str, content: str) -> dict:
+	"""Save the signed-in agent's profile photo on their Employee and User records."""
+	user = frappe.session.user
+	if not user or user == "Guest":
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
+	if not (filename or "").strip() or not (content or "").strip():
+		frappe.throw(_("A photo is required."))
+
+	employee = frappe.db.get_value(
+		"Employee",
+		{"user_id": user, "status": "Active"},
+		"name",
+	)
+	if not employee:
+		frappe.throw(_("No active agent is linked to your user."), frappe.PermissionError)
+	if not frappe.get_meta("Employee").has_field("image"):
+		frappe.throw(_("Profile photos are not available on this site."))
+
+	safe_name, file_bytes = _prepare_profile_image(content)
+	previous_employee = frappe.db.get_value("Employee", employee, "image")
+	previous_user = frappe.db.get_value("User", user, "user_image")
+
+	from frappe.utils.file_manager import save_file
+
+	file_doc = save_file(
+		safe_name,
+		file_bytes,
+		"Employee",
+		employee,
+		folder="Home",
+		is_private=0,
+		df="image",
+	)
+	file_url = file_doc.file_url
+	if not file_url:
+		frappe.throw(_("The photo could not be saved."))
+
+	frappe.db.set_value("Employee", employee, "image", file_url)
+	frappe.db.set_value("User", user, "user_image", file_url)
+	_drop_replaced_image(previous_employee, file_url, employee, user)
+	if previous_user != previous_employee:
+		_drop_replaced_image(previous_user, file_url, employee, user)
+
+	return {"image": file_url, "user_image": file_url, "employee": employee}
+
+
+def _prepare_profile_image(content: str) -> tuple[str, bytes]:
+	import base64
+	import io
+
+	from PIL import Image, ImageOps
+
+	raw_content = (content or "").strip()
+	if raw_content.startswith("data:") and "," in raw_content:
+		raw_content = raw_content.split(",", 1)[1]
+	try:
+		decoded = base64.b64decode(raw_content, validate=False)
+	except Exception:
+		frappe.throw(_("The photo could not be read."))
+	if not decoded:
+		frappe.throw(_("A photo is required."))
+	if len(decoded) > MAX_PROFILE_IMAGE_BYTES:
+		frappe.throw(_("Photo must be 10 MB or smaller."))
+
+	try:
+		with Image.open(io.BytesIO(decoded)) as image:
+			image.seek(0)
+			image = ImageOps.exif_transpose(image)
+			image.load()
+			resample = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
+			image.thumbnail((PROFILE_IMAGE_EDGE, PROFILE_IMAGE_EDGE), resample)
+			has_alpha = image.mode in ("RGBA", "LA") or (
+				image.mode == "P" and "transparency" in image.info
+			)
+			if has_alpha:
+				image = image.convert("RGBA")
+				buffer = io.BytesIO()
+				image.save(buffer, format="PNG", optimize=True)
+				return "profile.png", buffer.getvalue()
+			image = image.convert("RGB")
+			buffer = io.BytesIO()
+			image.save(buffer, format="JPEG", quality=85, optimize=True)
+			return "profile.jpg", buffer.getvalue()
+	except Exception:
+		frappe.throw(_("Upload a JPG, PNG, WEBP, or GIF photo."))
+
+
+def _drop_replaced_image(old_url: str | None, new_url: str, employee: str, user: str) -> None:
+	if not old_url or old_url == new_url:
+		return
+	if not (old_url.startswith("/files/") or old_url.startswith("/private/files/")):
+		return
+	for name in frappe.get_all("File", filters={"file_url": old_url}, pluck="name"):
+		attached_to_doctype, attached_to_name = frappe.db.get_value(
+			"File", name, ["attached_to_doctype", "attached_to_name"]
+		)
+		owned = (attached_to_doctype == "Employee" and attached_to_name == employee) or (
+			attached_to_doctype == "User" and attached_to_name == user
+		)
+		if owned:
+			frappe.delete_doc("File", name, ignore_permissions=True, force=True)
 
 
 @frappe.whitelist()
@@ -60,10 +213,11 @@ def get_employee_profile_stats(employee: str) -> dict:
 	income = _salary_totals(employee)
 	billed = _billed_totals(employee)
 	leave_remaining = _leave_remaining(employee)
+	leave_money_remaining = _leave_money_remaining(employee)
 	billed_company = _convert_amount(billed["amount"], billed["currency"], company_currency)
 	agent_profit = flt(billed_company) - flt(income["gross_pay"])
 
-	return {
+	stats = {
 		"employee": emp.name,
 		"employee_name": emp.employee_name,
 		"user_id": emp.user_id or "",
@@ -76,7 +230,11 @@ def get_employee_profile_stats(employee: str) -> dict:
 		"total_billed": flt(billed["amount"], 2),
 		"agent_profit": flt(agent_profit, 2),
 		"leave_remaining": leave_remaining,
+		"leave_money_remaining": leave_money_remaining,
 	}
+	from hrms.hr.role_access import redact_profile_stats
+
+	return redact_profile_stats(stats)
 
 
 def _leave_remaining(employee: str) -> float:
@@ -91,6 +249,20 @@ def _leave_remaining(employee: str) -> float:
 	for values in (details.get("leave_allocation") or {}).values():
 		total += flt(values.get("remaining_leaves"))
 	return flt(total, 2)
+
+
+def _leave_money_remaining(employee: str) -> float:
+	from hrms.hr.pto_anniversary import PTO_LEAVE_TYPE, pto_money_value
+
+	try:
+		from hrms.hr.doctype.leave_application.leave_application import get_leave_details
+
+		details = get_leave_details(employee, getdate())
+	except Exception:
+		return 0.0
+
+	remaining = flt((details.get("leave_allocation") or {}).get(PTO_LEAVE_TYPE, {}).get("remaining_leaves"))
+	return pto_money_value(employee, remaining)
 
 
 def _total_hours(employee: str) -> float:

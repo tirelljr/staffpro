@@ -2790,43 +2790,42 @@ def get_lwp_or_ppl_for_date_range(employee, start_date, end_date):
 
 
 def _attendance_hours_for_slip(slip) -> float:
-	from hrms.payroll.daily_pay import ensure_working_hours_from_times
+	from hrms.payroll.daily_pay import payroll_hours_for_period
 
-	hours = 0.0
-	for row in _slip_period_attendance(slip, ["working_hours", "status", "in_time", "out_time"]):
-		if (row.get("status") or "") == "Absent":
-			continue
-		hours += flt(row.working_hours) or flt(ensure_working_hours_from_times(row))
-	return flt(hours)
+	return payroll_hours_for_period(slip.employee, slip.start_date, slip.end_date)
 
 
 def _hourly_inputs_for_slip(slip) -> tuple[float, float, float, float]:
 	from hrms.hr.doctype.overtime_slip.overtime_slip import get_pay_period_overtime
-	from hrms.payroll.daily_pay import ensure_working_hours_from_times, get_public_holiday_pay_context
+	from hrms.payroll.daily_pay import (
+		apply_approved_week_hours,
+		ensure_working_hours_from_times,
+		get_public_holiday_pay_context,
+	)
 
 	overtime_result = get_pay_period_overtime(slip.employee, slip.start_date, slip.end_date)
 	overtime_hours = flt(overtime_result["ordinary_overtime_duration"])
 	holiday_hours = 0.0
 	holiday_pay = 0.0
 	total_hours = 0.0
-	fields = ["working_hours", "status", "attendance_date", "daily_pay"]
+	fields = ["name", "working_hours", "status", "attendance_date", "daily_pay"]
 	if frappe.db.has_column("Attendance", "in_time"):
 		fields += ["in_time", "out_time"]
 
-	for row in _slip_period_attendance(slip, fields):
+	rows = _slip_period_attendance(slip, fields)
+	apply_approved_week_hours(slip.employee, rows)
+	for row in rows:
 		holiday_ctx = get_public_holiday_pay_context(slip.employee, row.attendance_date)
 		if (row.get("status") or "") == "Absent" and not holiday_ctx:
 			continue
 		worked = flt(row.working_hours) or flt(ensure_working_hours_from_times(row))
-		if holiday_ctx and worked <= 0 and flt(row.get("daily_pay")) > 0:
+		if holiday_ctx and worked <= 0 and flt(row.get("daily_pay")) > 0 and not row.get("_week_override"):
 			worked = 8.0
 		total_hours += worked
 		if holiday_ctx:
 			holiday_hours += worked
 			holiday_pay += flt(row.get("daily_pay")) or flt(flt(slip.hour_rate) * worked, 2)
 
-	if flt(slip.total_working_hours):
-		total_hours = max(flt(slip.total_working_hours), total_hours)
 	regular_hours = max(total_hours - overtime_hours - holiday_hours, 0.0)
 	bonus = _earning_amount_on_slip(slip, category="Bonus")
 	holiday_on_slip = _earning_amount_on_slip(slip, match="holiday")
