@@ -1844,12 +1844,18 @@ def _hours_comments_by_attendance(names: list[str]) -> dict[str, list[dict]]:
 @frappe.whitelist()
 def get_hours_filter_options() -> dict:
 	frappe.has_permission("Attendance", "read", throw=True)
+	from hrms.hr.staff_pro_roles import is_staff_pro_hr_desk_user
+
+	can_list_employees = frappe.has_permission("Employee", "read")
+	if not can_list_employees and not is_staff_pro_hr_desk_user():
+		frappe.throw(_("Insufficient Permission for {0}").format(_("Employee")), frappe.PermissionError)
 	employees = frappe.get_list(
 		"Employee",
 		fields=["name", "employee_name", "first_name", "last_name", "department", "designation", "user_id"],
 		filters={"status": "Active"},
 		order_by="employee_name asc",
 		limit=500,
+		ignore_permissions=not can_list_employees and is_staff_pro_hr_desk_user(),
 	)
 	departments = frappe.get_list(
 		"Department",

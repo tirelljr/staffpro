@@ -189,10 +189,13 @@ def merge_ess_docperms_for_hr_assistant() -> None:
 
 
 def sync_hr_assistant_permissions() -> None:
+	from hrms.hr.staff_pro_hr_assistant_setup import apply_hr_assistant_core_permissions
+
 	ensure_hr_assistant_role()
 	if frappe.db.exists("Role", HR_PERMISSION_SOURCE_ROLE):
 		copy_role_docperms(HR_PERMISSION_SOURCE_ROLE, HR_ASSISTANT_ROLE)
 		mirror_role_sidebar_tables(HR_PERMISSION_SOURCE_ROLE, HR_ASSISTANT_ROLE)
 	merge_ess_docperms_for_hr_assistant()
+	apply_hr_assistant_core_permissions()
 	clear_employee_user_permissions_for_users(HR_ASSISTANT_ROLE)
 	frappe.clear_cache()
