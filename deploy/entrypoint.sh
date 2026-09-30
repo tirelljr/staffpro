@@ -98,8 +98,8 @@ create_or_migrate_site() {
 			bench --site "$SITE_NAME" set-config host_name "https://${RENDER_EXTERNAL_HOSTNAME}"
 		fi
 		bench --site "$SITE_NAME" enable-scheduler
-		bench --site "$SITE_NAME" execute hrms.branding.apply_branding || true
-		bench --site "$SITE_NAME" execute hrms.boot.prepare_staff_pro_first_login || true
+		bench --site "$SITE_NAME" execute "frappe.get_attr('hrms.branding.apply_branding')()" || true
+		bench --site "$SITE_NAME" execute "frappe.get_attr('hrms.boot.prepare_staff_pro_first_login')()" || true
 		bench --site "$SITE_NAME" clear-cache || true
 		echo "Site ${SITE_NAME} is ready. Sign in as Matt Chavez, Micheal Graylord, or Myra Chavez (password: admin)."
 	else
@@ -117,8 +117,8 @@ refresh_desk_assets() {
 	echo "Refreshing desk assets (Redis is available at runtime)..."
 	yarn --cwd apps/hrms build || true
 	bench build --app hrms || true
-	bench --site "$SITE_NAME" execute hrms.branding.repair_desk_ltr_bundles || true
-	bench --site "$SITE_NAME" execute hrms.branding.apply_branding || true
+	bench --site "$SITE_NAME" execute "frappe.get_attr('hrms.branding.repair_desk_ltr_bundles')()" || true
+	bench --site "$SITE_NAME" execute "frappe.get_attr('hrms.branding.apply_branding')()" || true
 	bench --site "$SITE_NAME" clear-cache || true
 }
 

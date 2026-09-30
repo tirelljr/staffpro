@@ -49,8 +49,8 @@ finish_customization_setup() {
 
     echo "Applying migrations and branding..."
     bench --site hrms.localhost migrate || true
-    bench --site hrms.localhost execute hrms.branding.apply_branding
-    bench --site hrms.localhost execute hrms.boot.prepare_staff_pro_first_login
+    bench --site hrms.localhost execute "frappe.get_attr('hrms.branding.apply_branding')()"
+    bench --site hrms.localhost execute "frappe.get_attr('hrms.boot.prepare_staff_pro_first_login')()"
     publish_employee_portal
     bench --site hrms.localhost clear-cache
 }
