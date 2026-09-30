@@ -112,10 +112,19 @@ create_or_migrate_site() {
 	fi
 }
 
+refresh_desk_assets() {
+	# bench build during the Docker image build has no Redis; assets.json may be stale.
+	echo "Refreshing desk assets (Redis is available at runtime)..."
+	bench build --app hrms || true
+	bench --site "$SITE_NAME" execute hrms.branding.apply_branding || true
+	bench --site "$SITE_NAME" clear-cache || true
+}
+
 trap 'kill $(jobs -p) 2>/dev/null; wait' SIGTERM SIGINT
 
 start_nginx
 create_or_migrate_site
+refresh_desk_assets
 
 GUNICORN_BIND="127.0.0.1:8000"
 if ! command -v nginx >/dev/null 2>&1; then

@@ -86,11 +86,6 @@
 				min-height: 100% !important;
 				max-height: none !important;
 			}
-			.body-sidebar-container:not(.expanded),
-			.body-sidebar-container:not(.expanded) .body-sidebar {
-				height: 0 !important;
-				min-height: 0 !important;
-			}
 		`;
 		(document.head || document.documentElement).appendChild(style);
 	}

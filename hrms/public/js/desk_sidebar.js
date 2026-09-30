@@ -718,6 +718,31 @@ body.staff-pro-has-topbar .body-sidebar-container {
 .body-sidebar-container:not(.expanded) .body-sidebar .collapse-sidebar-link {
 	display: none !important;
 }
+/* Frappe pinned dock adds sidebar-hidden while the panel is open; labels stay opacity 0. */
+body.staff-pro-alive .body-sidebar-container.sidebar-hidden .body-sidebar,
+body.staff-pro-alive .body-sidebar-container.expanded .body-sidebar {
+	width: var(--sidebar-width, 260px) !important;
+	opacity: 1 !important;
+	pointer-events: auto !important;
+}
+body.staff-pro-alive .body-sidebar-container.sidebar-hidden .body-sidebar > *,
+body.staff-pro-alive .body-sidebar-container.sidebar-hidden .sidebar-item-label,
+body.staff-pro-alive .body-sidebar-container.sidebar-hidden .avatar-name-email,
+body.staff-pro-alive .body-sidebar-container.sidebar-hidden .title-container {
+	opacity: 1 !important;
+	visibility: visible !important;
+	transform: none !important;
+}
+body.staff-pro-alive.dock-pinned .dock,
+body.staff-pro-alive.dock-open .dock,
+body.staff-pro-alive.dock-pinned .workspace-dock,
+body.staff-pro-alive.dock-open .workspace-dock {
+	position: sticky !important;
+	left: auto !important;
+	transform: none !important;
+	translate: none !important;
+	visibility: visible !important;
+}
 
 body.staff-pro-hide-form-sidebar .layout-side-section.right,
 body.staff-pro-hide-form-sidebar .page-head .sidebar-toggle-btn,
@@ -1695,6 +1720,27 @@ function sidebar_can_toggle_width(sidebar) {
 	return Boolean(sidebar?.sidebar_header && typeof sidebar.sidebar_header.toggle_width === "function");
 }
 
+function patch_sidebar_pinned_visibility() {
+	const Sidebar = frappe.ui && frappe.ui.Sidebar;
+	if (!Sidebar?.prototype || Sidebar.prototype._staff_pro_pinned_visibility) return;
+	Sidebar.prototype._staff_pro_pinned_visibility = true;
+
+	const originalApply = Sidebar.prototype.apply_expanded_state;
+	if (typeof originalApply === "function") {
+		Sidebar.prototype.apply_expanded_state = function () {
+			if (should_use_staff_pro_desk_home() && !(typeof frappe.is_mobile === "function" && frappe.is_mobile())) {
+				this.sidebar_expanded = true;
+			}
+			const result = originalApply.apply(this, arguments);
+			if (should_use_staff_pro_desk_home()) {
+				this.wrapper?.removeClass("sidebar-hidden").addClass("expanded");
+				document.body.classList.add("dock-open", "dock-pinned", "dock-active");
+			}
+			return result;
+		};
+	}
+}
+
 function patch_sidebar_expand_guard() {
 	const Sidebar = frappe.ui && frappe.ui.Sidebar;
 	if (!Sidebar?.prototype || Sidebar.prototype._staff_pro_expand_guard) return;
@@ -1717,19 +1763,28 @@ function keep_staff_pro_sidebar_expanded() {
 	patch_sidebar_expand_guard();
 	if (!should_use_staff_pro_desk_home()) return;
 	if (typeof frappe.is_mobile === "function" && frappe.is_mobile()) return;
-	const sidebar = frappe.app?.sidebar;
-	if (!sidebar?.open) return;
 	try {
 		localStorage.setItem("sidebar-expanded", "true");
 	} catch (e) {
 		/* ignore */
 	}
+	document.body.classList.add("dock-open", "dock-pinned", "dock-active");
+	document.querySelectorAll(".body-sidebar-container").forEach((el) => {
+		el.classList.add("expanded");
+		el.classList.remove("sidebar-hidden");
+	});
+	const sidebar = frappe.app?.sidebar;
+	if (!sidebar) return;
 	sidebar.sidebar_expanded = true;
-	if (!sidebar_can_toggle_width(sidebar)) return;
-	try {
-		sidebar.open();
-	} catch (e) {
-		/* header is created later in refresh_header() */
+	if (sidebar.wrapper?.length) {
+		sidebar.wrapper.removeClass("sidebar-hidden").addClass("expanded");
+	}
+	if (typeof sidebar.open === "function") {
+		try {
+			sidebar.open();
+		} catch (e) {
+			/* header is created later in refresh_header() */
+		}
 	}
 }
 
@@ -2312,7 +2367,8 @@ function pin_staff_pro_dock() {
 		Dock.prototype.apply_open_state = function () {
 			this.enabled = true;
 			this.is_open = true;
-			$("body").addClass("dock-open dock-active");
+			this.is_pinned = true;
+			$("body").addClass("dock-open dock-pinned dock-active");
 			this.$dock?.removeClass("hidden").attr("aria-hidden", "false").prop("inert", false);
 			if (typeof original_apply === "function") {
 				try {
@@ -2334,8 +2390,10 @@ function pin_staff_pro_dock() {
 	if (dock) {
 		dock.enabled = true;
 		dock.is_open = true;
+		dock.is_pinned = true;
 		dock.apply_open_state?.();
 	}
+	$("body").addClass("dock-open dock-pinned dock-active");
 	$(".dock, .workspace-dock")
 		.removeClass("hidden")
 		.attr("aria-hidden", "false")
@@ -2502,6 +2560,7 @@ function watch_workspace_dock() {
 	inject_sidebar_css();
 	disable_app_onboarding();
 	disable_sidebar_help();
+	patch_sidebar_pinned_visibility();
 	patch_workspace_dock();
 	patch_form_sidebar_policy();
 	apply_form_sidebar_policy();
@@ -2531,6 +2590,7 @@ function watch_workspace_dock() {
 			render_staff_pro_dock_integrations();
 			remove_sidebar_search();
 			pin_staff_pro_dock();
+			keep_staff_pro_sidebar_expanded();
 			enhance_sidebar_menus();
 			style_sidebar_collapse_toggle();
 			disable_app_onboarding();
