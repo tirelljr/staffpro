@@ -252,8 +252,18 @@ function strip_unused_user_actions(frm) {
 	window.hrms?.role_access?.strip_user_buttons?.(frm.page?.wrapper || frm.$wrapper);
 }
 
+function use_username_for_new_user(frm) {
+	if (!frm.is_new() || !frm.fields_dict.email || frm._username_login) return;
+	frm._username_login = true;
+	frm.set_df_property("email", "label", __("Username"));
+	frm.set_df_property("email", "options", "");
+	frm.fields_dict.email.df.options = "";
+	frm.refresh_field("email");
+}
+
 function apply_bpo_user_form(frm) {
 	hide_module_profile(frm);
+	use_username_for_new_user(frm);
 	mount_role_switches(frm);
 	install_bpo_module_editor(frm);
 	lock_belize_user_timezone(frm);
@@ -298,5 +308,13 @@ frappe.ui.form.on("User", {
 	refresh(frm) {
 		apply_bpo_user_form(frm);
 		watch_user_pickers(frm);
+	},
+	before_save(frm) {
+		if (!frm.is_new()) return;
+		const typed = (frm.doc.email || "").trim();
+		if (!typed || typed.includes("@")) return;
+		frm.doc.username = typed;
+		frm.doc.email = `${typed.toLowerCase()}@users.staffpro.local`;
+		frm.doc.send_welcome_email = 0;
 	},
 });

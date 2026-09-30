@@ -313,6 +313,94 @@ def resolve_user_from_login(login: str | None) -> str | None:
 	return rows[0][0] if rows else None
 
 
+LOCAL_LOGIN_DOMAIN = "users.staffpro.local"
+
+
+def local_login_email(username: str) -> str:
+	return f"{username.lower()}@{LOCAL_LOGIN_DOMAIN}"
+
+
+def prepare_user_login(doc, method=None):
+	"""New desk users are created from a username. The User id stays an internal address."""
+	if not doc.is_new() or doc.name in {"Administrator", "Guest"}:
+		return
+
+	email = (doc.email or "").strip()
+	username = (doc.username or "").strip()
+	if email and "@" not in email:
+		login = clean_username(email)
+		doc.username = login
+		doc.email = local_login_email(login)
+		doc.send_welcome_email = 0
+		return
+
+	if not username or "@" in username:
+		return
+	if email and not email.lower().endswith(f"@{LOCAL_LOGIN_DOMAIN}"):
+		return
+
+	login = clean_username(username)
+	doc.username = login
+	doc.email = local_login_email(login)
+	doc.send_welcome_email = 0
+
+
+def _selected_role_names(roles) -> list[str]:
+	if isinstance(roles, str):
+		roles = frappe.parse_json(roles)
+	names = []
+	for row in roles or []:
+		if isinstance(row, dict):
+			role = row.get("role") or row.get("name")
+		else:
+			role = row
+		role = (role or "").strip()
+		if role and role not in names:
+			names.append(role)
+	return names
+
+
+def _can_assign_user_roles() -> bool:
+	permlevel = frappe.get_meta("User").get_field("roles").permlevel or 0
+	user_roles = set(frappe.get_roles())
+	for perm in frappe.get_meta("User").permissions:
+		if perm.role in user_roles and cint(perm.permlevel) == permlevel and cint(perm.write):
+			return True
+	return False
+
+
+@frappe.whitelist()
+def create_user_login(username: str, first_name: str, roles=None, last_name: str | None = None) -> dict:
+	"""Create a desk user from a username and Role records."""
+	frappe.has_permission("User", "create", throw=True)
+	login = clean_username(username)
+	if frappe.db.exists("User", {"username": login}) or frappe.db.exists("User", local_login_email(login)):
+		frappe.throw(_("Username {0} is already taken.").format(frappe.bold(login)))
+
+	chosen = _selected_role_names(roles)
+	missing = [role for role in chosen if not frappe.db.exists("Role", role)]
+	if missing:
+		frappe.throw(_("Role {0} was not found.").format(frappe.bold(missing[0])))
+	if chosen and not _can_assign_user_roles():
+		frappe.throw(_("You do not have permission to assign roles."), frappe.PermissionError)
+
+	user = frappe.get_doc(
+		{
+			"doctype": "User",
+			"email": local_login_email(login),
+			"username": login,
+			"first_name": (first_name or login).strip(),
+			"last_name": (last_name or "").strip(),
+			"send_welcome_email": 0,
+			"enabled": 1,
+			"user_type": "System User",
+			"roles": [{"doctype": "Has Role", "role": role} for role in chosen],
+		}
+	)
+	user.insert()
+	return user.as_dict()
+
+
 def clean_username(value: str | None) -> str:
 	typed = (value or "").strip()
 	if not typed:
@@ -347,7 +435,7 @@ def _ensure_username(user_name: str, employee) -> None:
 def _create_user_for_employee(employee, login: str) -> str:
 	user_email = (employee.company_email or employee.personal_email or "").strip()
 	if not user_email:
-		user_email = f"{login.lower()}@users.staffpro.local"
+		user_email = local_login_email(login)
 	existing = frappe.db.get_value("User", {"email": user_email}, "name")
 	if existing:
 		_apply_username_to_user(existing, login)

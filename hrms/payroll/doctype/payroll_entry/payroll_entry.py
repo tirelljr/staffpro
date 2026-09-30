@@ -2009,13 +2009,114 @@ def log_payroll_failure(process, payroll_entry, error):
 	payroll_entry.db_set({"error_message": error_message, "status": "Failed"})
 
 
+def joined_after_pay_period(date_of_joining, end_date) -> bool:
+	"""True when the agent's company join date is after the pay period ends."""
+	if not date_of_joining or not end_date:
+		return False
+	return getdate(date_of_joining) > getdate(end_date)
+
+
+def _joining_dates_for(employees) -> dict:
+	employees = [name for name in (employees or []) if name]
+	if not employees:
+		return {}
+	rows = frappe.get_all(
+		"Employee",
+		filters={"name": ("in", employees)},
+		fields=["name", "date_of_joining"],
+	)
+	return {row.name: row.date_of_joining for row in rows}
+
+
+def agents_joining_after_period(employees, end_date) -> list[dict]:
+	"""Agents on this payroll whose company join date is after the pay period."""
+	if isinstance(employees, str):
+		employees = frappe.parse_json(employees) or []
+	employees = [name for name in (employees or []) if name]
+	if not employees or not end_date:
+		return []
+	rows = frappe.get_all(
+		"Employee",
+		filters={"name": ("in", employees)},
+		fields=["name", "employee_name", "date_of_joining"],
+		order_by="employee_name asc",
+	)
+	late = []
+	for row in rows:
+		if not joined_after_pay_period(row.date_of_joining, end_date):
+			continue
+		late.append(
+			{
+				"employee": row.name,
+				"employee_name": row.employee_name or row.name,
+				"date_of_joining": str(getdate(row.date_of_joining)),
+			}
+		)
+	return late
+
+
+@frappe.whitelist()
+def get_agents_joining_after_period(employees=None, end_date=None):
+	if not frappe.has_permission("Payroll Entry", "read"):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
+	return agents_joining_after_period(employees, end_date)
+
+
+def employee_force_included(payroll_entry: str | None, employee: str | None) -> bool:
+	if not payroll_entry or not employee:
+		return False
+	if not frappe.get_meta("Payroll Employee Detail").has_field("force_include"):
+		return False
+	return bool(
+		cint(
+			frappe.db.get_value(
+				"Payroll Employee Detail",
+				{"parent": payroll_entry, "parenttype": "Payroll Entry", "employee": employee},
+				"force_include",
+			)
+		)
+	)
+
+
+@frappe.whitelist()
+def set_agents_force_included(payroll_entry: str, employees=None):
+	"""Mark submitted-payroll agents to pay even though they joined after the period."""
+	if not frappe.has_permission("Payroll Entry", "write"):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
+	if isinstance(employees, str):
+		employees = frappe.parse_json(employees) or []
+	forced = {name for name in (employees or []) if name}
+	doc = frappe.get_doc("Payroll Entry", payroll_entry)
+	if not frappe.get_meta("Payroll Employee Detail").has_field("force_include"):
+		frappe.throw(_("Reload after migrate so payroll can force-add agents who joined late."))
+	for row in doc.employees:
+		if not row.employee or not row.name or row.employee not in forced:
+			continue
+		if cint(row.force_include):
+			continue
+		frappe.db.set_value(
+			"Payroll Employee Detail", row.name, "force_include", 1, update_modified=False
+		)
+	return {"force_included": sorted(forced)}
+
+
+def _error_text(error) -> str:
+	parts = [str(error or "")]
+	for entry in list(getattr(frappe, "message_log", None) or []):
+		if isinstance(entry, dict):
+			parts.append(str(entry.get("message") or ""))
+		else:
+			parts.append(str(entry))
+	return "\n".join(parts).lower()
+
+
 def _is_outside_payroll_period_error(error) -> bool:
-	message = str(error).lower()
+	message = error.lower() if isinstance(error, str) else _error_text(error)
 	return "joining after payroll period" in message or "left before payroll period" in message
 
 
 def _is_missing_salary_structure_error(error) -> bool:
-	message = str(error).lower()
+	message = error.lower() if isinstance(error, str) else _error_text(error)
 	if "salary structure" not in message:
 		return False
 	return any(
@@ -2071,6 +2172,7 @@ def create_salary_slips_for_employees(employees, args, publish_progress=True):
 		skipped_period = []
 
 		employees = list(set(employees) - set(salary_slips_exist_for))
+		joining_dates = _joining_dates_for(employees)
 		use_employee_frequency = bool(getattr(frappe.flags, "payroll_use_employee_frequency", False))
 		employee_frequency = None
 		if use_employee_frequency:
@@ -2078,6 +2180,11 @@ def create_salary_slips_for_employees(employees, args, publish_progress=True):
 
 			employee_frequency = payroll_frequency_for_employee
 		for emp in employees:
+			joined_after = joined_after_pay_period(joining_dates.get(emp), args.get("end_date"))
+			allow_late_joining = joined_after and employee_force_included(args.get("payroll_entry"), emp)
+			if joined_after and not allow_late_joining:
+				skipped_period.append(emp)
+				continue
 			frequency = args.get("payroll_frequency")
 			if employee_frequency:
 				frequency = (
@@ -2100,6 +2207,9 @@ def create_salary_slips_for_employees(employees, args, publish_progress=True):
 				"currency": args.get("currency"),
 			}
 			frappe.db.savepoint("before_salary_slip")
+			previous_late_flag = getattr(frappe.flags, "ignore_joining_after_period", False)
+			if allow_late_joining:
+				frappe.flags.ignore_joining_after_period = True
 			try:
 				frappe.get_doc(slip_args).insert()
 			except Exception as e:
@@ -2113,6 +2223,8 @@ def create_salary_slips_for_employees(employees, args, publish_progress=True):
 						skipped.append(emp)
 					continue
 				raise
+			finally:
+				frappe.flags.ignore_joining_after_period = previous_late_flag
 
 			count += 1
 			if publish_progress and employees:

@@ -447,6 +447,35 @@ class TestPayrollEntry(HRMSTestSuite):
 			_is_missing_salary_structure_error("Please set account in Salary Component Bonus")
 		)
 
+	def test_joining_after_period_error_is_detected_from_the_message_log(self):
+		from hrms.payroll.doctype.payroll_entry.payroll_entry import (
+			_is_outside_payroll_period_error,
+			joined_after_pay_period,
+		)
+
+		self.assertTrue(joined_after_pay_period("2026-08-01", "2026-07-24"))
+		self.assertFalse(joined_after_pay_period("2026-07-24", "2026-07-24"))
+		self.assertFalse(joined_after_pay_period("2026-07-01", "2026-07-24"))
+		self.assertFalse(joined_after_pay_period(None, "2026-07-24"))
+		self.assertTrue(
+			_is_outside_payroll_period_error(
+				"Cannot create Salary Slip for Employee joining after Payroll Period"
+			)
+		)
+
+		class EmptyError(Exception):
+			def __str__(self):
+				return ""
+
+		previous = list(frappe.message_log or [])
+		frappe.message_log = [
+			{"message": "Cannot create Salary Slip for Employee joining after Payroll Period"}
+		]
+		try:
+			self.assertTrue(_is_outside_payroll_period_error(EmptyError()))
+		finally:
+			frappe.message_log = previous
+
 	def test_missing_salary_structure_skips_employee_and_keeps_payroll_entry(self):
 		company_doc = frappe.get_doc("Company", "_Test Company")
 		employee = make_employee("test_pe_has_structure@payroll.com", company=company_doc.name)

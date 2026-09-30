@@ -56,13 +56,13 @@ def update_website_context(context):
 
 def ensure_desk_bundles():
 	"""Publish hashed desk CSS/JS so first login can load the custom BPO UI."""
-	ensure_hashed_bundle("hrms.bundle.css", ("css", "css-rtl"))
-	ensure_hashed_bundle("hrms.bundle.js", ("js", "js-rtl"))
+	ensure_hashed_bundle("hrms.bundle.css", ("css",))
+	ensure_hashed_bundle("hrms.bundle.js", ("js",))
 
 
 def ensure_ltr_bundle_css():
-	"""Copy the RTL bundle to the LTR path when Docker/Windows skips dist/css."""
-	ensure_hashed_bundle("hrms.bundle.css", ("css", "css-rtl"))
+	"""Publish the LTR desk CSS bundle. Never substitute the RTL build."""
+	ensure_hashed_bundle("hrms.bundle.css", ("css",))
 
 
 def ensure_hashed_bundle(manifest_key: str, folders: tuple[str, ...]):
@@ -86,18 +86,22 @@ def publish_hashed_bundle(
 	manifest_key: str,
 	folders: tuple[str, ...],
 ):
-	"""If the hashed bundle is missing, copy the newest matching file onto that name."""
-	sources = []
-	for folder in folders:
-		directory = app_dist / folder
-		if directory.exists():
-			pattern = f"{Path(manifest_key).stem}.*{Path(manifest_key).suffix}"
-			sources.extend(
-				path
-				for path in directory.glob(pattern)
-				if path.is_file() and path.stat().st_size and not path.name.endswith(".map")
-			)
+	"""Copy the newest bundle from the primary folder onto the hashed asset name.
 
+	Only ``folders[0]`` is used. A mirrored folder such as css-rtl must not be
+	published as the LTR stylesheet the desk loads.
+	"""
+	if not folders:
+		return None
+	directory = app_dist / folders[0]
+	pattern = f"{Path(manifest_key).stem}.*{Path(manifest_key).suffix}"
+	sources = []
+	if directory.exists():
+		sources = [
+			path
+			for path in directory.glob(pattern)
+			if path.is_file() and path.stat().st_size and not path.name.endswith(".map")
+		]
 	if not sources:
 		return None
 
@@ -262,3 +266,60 @@ def _set_if_field(doctype: str, fieldname: str, value: str) -> None:
 	if not frappe.get_meta(doctype).has_field(fieldname):
 		return
 	frappe.db.set_single_value(doctype, fieldname, value)
+
+
+def strip_early_hint_preloads(response=None, **kwargs):
+	"""Drop Link rel=preload headers so proxies do not emit unused Early Hints.
+
+	Frappe advertises website, login, and icon-sprite preloads on the desk
+	response. Render turns those into HTTP 103 Early Hints, and Chrome then
+	reports that the desk never used them. Stylesheets and scripts in the HTML
+	are unchanged.
+	"""
+	response = response if response is not None else kwargs.get("response")
+	if response is None:
+		response = getattr(getattr(frappe, "local", None), "response", None)
+	headers = getattr(response, "headers", None)
+	if headers is None and isinstance(response, dict):
+		headers = response.get("headers", response)
+	if headers is not None:
+		_drop_preload_links(headers)
+	return response
+
+
+def _drop_preload_links(headers) -> None:
+	if hasattr(headers, "getlist"):
+		values = headers.getlist("Link")
+		if not values:
+			return
+		try:
+			del headers["Link"]
+		except KeyError:
+			return
+		for part in _preload_links_to_keep(values):
+			headers.add("Link", part)
+		return
+
+	if isinstance(headers, dict):
+		key = "Link" if "Link" in headers else "link" if "link" in headers else ""
+		if not key:
+			return
+		kept = _preload_links_to_keep([headers.get(key)])
+		if kept:
+			headers[key] = ", ".join(kept)
+		else:
+			headers.pop(key, None)
+
+
+def _preload_links_to_keep(values) -> list[str]:
+	kept = []
+	for value in values:
+		if not value:
+			continue
+		for part in str(value).split(","):
+			part = part.strip()
+			normalized = part.replace(" ", "").lower()
+			if not part or "rel=preload" in normalized or 'rel="preload"' in normalized:
+				continue
+			kept.append(part)
+	return kept

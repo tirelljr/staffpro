@@ -122,3 +122,31 @@ class TestStaffProDeskHome(HRMSTestSuite):
 			self.assertEqual(dest.name, "hrms.bundle.PYHPJZB7.js")
 			self.assertTrue(dest.exists())
 			self.assertIn("window.hrms", dest.read_text(encoding="utf-8"))
+
+	def test_rtl_css_is_not_published_as_the_ltr_bundle(self):
+		with tempfile.TemporaryDirectory() as tmp:
+			app_dist = Path(tmp) / "dist"
+			ltr = app_dist / "css"
+			rtl = app_dist / "css-rtl"
+			ltr.mkdir(parents=True)
+			rtl.mkdir(parents=True)
+			ltr_file = ltr / "hrms.bundle.OLD.css"
+			rtl_file = rtl / "hrms.bundle.NEW.css"
+			ltr_file.write_text("body{direction:ltr}", encoding="utf-8")
+			rtl_file.write_text("body{direction:rtl}", encoding="utf-8")
+			manifest = Path(tmp) / "assets.json"
+			manifest.write_text(
+				json.dumps({"hrms.bundle.css": "/assets/hrms/dist/css/hrms.bundle.LTR999.css"}),
+				encoding="utf-8",
+			)
+
+			dest = publish_hashed_bundle(app_dist, manifest, "hrms.bundle.css", ("css", "css-rtl"))
+			self.assertIsNotNone(dest)
+			self.assertEqual(dest.parent.name, "css")
+			self.assertIn("direction:ltr", dest.read_text(encoding="utf-8"))
+
+			rtl_only = Path(tmp) / "rtl-only"
+			(rtl_only / "css-rtl").mkdir(parents=True)
+			(rtl_only / "css-rtl" / "hrms.bundle.NEW.css").write_text("body{direction:rtl}", encoding="utf-8")
+			missed = publish_hashed_bundle(rtl_only, manifest, "hrms.bundle.css", ("css", "css-rtl"))
+			self.assertIsNone(missed)

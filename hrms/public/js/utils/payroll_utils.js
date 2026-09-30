@@ -86,6 +86,7 @@ hrms.payroll_utils = {
 		const dates = hrms.payroll_utils.preview_period_dates(current);
 		const can_create = Boolean(current.can_create && (current.entries || []).length);
 		const dropped = new Set();
+		const forced = new Set();
 		let editing = false;
 		let $edit = null;
 		const dialog = new frappe.ui.Dialog({
@@ -109,7 +110,7 @@ hrms.payroll_utils = {
 					fieldtype: "Section Break",
 					description: current.simple
 						? __(
-								"Salary is calculated for these agents. Use Edit to drop anyone who should not be paid.",
+								"Salary is calculated for these agents. Use Edit to drop anyone who should not be paid. Agents who joined the company after this pay period are listed separately.",
 							)
 						: __(
 								"Change the pay period to recalculate agents, hours, and who is included.",
@@ -139,7 +140,8 @@ hrms.payroll_utils = {
 				const args = { start_date: period.start, end_date: period.end };
 				if (current.simple) {
 					args.employees = selected_employee_ids();
-					if (!args.employees.length) {
+					args.force_employees = forced_employee_ids();
+					if (!args.employees.length && !args.force_employees.length) {
 						frappe.msgprint(__("Select at least one agent."));
 						return;
 					}
@@ -177,15 +179,31 @@ hrms.payroll_utils = {
 
 		function selected_employee_ids() {
 			return agent_rows()
-				.filter((row) => row.employee && !dropped.has(row.employee))
+				.filter((row) => row.employee && !cint(row.joined_after_period) && !dropped.has(row.employee))
 				.map((row) => row.employee);
 		}
 
+		function forced_employee_ids() {
+			return agent_rows()
+				.filter((row) => row.employee && cint(row.joined_after_period) && forced.has(row.employee))
+				.map((row) => row.employee);
+		}
+
+		function sync_late_defaults() {
+			for (const row of agent_rows()) {
+				if (cint(row.joined_after_period) && row.employee && !forced.has(row.employee)) {
+					dropped.add(row.employee);
+				}
+			}
+		}
+
 		function render_current_html(payload) {
+			sync_late_defaults();
 			if (payload && payload.simple) {
 				return hrms.payroll_utils.render_simple_agent_preview(payload, {
 					editing,
 					dropped,
+					forced,
 				});
 			}
 			return hrms.payroll_utils.render_payroll_preview_html(payload);
@@ -234,6 +252,8 @@ hrms.payroll_utils = {
 			}
 			last_start = period.start;
 			last_end = period.end;
+			dropped.clear();
+			forced.clear();
 			frappe.call({
 				method: preview_method,
 				args: { start_date: period.start, end_date: period.end },
@@ -273,6 +293,20 @@ hrms.payroll_utils = {
 				}
 				apply_preview(current);
 			});
+			summary.$wrapper.on("change", ".payroll-agent-force", function () {
+				const employee = this.getAttribute("data-employee");
+				if (!employee) {
+					return;
+				}
+				if (this.checked) {
+					forced.add(employee);
+					dropped.delete(employee);
+				} else {
+					forced.delete(employee);
+					dropped.add(employee);
+				}
+				apply_preview(current);
+			});
 		}
 
 		const start_field = dialog.get_field("start_date");
@@ -292,10 +326,14 @@ hrms.payroll_utils = {
 		state = state || {};
 		const editing = Boolean(state.editing);
 		const dropped = state.dropped || new Set();
+		const forced = state.forced || new Set();
 		const rows = (((preview.entries || [])[0] || {}).agent_rows || []).slice();
-		const included = rows.filter((row) => !dropped.has(row.employee));
-		const visible = editing ? rows : included;
-		const hours = included.reduce((total, row) => total + flt(row.hours), 0);
+		const regular = rows.filter((row) => !cint(row.joined_after_period));
+		const late = rows.filter((row) => cint(row.joined_after_period));
+		const included = regular.filter((row) => !dropped.has(row.employee));
+		const visible = editing ? regular : included;
+		const forced_rows = late.filter((row) => forced.has(row.employee));
+		const hours = included.concat(forced_rows).reduce((total, row) => total + flt(row.hours), 0);
 		const body = visible.length
 			? visible
 					.map((row) => {
@@ -315,11 +353,18 @@ hrms.payroll_utils = {
 			: `<tr><td colspan="${editing ? 3 : 2}" class="text-muted">${__(
 					"No agents selected. Use Edit to add agents back.",
 				)}</td></tr>`;
+		const forced_count = forced_rows.length;
 		const include_header = editing ? `<th>${__("Include")}</th>` : "";
+		const count_line = forced_count
+			? `<p><b>${included.length}</b> ${__("agents")}, <b>${forced_count}</b> ${__(
+					"force added",
+				)}, <b>${hours.toFixed(2)}</b> ${__("hours")}</p>`
+			: `<p><b>${included.length}</b> ${__("agents")}, <b>${hours.toFixed(2)}</b> ${__("hours")}</p>`;
 		return `
 			<div>
 				<p>${frappe.utils.escape_html(preview.message || "")}</p>
-				<p><b>${included.length}</b> ${__("agents")}, <b>${hours.toFixed(2)}</b> ${__("hours")}</p>
+				${hrms.payroll_utils.render_late_joining_warning(late, forced)}
+				${count_line}
 				<table class="table table-bordered" style="margin-top: 12px;">
 					<thead>
 						<tr>
@@ -333,6 +378,47 @@ hrms.payroll_utils = {
 			</div>
 		`;
 	},
+	render_late_joining_warning(rows, forced) {
+		rows = rows || [];
+		forced = forced || new Set();
+		if (!rows.length) {
+			return "";
+		}
+		const body = rows
+			.map((row) => {
+				const checked = forced.has(row.employee) ? "checked" : "";
+				const joined = row.date_of_joining
+					? frappe.datetime.str_to_user(row.date_of_joining)
+					: "";
+				return `<tr>
+					<td><input type="checkbox" class="payroll-agent-force" data-employee="${frappe.utils.escape_html(
+						row.employee || "",
+					)}" ${checked}></td>
+					<td>${frappe.utils.escape_html(row.employee_name || row.employee || "")}</td>
+					<td>${frappe.utils.escape_html(joined)}</td>
+				</tr>`;
+			})
+			.join("");
+		return `
+			<div class="alert alert-warning" style="margin-top: 12px;">
+				<div><b>${__("Joined after this pay period")}</b></div>
+				<div style="margin-top: 4px;">${__(
+					"These agents joined the company after the pay period ends. Leave Force add unchecked to remove them from this payroll, or check it to pay them anyway.",
+				)}</div>
+				<table class="table table-bordered" style="margin-top: 8px; background: #fff;">
+					<thead>
+						<tr>
+							<th>${__("Force add")}</th>
+							<th>${__("Agent")}</th>
+							<th>${__("Joined")}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+				</table>
+			</div>
+		`;
+	},
+
 	render_payroll_preview_html(preview) {
 		preview = preview || {};
 		const entries = preview.entries || [];
@@ -385,9 +471,31 @@ hrms.payroll_utils = {
 			</div>`
 			: "";
 
+		const late_html = (preview.joined_after || []).length
+			? `<div class="alert alert-warning" style="margin-top: 12px;">
+				<div><b>${__("Joined after this pay period")}</b></div>
+				<div style="margin-top: 4px;">${__(
+					"These agents joined the company after the pay period, so they are not included. To pay them anyway, approve payroll for every agent and choose Force add.",
+				)}</div>
+				<ul style="margin: 6px 0 0; padding-left: 18px;">
+					${preview.joined_after
+						.map((row) => {
+							const joined = row.date_of_joining
+								? frappe.datetime.str_to_user(row.date_of_joining)
+								: "";
+							return `<li>${frappe.utils.escape_html(row.employee_name || row.employee || "")}${
+								joined ? ` — ${frappe.utils.escape_html(joined)}` : ""
+							}</li>`;
+						})
+						.join("")}
+				</ul>
+			</div>`
+			: "";
+
 		return `
 			<div>
 				<p>${frappe.utils.escape_html(preview.message || "")}</p>
+				${late_html}
 				${table}
 				${skipped_html}
 			</div>

@@ -44,6 +44,7 @@ app_include_js = [
 	"/assets/hrms/js/staff_pro_home_redirect.js",
 	"/assets/hrms/js/client_ip.js",
 	"/assets/hrms/js/role_access.js",
+	"/assets/hrms/js/user_quick_entry.js",
 	"hrms.bundle.js",
 ]
 app_include_css = "hrms.bundle.css"
@@ -171,6 +172,8 @@ before_request = [
 	"hrms.hr.role_access.install_list_redaction",
 ]
 
+after_request = ["hrms.branding.strip_early_hint_preloads"]
+
 setup_wizard_requires = "assets/hrms/js/setup_wizard.js"
 setup_wizard_complete = "hrms.hr.staff_pro_sidebars.after_setup_wizard"
 
@@ -261,6 +264,7 @@ doc_events = {
 	},
 	"User": {
 		"onload": "hrms.hr.bpo_user_permissions.filter_user_modules_onload",
+		"before_naming": "hrms.overrides.employee_master.prepare_user_login",
 		"validate": [
 			"erpnext.setup.doctype.employee.employee.validate_employee_role",
 			"hrms.overrides.employee_master.update_approver_user_roles",

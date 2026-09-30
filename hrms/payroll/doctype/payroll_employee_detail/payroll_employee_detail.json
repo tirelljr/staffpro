@@ -12,7 +12,8 @@
   "column_break_3",
   "department",
   "designation",
-  "is_salary_withheld"
+  "is_salary_withheld",
+  "force_include"
  ],
  "fields": [
   {
@@ -77,11 +78,19 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Is Salary Withheld"
+  },
+  {
+   "default": "0",
+   "description": "Pay this agent even though their company join date is after the pay period.",
+   "fieldname": "force_include",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Force Add"
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-08-21 14:00:00.000000",
+ "modified": "2026-09-30 01:40:00.000000",
  "modified_by": "Administrator",
  "module": "Payroll",
  "name": "Payroll Employee Detail",

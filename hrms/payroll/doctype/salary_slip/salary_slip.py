@@ -443,6 +443,16 @@ class SalarySlip(TransactionBase):
 		self.paid_from_bank_account = bank_account
 		self.paid_from_bank = bank_label_for_account(bank_account)
 
+	def allows_joining_after_period(self) -> bool:
+		"""Payroll can force-add an agent whose company join date is after this pay period."""
+		if getattr(frappe.flags, "ignore_joining_after_period", False):
+			return True
+		if not self.payroll_entry or not self.employee:
+			return False
+		from hrms.payroll.doctype.payroll_entry.payroll_entry import employee_force_included
+
+		return employee_force_included(self.payroll_entry, self.employee)
+
 	def validate_dates(self):
 		self.validate_from_to_dates("start_date", "end_date")
 
@@ -451,7 +461,7 @@ class SalarySlip(TransactionBase):
 				_("Please set the Date Of Joining for employee {0}").format(frappe.bold(self.employee_name))
 			)
 
-		if date_diff(self.end_date, self.joining_date) < 0:
+		if date_diff(self.end_date, self.joining_date) < 0 and not self.allows_joining_after_period():
 			frappe.throw(_("Cannot create Salary Slip for Employee joining after Payroll Period"))
 
 		if self.relieving_date and date_diff(self.relieving_date, self.start_date) < 0:
