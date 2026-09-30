@@ -277,8 +277,7 @@ body.staff-pro-has-topbar .body-sidebar-container {
 /* —— Body sidebar (menus + submenus) —— */
 .body-sidebar {
 	position: absolute;
-	left: 0 !important;
-	right: auto !important;
+	left: 0;
 	top: 0;
 	bottom: 0;
 	z-index: 1020;
@@ -773,69 +772,29 @@ body.staff-pro-has-topbar .body-sidebar-container {
 	display: none !important;
 }
 
-/* Desktop keeps the workspace menu open. Collapsing it leaves the blank
-   white column: Frappe sets label opacity to 0 and parks the dock off-screen. */
-@media (min-width: 768px) {
-	.body-sidebar-container:not(.expanded),
-	.body-sidebar-container.sidebar-hidden {
-		flex: 0 0 var(--sidebar-width, 260px) !important;
-		width: var(--sidebar-width, 260px) !important;
-		height: 100% !important;
-		min-height: 100vh !important;
-		min-height: 100dvh !important;
-		overflow: visible !important;
+/* Collapsed submenu — let Frappe hide the panel instead of leaving a white strip */
+.body-sidebar-container:not(.expanded) {
+	width: 0 !important;
+	height: 0 !important;
+	min-height: 0 !important;
+	max-height: none !important;
+	overflow: visible !important;
+
+	.body-sidebar-placeholder {
+		width: 0 !important;
+		height: 0 !important;
 	}
 
-	.body-sidebar-container:not(.expanded) .body-sidebar,
-	.body-sidebar-container.sidebar-hidden .body-sidebar {
-		width: var(--sidebar-width, 260px) !important;
-		height: 100% !important;
-		min-height: 100% !important;
-		opacity: 1 !important;
-		background: #ffffff !important;
-		pointer-events: auto !important;
+	.body-sidebar {
+		width: 0 !important;
+		height: 0 !important;
+		background: transparent !important;
+		border-right-color: transparent !important;
+		pointer-events: none;
 	}
 
-	.body-sidebar-container:not(.expanded) .body-sidebar > *,
-	.body-sidebar-container.sidebar-hidden .body-sidebar > * {
-		opacity: 1 !important;
-		transform: none !important;
-		visibility: visible !important;
-	}
-
-	.body-sidebar-container:not(.expanded) .sidebar-item-label,
-	.body-sidebar-container.sidebar-hidden .sidebar-item-label,
-	.body-sidebar-container:not(.expanded) .avatar-name-email,
-	.body-sidebar-container.sidebar-hidden .avatar-name-email,
-	.body-sidebar-container:not(.expanded) .title-container,
-	.body-sidebar-container.sidebar-hidden .title-container {
-		opacity: 1 !important;
-		visibility: visible !important;
-		width: auto !important;
-		flex: 1 1 auto !important;
-		overflow: visible !important;
-	}
-
-	.dock,
-	.workspace-dock {
-		position: sticky !important;
-		left: auto !important;
-		right: auto !important;
-		transform: none !important;
-	}
-
-	.dock-item,
-	.dock button.dock-item {
-		height: auto !important;
-		overflow: visible !important;
-		color: #000000 !important;
-	}
-
-	.dock-item .dock-item-label,
-	.dock .dock-label {
-		display: block !important;
-		color: #000000 !important;
-		opacity: 1 !important;
+	.body-sidebar .collapse-sidebar-link {
+		display: none !important;
 	}
 }
 

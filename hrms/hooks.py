@@ -172,8 +172,6 @@ before_request = [
 	"hrms.hr.role_access.install_list_redaction",
 ]
 
-after_request = ["hrms.branding.strip_early_hint_preloads"]
-
 setup_wizard_requires = "assets/hrms/js/setup_wizard.js"
 setup_wizard_complete = "hrms.hr.staff_pro_sidebars.after_setup_wizard"
 

@@ -54,6 +54,12 @@
 			.page-container[data-page-route="dashboard-view"] {
 				background: #f4f4f4 !important;
 			}
+			#page-dashboard-view:not(:has(.sp-dash-pills)) .dashboard-graph,
+			#page-dashboard:not(:has(.sp-dash-pills)) .dashboard-graph,
+			.page-container[data-page-route="dashboard-view"]:not(:has(.sp-dash-pills)) .dashboard-graph,
+			#page-dashboard-view:not(:has(.sp-dash-pills)) .dashboard-view > .widget-group,
+			#page-dashboard-view:not(:has(.sp-dash-pills)) .number-widget-area,
+			#page-dashboard-view:not(:has(.sp-dash-pills)) .number-card-container,
 			#page-desktop,
 			#page-apps,
 			.page-container[data-page-route="desktop"],
@@ -65,85 +71,25 @@
 				min-height: 100vh !important;
 				min-height: 100dvh !important;
 			}
-			@media (min-width: 768px) {
-				.dock,
-				.workspace-dock {
-					position: sticky !important;
-					left: auto !important;
-					right: auto !important;
-					transform: none !important;
-					display: flex !important;
-					visibility: visible !important;
-					opacity: 1 !important;
-					flex: 0 0 72px !important;
-					width: 72px !important;
-					height: 100% !important;
-					min-height: calc(100vh - 64px) !important;
-					min-height: calc(100dvh - 64px) !important;
-					background: #ffffff !important;
-				}
-				.dock.hidden,
-				.workspace-dock.hidden,
-				.dock[aria-hidden="true"] {
-					display: flex !important;
-					visibility: visible !important;
-					opacity: 1 !important;
-				}
-				.dock-item,
-				.dock button.dock-item,
-				.workspace-dock button.workspace-dock-item {
-					height: auto !important;
-					min-height: 64px !important;
-					overflow: visible !important;
-					color: #111111 !important;
-				}
-				.dock-item .dock-item-label,
-				.dock .dock-label,
-				.workspace-dock .workspace-dock-label {
-					display: block !important;
-					opacity: 1 !important;
-					visibility: visible !important;
-					color: #111111 !important;
-				}
-				.body-sidebar-container,
-				.body-sidebar-container:not(.expanded),
-				.body-sidebar-container.sidebar-hidden {
-					display: flex !important;
-					flex: 0 0 260px !important;
-					width: 260px !important;
-					height: auto !important;
-					min-height: calc(100vh - 64px) !important;
-					min-height: calc(100dvh - 64px) !important;
-					overflow: visible !important;
-					visibility: visible !important;
-					opacity: 1 !important;
-				}
-				.body-sidebar,
-				.body-sidebar-container:not(.expanded) .body-sidebar,
-				.body-sidebar-container.sidebar-hidden .body-sidebar {
-					left: 0 !important;
-					right: auto !important;
-					width: 260px !important;
-					height: 100% !important;
-					min-height: 100% !important;
-					opacity: 1 !important;
-					visibility: visible !important;
-					background: #ffffff !important;
-					pointer-events: auto !important;
-				}
-				.body-sidebar-container .body-sidebar > *,
-				.body-sidebar-container:not(.expanded) .body-sidebar > *,
-				.body-sidebar-container.sidebar-hidden .body-sidebar > *,
-				.body-sidebar .sidebar-item-label,
-				.body-sidebar .avatar-name-email,
-				.body-sidebar .title-container,
-				.body-sidebar .header-title {
-					opacity: 1 !important;
-					visibility: visible !important;
-					transform: none !important;
-					width: auto !important;
-					color: #111111 !important;
-				}
+			.dock,
+			.workspace-dock,
+			.body-sidebar-container {
+				align-self: stretch !important;
+				height: 100% !important;
+				min-height: 100vh !important;
+				min-height: 100dvh !important;
+				max-height: none !important;
+			}
+			.body-sidebar-container.expanded .body-sidebar,
+			.body-sidebar {
+				height: 100% !important;
+				min-height: 100% !important;
+				max-height: none !important;
+			}
+			.body-sidebar-container:not(.expanded),
+			.body-sidebar-container:not(.expanded) .body-sidebar {
+				height: 0 !important;
+				min-height: 0 !important;
 			}
 		`;
 		(document.head || document.documentElement).appendChild(style);

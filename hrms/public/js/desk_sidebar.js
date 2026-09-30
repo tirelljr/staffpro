@@ -372,7 +372,6 @@ body.staff-pro-has-topbar .body-sidebar-container {
 .body-sidebar {
 	position: absolute !important;
 	left: 0 !important;
-	right: auto !important;
 	top: 0 !important;
 	bottom: 0 !important;
 	z-index: 1020 !important;
@@ -697,71 +696,27 @@ body.staff-pro-has-topbar .body-sidebar-container {
 	stroke: #000000 !important;
 	fill: none !important;
 }
-/* Desktop keeps the menu open. A collapsed Frappe panel is a blank white
-   strip: labels are opacity 0 and the dock icons sit off-screen. */
-@media (min-width: 768px) {
-	.body-sidebar-container:not(.expanded),
-	.body-sidebar-container.sidebar-hidden {
-		flex: 0 0 var(--sidebar-width, 260px) !important;
-		width: var(--sidebar-width, 260px) !important;
-		height: 100% !important;
-		min-height: 100vh !important;
-		min-height: 100dvh !important;
-		max-height: none !important;
-		overflow: visible !important;
-	}
-	.body-sidebar-container:not(.expanded) .body-sidebar,
-	.body-sidebar-container.sidebar-hidden .body-sidebar {
-		width: var(--sidebar-width, 260px) !important;
-		height: 100% !important;
-		min-height: 100% !important;
-		opacity: 1 !important;
-		background: #ffffff !important;
-		border-right-color: #ececec !important;
-		pointer-events: auto !important;
-	}
-	.body-sidebar-container:not(.expanded) .body-sidebar > *,
-	.body-sidebar-container.sidebar-hidden .body-sidebar > * {
-		opacity: 1 !important;
-		transform: none !important;
-		visibility: visible !important;
-	}
-	.body-sidebar-container:not(.expanded) .sidebar-item-label,
-	.body-sidebar-container.sidebar-hidden .sidebar-item-label,
-	.body-sidebar-container:not(.expanded) .avatar-name-email,
-	.body-sidebar-container.sidebar-hidden .avatar-name-email,
-	.body-sidebar-container:not(.expanded) .title-container,
-	.body-sidebar-container.sidebar-hidden .title-container {
-		opacity: 1 !important;
-		visibility: visible !important;
-		width: auto !important;
-		min-width: 0 !important;
-		flex: 1 1 auto !important;
-		overflow: visible !important;
-	}
-	.dock,
-	.workspace-dock {
-		position: sticky !important;
-		left: auto !important;
-		right: auto !important;
-		transform: none !important;
-		translate: none !important;
-	}
-	.dock-item,
-	.dock button.dock-item,
-	.workspace-dock button.workspace-dock-item {
-		height: auto !important;
-		overflow: visible !important;
-		color: #000000 !important;
-	}
-	.dock-item .dock-item-label,
-	.dock .dock-label,
-	.workspace-dock .workspace-dock-label {
-		display: block !important;
-		opacity: 1 !important;
-		color: #000000 !important;
-		visibility: visible !important;
-	}
+.body-sidebar-container:not(.expanded) {
+	width: 0 !important;
+	height: 0 !important;
+	min-height: 0 !important;
+	max-height: none !important;
+	overflow: visible !important;
+}
+.body-sidebar-container:not(.expanded) .body-sidebar-placeholder {
+	width: 0 !important;
+	height: 0 !important;
+}
+.body-sidebar-container:not(.expanded) .body-sidebar {
+	width: 0 !important;
+	height: 0 !important;
+	min-height: 0 !important;
+	background: transparent !important;
+	border-right-color: transparent !important;
+	pointer-events: none;
+}
+.body-sidebar-container:not(.expanded) .body-sidebar .collapse-sidebar-link {
+	display: none !important;
 }
 
 body.staff-pro-hide-form-sidebar .layout-side-section.right,
@@ -1762,25 +1717,13 @@ function keep_staff_pro_sidebar_expanded() {
 	patch_sidebar_expand_guard();
 	if (!should_use_staff_pro_desk_home()) return;
 	if (typeof frappe.is_mobile === "function" && frappe.is_mobile()) return;
+	const sidebar = frappe.app?.sidebar;
+	if (!sidebar?.open) return;
 	try {
 		localStorage.setItem("sidebar-expanded", "true");
 	} catch (e) {
 		/* ignore */
 	}
-	document.body.classList.add("dock-open", "dock-pinned", "dock-active");
-	document.body.classList.remove("sidebar-collapsed");
-	document.querySelectorAll(".body-sidebar-container").forEach((el) => {
-		el.classList.add("expanded");
-		el.classList.remove("sidebar-hidden");
-	});
-	const dock = staff_pro_dock_instance();
-	if (dock) {
-		dock.enabled = true;
-		dock.is_open = true;
-		dock.is_pinned = true;
-	}
-	const sidebar = frappe.app?.sidebar;
-	if (!sidebar?.open) return;
 	sidebar.sidebar_expanded = true;
 	if (!sidebar_can_toggle_width(sidebar)) return;
 	try {
@@ -2369,8 +2312,7 @@ function pin_staff_pro_dock() {
 		Dock.prototype.apply_open_state = function () {
 			this.enabled = true;
 			this.is_open = true;
-			this.is_pinned = true;
-			$("body").addClass("dock-open dock-pinned dock-active");
+			$("body").addClass("dock-open dock-active");
 			this.$dock?.removeClass("hidden").attr("aria-hidden", "false").prop("inert", false);
 			if (typeof original_apply === "function") {
 				try {
@@ -2392,10 +2334,8 @@ function pin_staff_pro_dock() {
 	if (dock) {
 		dock.enabled = true;
 		dock.is_open = true;
-		dock.is_pinned = true;
 		dock.apply_open_state?.();
 	}
-	$("body").addClass("dock-open dock-pinned dock-active");
 	$(".dock, .workspace-dock")
 		.removeClass("hidden")
 		.attr("aria-hidden", "false")
@@ -2591,7 +2531,6 @@ function watch_workspace_dock() {
 			render_staff_pro_dock_integrations();
 			remove_sidebar_search();
 			pin_staff_pro_dock();
-			keep_staff_pro_sidebar_expanded();
 			enhance_sidebar_menus();
 			style_sidebar_collapse_toggle();
 			disable_app_onboarding();
