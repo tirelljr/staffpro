@@ -28,7 +28,6 @@ html, body {
 	min-height: 100vh !important;
 	min-height: 100dvh !important;
 	max-height: none !important;
-	display: flex !important;
 	flex-direction: column !important;
 	align-items: center !important;
 	background: #ffffff !important;
@@ -36,20 +35,18 @@ html, body {
 	padding: 10px 0 12px !important;
 	transform: none !important;
 	translate: none !important;
-	visibility: visible !important;
-	opacity: 1 !important;
-	pointer-events: auto !important;
 	z-index: 2 !important;
 }
-.workspace-dock.hidden,
-.dock.hidden,
-.dock[aria-hidden="true"],
-.workspace-dock[aria-hidden="true"] {
+.workspace-dock:not(.hidden),
+.dock:not(.hidden) {
 	display: flex !important;
 	visibility: visible !important;
 	opacity: 1 !important;
-	transform: none !important;
-	translate: none !important;
+	pointer-events: auto !important;
+}
+.workspace-dock.hidden,
+.dock.hidden {
+	display: none !important;
 }
 body.staff-pro-has-topbar .workspace-dock,
 body.staff-pro-has-topbar .dock {
@@ -414,6 +411,7 @@ body.staff-pro-has-topbar .body-sidebar-container {
 }
 .dock-item,
 .dock-item svg,
+.dock-item use,
 .dock-item .icon,
 .dock-item img,
 .workspace-dock-item svg,
@@ -421,6 +419,7 @@ body.staff-pro-has-topbar .body-sidebar-container {
 	opacity: 1 !important;
 	visibility: visible !important;
 	--icon-motion-opacity: 1;
+	--icon-stroke: currentColor;
 }
 .body-sidebar .body-sidebar-top,
 .body-sidebar .sidebar-items {
@@ -1852,17 +1851,26 @@ function keep_staff_pro_sidebar_expanded() {
 	}
 }
 
+function staff_pro_select_shell(sidebar, name) {
+	if (!sidebar || !name) return;
+	if (typeof sidebar.select_shell === "function") {
+		sidebar.select_shell(name);
+	} else if (typeof sidebar.select_module === "function") {
+		sidebar.select_module(name);
+	} else if (typeof sidebar.setup === "function") {
+		sidebar.setup(name);
+	} else if (typeof sidebar.select_sidebar === "function") {
+		sidebar.select_sidebar(name);
+	}
+}
+
 function staff_pro_activate_sidebar(name) {
 	const sidebar = frappe.app?.sidebar;
 	staff_pro_remember_sidebar(name);
 	if (!sidebar || !name) return;
 	sidebar._staff_pro_pinned_sidebar = name;
 	keep_staff_pro_sidebar_expanded();
-	if (typeof sidebar.select_module === "function") {
-		sidebar.select_module(name);
-	} else if (staff_pro_sidebar_payload(name) && typeof sidebar.select_sidebar === "function") {
-		sidebar.select_sidebar(name);
-	}
+	staff_pro_select_shell(sidebar, name);
 	sidebar.refresh_header?.();
 	sidebar.refresh_dock?.();
 }
@@ -2154,15 +2162,21 @@ function patch_sidebar_workspace_switch() {
 	// runs on that route change and restores _staff_pro_pinned_sidebar. If the pin is
 	// still the previous workspace, the new submenu is built and immediately replaced,
 	// so the user has to click the dock icon again once the route is already current.
-	const originalSelectModule = Sidebar.prototype.select_module;
+	const originalSelectModule = Sidebar.prototype.select_module || Sidebar.prototype.select_shell;
 	if (typeof originalSelectModule === "function") {
-		Sidebar.prototype.select_module = function (module) {
+		const patched = function (module) {
 			if (should_use_staff_pro_desk_home() && module) {
 				this._staff_pro_pinned_sidebar = module;
 				staff_pro_remember_sidebar(module);
 			}
 			return originalSelectModule.call(this, module);
 		};
+		if (Sidebar.prototype.select_module) {
+			Sidebar.prototype.select_module = patched;
+		}
+		if (Sidebar.prototype.select_shell) {
+			Sidebar.prototype.select_shell = patched;
+		}
 	}
 
 	const originalOpenWorkspace = Sidebar.prototype.open_workspace;
@@ -2197,46 +2211,31 @@ function patch_sidebar_workspace_switch() {
 
 	const originalSetWorkspaceSidebar = Sidebar.prototype.set_workspace_sidebar;
 	Sidebar.prototype.set_workspace_sidebar = function () {
-		if (should_use_staff_pro_desk_home()) {
-			const portal = staff_pro_current_portal();
-			let pinned = this._staff_pro_pinned_sidebar;
-			const current = this.current_module || this.sidebar_title;
+		const result = originalSetWorkspaceSidebar.call(this);
+		if (!should_use_staff_pro_desk_home()) return result;
 
-			if (portal === "hr" && pinned && !staff_pro_is_hr_sidebar(pinned)) {
-				this._staff_pro_pinned_sidebar = null;
-				pinned = null;
-			}
-
-			if (
-				pinned &&
-				staff_pro_sidebar_payload(pinned) &&
-				(portal !== "hr" || staff_pro_is_hr_sidebar(pinned))
-			) {
-				if (typeof this.select_module === "function") {
-					this.select_module(pinned);
-				} else {
-					this.select_sidebar?.(pinned);
-				}
-				this.set_active_workspace_item?.();
-				this.refresh_dock?.();
-				return;
-			}
-
-			if (portal === "hr" && !staff_pro_is_hr_sidebar(current)) {
-				const home = staff_pro_hr_home_sidebar();
-				staff_pro_remember_sidebar(home);
-				if (typeof this.select_module === "function") {
-					this.select_module(home);
-				} else {
-					this.select_sidebar?.(home);
-				}
-				this.set_active_workspace_item?.();
-				this.refresh_header?.();
-				this.refresh_dock?.();
-				return;
-			}
+		const portal = staff_pro_current_portal();
+		let pinned = this._staff_pro_pinned_sidebar;
+		if (portal === "hr" && pinned && !staff_pro_is_hr_sidebar(pinned)) {
+			this._staff_pro_pinned_sidebar = null;
+			pinned = null;
 		}
-		return originalSetWorkspaceSidebar.call(this);
+
+		let target = null;
+		if (pinned && staff_pro_sidebar_payload(pinned) && (portal !== "hr" || staff_pro_is_hr_sidebar(pinned))) {
+			target = pinned;
+		} else if (portal === "hr" && !staff_pro_is_hr_sidebar(this.current_module)) {
+			target = staff_pro_hr_home_sidebar();
+			staff_pro_remember_sidebar(target);
+		}
+
+		if (target && staff_pro_sidebar_payload(target) && target !== this.current_module) {
+			staff_pro_select_shell(this, target);
+			this.set_active_workspace_item?.();
+			this.refresh_header?.();
+			this.refresh_dock?.();
+		}
+		return result;
 	};
 }
 
@@ -2420,8 +2419,39 @@ function patch_standard_items_band() {
 	};
 }
 
+function patch_staff_pro_sidebar_app() {
+	const Sidebar = frappe.ui && frappe.ui.Sidebar;
+	if (!Sidebar?.prototype || Sidebar.prototype._staff_pro_app_fallback) return;
+	Sidebar.prototype._staff_pro_app_fallback = true;
+
+	const originalApp = Sidebar.prototype.get_sidebar_app;
+	Sidebar.prototype.get_sidebar_app = function () {
+		const app = typeof originalApp === "function" ? originalApp.apply(this, arguments) : null;
+		if (app) return app;
+		const data = frappe.boot?.app_data || [];
+		return data.find((entry) => entry?.app_name === "hrms") || data[0] || null;
+	};
+
+	const originalEnabled = Sidebar.prototype.dock_enabled;
+	if (typeof originalEnabled === "function") {
+		Sidebar.prototype.dock_enabled = function () {
+			if (originalEnabled.apply(this, arguments)) return true;
+			if (!should_use_staff_pro_desk_home()) return false;
+			const data = frappe.boot?.app_data || [];
+			const hrms = data.find((entry) => entry?.app_name === "hrms");
+			return this.collect_dock_entries(hrms).length > 0;
+		};
+	}
+}
+
 function pin_staff_pro_dock() {
 	if (!should_use_staff_pro_desk_home()) return;
+	patch_staff_pro_sidebar_app();
+
+	if (frappe.boot) {
+		frappe.boot.desk_settings = frappe.boot.desk_settings || {};
+		frappe.boot.desk_settings.dock_mode = "Pinned";
+	}
 
 	const Dock = staff_pro_dock_class();
 	if (Dock?.prototype && !Dock.prototype._staff_pro_always_visible) {
@@ -2432,6 +2462,7 @@ function pin_staff_pro_dock() {
 			this.enabled = true;
 			this.is_open = true;
 			this.is_pinned = true;
+			this.pinned = true;
 			$("body").addClass("dock-open dock-pinned dock-active");
 			this.$dock?.removeClass("hidden").attr("aria-hidden", "false").prop("inert", false);
 			if (typeof original_apply === "function") {
@@ -2455,11 +2486,20 @@ function pin_staff_pro_dock() {
 		dock.enabled = true;
 		dock.is_open = true;
 		dock.is_pinned = true;
+		dock.pinned = true;
+		dock.$dock?.removeClass("hidden").attr("aria-hidden", "false").prop("inert", false);
+		if (!dock.$items?.children()?.length) {
+			try {
+				dock.refresh?.();
+			} catch (e) {
+				/* sidebar app may not be resolved yet */
+			}
+		}
+		dock.apply_pin?.();
 		dock.apply_open_state?.();
 	}
 	$("body").addClass("dock-open dock-pinned dock-active");
-	$(".dock, .workspace-dock")
-		.removeClass("hidden")
+	$(".dock:not(.hidden), .workspace-dock:not(.hidden)")
 		.attr("aria-hidden", "false")
 		.prop("inert", false);
 }
@@ -2637,6 +2677,9 @@ function watch_workspace_dock() {
 	enhance_sidebar_menus();
 	style_sidebar_collapse_toggle();
 	keep_staff_pro_sidebar_expanded();
+	if (should_use_staff_pro_desk_home() && frappe.app?.sidebar && !frappe.app.sidebar.current_module) {
+		staff_pro_activate_sidebar(staff_pro_hr_home_sidebar());
+	}
 
 	const dock = document.querySelector(".dock, .workspace-dock");
 	const sidebar = document.querySelector(".body-sidebar");

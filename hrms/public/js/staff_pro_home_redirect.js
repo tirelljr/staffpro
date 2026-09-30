@@ -54,12 +54,6 @@
 			.page-container[data-page-route="dashboard-view"] {
 				background: #f4f4f4 !important;
 			}
-			#page-dashboard-view:not(:has(.sp-dash-pills)) .dashboard-graph,
-			#page-dashboard:not(:has(.sp-dash-pills)) .dashboard-graph,
-			.page-container[data-page-route="dashboard-view"]:not(:has(.sp-dash-pills)) .dashboard-graph,
-			#page-dashboard-view:not(:has(.sp-dash-pills)) .dashboard-view > .widget-group,
-			#page-dashboard-view:not(:has(.sp-dash-pills)) .number-widget-area,
-			#page-dashboard-view:not(:has(.sp-dash-pills)) .number-card-container,
 			#page-desktop,
 			#page-apps,
 			.page-container[data-page-route="desktop"],
@@ -78,8 +72,8 @@
 				background: transparent !important;
 			}
 			@media (min-width: 768px) {
-				.dock,
-				.workspace-dock {
+				.dock:not(.hidden),
+				.workspace-dock:not(.hidden) {
 					position: sticky !important;
 					left: auto !important;
 					right: auto !important;
@@ -94,10 +88,8 @@
 					min-height: calc(100dvh - 64px) !important;
 					background: #ffffff !important;
 				}
-				.dock.hidden,
-				.workspace-dock.hidden,
-				.dock[aria-hidden="true"],
-				.workspace-dock[aria-hidden="true"] {
+				body.dock-active .dock:not(.hidden),
+				body.dock-pinned .dock:not(.hidden) {
 					display: flex !important;
 					visibility: visible !important;
 					opacity: 1 !important;
@@ -120,11 +112,28 @@
 				}
 				.dock-item,
 				.dock-item svg,
+				.dock-item use,
 				.dock-item .icon,
 				.dock-item img {
 					opacity: 1 !important;
 					visibility: visible !important;
-					--icon-motion-opacity: 1;
+					--icon-motion-opacity: 1 !important;
+					--icon-stroke: #111111;
+					color: #111111 !important;
+				}
+				.dock .dock-item-label {
+					display: block !important;
+				}
+				.body-sidebar-container:not(.expanded) .body-sidebar .sidebar-item-label,
+				.body-sidebar-container.sidebar-hidden .body-sidebar .sidebar-item-label,
+				.body-sidebar-container:not(.expanded) .body-sidebar .avatar-name-email,
+				.body-sidebar-container.sidebar-hidden .body-sidebar .avatar-name-email {
+					flex: 1 1 auto !important;
+					min-width: 0 !important;
+					width: auto !important;
+					overflow: visible !important;
+					opacity: 1 !important;
+					visibility: visible !important;
 					color: #111111 !important;
 				}
 				.body-sidebar-container,

@@ -828,6 +828,8 @@ body.staff-pro-has-topbar .body-sidebar-container {
 		opacity: 1 !important;
 		visibility: visible !important;
 		transform: none !important;
+		flex: 1 1 auto !important;
+		min-width: 0 !important;
 		width: auto !important;
 		overflow: visible !important;
 	}
