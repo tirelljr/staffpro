@@ -12,27 +12,21 @@ frappe.ui.form.UserQuickEntryForm = class UserQuickEntryForm extends frappe.ui.f
 
 	set_meta_and_mandatory_fields() {
 		super.set_meta_and_mandatory_fields();
-		const fields = [];
-		for (const df of this.docfields) {
-			if (df.fieldname === "role_profiles") continue;
-			if (df.fieldname === "email") {
-				fields.push({
-					...df,
-					label: __("Username"),
-					fieldtype: "Data",
-					options: "",
-					reqd: 1,
-				});
-				continue;
-			}
-			fields.push(df);
-		}
+		const fields = this.docfields.filter(
+			(df) => !["email", "first_name", "role_profiles"].includes(df.fieldname)
+		);
+		fields.unshift({
+			fieldname: "login_name",
+			fieldtype: "Data",
+			label: __("Username"),
+			reqd: 1,
+		});
 		fields.push({
-			fieldname: "roles",
+			fieldname: "desk_roles",
 			fieldtype: "Table MultiSelect",
 			label: __("Roles"),
 			options: "Has Role",
-			reqd: 0,
+			reqd: 1,
 		});
 		this.docfields = fields;
 	}
@@ -44,9 +38,9 @@ frappe.ui.form.UserQuickEntryForm = class UserQuickEntryForm extends frappe.ui.f
 			return Promise.resolve();
 		}
 
-		const username = (data.email || "").trim();
+		const username = (data.login_name || "").trim();
 		if (!username || username.includes("@")) {
-			this.working = false;
+			this.dialog.working = false;
 			frappe.msgprint(__("Use a username, not an email address."));
 			return Promise.resolve();
 		}
@@ -58,7 +52,7 @@ frappe.ui.form.UserQuickEntryForm = class UserQuickEntryForm extends frappe.ui.f
 					username,
 					first_name: data.first_name,
 					last_name: data.last_name,
-					roles: data.roles || [],
+					roles: data.desk_roles || [],
 				},
 				callback(r) {
 					if (r?.message) {
