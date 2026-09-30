@@ -1371,7 +1371,44 @@ function staff_pro_can_access_hr() {
 	return should_use_staff_pro_desk_home();
 }
 
+function staff_pro_my_work_url() {
+	return frappe.boot?.staff_pro_my_work_portal || "/agents";
+}
+
+function staff_pro_show_my_work_portal() {
+	return Boolean(frappe.boot?.staff_pro_show_my_work_portal);
+}
+
+function staff_pro_open_my_work_portal() {
+	window.location.href = staff_pro_my_work_url();
+}
+
+function inject_my_work_sidebar_link() {
+	if (!staff_pro_show_my_work_portal()) return;
+	const $items = $(".body-sidebar .sidebar-items").first();
+	if (!$items.length || $items.find(".staff-pro-my-work-link").length) return;
+
+	const url = frappe.utils.escape_html(staff_pro_my_work_url());
+	const label = frappe.utils.escape_html(__("My Work"));
+	const glyph = PARENT_GLYPHS.person;
+	$items.prepend(`
+		<div class="standard-sidebar-item staff-pro-my-work-link">
+			<a href="${url}" class="item-anchor" title="${label}">
+				<div class="sidebar-item-icon staff-pro-glyph">${glyph}</div>
+				<span class="sidebar-item-label">${label}</span>
+			</a>
+		</div>
+	`);
+	$items.find(".staff-pro-my-work-link .item-anchor").on("click", (e) => {
+		e.preventDefault();
+		staff_pro_open_my_work_portal();
+	});
+}
+
 function shortcut_label($item) {
+	if ($item.hasClass("staff-pro-dock-my-work")) {
+		return __("My Work");
+	}
 	if ($item.hasClass("staff-pro-dock-hr")) {
 		return __("HR");
 	}
@@ -1458,6 +1495,17 @@ function staff_pro_open_portal(key) {
 function staff_pro_dock_shortcuts() {
 	const portal = staff_pro_current_portal();
 	const shortcuts = [];
+
+	if (staff_pro_show_my_work_portal()) {
+		shortcuts.push({
+			name: "my-work",
+			icon: "user",
+			label: __("My Work"),
+			css_class: "staff-pro-dock-my-work",
+			condition: () => true,
+			on_click: () => staff_pro_open_my_work_portal(),
+		});
+	}
 
 	if (portal !== "hr") {
 		shortcuts.push({
@@ -1805,7 +1853,7 @@ function refresh_staff_pro_dock_shortcuts() {
 	const hasExpectedShortcuts = expectedShortcuts.length
 		? Boolean(
 				dock.$shortcuts.children(
-					".staff-pro-dock-hr, .staff-pro-dock-accounting, .staff-pro-dock-admin"
+					".staff-pro-dock-hr, .staff-pro-dock-accounting, .staff-pro-dock-admin, .staff-pro-dock-my-work"
 				).length
 			)
 		: true;
@@ -2112,6 +2160,7 @@ function watch_workspace_dock() {
 	remove_sidebar_search();
 	enhance_sidebar_menus();
 	style_sidebar_collapse_toggle();
+	inject_my_work_sidebar_link();
 
 	const dock = document.querySelector(".dock, .workspace-dock");
 	const sidebar = document.querySelector(".body-sidebar");
@@ -2130,6 +2179,7 @@ function watch_workspace_dock() {
 			remove_sidebar_search();
 			enhance_sidebar_menus();
 			style_sidebar_collapse_toggle();
+			inject_my_work_sidebar_link();
 			disable_app_onboarding();
 			disable_sidebar_help();
 		} catch (e) {

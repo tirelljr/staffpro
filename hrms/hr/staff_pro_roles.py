@@ -26,6 +26,7 @@ AGENT_PORTAL_ROLES = frozenset({"Employee Self Service", "Employee"})
 
 HR_ASSISTANT_ROLE = "HR Assistant"
 HR_PERMISSION_SOURCE_ROLE = "HR User"
+MY_WORK_PORTAL_PATH = "/agents"
 
 DOC_PERM_PTYPES = (
 	"permlevel",
@@ -54,6 +55,22 @@ def user_roles(user: str | None = None) -> set[str]:
 
 def is_staff_pro_hr_desk_user(user: str | None = None) -> bool:
 	return bool(user_roles(user) & STAFF_PRO_HR_DESK_ROLES)
+
+
+def is_hr_assistant_user(user: str | None = None) -> bool:
+	return HR_ASSISTANT_ROLE in user_roles(user)
+
+
+def linked_active_employee(user: str | None = None) -> str | None:
+	user = user or frappe.session.user
+	if not user or user == "Guest":
+		return None
+	return frappe.db.get_value("Employee", {"user_id": user, "status": "Active"}, "name")
+
+
+def can_use_my_work_portal(user: str | None = None) -> bool:
+	"""HR Assistants with an active Employee record may open the agent PWA."""
+	return is_hr_assistant_user(user) and bool(linked_active_employee(user))
 
 
 def is_agent_portal_user(user: str | None = None) -> bool:
@@ -159,10 +176,23 @@ def clear_employee_user_permissions_for_users(role: str) -> None:
 		frappe.db.delete("User Permission", {"user": user, "allow": "Employee"})
 
 
+def merge_ess_docperms_for_hr_assistant() -> None:
+	from hrms.setup import get_user_types_data
+
+	ess_doctypes = get_user_types_data().get("Employee Self Service", {}).get("doctypes", {})
+	for doctype, perms in ess_doctypes.items():
+		if not frappe.db.exists("DocType", doctype):
+			continue
+		add_permission(doctype, HR_ASSISTANT_ROLE, permlevel=0)
+		for ptype in perms:
+			update_permission_property(doctype, HR_ASSISTANT_ROLE, permlevel=0, ptype=ptype, value=1)
+
+
 def sync_hr_assistant_permissions() -> None:
 	ensure_hr_assistant_role()
 	if frappe.db.exists("Role", HR_PERMISSION_SOURCE_ROLE):
 		copy_role_docperms(HR_PERMISSION_SOURCE_ROLE, HR_ASSISTANT_ROLE)
 		mirror_role_sidebar_tables(HR_PERMISSION_SOURCE_ROLE, HR_ASSISTANT_ROLE)
+	merge_ess_docperms_for_hr_assistant()
 	clear_employee_user_permissions_for_users(HR_ASSISTANT_ROLE)
 	frappe.clear_cache()

@@ -4,10 +4,25 @@ const DESK_ROLES = new Set([
 	"System Manager",
 	"HR Manager",
 	"HR User",
+	"HR Assistant",
 	"Accounts Manager",
 	"Accounts User",
 	"Payroll Manager",
 ])
+
+export const HR_ASSISTANT_ROLE = "HR Assistant"
+
+export function isHrAssistant(user) {
+	if (!user?.roles?.length) return false
+	return user.roles.includes(HR_ASSISTANT_ROLE)
+}
+
+/**
+ * HR Assistants who are also active employees use the /agents PWA for clock-in and self-service.
+ */
+export function canUseMyWorkPortal(user) {
+	return isHrAssistant(user)
+}
 
 /**
  * True when the user should see the Desk bridge from the employee PWA.

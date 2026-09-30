@@ -20,7 +20,7 @@ import { session } from "@/data/session"
 import { userResource } from "@/data/user"
 import { employeeResource } from "@/data/employee"
 import { syncNotificationResources } from "@/data/notifications"
-import { canOpenDesk } from "@/utils/deskAccess"
+import { canOpenDesk, canUseMyWorkPortal } from "@/utils/deskAccess"
 
 import dayjs from "@/utils/dayjs"
 import getIonicConfig from "@/utils/ionicConfig"
@@ -147,8 +147,12 @@ router.beforeEach(async (to, _, next) => {
 		return next()
 	}
 
-	// Desk admins opening /agents land on the kiosk, not their employee dashboard.
-	if (canOpenDesk(userResource.data) && KIOSK_HOME_ROUTES.has(to.name)) {
+	// Desk admins opening /agents land on the kiosk, except HR Assistants using My Work.
+	if (
+		canOpenDesk(userResource.data) &&
+		!canUseMyWorkPortal(userResource.data) &&
+		KIOSK_HOME_ROUTES.has(to.name)
+	) {
 		return next({ name: "Login" })
 	}
 

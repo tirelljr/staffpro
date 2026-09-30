@@ -1,6 +1,12 @@
 import frappe
 from frappe import _
 
+from hrms.hr.staff_pro_roles import (
+	MY_WORK_PORTAL_PATH,
+	can_use_my_work_portal,
+	is_agent_portal_user,
+)
+
 BPO_DOCTYPE_UI_MESSAGES = {
 	"Designation": "Role",
 	"Designations": "Roles",
@@ -42,8 +48,6 @@ STAFF_PRO_BRAND = {
 	"title": "Staff Pro BPO",
 	"logo_url": "/assets/hrms/images/staff-pro-bpo-logo.png",
 }
-from hrms.hr.staff_pro_roles import is_agent_portal_user
-
 EMPLOYEE_ONLY_ROLES = frozenset({"Employee Self Service"})
 # Unified workspaces may be opened as dashboards by title/name; map to real Dashboard docs.
 WORKSPACE_DASHBOARD_ALIASES = {
@@ -261,6 +265,8 @@ def extend_bootinfo(bootinfo):
 			full_name = frappe.utils.get_fullname(user) or ""
 			first_name = full_name.split()[0] if full_name else ""
 	bootinfo["staff_pro_user"] = {"first_name": first_name}
+	bootinfo["staff_pro_my_work_portal"] = MY_WORK_PORTAL_PATH
+	bootinfo["staff_pro_show_my_work_portal"] = can_use_my_work_portal(user)
 	bootinfo["staff_pro_bpo_sidebar_labels"] = get_sidebar_label_maps()
 	apply_payroll_frequency_translations(bootinfo)
 	_filter_bpo_workspace_sidebars(bootinfo)

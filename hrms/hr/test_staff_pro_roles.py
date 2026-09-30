@@ -6,7 +6,11 @@ from frappe.tests import IntegrationTestCase
 
 from hrms.boot import is_staff_pro_desk_admin
 from hrms.hr.staff_pro_desk_permissions import can_access_sidebar_link, filter_sidebar_rows
-from hrms.hr.staff_pro_roles import is_agent_portal_user, is_staff_pro_hr_desk_user
+from hrms.hr.staff_pro_roles import (
+	can_use_my_work_portal,
+	is_agent_portal_user,
+	is_staff_pro_hr_desk_user,
+)
 from hrms.tests.test_utils import HRMSTestSuite
 
 
@@ -52,6 +56,10 @@ class TestStaffProRoles(HRMSTestSuite):
 			doc.insert()
 		self.assertTrue(is_agent_portal_user(user))
 		self.assertFalse(is_staff_pro_desk_admin(user))
+
+	def test_hr_assistant_my_work_requires_linked_employee(self):
+		user = "test_hr_assistant@example.com"
+		self.assertFalse(can_use_my_work_portal(user))
 
 	def test_hr_assistant_keeps_employee_sidebar_link(self):
 		user = "test_hr_assistant@example.com"

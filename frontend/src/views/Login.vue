@@ -206,7 +206,7 @@ import { IonPage, IonContent } from "@ionic/vue"
 import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { Input, Button, ErrorMessage, Dialog, createResource, call, debounce } from "frappe-ui"
 import { STAFF_PRO_LOGO_URL } from "@/utils/branding"
-import { canOpenDesk } from "@/utils/deskAccess"
+import { canOpenDesk, canUseMyWorkPortal } from "@/utils/deskAccess"
 import { scanClientIpv4, isPlaceholderPeerIpv4 } from "@/utils/clientIp"
 import {
 	forgetPassword,
@@ -252,7 +252,9 @@ const session = inject("$session")
 const userResource = inject("$user")
 const __ = inject("$translate")
 const dayjs = inject("$dayjs")
-const portalBlocked = computed(() => canOpenDesk(userResource?.data))
+const portalBlocked = computed(
+	() => canOpenDesk(userResource?.data) && !canUseMyWorkPortal(userResource?.data),
+)
 
 const liveProfile = ref(null)
 const selectedRemembered = computed(() => getRememberedUser(username.value))
