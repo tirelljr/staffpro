@@ -231,6 +231,27 @@ body.staff-pro-has-topbar .dock {
 	margin: 0 0 8px !important;
 }
 
+.dock .dock-user,
+#desk-dock .dock-user {
+	overflow: visible;
+	flex: 0 0 auto;
+	margin-top: auto;
+}
+
+.dock button.dock-item.dock-user-button,
+#desk-dock button.dock-user-button {
+	width: 40px;
+	height: 40px;
+	min-height: 40px;
+	padding: 0;
+	border-radius: 999px;
+}
+
+.es-menu,
+.staff-pro-dock-user-menu {
+	z-index: 2300;
+}
+
 /* Keep Frappe's overlay sidebar: the placeholder reserves width so the
    submenu sits next to the dock instead of being clipped behind main content. */
 .body-sidebar-container {

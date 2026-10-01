@@ -1,0 +1,78 @@
+body.staff-pro-alive #page-backups,
+body.staff-pro-alive .page-container[data-page-route="backups"] {
+	background: var(--sp-canvas, #f4f4f4) !important;
+}
+
+body.staff-pro-alive #page-backups .layout-main-section,
+body.staff-pro-alive .page-container[data-page-route="backups"] .layout-main-section {
+	background: transparent !important;
+	border: 0 !important;
+	box-shadow: none !important;
+	padding: 8px 20px 32px !important;
+}
+
+.sp-backups-page {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	max-width: 920px;
+}
+
+.sp-backups-card {
+	background: var(--sp-surface, #fff);
+	border: 1px solid var(--sp-line, #e5e7eb);
+	border-radius: 12px;
+	padding: 20px;
+}
+
+.sp-backups-card h2 {
+	margin: 0 0 8px;
+	font-size: 16px;
+	font-weight: 650;
+}
+
+.sp-backups-note,
+.sp-backups-empty {
+	margin: 0 0 16px;
+	color: var(--sp-muted, #6b7280);
+	font-size: 13px;
+}
+
+.sp-backups-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px 16px;
+	margin-bottom: 8px;
+}
+
+.sp-backups-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.sp-backups-table th,
+.sp-backups-table td {
+	padding: 8px 10px;
+	text-align: left;
+	border-bottom: 1px solid var(--sp-line, #e5e7eb);
+	vertical-align: middle;
+}
+
+.sp-backups-table th {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--sp-muted, #6b7280);
+}
+
+.sp-backups-table td:last-child,
+.sp-backups-table th:last-child {
+	text-align: right;
+	width: 110px;
+}
+
+@media (max-width: 720px) {
+	.sp-backups-grid {
+		grid-template-columns: 1fr;
+	}
+}

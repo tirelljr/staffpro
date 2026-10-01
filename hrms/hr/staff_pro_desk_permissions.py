@@ -9,17 +9,12 @@ import frappe
 
 from hrms.hr.bpo_sidebar_labels import apply_bpo_labels, _drop_empty_sections
 from hrms.hr.staff_pro_roles import is_staff_pro_hr_desk_user
+from hrms.hr.staff_pro_sidebars import filter_removed_sidebar_items
 
 USER_STAT_RESTRICTION_FIELDS = {
 	"agent_profit": "sp_restrict_agent_profit",
 	"total_billed": "sp_restrict_billed_to_client",
 	"payroll_totals": "sp_restrict_payroll_totals",
-}
-
-DOCTYPERULES = {
-	"agent_profit": ("Client Invoice", "Salary Slip"),
-	"total_billed": ("Client Invoice",),
-	"payroll_totals": ("Salary Slip",),
 }
 
 
@@ -34,32 +29,26 @@ def _user_restriction_flag(user: str, fieldname: str) -> bool:
 	return bool(frappe.db.get_value("User", user, fieldname))
 
 
-def _role_allows_stat(user: str, stat_key: str) -> bool:
-	doctypes = [dt for dt in DOCTYPERULES.get(stat_key, ()) if frappe.db.exists("DocType", dt)]
-	if not doctypes:
-		return False
-	return all(frappe.has_permission(doctype, "read", user=user) for doctype in doctypes)
-
-
 def get_profile_stat_visibility(user=None) -> dict[str, bool]:
 	"""Which employee sidebar totals the signed-in user may see."""
+	from hrms.hr.role_access import can_see
+
 	user = _session_user(user)
 	if user == "Guest":
 		return {key: False for key in USER_STAT_RESTRICTION_FIELDS}
 
-	if is_staff_pro_hr_desk_user(user) and user != "Guest":
-		flags = {key: True for key in USER_STAT_RESTRICTION_FIELDS}
-	elif user == "Administrator" or "System Manager" in frappe.get_roles(user):
-		flags = {key: True for key in USER_STAT_RESTRICTION_FIELDS}
-	else:
-		flags = {}
-		for stat_key, fieldname in USER_STAT_RESTRICTION_FIELDS.items():
-			if _user_restriction_flag(user, fieldname):
-				flags[stat_key] = False
-			elif stat_key == "payroll_totals":
-				flags[stat_key] = _role_allows_stat(user, stat_key)
-			else:
-				flags[stat_key] = _role_allows_stat(user, stat_key)
+	sees_salary = can_see("see_agent_salary", user)
+	sees_billing = can_see("see_bill_to_client", user) or can_see("see_client_invoices", user)
+	sees_ss = can_see("see_social_security", user)
+	flags = {
+		"agent_profit": sees_salary and sees_billing,
+		"total_billed": sees_billing,
+		"payroll_totals": sees_salary,
+		"ss_totals": sees_ss,
+	}
+	for stat_key, fieldname in USER_STAT_RESTRICTION_FIELDS.items():
+		if _user_restriction_flag(user, fieldname):
+			flags[stat_key] = False
 
 	# Always allow operational stats when Employee is readable.
 	can_read_employee = frappe.has_permission("Employee", "read", user=user)
@@ -70,10 +59,15 @@ def get_profile_stat_visibility(user=None) -> dict[str, bool]:
 
 def filter_profile_stats_payload(stats: dict, user=None) -> dict:
 	"""Remove sensitive totals from API responses."""
-	visibility = get_profile_stat_visibility(user)
+	visibility = dict(get_profile_stat_visibility(user))
 	out = dict(stats)
+	if not out.get("has_client_billing", True):
+		visibility["total_billed"] = False
+		visibility["agent_profit"] = False
 	if not visibility.get("payroll_totals"):
-		for key in ("total_income", "total_ss", "total_tax"):
+		out.pop("total_income", None)
+	if not visibility.get("ss_totals"):
+		for key in ("total_ss", "total_tax"):
 			out.pop(key, None)
 	if not visibility.get("total_billed"):
 		out.pop("total_billed", None)
@@ -129,8 +123,9 @@ def filter_sidebar_rows(rows: list | None, user=None) -> list:
 		return []
 
 	user = _session_user(user)
+	rows = filter_removed_sidebar_items([dict(row) for row in rows if isinstance(row, dict)])
 	if is_staff_pro_hr_desk_user(user):
-		return _drop_empty_sections(apply_bpo_labels([dict(row) for row in rows if isinstance(row, dict)]))
+		return _drop_empty_sections(apply_bpo_labels(rows))
 
 	filtered: list[dict] = []
 	for row in rows:

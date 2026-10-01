@@ -11,7 +11,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import getdate
 
-from hrms.ai.graph import run_agent
+from hrms.ai.graph import _history_messages, pin_employee_args, run_agent
 from hrms.ai.memory import get_user_memory
 from hrms.ai.settings import assert_tool_allowed
 from hrms.ai.tools import ALL_TOOLS
@@ -93,6 +93,65 @@ class TestAskAIGraph(FrappeTestCase):
 			)
 		self.assertEqual(result["content"], "Two employees are currently in.")
 		self.assertEqual(result["blocks"][0]["type"], "chart")
+
+	def test_attached_agent_replaces_other_employees_on_writes(self):
+		pinned = pin_employee_args(
+			{
+				"name": "set_clock_times",
+				"args": {"employee": "HR-EMP-OTHER", "in_time": "10:00 AM", "out_time": "4:00 PM"},
+				"id": "clock-1",
+			},
+			"HR-EMP-FOCUS",
+			{"employee", "employees", "in_time", "out_time"},
+		)
+		self.assertEqual(pinned["args"]["employee"], "HR-EMP-FOCUS")
+		self.assertEqual(pinned["args"]["employees"], "HR-EMP-FOCUS")
+		untouched = pin_employee_args(
+			{
+				"name": "review_time_clock_adjustment",
+				"args": {"name": "TCA-1", "action": "Approve"},
+				"id": "review-1",
+			},
+			"HR-EMP-FOCUS",
+			{"name", "action", "comment"},
+		)
+		self.assertEqual(untouched["args"]["name"], "TCA-1")
+		self.assertNotIn("employee", untouched["args"])
+
+	def test_attached_agent_is_named_in_the_prompt_and_write(self):
+		prompt = _history_messages(
+			[{"role": "user", "content": "Set today's clock."}],
+			focus_employee="HR-EMP-FOCUS",
+		)[0].content
+		self.assertIn("HR-EMP-FOCUS", prompt)
+		self.assertIn("only about this agent", prompt.lower())
+		model = FakeToolCallingModel(
+			[
+				AIMessage(
+					content="",
+					tool_calls=[
+						{
+							"name": "set_clock_times",
+							"args": {
+								"employee": "HR-EMP-OTHER",
+								"in_time": "10:00 AM",
+								"out_time": "4:00 PM",
+								"attendance_date": "2026-09-30",
+							},
+							"id": "clock-focus",
+						}
+					],
+				)
+			]
+		)
+		result = run_agent(
+			[{"role": "user", "content": "Set clock to 10 AM and 4 PM"}],
+			model=model,
+			tools=ALL_TOOLS,
+			focus_employee="HR-EMP-FOCUS",
+		)
+		self.assertEqual(result["pending_action"]["arguments"]["employee"], "HR-EMP-FOCUS")
+		self.assertEqual(result["pending_action"]["arguments"]["employees"], "HR-EMP-FOCUS")
 
 	def test_write_tool_stops_for_confirmation(self):
 		model = FakeToolCallingModel(
@@ -513,6 +572,12 @@ class TestAskAIAPI(FrappeTestCase):
 			frappe.db.set_single_value("System Settings", "enable_ask_ai", 1)
 			frappe.clear_cache(doctype="System Settings")
 
+	def test_desk_users_can_open_ask_ai_when_enabled(self):
+		from hrms.ai.permissions import AI_ROLES, can_use_ask_ai
+
+		self.assertIn("HR Assistant", AI_ROLES)
+		self.assertTrue(can_use_ask_ai("Administrator"))
+
 	def tearDown(self):
 		frappe.set_user("Administrator")
 		for name in self.created:
@@ -546,6 +611,18 @@ class TestAskAIAPI(FrappeTestCase):
 			payload = chat("Add a checked comment")
 		self.created.append(payload["conversation"])
 		return payload["conversation"]
+
+	def test_chat_passes_attached_agent_to_the_model(self):
+		with patch("hrms.api.assistant._clean_employee", return_value="HR-EMP-FOCUS"), patch(
+			"hrms.api.assistant._supports_employee", return_value=False
+		), patch(
+			"hrms.api.assistant.run_agent",
+			return_value={"content": "Only this agent.", "blocks": [], "pending_action": None},
+		) as agent:
+			payload = chat("Show hours for the attached agent", employee="HR-EMP-FOCUS")
+		self.created.append(payload["conversation"])
+		self.assertEqual(agent.call_args.kwargs["focus_employee"], "HR-EMP-FOCUS")
+		self.assertEqual(payload["employee"], "HR-EMP-FOCUS")
 
 	def test_confirm_executes_pending_action_once(self):
 		name = self._pending_conversation()

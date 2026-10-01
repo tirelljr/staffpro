@@ -38,6 +38,16 @@ def get_boot():
 
 	apply_payroll_frequency_translations(bootinfo)
 
+	user = frappe.session.user
+	if user and user != "Guest":
+		from hrms.hr.staff_pro_roles import can_use_my_work_portal
+
+		bootinfo.session_user = user
+		bootinfo.staff_pro_my_work = bool(can_use_my_work_portal(user))
+	else:
+		bootinfo.session_user = None
+		bootinfo.staff_pro_my_work = False
+
 	return bootinfo
 
 

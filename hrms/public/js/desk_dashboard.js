@@ -221,6 +221,9 @@ body.staff-pro-alive #page-dashboard-view .dashboard-graph:has(.sp-dash-hours){d
 .sp-hours__list{max-height:none!important;overflow:visible!important}
 .sp-hours__table-head{position:sticky;top:0;z-index:2;background:#fff}
 .sp-hours__table-head,.sp-hours__row-main,.sp-hours__group-head{width:100%;min-width:0!important;grid-template-columns:minmax(72px,1.2fr) minmax(56px,.8fr) repeat(2,minmax(48px,.55fr)) minmax(52px,.6fr) repeat(2,minmax(52px,.65fr)) minmax(64px,.75fr) minmax(56px,.65fr) minmax(64px,.75fr) minmax(44px,.5fr)!important}
+.sp-hours--hide-salary.sp-hours--hide-ss .sp-hours__table-head,.sp-hours--hide-salary.sp-hours--hide-ss .sp-hours__row-main,.sp-hours--hide-salary.sp-hours--hide-ss .sp-hours__group-head{grid-template-columns:minmax(72px,1.2fr) minmax(56px,.8fr) repeat(2,minmax(48px,.55fr)) minmax(52px,.6fr) repeat(2,minmax(52px,.65fr)) minmax(44px,.5fr)!important}
+.sp-hours--hide-salary:not(.sp-hours--hide-ss) .sp-hours__table-head,.sp-hours--hide-salary:not(.sp-hours--hide-ss) .sp-hours__row-main,.sp-hours--hide-salary:not(.sp-hours--hide-ss) .sp-hours__group-head{grid-template-columns:minmax(72px,1.2fr) minmax(56px,.8fr) repeat(2,minmax(48px,.55fr)) minmax(52px,.6fr) repeat(2,minmax(52px,.65fr)) minmax(56px,.65fr) minmax(44px,.5fr)!important}
+.sp-hours--hide-ss:not(.sp-hours--hide-salary) .sp-hours__table-head,.sp-hours--hide-ss:not(.sp-hours--hide-salary) .sp-hours__row-main,.sp-hours--hide-ss:not(.sp-hours--hide-salary) .sp-hours__group-head{grid-template-columns:minmax(72px,1.2fr) minmax(56px,.8fr) repeat(2,minmax(48px,.55fr)) minmax(52px,.6fr) repeat(2,minmax(52px,.65fr)) minmax(64px,.75fr) minmax(64px,.75fr) minmax(44px,.5fr)!important}
 .sp-hours__gross,.sp-hours__ss,.sp-hours__net{overflow:visible;text-align:right;text-overflow:unset;font-variant-numeric:tabular-nums}
 `;
 
@@ -296,6 +299,7 @@ body.staff-pro-alive #page-dashboard-view.sp-dash--payroll .layout-main-section,
 .sp-paydash__filter-option:hover,.sp-paydash__filter-option.is-selected{background:#f4f6f8}
 .sp-paydash__table-wrap{overflow-x:auto}
 .sp-paydash__table-head,.sp-paydash__row{display:grid;grid-template-columns:28px minmax(150px,1.4fr) minmax(100px,.95fr) minmax(130px,.85fr) minmax(84px,.6fr) minmax(88px,.75fr) minmax(76px,.65fr) minmax(120px,.9fr) minmax(88px,.75fr) 36px;gap:12px;align-items:center;width:100%;min-width:1180px}
+.sp-paydash--hide-ss .sp-paydash__table-head,.sp-paydash--hide-ss .sp-paydash__row{grid-template-columns:28px minmax(150px,1.4fr) minmax(100px,.95fr) minmax(130px,.85fr) minmax(84px,.6fr) minmax(88px,.75fr) minmax(76px,.65fr) minmax(88px,.75fr) 36px;min-width:1060px}
 .sp-paydash__table-head{padding:10px 8px;color:#9aa3af;font-size:12px;font-weight:600}
 .sp-paydash__row{padding:12px 8px;border:0;border-top:1px solid #eef1f4;background:transparent;font:inherit;font-size:13px;color:#111;text-align:left;cursor:pointer}
 .sp-paydash__row:hover{background:#fafbfc}
@@ -477,6 +481,21 @@ const HOURS_SORT_COLUMNS = [
 	["net_daily_pay", "Net"],
 ];
 const HOURS_DEFAULT_SORT = { field: "attendance_date", order: "desc" };
+
+function hours_pay_fields() {
+	return window.hrms?.role_access?.pay_fields
+		? hrms.role_access.pay_fields()
+		: { salary: true, ss: true, billing: true };
+}
+
+function hours_sort_columns() {
+	const flags = hours_pay_fields();
+	return HOURS_SORT_COLUMNS.filter(([field]) => {
+		if (field === "daily_pay" || field === "net_daily_pay") return flags.salary;
+		if (field === "week_ss") return flags.ss;
+		return true;
+	});
+}
 
 const kpi_sparkline_cache = {};
 let kpi_sparkline_request = null;
@@ -3310,7 +3329,7 @@ function hours_sort_state($panel) {
 }
 
 function render_hours_table_head() {
-	const buttons = HOURS_SORT_COLUMNS.map(([field, label]) => {
+	const buttons = hours_sort_columns().map(([field, label]) => {
 		const active = field === HOURS_DEFAULT_SORT.field;
 		return `
 			<button type="button" class="sp-hours__sort${active ? " is-active" : ""}" data-sort="${escape_html(field)}" aria-sort="${active ? "descending" : "none"}" title="${escape_html(__("Sort by {0}", [__(label)]))}">
@@ -3418,14 +3437,21 @@ function format_hours_money(value) {
 }
 
 function render_hours_totals_text(totals) {
+	const flags = hours_pay_fields();
 	const parts = [
 		__("Total Hours: {0}", [format_hours_duration(totals.total)]),
 		__("Paid Hours: {0}", [format_hours_duration(totals.paid)]),
-		__("Gross: {0}", [format_hours_money(totals.daily_pay)]),
-		__("SS: {0}", [format_hours_money(totals.ss_deduction)]),
-		__("Net: {0}", [format_hours_money(totals.net_daily_pay)]),
 	];
-	if (Number(totals.tax_deduction || 0) > 0) {
+	if (flags.salary) {
+		parts.push(__("Gross: {0}", [format_hours_money(totals.daily_pay)]));
+	}
+	if (flags.ss) {
+		parts.push(__("SS: {0}", [format_hours_money(totals.ss_deduction)]));
+	}
+	if (flags.salary) {
+		parts.push(__("Net: {0}", [format_hours_money(totals.net_daily_pay)]));
+	}
+	if (flags.ss && Number(totals.tax_deduction || 0) > 0) {
 		parts.push(__("Tax: {0}", [format_hours_money(totals.tax_deduction)]));
 	}
 	return parts.join("    ");
@@ -3477,11 +3503,11 @@ function render_hours_row(row) {
 				<span>${escape_html(format_hours_duration(row_working_hours(row)))}</span>
 				<span>${escape_html(__(row.status || ""))}</span>
 				<span>${escape_html(row.shift || row.leave_type || row.job || "")}</span>
-				<span class="sp-hours__gross">${escape_html(format_hours_money(row.daily_pay))}</span>
-				<span class="sp-hours__ss">${escape_html(
+				${hours_pay_fields().salary ? `<span class="sp-hours__gross">${escape_html(format_hours_money(row.daily_pay))}</span>` : ""}
+				${hours_pay_fields().ss ? `<span class="sp-hours__ss">${escape_html(
 					Number(row.ss_deduction) ? format_hours_money(row.ss_deduction) : "—",
-				)}</span>
-				<span class="sp-hours__net">${escape_html(format_hours_money(row.net_daily_pay))}</span>
+				)}</span>` : ""}
+				${hours_pay_fields().salary ? `<span class="sp-hours__net">${escape_html(format_hours_money(row.net_daily_pay))}</span>` : ""}
 				${actions || "<span class=\"sp-hours__row-actions\"></span>"}
 			</div>
 			${render_hours_comments(row.comments)}
@@ -3573,9 +3599,9 @@ function render_hours_week_group(week, group_by_date) {
 				<span>${escape_html(format_hours_duration(week.hours))}</span>
 				<span></span>
 				<span></span>
-				<span class="sp-hours__gross">${escape_html(format_hours_money(week.pay))}</span>
-				<span class="sp-hours__ss">${escape_html(format_hours_money(week.ss))}</span>
-				<span class="sp-hours__net">${escape_html(format_hours_money(week.net))}</span>
+				${hours_pay_fields().salary ? `<span class="sp-hours__gross">${escape_html(format_hours_money(week.pay))}</span>` : ""}
+				${hours_pay_fields().ss ? `<span class="sp-hours__ss">${escape_html(format_hours_money(week.ss))}</span>` : ""}
+				${hours_pay_fields().salary ? `<span class="sp-hours__net">${escape_html(format_hours_money(week.net))}</span>` : ""}
 				<span></span>
 			</div>
 			${inner}
@@ -3662,7 +3688,7 @@ function load_hours($panel) {
 
 function payroll_board_html() {
 	return `
-		<section class="sp-payroll-board" aria-label="${escape_html(__("Payroll"))}">
+		<section class="sp-payroll-board${hours_pay_fields().ss ? "" : " sp-paydash--hide-ss"}" aria-label="${escape_html(__("Payroll"))}">
 			<div class="sp-paydash__toolbar">
 				<h2 class="sp-paydash__title">${escape_html(__("Payroll"))}</h2>
 				<div class="sp-paydash__actions">
@@ -3757,7 +3783,7 @@ function payroll_board_html() {
 						<span>${escape_html(__("Status"))}</span>
 						<span>${escape_html(__("Base salary"))}</span>
 						<span>${escape_html(__("Bonuses"))}</span>
-						<span>${escape_html(__("Social Security"))}</span>
+						${hours_pay_fields().ss ? `<span>${escape_html(__("Social Security"))}</span>` : ""}
 						<span>${escape_html(__("Total salary"))}</span>
 						<span></span>
 					</div>
@@ -3956,7 +3982,7 @@ function render_payroll_board_rows(rows, selected) {
 					<span class="sp-paydash__status is-${escape_html(payroll_row_status(row))}">${escape_html(row.status_label || "")}</span>
 					<span class="sp-paydash__money">${escape_html(format_payroll_money(row.base_salary, row.currency))}</span>
 					<span class="sp-paydash__money">${escape_html(format_payroll_money(row.bonus, row.currency))}</span>
-					<span class="sp-paydash__money">${escape_html(format_payroll_money(row.ss_contribution, row.currency))}</span>
+					${hours_pay_fields().ss ? `<span class="sp-paydash__money">${escape_html(format_ss_amount(row))}</span>` : ""}
 					<span class="sp-paydash__money">${escape_html(format_payroll_money(row.net_pay, row.currency))}</span>
 					<span><button type="button" class="sp-paydash__more" aria-label="${escape_html(__("Open pay stub"))}">${ICONS.more}</button></span>
 				</div>
@@ -4001,7 +4027,9 @@ function open_payroll_board_row(rowEl) {
 function export_payroll_board_csv($board) {
 	const selected = selected_payroll_keys($board);
 	const rows = filtered_payroll_board_rows($board).filter((row) => !selected.size || selected.has(payroll_row_key(row)));
-	const header = ["Full name", "Department", "Pay date", "Status", "Base salary", "Bonuses", "Social Security", "Total salary"];
+	const header = hours_pay_fields().ss
+		? ["Full name", "Department", "Pay date", "Status", "Base salary", "Bonuses", "Social Security", "Total salary"]
+		: ["Full name", "Department", "Pay date", "Status", "Base salary", "Bonuses", "Total salary"];
 	const lines = [
 		header.join(","),
 		...rows.map((row) =>
@@ -4012,7 +4040,7 @@ function export_payroll_board_csv($board) {
 				row.status_label || "",
 				row.base_salary ?? "",
 				row.bonus ?? "",
-				row.ss_contribution ?? "",
+				...(hours_pay_fields().ss ? [row.ss_contribution ?? ""] : []),
 				row.net_pay ?? row.gross_pay ?? "",
 			]
 				.map((value) => `"${String(value).replace(/"/g, '""')}"`)
@@ -4320,7 +4348,7 @@ function inject_hours_board($root) {
 
 	const today = frappe.datetime.get_today();
 	const $panel = $(`
-		<section class="sp-dash-panel sp-dash-hours" aria-label="${escape_html(__("Hours"))}">
+		<section class="sp-dash-panel sp-dash-hours${hours_pay_fields().salary ? "" : " sp-hours--hide-salary"}${hours_pay_fields().ss ? "" : " sp-hours--hide-ss"}" aria-label="${escape_html(__("Hours"))}">
 			<div class="sp-dash-panel__head">
 				<h2 class="sp-dash-panel__title">${escape_html(__("All Agents"))}</h2>
 				<div class="sp-hours__totals text-muted" aria-live="polite"></div>
@@ -5288,7 +5316,6 @@ function enhance_page_empty() {
 
 const BPO_DASHBOARD_MENU = new Set([
 	"Human Resource",
-	"Data Analytics",
 	"SS and Taxes",
 	"Attendance",
 	"Payroll",
@@ -5301,7 +5328,6 @@ const BPO_DASHBOARD_ORDER = [
 	"Payroll",
 	"SS and Taxes",
 	"Recruitment",
-	"Data Analytics",
 ];
 
 const BPO_DASHBOARD_LABELS = {
@@ -5504,10 +5530,15 @@ function hide_frappe_dashboard_chrome($root) {
 }
 
 function enhance() {
+	if (document.body?._staff_pro_dash_enhancing) return;
+	if (document.body) document.body._staff_pro_dash_enhancing = true;
+	try {
 	bind_import_agents_intercept();
 	inject_dash_css();
 	patch_list_view_meta();
-	document.body.classList.add("staff-pro-alive");
+	if (document.body && !document.body.classList.contains("staff-pro-alive")) {
+		document.body.classList.add("staff-pro-alive");
+	}
 	install_dashboard_menu_filter();
 	const $root = page_root();
 
@@ -5539,6 +5570,13 @@ function enhance() {
 	remove_chart_filter_buttons($(document.body));
 	theme_charts($(document.body));
 	enhance_page_empty();
+	} finally {
+		if (document.body) {
+			requestAnimationFrame(() => {
+				document.body._staff_pro_dash_enhancing = false;
+			});
+		}
+	}
 }
 
 function watch() {

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="csrf-token" content="{{ csrf_token }}">
+	<title>{{ _("System locked") }}</title>
+	<style>
+		body {
+			background: #f4f4f4;
+			color: #1c1c1c;
+			font-family: "Inter", "Segoe UI", sans-serif;
+			margin: 0;
+		}
+		.sp-lock {
+			margin: 8vh auto;
+			max-width: 420px;
+			padding: 0 16px;
+		}
+		.sp-lock-card {
+			background: #fff;
+			border: 1px solid #e6e6e6;
+			border-radius: 16px;
+			padding: 28px 24px;
+		}
+		h1 {
+			font-size: 22px;
+			margin: 0 0 8px;
+		}
+		p {
+			color: #5c5c5c;
+			line-height: 1.5;
+			margin: 0 0 20px;
+		}
+		label {
+			display: block;
+			font-size: 13px;
+			font-weight: 600;
+			margin-bottom: 6px;
+		}
+		input {
+			border: 1px solid #d8d8d8;
+			border-radius: 8px;
+			box-sizing: border-box;
+			font: inherit;
+			margin-bottom: 16px;
+			padding: 10px 12px;
+			width: 100%;
+		}
+		button {
+			background: #1c1c1c;
+			border: 0;
+			border-radius: 8px;
+			color: #fff;
+			cursor: pointer;
+			font: inherit;
+			font-weight: 600;
+			padding: 10px 14px;
+			width: 100%;
+		}
+		button:disabled {
+			opacity: 0.6;
+		}
+		.error {
+			color: #9f2d2d;
+			min-height: 1.2em;
+			margin: 12px 0 0;
+		}
+	</style>
+</head>
+<body>
+	<main class="sp-lock">
+		<form class="sp-lock-card" id="sp-lock-form" data-error-fallback="{{ _('Master key is incorrect.') }}" data-network-error="{{ _('Could not turn access back on.') }}">
+			<h1>{{ _("System access is off") }}</h1>
+			<p>{{ lock_message }}</p>
+			<label for="sp-master-key">{{ _("Master key") }}</label>
+			<input id="sp-master-key" type="password" autocomplete="current-password" required>
+			<button type="submit">{{ _("Turn access back on") }}</button>
+			<p class="error" id="sp-lock-error" role="alert"></p>
+		</form>
+	</main>
+	<script>
+		const form = document.getElementById("sp-lock-form");
+		const error = document.getElementById("sp-lock-error");
+		const token = document.querySelector('meta[name="csrf-token"]').getAttribute("content");
+		const fallback = form.getAttribute("data-error-fallback");
+		const networkError = form.getAttribute("data-network-error");
+
+		function readMessage(payload) {
+			if (!payload) return "";
+			if (payload._server_messages) {
+				try {
+					const rows = JSON.parse(payload._server_messages);
+					const first = JSON.parse(rows[0]);
+					if (first.message) return first.message;
+				} catch (e) {}
+			}
+			return payload.message || payload.exception || "";
+		}
+
+		form.addEventListener("submit", async function (event) {
+			event.preventDefault();
+			error.textContent = "";
+			const button = form.querySelector("button");
+			const key = document.getElementById("sp-master-key").value;
+			button.disabled = true;
+			try {
+				const body = new URLSearchParams();
+				body.set("master_key", key);
+				body.set("csrf_token", token);
+				const response = await fetch("/api/method/hrms.hr.master_key.unlock_system", {
+					method: "POST",
+					headers: {
+						"Accept": "application/json",
+						"Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+						"X-Frappe-CSRF-Token": token,
+					},
+					body,
+					credentials: "same-origin",
+				});
+				const payload = await response.json();
+				if (!response.ok || payload.exc || payload.exception) {
+					error.textContent = readMessage(payload) || fallback;
+					document.getElementById("sp-master-key").value = "";
+					return;
+				}
+				window.location.href = (payload.message && payload.message.redirect) || "/login";
+			} catch (e) {
+				error.textContent = networkError;
+			} finally {
+				button.disabled = false;
+			}
+		});
+	</script>
+</body>
+</html>

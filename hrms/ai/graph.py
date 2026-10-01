@@ -90,20 +90,34 @@ def _model_from_settings():
 	return _chat_model(settings), settings.max_tool_rounds
 
 
-def _history_messages(history: list[dict], memory: str = "") -> list[BaseMessage]:
+def _focus_instructions(focus_employee: str) -> str:
+	focus_employee = str(focus_employee or "").strip()
+	if not focus_employee:
+		return "No agent is attached. You may answer across the agents this user can access."
+	label = ""
+	if frappe.db.exists("Employee", focus_employee):
+		label = frappe.db.get_value("Employee", focus_employee, "employee_name") or ""
+	who = f"{label} ({focus_employee})" if label else focus_employee
+	return (
+		f"Attached agent: {who}. This conversation is only about this agent. "
+		f"Pass employee '{focus_employee}' on every tool that accepts an employee. "
+		"Do not look up, list, export, or change any other agent. "
+		"Do not run payroll for the whole company while this agent is attached."
+	)
+
+
+def _history_messages(history: list[dict], memory: str = "", focus_employee: str = "") -> list[BaseMessage]:
 	today = getdate()
-	messages: list[BaseMessage] = [
-		SystemMessage(
-			content=SYSTEM_PROMPT.format(
-				today=today.strftime("%A, %d %B %Y"),
-				today_iso=str(today),
-				user=frappe.session.user,
-				memory=(memory or "").strip() or "None yet.",
-				denied=", ".join(denied_capability_labels()) or "None",
-				permission_denied=PERMISSION_DENIED,
-			)
-		)
-	]
+	content = SYSTEM_PROMPT.format(
+		today=today.strftime("%A, %d %B %Y"),
+		today_iso=str(today),
+		user=frappe.session.user,
+		memory=(memory or "").strip() or "None yet.",
+		denied=", ".join(denied_capability_labels()) or "None",
+		permission_denied=PERMISSION_DENIED,
+	)
+	content = f"{content}\n\n{_focus_instructions(focus_employee)}"
+	messages: list[BaseMessage] = [SystemMessage(content=content)]
 	for item in history[-50:]:
 		content = str(item.get("content") or "")
 		if not content:
@@ -204,6 +218,31 @@ def coerce_attendance_date(value, user_text: str = "") -> str:
 	return str(day)
 
 
+def pin_employee_args(call: dict, focus_employee: str, accepted: set[str] | None = None) -> dict:
+	"""Force tool arguments onto the attached agent so the chat cannot drift to someone else."""
+	focus_employee = str(focus_employee or "").strip()
+	if not focus_employee or (call.get("name") or "") == "run_payroll":
+		return call
+	name = call.get("name") or ""
+	args = dict(call.get("args") or {})
+	accepted = set(accepted or ())
+	if name == "find_employees":
+		args["query"] = focus_employee
+		args["limit"] = 1
+		return {**call, "args": args}
+	if name == "update_floor_settings":
+		if str(args.get("action") or "").strip().lower() == "assign_seat":
+			args["employee"] = focus_employee
+		return {**call, "args": args}
+	if name not in EMPLOYEE_WRITE_TOOLS and "employee" not in accepted and "employees" not in accepted:
+		return call
+	if name in EMPLOYEE_WRITE_TOOLS or "employee" in accepted:
+		args["employee"] = focus_employee
+	if name in EMPLOYEE_WRITE_TOOLS or "employees" in accepted:
+		args["employees"] = focus_employee
+	return {**call, "args": args}
+
+
 def hydrate_write_call(call: dict, employees: list[str], user_text: str = "") -> dict:
 	args = dict(call.get("args") or {})
 	name = call.get("name") or ""
@@ -290,11 +329,18 @@ def _permission_denied_state(calls: list[dict]) -> dict | None:
 	return {"messages": outputs, "pending_action": None, "permission_denied": True}
 
 
-def build_graph(model, tools=None):
+def build_graph(model, tools=None, focus_employee: str = ""):
 	tools = list(tools if tools is not None else get_enabled_tools())
+	focus_employee = str(focus_employee or "").strip()
 	write_names = {tool.name for tool in tools if tool.name in WRITE_TOOL_NAMES}
 	read_tools = [tool for tool in tools if tool.name not in WRITE_TOOL_NAMES]
+	all_by_name = {tool.name: tool for tool in tools}
 	bound_model = model.bind_tools(tools)
+
+	def _pin(call: dict) -> dict:
+		tool = all_by_name.get(call.get("name") or "")
+		accepted = set((getattr(tool, "args", None) or {}).keys()) if tool else set()
+		return pin_employee_args(call, focus_employee, accepted)
 
 	def call_model(state: AgentState) -> dict:
 		return {"messages": [bound_model.invoke(state["messages"])]}
@@ -325,11 +371,13 @@ def build_graph(model, tools=None):
 		message = state["messages"][-1] if state.get("messages") else None
 		outputs: list[ToolMessage] = []
 		by_name = {tool.name: tool for tool in read_tools}
-		calls = _tool_calls(message)
+		calls = [_pin(call) for call in _tool_calls(message)]
 		blocked = _permission_denied_state(calls)
 		if blocked:
 			return blocked
 		write_calls = [call for call in calls if call.get("name") in write_names]
+		if focus_employee:
+			write_calls = [call for call in write_calls if call.get("name") != "run_payroll"]
 		denied = False
 		for call in calls:
 			name = call.get("name")
@@ -361,12 +409,12 @@ def build_graph(model, tools=None):
 		if denied:
 			outputs.append(AIMessage(content=PERMISSION_DENIED))
 			return {"messages": outputs, "pending_action": None, "permission_denied": True}
-		employees = employee_ids_from_messages(outputs)
+		employees = [focus_employee] if focus_employee else employee_ids_from_messages(outputs)
 		user_text = user_text_from_messages(state.get("messages") or [])
 		if not write_calls and user_can_run_call("set_clock_times"):
 			inferred = infer_clock_write((state.get("messages") or []) + outputs, employees)
 			write_calls = [inferred] if inferred else []
-		hydrated = [hydrate_write_call(call, employees, user_text) for call in write_calls]
+		hydrated = [_pin(hydrate_write_call(call, employees, user_text)) for call in write_calls]
 		if hydrated and not all(user_can_run_call(call.get("name") or "", call.get("args") or {}) for call in hydrated):
 			outputs.append(AIMessage(content=PERMISSION_DENIED))
 			return {"messages": outputs, "pending_action": None, "permission_denied": True}
@@ -374,13 +422,28 @@ def build_graph(model, tools=None):
 		return {"messages": outputs, "pending_action": pending}
 
 	def create_pending_action(state: AgentState) -> dict:
-		employees = employee_ids_from_messages(state.get("messages") or [])
+		employees = [focus_employee] if focus_employee else employee_ids_from_messages(state.get("messages") or [])
 		raw: list[dict] = []
 		for message in reversed(state.get("messages") or []):
 			raw = [call for call in _tool_calls(message) if call.get("name") in write_names]
 			if raw:
 				break
-		calls = [hydrate_write_call(call, employees, user_text_from_messages(state.get("messages") or [])) for call in raw]
+		user_text = user_text_from_messages(state.get("messages") or [])
+		calls = [_pin(hydrate_write_call(call, employees, user_text)) for call in raw]
+		if focus_employee and any(call.get("name") == "run_payroll" for call in calls):
+			calls = [call for call in calls if call.get("name") != "run_payroll"]
+			if not calls:
+				return {
+					"messages": [
+						AIMessage(
+							content=(
+								"An agent is attached, so I will not run payroll for the whole company. "
+								"I can only work on the attached agent."
+							)
+						)
+					],
+					"pending_action": None,
+				}
 		if calls and not all(user_can_run_call(call.get("name") or "", call.get("args") or {}) for call in calls):
 			return {
 				"messages": [AIMessage(content=PERMISSION_DENIED)],
@@ -437,6 +500,7 @@ def run_agent(
 	max_tool_rounds: int | None = None,
 	tools=None,
 	memory: str = "",
+	focus_employee: str = "",
 ) -> dict:
 	if model is None:
 		model, configured_rounds = _model_from_settings()
@@ -444,9 +508,10 @@ def run_agent(
 	max_tool_rounds = max_tool_rounds or 6
 	if tools is None:
 		tools = get_enabled_tools()
-	initial_messages = _history_messages(history, memory=memory)
+	focus_employee = str(focus_employee or "").strip()
+	initial_messages = _history_messages(history, memory=memory, focus_employee=focus_employee)
 	try:
-		result = build_graph(model, tools).invoke(
+		result = build_graph(model, tools, focus_employee=focus_employee).invoke(
 			{"messages": initial_messages, "pending_action": None},
 			config={"recursion_limit": max_tool_rounds * 2 + 3},
 		)

@@ -180,10 +180,28 @@ def collect_export_data(arguments: dict[str, Any]) -> dict[str, Any]:
 	}
 
 
+def _rows_for_employee(rows: list[dict], employee: str) -> list[dict]:
+	employee = str(employee or "").strip()
+	if not employee:
+		return rows
+	from hrms.ai.tools.common import resolve_employee
+
+	employee_id = resolve_employee(employee)
+	employee_name = frappe.db.get_value("Employee", employee_id, "employee_name") or ""
+	matched = []
+	for row in rows:
+		if row.get("employee") == employee_id or row.get("name") == employee_id:
+			matched.append(row)
+			continue
+		if employee_name and row.get("employee_name") == employee_name and not row.get("employee"):
+			matched.append(row)
+	return matched
+
+
 def execute_export_information(arguments: dict[str, Any], conversation: str | None = None) -> dict[str, Any]:
 	file_format = _file_format(arguments.get("file_format") or arguments.get("format") or "csv")
 	data = collect_export_data(arguments)
-	rows = list(data.get("rows") or [])[:500]
+	rows = _rows_for_employee(list(data.get("rows") or []), arguments.get("employee"))[:500]
 	if not rows:
 		frappe.throw(_("Nothing to export for {0}.").format(data["title"]))
 	content, filename = _render_file(data["title"], data["columns"], rows, file_format)

@@ -26,8 +26,8 @@ ACCESS_GROUPS = (
 				"see_people_dashboard",
 				"People dashboard",
 				"The people home screen and headcount charts.",
-				links=("Human Resource", "Data Analytics"),
-				dashboards=("Human Resource", "Data Analytics"),
+				links=("Human Resource",),
+				dashboards=("Human Resource",),
 				workspaces=("people",),
 			),
 			_area(
@@ -177,15 +177,6 @@ ACCESS_GROUPS = (
 				workspaces=("time",),
 			),
 			_area(
-				"see_time_off_admin",
-				"Time off admin",
-				"PTO control, policy assignment, and allocations.",
-				labels=("Time Off Control", "PTO Policy Setup", "PTO Allocation"),
-				links=("Leave Control Panel", "Leave Policy Assignment", "Leave Allocation"),
-				doctypes=("Leave Control Panel", "Leave Policy Assignment", "Leave Allocation"),
-				workspaces=("time",),
-			),
-			_area(
 				"see_overtime",
 				"Overtime",
 				"Overtime slips.",
@@ -224,9 +215,6 @@ ACCESS_GROUPS = (
 					"Work Site",
 					"Shift Patterns",
 					"Holiday List",
-					"Leave Period",
-					"Leave Policy",
-					"Leave Block List",
 					"Leave Type",
 				),
 				links=(
@@ -234,9 +222,6 @@ ACCESS_GROUPS = (
 					"Shift Location",
 					"Shift Schedule",
 					"Holiday List",
-					"Leave Period",
-					"Leave Policy",
-					"Leave Block List",
 					"Leave Type",
 				),
 				doctypes=(
@@ -244,9 +229,6 @@ ACCESS_GROUPS = (
 					"Shift Location",
 					"Shift Schedule",
 					"Holiday List",
-					"Leave Period",
-					"Leave Policy",
-					"Leave Block List",
 					"Leave Type",
 				),
 				workspaces=("time",),
@@ -513,9 +495,9 @@ ACCESS_GROUPS = (
 			_area(
 				"see_client_invoices",
 				"Client invoices",
-				"Client invoices, posted invoices, outstanding balances, and recording a payment.",
-				labels=("Client Invoices", "Posted Invoices", "Outstanding Invoices", "Record Payment"),
-				links=("Client Invoice", "Sales Invoice", "Accounts Receivable", "Payment Entry"),
+				"Client invoices, posted invoices, and outstanding balances.",
+				labels=("Client Invoices", "Posted Invoices", "Outstanding Invoices"),
+				links=("Client Invoice", "Sales Invoice", "Accounts Receivable"),
 				doctypes=("Client Invoice", "Sales Invoice"),
 				reports=("Accounts Receivable",),
 				workspaces=("finance",),
@@ -539,10 +521,11 @@ ACCESS_GROUPS = (
 			_area(
 				"see_system_setup",
 				"System setup",
-				"System settings, the website, and email accounts.",
-				labels=("System Settings", "Website Settings", "Email Account"),
-				links=("System Settings", "Website Settings", "Email Account"),
-				doctypes=("System Settings", "Website Settings", "Email Account"),
+				"System settings, backups, and the website.",
+				labels=("System Settings", "Website Settings", "Backups"),
+				links=("System Settings", "Website Settings", "backups"),
+				pages=("backups",),
+				doctypes=("System Settings", "Website Settings"),
 				workspaces=("admin",),
 			),
 			_area(
@@ -555,22 +538,12 @@ ACCESS_GROUPS = (
 				workspaces=("admin",),
 			),
 			_area(
-				"see_customization",
-				"Customization",
-				"Form layout and print formats.",
-				labels=("Customize Form", "Print Format"),
-				links=("customize-form", "Print Format"),
-				pages=("customize-form",),
-				doctypes=("Print Format",),
-				workspaces=("admin",),
-			),
-			_area(
 				"see_audit_logs",
 				"Audit logs",
-				"Activity, access, permissions, errors, and the audit trail.",
-				labels=("Activity Log", "Access Log", "Permission Log", "Error Log", "Audit Trail"),
-				links=("Activity Log", "Access Log", "Permission Log", "Error Log", "Audit Trail"),
-				doctypes=("Activity Log", "Access Log", "Permission Log", "Error Log"),
+				"Activity, access, permissions, and the audit trail.",
+				labels=("Activity Log", "Access Log", "Permission Log", "Audit Trail"),
+				links=("Activity Log", "Access Log", "Permission Log", "Audit Trail"),
+				doctypes=("Activity Log", "Access Log", "Permission Log"),
 				reports=("Audit Trail",),
 				workspaces=("admin",),
 			),
@@ -830,6 +803,138 @@ def disable_two_factor_auth():
 			frappe.clear_cache(doctype="User")
 
 
+ACCESS_CHANGED_EVENT = "staff_pro_access_changed"
+
+
+def clear_user_access_cache(user=None) -> None:
+	cached = getattr(frappe.local, "_staff_pro_user_access", None)
+	if not isinstance(cached, dict):
+		return
+	if user and cached.get("_user") != user:
+		return
+	frappe.local._staff_pro_user_access = None
+
+
+def session_access_payload(user=None) -> dict:
+	"""Access flags and blocked routes for one signed-in desk user."""
+	user = user or frappe.session.user
+	clear_user_access_cache(user)
+	access = user_access(user)
+	return {"access": access, "blocks": blocked_routes(access)}
+
+
+@frappe.whitelist()
+def get_session_access() -> dict:
+	if frappe.session.user in {None, "Guest"}:
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
+	return session_access_payload()
+
+
+@frappe.whitelist()
+def assign_role_user(role: str, user: str, remove: int | str = 0) -> str:
+	"""Attach or detach one person. Accepts a username, email, or full name."""
+	role_name = (role or "").strip()
+	if not role_name or not frappe.db.exists("Role", role_name):
+		frappe.throw(_("Role {0} was not found.").format(role_name or _("Unknown")))
+
+	from hrms.overrides.employee_master import resolve_user_from_login
+
+	user_name = resolve_user_from_login(user)
+	if not user_name or user_name == "Guest":
+		frappe.throw(_("User {0} was not found.").format((user or "").strip() or _("Unknown")))
+
+	frappe.has_permission("User", "write", doc=user_name, throw=True)
+	if frappe.get_all(
+		"User Role Profile",
+		filters={"parent": user_name, "parenttype": "User"},
+		limit=1,
+	):
+		frappe.throw(
+			_("{0}'s roles come from a role profile. Change that profile to update this role.").format(
+				frappe.db.get_value("User", user_name, "full_name") or user_name
+			)
+		)
+
+	doc = frappe.get_doc("User", user_name)
+	doc.check_permission("write")
+	if cint(remove):
+		doc.remove_roles(role_name)
+	else:
+		doc.add_roles(role_name)
+	return user_name
+
+
+def users_with_role(role_name: str) -> list[str]:
+	if not role_name:
+		return []
+	return [
+		name
+		for name in frappe.get_all(
+			"Has Role",
+			filters={"role": role_name, "parenttype": "User"},
+			pluck="parent",
+		)
+		if name and name != "Guest"
+	]
+
+
+def _role_access_changed(doc) -> bool:
+	before = doc.get_doc_before_save()
+	if not before:
+		return True
+	for name in FLAG_NAMES:
+		if flag_enabled(doc.get(name)) != flag_enabled(before.get(name)):
+			return True
+	return False
+
+
+def _user_roles_changed(doc) -> bool:
+	before = doc.get_doc_before_save()
+	if not before:
+		return bool(doc.get("roles"))
+	old = {row.role for row in (before.get("roles") or []) if row.role}
+	new = {row.role for row in (doc.get("roles") or []) if row.role}
+	return old != new
+
+
+def notify_access_changed(users) -> None:
+	seen = set()
+	for user in users or []:
+		if not user or user in seen or user == "Guest":
+			continue
+		seen.add(user)
+		try:
+			frappe.clear_cache(user=user)
+		except Exception:
+			pass
+		payload = session_access_payload(user)
+		frappe.publish_realtime(ACCESS_CHANGED_EVENT, payload, user=user, after_commit=True)
+
+
+def on_role_update(doc, method=None):
+	if _role_access_changed(doc):
+		frappe.clear_cache(doctype="Role")
+		notify_access_changed(users_with_role(doc.name))
+	try:
+		sync_role_switch_permissions(getattr(doc, "name", None))
+	except Exception:
+		frappe.log_error(title="Role access sync failed")
+
+
+def on_user_update(doc, method=None):
+	if not _user_roles_changed(doc):
+		return
+	notify_access_changed([doc.name])
+
+
+def on_has_role_change(doc, method=None):
+	if getattr(doc, "parenttype", None) != "User":
+		return
+	parent = getattr(doc, "parent", None)
+	if parent:
+		notify_access_changed([parent])
+
+
 def user_access(user=None) -> dict[str, bool]:
 	user = user or frappe.session.user
 	if not user or user == "Guest":
@@ -935,6 +1040,19 @@ def workspace_allowed(name, access=None) -> bool:
 	return any(access.get(flag, True) for flag in flags)
 
 
+def _session_is_system_manager() -> bool:
+	user = getattr(getattr(frappe, "session", None), "user", None)
+	if not user or user == "Guest":
+		return False
+	if user == "Administrator":
+		return True
+	try:
+		roles = frappe.get_roles(user)
+	except Exception:
+		return False
+	return "System Manager" in set(roles or [])
+
+
 def _matched_flags(item) -> list[str]:
 	label = str(item.get("label") or "")
 	link = str(item.get("link_to") or "")
@@ -959,11 +1077,26 @@ def _matched_flags(item) -> list[str]:
 	return hits
 
 
-def sidebar_item_allowed(item, access=None) -> bool:
+def sidebar_item_has_switch(item) -> bool:
+	"""True when a sidebar row is tied to a Role form switch."""
+	if not isinstance(item, dict):
+		return False
+	if str(item.get("type") or "") in {"Section Break", "section"}:
+		return False
+	return bool(_matched_flags(item))
+
+
+def sidebar_item_allowed(item, access=None, is_system_manager=None) -> bool:
 	if not isinstance(item, dict):
 		return True
 	if str(item.get("type") or "") in {"Section Break", "section"}:
 		return True
+	from hrms.hr.master_key import is_master_key_sidebar_item
+
+	if is_master_key_sidebar_item(item):
+		if is_system_manager is None:
+			is_system_manager = _session_is_system_manager()
+		return bool(is_system_manager)
 	access = access if access is not None else user_access()
 	hits = _matched_flags(item)
 	if not hits:
@@ -1129,6 +1262,157 @@ def redact_query_rows(doctype, rows):
 	return rows
 
 
+HOURS_SALARY_FIELDS = ("hour_rate", "daily_pay", "net_daily_pay")
+HOURS_SS_FIELDS = ("ss_deduction", "tax_deduction", "week_ss", "week_tax")
+
+SKIP_SWITCH_GRANT_ROLES = frozenset(
+	{
+		"Administrator",
+		"System Manager",
+		"Guest",
+		"All",
+		"Desk User",
+		"Employee",
+		"Employee Self Service",
+	}
+)
+
+
+def redact_hours_payload(payload, access=None):
+	"""Drop salary and SS amounts the signed-in role is not allowed to see."""
+	access = access or user_access()
+	see_salary = access.get("see_agent_salary", True)
+	see_ss = access.get("see_social_security", True)
+	if see_salary and see_ss:
+		return payload
+
+	def strip(row):
+		if not isinstance(row, dict):
+			return row
+		out = dict(row)
+		if not see_salary:
+			for field in HOURS_SALARY_FIELDS:
+				out.pop(field, None)
+		if not see_ss:
+			for field in HOURS_SS_FIELDS:
+				out.pop(field, None)
+		return out
+
+	if isinstance(payload, list):
+		return [strip(row) for row in payload]
+	if not isinstance(payload, dict):
+		return payload
+	if "rows" in payload or "totals" in payload:
+		out = dict(payload)
+		if isinstance(payload.get("rows"), list):
+			out["rows"] = [strip(row) for row in payload["rows"]]
+		if isinstance(payload.get("totals"), dict):
+			out["totals"] = strip(payload["totals"])
+		return out
+	return strip(payload)
+
+
+def switch_grant_targets(access=None) -> dict[str, list[str]]:
+	"""DocTypes, reports, and pages a role should be able to open for its on switches."""
+	access = access or full_access()
+	doctypes: list[str] = []
+	reports: list[str] = []
+	pages: list[str] = []
+	for spec in _iter_specs():
+		if not access.get(spec["fieldname"], True):
+			continue
+		doctypes.extend(spec.get("doctypes") or ())
+		reports.extend(spec.get("reports") or ())
+		pages.extend(spec.get("pages") or ())
+		for link in spec.get("links") or ():
+			if link and link not in doctypes and link not in pages:
+				doctypes.append(link)
+	if access.get("see_agents", True) or access.get("see_floor_workers", True):
+		doctypes.append("Employee")
+	if access.get("see_td4_forms", True):
+		doctypes.append("TD4 Form")
+	return {
+		"doctypes": _unique(doctypes),
+		"reports": _unique(reports),
+		"pages": _unique(pages),
+	}
+
+
+def _role_switch_access(role_name: str) -> dict[str, bool] | None:
+	if not role_name or role_name in SKIP_SWITCH_GRANT_ROLES:
+		return None
+	if not frappe.db.exists("Role", role_name):
+		return None
+	if not frappe.db.get_value("Role", role_name, "desk_access"):
+		return None
+	if not fields_ready():
+		return full_access()
+	row = frappe.db.get_value("Role", role_name, FLAG_NAMES, as_dict=True) or {}
+	return {name: flag_enabled(row.get(name)) for name in FLAG_NAMES}
+
+
+def _ensure_doctype_read(doctype: str, role: str) -> None:
+	if not doctype or not frappe.db.exists("DocType", doctype):
+		return
+	from frappe.permissions import add_permission, update_permission_property
+
+	try:
+		add_permission(doctype, role, permlevel=0)
+	except Exception:
+		return
+	for ptype in ("read", "select", "report", "export"):
+		try:
+			update_permission_property(doctype, role, permlevel=0, ptype=ptype, value=1)
+		except Exception:
+			continue
+
+
+def _ensure_child_role(parenttype: str, parent: str, role: str) -> None:
+	if not parent or not frappe.db.exists(parenttype, parent):
+		return
+	if frappe.db.exists("Has Role", {"parent": parent, "parenttype": parenttype, "role": role}):
+		return
+	try:
+		frappe.get_doc(
+			{
+				"doctype": "Has Role",
+				"parent": parent,
+				"parenttype": parenttype,
+				"parentfield": "roles",
+				"role": role,
+			}
+		).insert(ignore_permissions=True)
+	except Exception:
+		return
+
+
+def sync_role_switch_permissions(role_name: str | None) -> None:
+	"""Give a desk role read access to every screen its switches leave on."""
+	access = _role_switch_access(role_name)
+	if not access:
+		return
+	targets = switch_grant_targets(access)
+	for doctype in targets["doctypes"]:
+		_ensure_doctype_read(doctype, role_name)
+	for report in targets["reports"]:
+		_ensure_doctype_read(report, role_name)
+		_ensure_child_role("Report", report, role_name)
+	for page in targets["pages"]:
+		_ensure_child_role("Page", page, role_name)
+
+
+def sync_all_role_switch_permissions() -> None:
+	if not frappe.db.exists("DocType", "Role"):
+		return
+	ensure_role_access_fields()
+	roles = frappe.get_all("Role", filters={"desk_access": 1}, pluck="name")
+	for role in roles:
+		if role in SKIP_SWITCH_GRANT_ROLES:
+			continue
+		sync_role_switch_permissions(role)
+	frappe.clear_cache()
+
+
 def _query_fields_to_blank(doctype) -> tuple[str, ...]:
 	if doctype == "Employee":
 		return tuple(hidden_employee_fields())
@@ -1136,6 +1420,13 @@ def _query_fields_to_blank(doctype) -> tuple[str, ...]:
 		return CUSTOMER_FIELDS["see_bill_to_client"]
 	if doctype in {"Client Invoice Item", "Sales Invoice Item"} and not can_see("see_bill_to_client"):
 		return ("billing_rate",)
+	if doctype == "Attendance":
+		fields: list[str] = []
+		if not can_see("see_agent_salary"):
+			fields.extend(HOURS_SALARY_FIELDS)
+		if not can_see("see_social_security"):
+			fields.extend(HOURS_SS_FIELDS)
+		return tuple(fields)
 	return ()
 
 

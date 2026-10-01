@@ -5,8 +5,9 @@
  "doctype": "DocType",
  "editable_grid": 0,
  "engine": "InnoDB",
- "field_order": [
+  "field_order": [
   "user",
+  "employee",
   "title",
   "last_message_at",
   "messages"
@@ -22,6 +23,13 @@
    "options": "User",
    "read_only": 1,
    "reqd": 1
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Agent",
+   "options": "Employee"
   },
   {
    "fieldname": "title",

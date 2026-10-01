@@ -62,19 +62,15 @@ class ClientInvoice(Document):
 		self.currency = CLIENT_BILLING_CURRENCY
 
 	def drop_floor_workers(self):
-		"""Floor worker hours stay on payroll and are never billed to a client."""
-		if not self.agents or not frappe.get_meta("Employee").has_field("is_floor_worker"):
+		"""Floor worker and HR Assistant hours stay on payroll and are never billed to a client."""
+		if not self.agents:
 			return
 		names = [row.employee for row in self.agents if row.employee]
 		if not names:
 			return
-		flagged = set(
-			frappe.get_all(
-				"Employee",
-				filters={"name": ("in", names), "is_floor_worker": 1},
-				pluck="name",
-			)
-		)
+		from hrms.hr.staff_pro_roles import employees_without_client_billing
+
+		flagged = employees_without_client_billing(names)
 		for row in list(self.agents):
 			if row.employee in flagged:
 				self.remove(row)
@@ -133,8 +129,6 @@ class ClientInvoice(Document):
 			frappe.throw(_("Client and Company are required before fetching agents"))
 
 		fields = ["name", "employee_name", "billing_rate"]
-		if frappe.get_meta("Employee").has_field("is_floor_worker"):
-			fields.append("is_floor_worker")
 		employees = frappe.get_all(
 			"Employee",
 			filters={
@@ -144,7 +138,10 @@ class ClientInvoice(Document):
 			},
 			fields=fields,
 		)
-		employees = [row for row in employees if not cint(row.get("is_floor_worker"))]
+		from hrms.hr.staff_pro_roles import employees_without_client_billing
+
+		internal = employees_without_client_billing([row.name for row in employees])
+		employees = [row for row in employees if row.name not in internal]
 		if not employees:
 			frappe.throw(
 				_("No active agents are assigned to client {0}").format(frappe.bold(self.customer))

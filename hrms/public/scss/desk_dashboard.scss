@@ -3087,6 +3087,57 @@ body.staff-pro-alive #page-dashboard-view .dashboard-graph:has(.sp-dash-hours) {
 	min-width: 0;
 }
 
+.sp-hours--hide-salary.sp-hours--hide-ss {
+	.sp-hours__table-head,
+	.sp-hours__row-main,
+	.sp-hours__group-head {
+		grid-template-columns:
+			minmax(72px, 1.2fr)
+			minmax(56px, 0.8fr)
+			minmax(48px, 0.55fr)
+			minmax(48px, 0.55fr)
+			minmax(52px, 0.6fr)
+			minmax(52px, 0.65fr)
+			minmax(52px, 0.65fr)
+			minmax(44px, 0.5fr);
+	}
+}
+
+.sp-hours--hide-salary:not(.sp-hours--hide-ss) {
+	.sp-hours__table-head,
+	.sp-hours__row-main,
+	.sp-hours__group-head {
+		grid-template-columns:
+			minmax(72px, 1.2fr)
+			minmax(56px, 0.8fr)
+			minmax(48px, 0.55fr)
+			minmax(48px, 0.55fr)
+			minmax(52px, 0.6fr)
+			minmax(52px, 0.65fr)
+			minmax(52px, 0.65fr)
+			minmax(56px, 0.65fr)
+			minmax(44px, 0.5fr);
+	}
+}
+
+.sp-hours--hide-ss:not(.sp-hours--hide-salary) {
+	.sp-hours__table-head,
+	.sp-hours__row-main,
+	.sp-hours__group-head {
+		grid-template-columns:
+			minmax(72px, 1.2fr)
+			minmax(56px, 0.8fr)
+			minmax(48px, 0.55fr)
+			minmax(48px, 0.55fr)
+			minmax(52px, 0.6fr)
+			minmax(52px, 0.65fr)
+			minmax(52px, 0.65fr)
+			minmax(64px, 0.75fr)
+			minmax(64px, 0.75fr)
+			minmax(44px, 0.5fr);
+	}
+}
+
 .sp-hours__table-head {
 	position: sticky;
 	top: 0;

@@ -305,11 +305,14 @@ def extend_bootinfo(bootinfo):
 			frappe.log_error(title="Role access boot")
 		bootinfo["staff_pro_access"] = access
 		bootinfo["staff_pro_access_blocks"] = blocked_routes(access)
-	from hrms.ai.settings import is_ask_ai_enabled
+	try:
+		from hrms.ai.permissions import can_use_ask_ai
 
-	bootinfo["staff_pro_ask_ai"] = {
-		"enabled": bool(is_staff_pro_desk_admin() and is_ask_ai_enabled()),
-	}
+		ask_ai_enabled = bool(can_use_ask_ai())
+	except Exception:
+		ask_ai_enabled = False
+		frappe.log_error(title="Ask AI boot")
+	bootinfo["staff_pro_ask_ai"] = {"enabled": ask_ai_enabled}
 	apply_payroll_frequency_translations(bootinfo)
 	_filter_bpo_workspace_sidebars(bootinfo)
 	_filter_bpo_module_sidebars(bootinfo)
@@ -442,10 +445,12 @@ def _is_allowed_bpo_dock_entry(entry, allowed_keys=None) -> bool:
 def _can_open_sidebar_item(item) -> bool:
 	if not isinstance(item, dict):
 		return True
-	from hrms.hr.role_access import sidebar_item_allowed
+	from hrms.hr.role_access import sidebar_item_allowed, sidebar_item_has_switch
 
 	if not sidebar_item_allowed(item):
 		return False
+	if sidebar_item_has_switch(item):
+		return True
 	if frappe.session.user in {"Administrator", "Guest"}:
 		return True
 	link_type = str(item.get("link_type") or "").strip().lower()
@@ -460,7 +465,7 @@ def _can_open_sidebar_item(item) -> bool:
 		if link_type == "report":
 			return bool(frappe.has_permission(link_to, "read") or frappe.has_permission("Report", "read", link_to))
 	except Exception:
-		return True
+		return False
 	return True
 
 

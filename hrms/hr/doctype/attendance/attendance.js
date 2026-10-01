@@ -13,6 +13,19 @@ frappe.ui.form.on("Attendance", {
 			return;
 		}
 
+		const flags = window.hrms?.role_access?.pay_fields
+			? hrms.role_access.pay_fields()
+			: { salary: true, ss: true };
+		["hour_rate", "daily_pay", "net_daily_pay"].forEach((fieldname) => {
+			if (frm.fields_dict[fieldname]) frm.toggle_display(fieldname, flags.salary);
+		});
+		["ss_deduction", "tax_deduction"].forEach((fieldname) => {
+			if (frm.fields_dict[fieldname]) frm.toggle_display(fieldname, flags.ss);
+		});
+		if (frm.fields_dict.daily_pay_section) {
+			frm.toggle_display("daily_pay_section", flags.salary || flags.ss);
+		}
+
 		if (frm.doc.__islocal && !frm.doc.attendance_date) {
 			frm.set_value("attendance_date", frappe.datetime.get_today());
 		}

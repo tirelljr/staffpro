@@ -90,7 +90,6 @@ class ExpenseClaim(AccountsController, PWANotificationsMixin):
 		total_exchange_gain_loss: DF.Currency
 		total_sanctioned_amount: DF.Currency
 		total_taxes_and_charges: DF.Currency
-		vehicle_log: DF.Link | None
 	# end: auto-generated types
 
 	def onload(self):

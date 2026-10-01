@@ -7,6 +7,7 @@ frappe.ui.form.on("System Settings", {
 	refresh(frm) {
 		lock_belize_timezone(frm);
 		hide_system_settings_app_tab(frm);
+		watch_system_settings_tabs(frm);
 		sync_ask_ai_provider_defaults(frm, false);
 	},
 
@@ -57,19 +58,45 @@ function lock_belize_timezone(frm) {
 }
 
 function hide_system_settings_app_tab(frm) {
-	["default_app", "app_tab"].forEach((fieldname) => {
-		frm.set_df_property(fieldname, "hidden", 1);
+	["default_app", "app_tab", "email_tab", "advanced_tab", "backups_tab"].forEach((fieldname) => {
+		if (frm.fields_dict?.[fieldname]) {
+			frm.set_df_property(fieldname, "hidden", 1);
+		}
 	});
 
-	frm.$wrapper?.find("#system-settings-app_tab").hide();
+	frm.$wrapper
+		?.find(
+			"#system-settings-app_tab, #system-settings-email_tab, #system-settings-advanced_tab, #system-settings-backups_tab",
+		)
+		.hide();
+	const hidden = new Set([
+		"App",
+		"Email",
+		"Advanced",
+		"Backups",
+		__("App"),
+		__("Email"),
+		__("Advanced"),
+		__("Backups"),
+	]);
 	frm.$wrapper
 		?.find("#form-tabs .nav-item, .form-tabs .nav-item, .form-tabs-list .nav-item")
 		.each(function () {
 			const text = ($(this).text() || "").replace(/\s+/g, " ").trim();
-			if (text === "App" || text === __("App")) {
+			if (hidden.has(text)) {
 				$(this).addClass("hidden hide").hide();
 			}
 		});
+}
+
+function watch_system_settings_tabs(frm) {
+	const tabs = frm.$wrapper?.find("#form-tabs").get(0);
+	if (!tabs || tabs._staffProSystemSettings) return;
+	tabs._staffProSystemSettings = true;
+	new MutationObserver(() => hide_system_settings_app_tab(frm)).observe(tabs, {
+		childList: true,
+		subtree: true,
+	});
 }
 
 async function scan_bpo_ipv4(frm) {

@@ -109,6 +109,7 @@ class LeaveApplication(Document, PWANotificationsMixin):
 	def validate(self):
 		validate_active_employee(self.employee)
 		set_employee_name(self)
+		self.validate_vacation_eligibility()
 		self.validate_dates()
 		self.validate_balance_leaves()
 		self.validate_leave_overlap()
@@ -184,6 +185,13 @@ class LeaveApplication(Document, PWANotificationsMixin):
 		employee_user = frappe.db.get_value("Employee", self.employee, "user_id", cache=True)
 		hrms.refetch_resource("hrms:my_leaves", employee_user)
 		hrms.refetch_resource("hrms:team_leaves")
+
+	def validate_vacation_eligibility(self):
+		if not self.leave_type or not self.employee or not self.from_date:
+			return
+		from hrms.hr.pto_anniversary import assert_can_take_vacation
+
+		assert_can_take_vacation(self.employee, self.leave_type, self.from_date)
 
 	def validate_applicable_after(self):
 		if self.leave_type:

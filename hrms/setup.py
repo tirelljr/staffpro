@@ -37,8 +37,10 @@ def after_install():
 	run_post_install_patches()
 	add_default_hr_permissions()
 	from hrms.hr.staff_pro_roles import sync_hr_assistant_permissions
+	from hrms.overrides.fiscal_year import ensure_company_fiscal_years
 
 	sync_hr_assistant_permissions()
+	ensure_company_fiscal_years()
 
 
 def before_uninstall():
@@ -78,7 +80,7 @@ def get_regional_custom_fields():
 
 
 def get_customizations():
-	from hrms.branding import USER_HIDDEN_SETTINGS_FIELDS
+	from hrms.branding import SYSTEM_HIDDEN_SETTINGS_FIELDS, USER_HIDDEN_SETTINGS_FIELDS
 	from hrms.hr.bpo_employee_labels import (
 		EMPLOYEE_FIELD_DEFAULTS,
 		EMPLOYEE_FIELD_LABELS,
@@ -119,8 +121,10 @@ def get_customizations():
 			{"doc_type": "Salary Slip", "field_name": "year_to_date", "property": "description"},
 			{"doc_type": "Salary Slip", "field_name": "month_to_date", "property": "description"},
 			{"doc_type": "Employee", "property": "default_view"},
-			{"doc_type": "System Settings", "field_name": "default_app", "property": "hidden"},
-			{"doc_type": "System Settings", "field_name": "app_tab", "property": "hidden"},
+			*[
+				{"doc_type": "System Settings", "field_name": fieldname, "property": "hidden"}
+				for fieldname in SYSTEM_HIDDEN_SETTINGS_FIELDS
+			],
 			*[
 				{"doc_type": "User", "field_name": fieldname, "property": "hidden"}
 				for fieldname in USER_HIDDEN_SETTINGS_FIELDS
@@ -882,6 +886,40 @@ def get_custom_fields():
 				"label": _("Restrict Agent Login to Registered Device"),
 				"insert_after": "scan_bpo_ipv4",
 			},
+			{
+				"default": "Off",
+				"fieldname": "staff_pro_backup_period",
+				"fieldtype": "Select",
+				"hidden": 1,
+				"insert_after": "restrict_agent_login_to_device",
+				"label": _("Backup Period"),
+				"options": "Off\nDaily\nWeekly\nMonthly",
+			},
+			{
+				"default": "Monday",
+				"fieldname": "staff_pro_backup_weekday",
+				"fieldtype": "Select",
+				"hidden": 1,
+				"insert_after": "staff_pro_backup_period",
+				"label": _("Backup Weekday"),
+				"options": "Monday\nTuesday\nWednesday\nThursday\nFriday\nSaturday\nSunday",
+			},
+			{
+				"default": "1",
+				"fieldname": "staff_pro_backup_month_day",
+				"fieldtype": "Int",
+				"hidden": 1,
+				"insert_after": "staff_pro_backup_weekday",
+				"label": _("Backup Day of Month"),
+			},
+			{
+				"default": "7",
+				"fieldname": "staff_pro_backup_limit",
+				"fieldtype": "Int",
+				"hidden": 1,
+				"insert_after": "staff_pro_backup_month_day",
+				"label": _("Dumps to Keep"),
+			},
 		],
 		"User": [
 			{
@@ -981,13 +1019,6 @@ def make_fixtures():
 			"bonus_type_name": _("Other"),
 			"description": _("Any other one-time bonus added to gross pay."),
 		},
-		# vehicle service item
-		{"doctype": "Vehicle Service Item", "service_item": "Brake Oil"},
-		{"doctype": "Vehicle Service Item", "service_item": "Brake Pad"},
-		{"doctype": "Vehicle Service Item", "service_item": "Clutch Plate"},
-		{"doctype": "Vehicle Service Item", "service_item": "Engine Oil"},
-		{"doctype": "Vehicle Service Item", "service_item": "Oil Change"},
-		{"doctype": "Vehicle Service Item", "service_item": "Wheels"},
 		# leave type
 		{
 			"doctype": "Leave Type",

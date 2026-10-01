@@ -221,16 +221,12 @@ function customize_organization_slide() {
 	const original_before_show = org_slide.before_show;
 	org_slide.onload = function (slide) {
 		set_staff_pro_company_values(slide);
+		apply_staff_pro_fiscal_year(slide);
 		slide.get_input("company_name")?.off("input");
 		slide.get_input("company_abbr")?.off("change");
 
 		slide.get_input("fy_start_date")?.off("change.staffpro").on("change.staffpro", function () {
-			const start_date = slide.form.fields_dict.fy_start_date.get_value();
-			const year_end_date = frappe.datetime.add_days(
-				frappe.datetime.add_months(start_date, 12),
-				-1,
-			);
-			slide.form.fields_dict.fy_end_date.set_value(year_end_date);
+			apply_staff_pro_fiscal_year(slide);
 		});
 
 		slide.get_input("view_coa")?.off("click.staffpro").on("click.staffpro", function () {
@@ -245,16 +241,45 @@ function customize_organization_slide() {
 	org_slide.before_show = function () {
 		original_before_show?.call(this);
 		set_staff_pro_company_values(this);
+		apply_staff_pro_fiscal_year(this);
 	};
 
 	const original_validate = org_slide.validate;
 	org_slide.validate = function () {
 		set_staff_pro_company_values(this);
+		apply_staff_pro_fiscal_year(this);
 		this.values.company_name = STAFF_PRO_COMPANY_NAME;
 		this.values.company_abbr = STAFF_PRO_COMPANY_ABBR;
 		this.values.setup_demo = 0;
 		return original_validate?.call(this) ?? true;
 	};
+}
+
+function staff_pro_fiscal_year_end(start_date) {
+	if (!start_date) {
+		return null;
+	}
+	return frappe.datetime.add_days(frappe.datetime.add_months(start_date, 12), -1);
+}
+
+function apply_staff_pro_fiscal_year(slide) {
+	const start_field = slide.form?.fields_dict?.fy_start_date;
+	const end_field = slide.form?.fields_dict?.fy_end_date;
+	if (!start_field || !end_field) {
+		return;
+	}
+
+	let start_date = start_field.get_value();
+	if (!start_date) {
+		const year = frappe.datetime.str_to_obj(frappe.datetime.now_date()).getFullYear();
+		start_date = `${year}-01-01`;
+		start_field.set_value(start_date);
+	}
+
+	const year_end_date = staff_pro_fiscal_year_end(start_date);
+	if (year_end_date) {
+		end_field.set_value(year_end_date);
+	}
 }
 
 function set_staff_pro_company_values(slide) {

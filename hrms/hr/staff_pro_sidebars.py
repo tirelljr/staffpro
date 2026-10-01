@@ -26,6 +26,20 @@ REMOVED_SIDEBAR_LABELS = frozenset(
 		"Unpaid Expense Claim",
 		"Team Structure",
 		"Organizational Chart",
+		"Data Analytics",
+		"Email Account",
+		"Customization",
+		"Customize Form",
+		"Print Format",
+		"Time Off Admin",
+		"Leave Admin",
+		"Time Off Control",
+		"PTO Policy Setup",
+		"PTO Allocation",
+		"Leave Period",
+		"Leave Policy",
+		"Leave Block List",
+		"Error Log",
 	}
 )
 REMOVED_SIDEBAR_LINKS = frozenset(
@@ -37,6 +51,17 @@ REMOVED_SIDEBAR_LINKS = frozenset(
 		"Salary Register",
 		"Unpaid Expense Claim",
 		"organizational-chart",
+		"Data Analytics",
+		"Email Account",
+		"customize-form",
+		"Print Format",
+		"Leave Control Panel",
+		"Leave Policy Assignment",
+		"Leave Allocation",
+		"Leave Period",
+		"Leave Policy",
+		"Leave Block List",
+		"Error Log",
 	}
 )
 
@@ -171,7 +196,7 @@ def _drop_empty_sections(items: list[dict]) -> list[dict]:
 	index = 0
 	while index < len(items):
 		row = items[index]
-		if row.get("type") == "Section Break" and (row.get("label") or "").strip() == "Reports":
+		if row.get("type") == "Section Break":
 			index += 1
 			children = []
 			while index < len(items) and items[index].get("child"):

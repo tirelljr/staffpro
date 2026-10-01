@@ -51,7 +51,7 @@ hrms.paid_time_off = {
 				<div class="sp-dash-panel__head">
 					<h2 class="sp-dash-panel__title">${this.escape(__("Paid Time Off"))}</h2>
 				</div>
-				<p class="sp-pto-form__hint">${this.escape(__("Pick an agent, the days they will be out, and the reason. Their PTO balance updates here and on Upcoming Absences."))}</p>
+				<p class="sp-pto-form__hint">${this.escape(__("Pick an agent, the days they will be out, and the reason. Vacation accrues after 2 weeks and can be taken after 1 year, one week at a time. Accruing time is not bookable until the work anniversary."))}</p>
 				<div class="sp-pto-form__grid">
 					<label class="sp-pto-field">
 						<span>${this.escape(__("Agent"))}</span>
@@ -98,6 +98,8 @@ hrms.paid_time_off = {
 						<span>${this.escape(__("Expired"))}</span>
 						<span>${this.escape(__("Closing"))}</span>
 						<span>${this.escape(__("PTO Money Value"))}</span>
+						<span>${this.escape(__("Usable"))}</span>
+						<span>${this.escape(__("Accruing"))}</span>
 					</div>
 					<div class="sp-pto-balance-list"></div>
 				</div>
@@ -324,6 +326,8 @@ hrms.paid_time_off = {
 					<span>${this.escape(this.number(row.leaves_expired))}</span>
 					<span>${this.escape(this.number(row.closing_balance))}</span>
 					<span>${this.escape(this.money(row.pto_money_value))}</span>
+					<span>${row.usable_days == null ? "—" : this.escape(this.number(row.usable_days))}</span>
+					<span>${row.accruing_days == null ? "—" : this.escape(this.number(row.accruing_days))}</span>
 				</button>`,
 				)
 				.join(""),

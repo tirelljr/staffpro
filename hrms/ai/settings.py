@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 import frappe
 from frappe import _
+from frappe.utils import cint
 
 PROVIDER_DEFAULTS = {
 	"DeepSeek": {"model": "deepseek-chat", "api_base": "https://api.deepseek.com"},
@@ -60,9 +61,9 @@ def _system_settings():
 
 def is_ask_ai_enabled() -> bool:
 	if _has_system_ai_fields():
-		return bool(_system_settings().enable_ask_ai)
+		return bool(cint(_system_settings().enable_ask_ai))
 	if frappe.db.exists("DocType", "AI Settings"):
-		return bool(frappe.get_cached_doc("AI Settings").enabled)
+		return bool(cint(frappe.get_cached_doc("AI Settings").enabled))
 	return False
 
 

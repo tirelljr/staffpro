@@ -452,13 +452,15 @@ def get_assigned_salary_structure(employee, on_date):
 def get_employee_currency(employee: str) -> str:
 	frappe.has_permission("Employee", "read", employee, throw=True)
 	employee_currency = frappe.db.get_value("Salary Structure Assignment", {"employee": employee}, "currency")
-	if not employee_currency:
-		frappe.throw(
-			_("There is no Salary Structure assigned to {0}. First assign a Salary Structure.").format(
-				employee
-			)
-		)
-	return employee_currency
+	if employee_currency:
+		return employee_currency
+
+	company = frappe.db.get_value("Employee", employee, "company")
+	return (
+		(frappe.db.get_value("Company", company, "default_currency") if company else None)
+		or frappe.defaults.get_global_default("currency")
+		or "BZD"
+	)
 
 
 def get_tax_component(salary_structure: str) -> str | None:

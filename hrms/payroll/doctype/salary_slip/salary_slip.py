@@ -29,7 +29,6 @@ from frappe.utils import (
 from frappe.utils.background_jobs import enqueue
 
 import erpnext
-from erpnext.accounts.utils import get_fiscal_year
 from erpnext.setup.doctype.employee.employee import get_holiday_list_for_employee
 from erpnext.utilities.transaction_base import TransactionBase
 
@@ -2634,15 +2633,11 @@ class SalarySlip(TransactionBase):
 
 	def get_year_to_date_period(self):
 		if self.payroll_period:
-			period_start_date = self.payroll_period.start_date
-			period_end_date = self.payroll_period.end_date
-		else:
-			# get dates based on fiscal year if no payroll period exists
-			fiscal_year = get_fiscal_year(date=self.start_date, company=self.company, as_dict=1)
-			period_start_date = fiscal_year.year_start_date
-			period_end_date = fiscal_year.year_end_date
+			return self.payroll_period.start_date, self.payroll_period.end_date
 
-		return period_start_date, period_end_date
+		from hrms.overrides.fiscal_year import calendar_year_period
+
+		return calendar_year_period(self.start_date)
 
 	def add_leave_balances(self):
 		self.set("leave_details", [])

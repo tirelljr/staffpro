@@ -195,10 +195,68 @@ SALES_INVOICE_ITEM_LABELS = {
 }
 
 
+INVOICE_REPORT_DOCTYPES = (
+	"Sales Invoice",
+	"Sales Invoice Item",
+	"Payment Entry",
+	"GL Entry",
+	"Customer",
+	"Account",
+	"Journal Entry",
+)
+
+INVOICE_REPORT_ROLES = (
+	"System Manager",
+	"HR Manager",
+	"Accounts Manager",
+	"Accounts User",
+)
+
+INVOICE_REPORT_PERMTYPES = ("read", "select", "report", "export", "print")
+
+
+def ensure_accounts_roles() -> None:
+	for name in ("Accounts Manager", "Accounts User"):
+		if frappe.db.exists("Role", name):
+			continue
+		frappe.get_doc(
+			{
+				"doctype": "Role",
+				"role_name": name,
+				"desk_access": 1,
+			}
+		).insert(ignore_permissions=True)
+
+
+def ensure_invoice_report_permissions() -> None:
+	"""Desk users must have permlevel 0 read on invoice doctypes.
+
+	Role cleanup previously stripped Sales Invoice DocPerms. Outstanding Invoices
+	then fails because the query builder cannot filter posting_date.
+	"""
+	from frappe.permissions import add_permission, update_permission_property
+
+	ensure_accounts_roles()
+	for doctype in INVOICE_REPORT_DOCTYPES:
+		if not frappe.db.exists("DocType", doctype):
+			continue
+		for role in INVOICE_REPORT_ROLES:
+			if not frappe.db.exists("Role", role):
+				continue
+			add_permission(doctype, role, permlevel=0)
+			for ptype in INVOICE_REPORT_PERMTYPES:
+				try:
+					update_permission_property(doctype, role, 0, ptype, 1)
+				except Exception:
+					continue
+		frappe.clear_cache(doctype=doctype)
+
+
 def apply_bpo_sales_invoice_layout():
 	if not frappe.db.exists("DocType", "Sales Invoice"):
 		return
 
+	ensure_invoice_report_permissions()
 	_hide_fields("Sales Invoice", HIDDEN_SALES_INVOICE_FIELDS)
 	_ensure_hidden_series_has_default("Sales Invoice", "naming_series")
 	_unrequire_hidden_fields_without_default("Sales Invoice", HIDDEN_SALES_INVOICE_FIELDS)

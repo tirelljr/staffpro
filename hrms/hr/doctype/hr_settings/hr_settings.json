@@ -33,6 +33,11 @@
   "leave_status_notification_template",
   "restrict_backdated_leave_application",
   "role_allowed_to_create_backdated_leave_application",
+  "vacation_section",
+  "vacation_accrual_wait_days",
+  "vacation_minutes_per_hours_worked",
+  "vacation_hours_per_accrual_unit",
+  "vacation_max_days",
   "expenses_tab",
   "expenses_settings_section",
   "expense_approver_mandatory_in_expense_claim",
@@ -246,6 +251,43 @@
    "fieldname": "restrict_backdated_leave_application",
    "fieldtype": "Check",
    "label": "Restrict Backdated Leave Application"
+  },
+  {
+   "fieldname": "vacation_section",
+   "fieldtype": "Section Break",
+   "label": "Vacation"
+  },
+  {
+   "default": "14",
+   "description": "Hours worked before this many days from the joining date do not accrue vacation.",
+   "fieldname": "vacation_accrual_wait_days",
+   "fieldtype": "Int",
+   "label": "Vacation Accrual Starts After (Days)",
+   "non_negative": 1
+  },
+  {
+   "default": "15",
+   "description": "Minutes of vacation earned for each block of hours worked. Default is 15 minutes.",
+   "fieldname": "vacation_minutes_per_hours_worked",
+   "fieldtype": "Float",
+   "label": "Vacation Minutes Earned",
+   "non_negative": 1
+  },
+  {
+   "default": "8",
+   "description": "Hours worked that earn the vacation minutes above. Default is 15 minutes for every 8 hours worked.",
+   "fieldname": "vacation_hours_per_accrual_unit",
+   "fieldtype": "Float",
+   "label": "Hours Worked per Accrual Block",
+   "non_negative": 1
+  },
+  {
+   "default": "10",
+   "description": "On each work anniversary, usable vacation is the past year's accrued time, capped at this many days.",
+   "fieldname": "vacation_max_days",
+   "fieldtype": "Float",
+   "label": "Maximum Vacation Days per Year",
+   "non_negative": 1
   },
   {
    "default": "0",

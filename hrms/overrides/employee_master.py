@@ -16,8 +16,10 @@ class EmployeeMaster(Employee):
 		apply_default_approvers(self)
 		super().validate()
 		from hrms.hr.floor_workers import apply_employee_floor_worker_rules
+		from hrms.hr.staff_pro_roles import apply_internal_staff_billing_rules
 
 		apply_employee_floor_worker_rules(self)
+		apply_internal_staff_billing_rules(self)
 
 	def autoname(self):
 		naming_method = frappe.db.get_single_value("HR Settings", "emp_created_by")

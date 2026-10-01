@@ -130,19 +130,19 @@ def _customers_for_payroll(doc) -> list[str]:
 
 	employees = [row.employee for row in doc.get("employees") or [] if row.employee]
 	if employees and frappe.get_meta("Employee").has_field("bill_to_customer"):
-		fields = ["bill_to_customer"]
-		if frappe.get_meta("Employee").has_field("is_floor_worker"):
-			fields.append("is_floor_worker")
+		from hrms.hr.staff_pro_roles import employees_without_client_billing
+
 		rows = frappe.get_all(
 			"Employee",
 			filters={"name": ("in", employees), "bill_to_customer": ("is", "set")},
-			fields=fields,
+			fields=["name", "bill_to_customer"],
 		)
+		internal = employees_without_client_billing([row.name for row in rows])
 		customers = [
 			row.bill_to_customer
 			for row in rows
 			if row.bill_to_customer
-			and not cint(row.get("is_floor_worker"))
+			and row.name not in internal
 			and not is_all_agents_payroll(row.bill_to_customer)
 		]
 		return list(dict.fromkeys(customers))
@@ -422,9 +422,8 @@ def submit_due_drafts(company: str, as_of: date, force: bool = False) -> dict:
 def get_billable_customers(company: str) -> list[str]:
 	if not frappe.get_meta("Employee").has_field("bill_to_customer"):
 		return []
-	fields = ["bill_to_customer"]
-	if frappe.get_meta("Employee").has_field("is_floor_worker"):
-		fields.append("is_floor_worker")
+	from hrms.hr.staff_pro_roles import employees_without_client_billing
+
 	rows = frappe.get_all(
 		"Employee",
 		filters={
@@ -432,13 +431,14 @@ def get_billable_customers(company: str) -> list[str]:
 			"status": "Active",
 			"bill_to_customer": ("is", "set"),
 		},
-		fields=fields,
+		fields=["name", "bill_to_customer"],
 	)
+	internal = employees_without_client_billing([row.name for row in rows])
 	return list(
 		dict.fromkeys(
 			row.bill_to_customer
 			for row in rows
-			if row.bill_to_customer and not cint(row.get("is_floor_worker"))
+			if row.bill_to_customer and row.name not in internal
 		)
 	)
 

@@ -17,10 +17,17 @@ export function isHrAssistant(user) {
 	return user.roles.includes(HR_ASSISTANT_ROLE)
 }
 
+export function isMyWorkSession() {
+	return Boolean(window.frappe?.boot?.staff_pro_my_work)
+}
+
 /**
  * HR Assistants who are also active employees use the /agents PWA for clock-in and self-service.
+ * The agents page boot flag is set from the desk session, so My Work does not depend on a
+ * JavaScript-readable user_id cookie.
  */
 export function canUseMyWorkPortal(user) {
+	if (isMyWorkSession()) return true
 	return isHrAssistant(user)
 }
 

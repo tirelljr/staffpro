@@ -26,7 +26,7 @@ AGENT_PORTAL_ROLES = frozenset({"Employee Self Service", "Employee"})
 
 HR_ASSISTANT_ROLE = "HR Assistant"
 HR_PERMISSION_SOURCE_ROLE = "HR User"
-MY_WORK_PORTAL_PATH = "/agents"
+MY_WORK_PORTAL_PATH = "/agents/dashboard/attendance"
 
 DOC_PERM_PTYPES = (
 	"permlevel",
@@ -59,6 +59,52 @@ def is_staff_pro_hr_desk_user(user: str | None = None) -> bool:
 
 def is_hr_assistant_user(user: str | None = None) -> bool:
 	return HR_ASSISTANT_ROLE in user_roles(user)
+
+
+def employee_is_hr_assistant(employee: str | None = None, user_id: str | None = None) -> bool:
+	user = user_id
+	if not user and employee:
+		user = frappe.db.get_value("Employee", employee, "user_id")
+	return bool(user) and is_hr_assistant_user(user)
+
+
+def employee_is_client_billable(
+	employee: str | None = None,
+	user_id: str | None = None,
+	is_floor: int | bool | None = None,
+) -> bool:
+	"""Floor workers and HR Assistants are internal staff and are not billed to a client."""
+	if is_floor is None and employee and frappe.get_meta("Employee").has_field("is_floor_worker"):
+		is_floor = frappe.db.get_value("Employee", employee, "is_floor_worker")
+	if is_floor:
+		return False
+	return not employee_is_hr_assistant(employee, user_id)
+
+
+def employees_without_client_billing(names: list[str] | None) -> set[str]:
+	if not names:
+		return set()
+	fields = ["name", "user_id"]
+	if frappe.get_meta("Employee").has_field("is_floor_worker"):
+		fields.append("is_floor_worker")
+	flagged = set()
+	for row in frappe.get_all("Employee", filters={"name": ("in", names)}, fields=fields):
+		if not employee_is_client_billable(
+			row.name, user_id=row.user_id, is_floor=row.get("is_floor_worker")
+		):
+			flagged.add(row.name)
+	return flagged
+
+
+def apply_internal_staff_billing_rules(doc) -> None:
+	"""HR Assistants are never billed to a client."""
+	if not employee_is_hr_assistant(doc.get("name"), user_id=doc.get("user_id")):
+		return
+	meta = getattr(doc, "meta", None) or frappe.get_meta("Employee")
+	if meta.has_field("bill_to_customer"):
+		doc.bill_to_customer = None
+	if meta.has_field("billing_rate"):
+		doc.billing_rate = 0
 
 
 def linked_active_employee(user: str | None = None) -> str | None:

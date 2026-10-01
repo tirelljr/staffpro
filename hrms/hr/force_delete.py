@@ -44,9 +44,10 @@ NO_CASCADE_DELETE = NO_HARD_DELETE | frozenset(
 	}
 )
 
+# Do not unlink DocPerm: those rows belong to the DocType JSON. Removing them
+# when a role is deleted leaves Sales Invoice (and others) without permlevel 0.
 ROLE_CHILD_TABLES = (
 	("Has Role", "role"),
-	("DocPerm", "role"),
 	("Custom DocPerm", "role"),
 	("Custom Role", "role"),
 	("User Document Type", "role"),

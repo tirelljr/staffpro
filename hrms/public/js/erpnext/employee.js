@@ -573,7 +573,7 @@ function setup_floor_worker_form(frm, clear_shift) {
 		}
 	}
 
-	["billing_section", "bill_to_customer", "billing_rate", "default_shift"].forEach((fieldname) => {
+	["billing_section", "bill_to_customer", "billing_rate", "billing_currency", "default_shift"].forEach((fieldname) => {
 		if (frm.fields_dict[fieldname]) {
 			frm.toggle_display(fieldname, !cint(frm.doc.is_floor_worker));
 		}
@@ -1365,6 +1365,14 @@ function setup_employee_profile_stats(frm) {
 		const hours = Number(stats.total_hours || 0);
 		const leave_remaining = Number(stats.leave_remaining || 0);
 		const sees_billing = staff_pro_can("see_bill_to_client") || staff_pro_can("see_client_invoices");
+		const has_client_billing = stats.has_client_billing !== false;
+		if (!has_client_billing) {
+			["billing_section", "bill_to_customer", "billing_rate", "billing_currency"].forEach((fieldname) => {
+				if (frm.fields_dict[fieldname]) {
+					frm.toggle_display(fieldname, false);
+				}
+			});
+		}
 		const rows = [
 			{
 				label: __("Total SS contributions"),
@@ -1379,12 +1387,12 @@ function setup_employee_profile_stats(frm) {
 			{
 				label: __("Total Billed to Client"),
 				value: money(stats.total_billed, billing_currency),
-				show: visibility.total_billed !== false && sees_billing,
+				show: has_client_billing && visibility.total_billed !== false && sees_billing,
 			},
 			{
 				label: __("Agent Profit"),
 				value: money(stats.agent_profit, company_currency),
-				show: visibility.agent_profit !== false && staff_pro_can("see_agent_salary") && sees_billing,
+				show: has_client_billing && visibility.agent_profit !== false && staff_pro_can("see_agent_salary") && sees_billing,
 			},
 			{
 				label: __("Tax total"),
@@ -1405,6 +1413,16 @@ function setup_employee_profile_stats(frm) {
 				label: __("Leave Money Value remaining"),
 				value: money(stats.leave_money_remaining, company_currency),
 				show: visibility.payroll_totals !== false && staff_pro_can("see_agent_salary"),
+			},
+			{
+				label: __("Vacation usable"),
+				value: `${Number(stats.vacation_usable || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} days`,
+				show: visibility.leave_remaining !== false,
+			},
+			{
+				label: __("Vacation accruing"),
+				value: `${Number(stats.vacation_accruing || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} days`,
+				show: visibility.leave_remaining !== false,
 			},
 		].filter((row) => row.show);
 		if (!rows.length) {

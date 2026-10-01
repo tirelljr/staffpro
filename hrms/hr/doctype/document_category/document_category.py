@@ -40,11 +40,14 @@ def seed_document_categories() -> None:
 	for name, description, sort_order in DEFAULT_DOCUMENT_CATEGORIES:
 		if frappe.db.exists("Document Category", name):
 			continue
-		frappe.get_doc(
-			{
-				"doctype": "Document Category",
-				"category_name": name,
-				"description": description,
-				"sort_order": sort_order,
-			}
-		).insert(ignore_permissions=True)
+		try:
+			frappe.get_doc(
+				{
+					"doctype": "Document Category",
+					"category_name": name,
+					"description": description,
+					"sort_order": sort_order,
+				}
+			).insert(ignore_permissions=True, ignore_if_duplicate=True)
+		except (frappe.DuplicateEntryError, frappe.UniqueValidationError):
+			frappe.clear_last_message()

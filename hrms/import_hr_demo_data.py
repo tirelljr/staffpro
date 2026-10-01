@@ -30,6 +30,7 @@ DEPARTMENTS = [
 
 DESIGNATIONS = [
 	"HR Manager",
+	"HR Assistant",
 	"Operations Manager",
 	"Team Lead",
 	"Customer Service Representative",
@@ -53,6 +54,66 @@ EMPLOYEES = [
 	{"first_name": "Pedro", "last_name": "Ramirez", "email": "pedro.ramirez@staffpro.local", "gender": "Male", "department": "IT", "designation": "IT Support Specialist", "date_of_birth": "1995-10-14", "date_of_joining": "2023-10-16", "reports_to": "james.rivera@staffpro.local"},
 	{"first_name": "Isabella", "last_name": "Morales", "email": "isabella.morales@staffpro.local", "gender": "Female", "department": "Customer Support", "designation": "Customer Service Representative", "date_of_birth": "1996-08-20", "date_of_joining": "2024-08-20", "reports_to": "ana.cruz@staffpro.local"},
 	{"first_name": "Luis", "last_name": "Herrera", "email": "luis.herrera@staffpro.local", "gender": "Male", "department": "Operations", "designation": "Supervisor", "date_of_birth": "1986-02-28", "date_of_joining": "2017-03-06", "reports_to": "james.rivera@staffpro.local"},
+	{
+		"first_name": "Nicole",
+		"last_name": "Bowen",
+		"email": "nicole.bowen@staffpro.local",
+		"gender": "Female",
+		"department": "Human Resources",
+		"designation": "HR Assistant",
+		"date_of_birth": "1993-04-18",
+		"date_of_joining": "2024-03-04",
+		"reports_to": "maria.santos@staffpro.local",
+		"hr_assistant": True,
+	},
+	{
+		"first_name": "Keisha",
+		"last_name": "Young",
+		"email": "keisha.young@staffpro.local",
+		"gender": "Female",
+		"department": "Human Resources",
+		"designation": "HR Assistant",
+		"date_of_birth": "1995-11-02",
+		"date_of_joining": "2025-01-13",
+		"reports_to": "maria.santos@staffpro.local",
+		"hr_assistant": True,
+	},
+	{
+		"first_name": "Tyler",
+		"last_name": "Castillo",
+		"email": "tyler.castillo@staffpro.local",
+		"gender": "Male",
+		"department": "Operations",
+		"designation": "Customer Service Representative",
+		"date_of_birth": "1997-06-09",
+		"date_of_joining": "2024-05-20",
+		"reports_to": "luis.herrera@staffpro.local",
+		"is_floor_worker": True,
+	},
+	{
+		"first_name": "Maya",
+		"last_name": "Flores",
+		"email": "maya.flores@staffpro.local",
+		"gender": "Female",
+		"department": "Operations",
+		"designation": "Customer Service Representative",
+		"date_of_birth": "1998-02-14",
+		"date_of_joining": "2024-09-03",
+		"reports_to": "luis.herrera@staffpro.local",
+		"is_floor_worker": True,
+	},
+	{
+		"first_name": "Owen",
+		"last_name": "Bell",
+		"email": "owen.bell@staffpro.local",
+		"gender": "Male",
+		"department": "Operations",
+		"designation": "Customer Service Representative",
+		"date_of_birth": "1996-12-01",
+		"date_of_joining": "2025-02-10",
+		"reports_to": "luis.herrera@staffpro.local",
+		"is_floor_worker": True,
+	},
 ]
 
 LEAVE_TYPES = ["Casual Leave", "Sick Leave", "Privilege Leave"]
@@ -77,6 +138,7 @@ DEMO_PAYROLL_WORKING_DAYS = 10
 
 HOUR_RATES = {
 	"HR Manager": 24.0,
+	"HR Assistant": 16.0,
 	"Operations Manager": 22.0,
 	"Team Lead": 16.0,
 	"Customer Service Representative": 12.5,
@@ -89,6 +151,7 @@ HOUR_RATES = {
 
 BILLING_RATES = {
 	"HR Manager": 36.0,
+	"HR Assistant": 0.0,
 	"Operations Manager": 32.0,
 	"Team Lead": 26.0,
 	"Customer Service Representative": 22.0,
@@ -164,6 +227,11 @@ DEMO_BANK_ACCOUNTS = {
 	"pedro.ramirez@staffpro.local": {"bank": "Belize Bank", "account_no": "2205748193", "account_type": "Checking"},
 	"isabella.morales@staffpro.local": {"bank": "Atlantic Bank", "account_no": "3106582947", "account_type": "Savings"},
 	"luis.herrera@staffpro.local": {"bank": "National Bank of Belize", "account_no": "4003728194", "account_type": "Savings"},
+	"nicole.bowen@staffpro.local": {"bank": "Heritage Bank", "account_no": "1507263841", "account_type": "Checking"},
+	"keisha.young@staffpro.local": {"bank": "Belize Bank", "account_no": "2209183746", "account_type": "Savings"},
+	"tyler.castillo@staffpro.local": {"bank": "Atlantic Bank", "account_no": "3108273645", "account_type": "Checking"},
+	"maya.flores@staffpro.local": {"bank": "National Bank of Belize", "account_no": "4006281739", "account_type": "Savings"},
+	"owen.bell@staffpro.local": {"bank": "Heritage Bank", "account_no": "1509384726", "account_type": "Checking"},
 }
 
 
@@ -191,14 +259,17 @@ def run(company=None):
 		return
 
 	print(f"Creating HR demo data for {company}...")
+	from hrms.overrides.fiscal_year import ensure_company_fiscal_years
+
+	ensure_company_fiscal_years(company)
 	frappe.flags.in_import = True
 
 	try:
 		_ensure_demo_masters()
+		departments = _create_departments(company)
+		designations = _create_designations()
+		holiday_list = _ensure_holiday_list(company)
 		if not _has_hr_demo_data(company):
-			departments = _create_departments(company)
-			designations = _create_designations()
-			holiday_list = _ensure_holiday_list(company)
 			_create_leave_period(company)
 			employee_map = _create_employees(company, departments, designations, holiday_list)
 			seed_demo_profile_images()
@@ -207,6 +278,11 @@ def run(company=None):
 			_create_job_openings(company, departments, designations)
 			_create_job_applicants(designations)
 			_set_default_company(company)
+		else:
+			employee_map = _sync_missing_demo_employees(company, departments, designations, holiday_list)
+			_apply_demo_workforce_profiles(employee_map)
+			seed_demo_profile_images()
+			seed_demo_employee_banks(company, employee_map)
 		seed_connected_bpo_demo(company)
 		frappe.db.commit()
 		status(company)
@@ -647,6 +723,50 @@ def _backfill_demo_payroll_banks(employee_map):
 					frappe.db.set_value("Payroll Employee Detail", name, detail_values, update_modified=False)
 
 
+def _demo_employee_spec(email: str) -> dict:
+	for row in EMPLOYEES:
+		if row["email"] == email:
+			return row
+	return {}
+
+
+def _employee_is_floor_worker(employee: str) -> bool:
+	email = frappe.db.get_value("Employee", employee, "company_email")
+	if email and _demo_employee_spec(email).get("is_floor_worker"):
+		return True
+	if frappe.get_meta("Employee").has_field("is_floor_worker"):
+		return bool(cint(frappe.db.get_value("Employee", employee, "is_floor_worker")))
+	return False
+
+
+def _sync_missing_demo_employees(company, departments, designations, holiday_list):
+	return _create_employees(company, departments, designations, holiday_list)
+
+
+def _apply_demo_workforce_profiles(employee_map):
+	from hrms.hr.floor_workers import apply_employee_floor_worker_rules
+
+	for email, employee in employee_map.items():
+		spec = _demo_employee_spec(email)
+		if spec.get("is_floor_worker") and frappe.get_meta("Employee").has_field("is_floor_worker"):
+			doc = frappe.get_doc("Employee", employee)
+			doc.is_floor_worker = 1
+			apply_employee_floor_worker_rules(doc)
+			doc.flags.ignore_permissions = True
+			doc.save()
+		if spec.get("hr_assistant"):
+			_provision_demo_hr_assistant(email)
+
+
+def _provision_demo_hr_assistant(email: str) -> None:
+	from hrms.hr.staff_pro_hr_assistant_setup import ensure_hr_assistant_user
+
+	try:
+		ensure_hr_assistant_user(email)
+	except Exception:
+		frappe.log_error(title=f"Demo HR Assistant setup failed for {email}")
+
+
 def _create_employees(company, departments, designations, holiday_list):
 	employee_map = {}
 
@@ -692,6 +812,7 @@ def _create_employees(company, departments, designations, holiday_list):
 
 	seed_demo_employee_dates()
 	_apply_employee_bpo_fields(company, employee_map)
+	_apply_demo_workforce_profiles(employee_map)
 	seed_demo_employee_banks(company, employee_map)
 	return employee_map
 
@@ -1553,6 +1674,7 @@ def seed_connected_bpo_demo(company=None):
 			frappe.log_error(title="Demo salary structure failed")
 		_configure_demo_payroll_settings(company)
 		history = seed_floor_history(company, list(employee_map.values()))
+		floor_days = _seed_floor_worker_attendance(company, employee_map)
 		exceptions = _stamp_attendance_exceptions(company, list(employee_map.values()))
 		submitted = _submit_open_attendance(company, history["from_date"], history["to_date"])
 		ot_demo = seed_overtime_and_holiday_demo(company, ensure_payroll_entry=False)
@@ -1575,7 +1697,7 @@ def seed_connected_bpo_demo(company=None):
 			frappe.db.commit()
 		print(
 			"Connected BPO demo: "
-			f"{history['created']} clock days, {submitted} attendance submitted, "
+			f"{history['created']} clock days, {floor_days} floor-worker days, {submitted} attendance submitted, "
 			f"{exceptions['absent']} absent, {exceptions['late']} late, {exceptions['early']} early, "
 			f"{payroll['slips']} salary slips, {invoices} client invoices, "
 			f"{(ot_demo or {}).get('employees', 0)} OT-threshold agents."
@@ -1618,6 +1740,7 @@ def _apply_employee_bpo_fields(company, employee_map):
 	meta = frappe.get_meta("Employee")
 	for email, employee in employee_map.items():
 		emp = emp_by_email.get(email) or {}
+		skip_billing = bool(emp.get("is_floor_worker"))
 		designation = emp.get("designation") or frappe.db.get_value("Employee", employee, "designation")
 		values = {}
 		if meta.has_field("ctc"):
@@ -1626,12 +1749,13 @@ def _apply_employee_bpo_fields(company, employee_map):
 			current = frappe.db.get_value("Employee", employee, "social_security_number")
 			if not current:
 				values["social_security_number"] = _demo_ss_number(email)
-		if meta.has_field("bill_to_customer"):
+		if meta.has_field("bill_to_customer") and not skip_billing:
 			client = CLIENT_ASSIGNMENTS.get(email)
 			if client and frappe.db.exists("Customer", client):
 				values["bill_to_customer"] = client
-		if meta.has_field("billing_rate"):
-			values["billing_rate"] = BILLING_RATES.get(designation, 22.0)
+		if meta.has_field("billing_rate") and not skip_billing:
+			rate = BILLING_RATES.get(designation, 22.0)
+			values["billing_rate"] = rate if rate else 0
 		if meta.has_field("billing_currency"):
 			values["billing_currency"] = "USD"
 		if meta.has_field("default_shift"):
@@ -1919,6 +2043,23 @@ def _demo_cycle_start():
 	return add_days(anchor, (7 - getdate(anchor).weekday()) % 7)
 
 
+def _seed_floor_worker_attendance(company, employee_map) -> int:
+	from hrms.hr.floor_workers import ensure_floor_worker_hours
+
+	floor_workers = [
+		employee for email, employee in employee_map.items() if _demo_employee_spec(email).get("is_floor_worker")
+	]
+	if not floor_workers:
+		return 0
+	today = getdate()
+	from_date = get_first_day(add_months(today, -1))
+	created = 0
+	for employee in floor_workers:
+		created += len(ensure_floor_worker_hours(from_date, today, employee=employee))
+	_backfill_attendance_pay(company, from_date, today)
+	return created
+
+
 def seed_floor_history(company, employees):
 	"""Seed Mon–Fri clocks from last month through today so dashboard charts have a series."""
 	today = getdate()
@@ -1943,6 +2084,8 @@ def seed_floor_history(company, employees):
 
 
 def _seed_history_day(index, employee, day) -> bool:
+	if _employee_is_floor_worker(employee):
+		return False
 	plan = _demo_day_plan(index, day)
 	if plan == "leave":
 		return False
@@ -2325,6 +2468,43 @@ def repair_payroll_window(company=None):
 	if not frappe.flags.in_test:
 		frappe.db.commit()
 	status(company)
+
+
+def list_demo_workforce(company=None):
+	"""Print agents, floor workers, and HR assistants for a quick sanity check."""
+	company = company or _get_company()
+	agents = floor = hr = 0
+	for emp in EMPLOYEES:
+		name = frappe.db.get_value(
+			"Employee",
+			{"company_email": emp["email"], "company": company},
+			["name", "employee_name", "designation", "is_floor_worker"],
+			as_dict=True,
+		)
+		if not name:
+			print(f"MISSING {emp['email']}")
+			continue
+		if emp.get("hr_assistant"):
+			hr += 1
+			roles = frappe.get_roles(emp["email"]) if frappe.db.exists("User", emp["email"]) else []
+			print(f"HR Assistant: {name.employee_name} ({emp['email']}) roles={roles}")
+		elif emp.get("is_floor_worker") or cint(name.is_floor_worker):
+			floor += 1
+			print(f"Floor worker: {name.employee_name} ({emp['email']})")
+		else:
+			agents += 1
+	print(f"Summary for {company}: {agents} agents, {floor} floor workers, {hr} HR assistants")
+	open_entry = frappe.db.get_value(
+		"Payroll Entry",
+		{"company": company, "docstatus": 0},
+		["name", "start_date", "end_date"],
+		as_dict=True,
+	)
+	if open_entry:
+		print(
+			f"Open payroll run: {open_entry.name} ({open_entry.start_date} to {open_entry.end_date}) — use Run Payroll Now"
+		)
+	return {"agents": agents, "floor_workers": floor, "hr_assistants": hr}
 
 
 def verify_ss_report(company=None):

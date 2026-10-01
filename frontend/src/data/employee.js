@@ -8,6 +8,7 @@ export const employeeResource = createResource({
 		if (error && error.exc_type === "AuthenticationError") {
 			// Avoid fighting an in-flight kiosk portal login (session cookie not ready yet).
 			if (window.location.pathname.includes("/login")) return
+			if (window.frappe?.boot?.staff_pro_my_work) return
 			router.push({ name: "Login" })
 		}
 	},

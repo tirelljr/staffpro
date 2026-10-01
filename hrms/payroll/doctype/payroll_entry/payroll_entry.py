@@ -21,6 +21,8 @@ from frappe.utils import (
 	flt,
 	fmt_money,
 	formatdate,
+	get_first_day,
+	get_last_day,
 	get_link_to_form,
 	getdate,
 )
@@ -29,7 +31,6 @@ import erpnext
 from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import (
 	get_accounting_dimensions,
 )
-from erpnext.accounts.utils import get_fiscal_year
 
 from hrms.payroll.doctype.salary_slip.salary_slip_loan_utils import if_lending_app_installed
 from hrms.payroll.doctype.salary_withholding.salary_withholding import link_bank_entry_in_salary_withholdings
@@ -1900,19 +1901,17 @@ def get_start_end_dates(
 			return frappe._dict({"start_date": start_date, "end_date": end_date})
 
 	if payroll_frequency == "Monthly" or payroll_frequency == "Bimonthly" or payroll_frequency == "":
-		fiscal_year = get_fiscal_year(start_date, company=company)[0]
-		month = "%02d" % getdate(start_date).month
-		m = get_month_details(fiscal_year, month)
+		resolved = getdate(start_date)
 		if payroll_frequency == "Bimonthly":
-			if getdate(start_date).day <= 15:
-				start_date = m["month_start_date"]
-				end_date = m["month_mid_end_date"]
+			if resolved.day <= 15:
+				start_date = get_first_day(resolved)
+				end_date = datetime.date(resolved.year, resolved.month, 15)
 			else:
-				start_date = m["month_mid_start_date"]
-				end_date = m["month_end_date"]
+				start_date = datetime.date(resolved.year, resolved.month, 16)
+				end_date = get_last_day(resolved)
 		else:
-			start_date = m["month_start_date"]
-			end_date = m["month_end_date"]
+			start_date = get_first_day(resolved)
+			end_date = get_last_day(resolved)
 
 	if payroll_frequency == "Weekly":
 		end_date = add_working_days(start_date, days_for_frequency("Weekly"))
@@ -1961,31 +1960,36 @@ def get_end_date(start_date: str | datetime.date, frequency: str) -> dict:
 
 
 def get_month_details(year, month):
-	ysd = frappe.db.get_value("Fiscal Year", year, "year_start_date")
-	if ysd:
-		import calendar
-		import datetime
+	import calendar
 
-		diff_mnt = cint(month) - cint(ysd.month)
-		if diff_mnt < 0:
-			diff_mnt = 12 - int(ysd.month) + cint(month)
-		msd = ysd + relativedelta(months=diff_mnt)  # month start date
-		month_days = cint(calendar.monthrange(cint(msd.year), cint(month))[1])  # days in month
-		mid_start = datetime.date(msd.year, cint(month), 16)  # month mid start date
-		mid_end = datetime.date(msd.year, cint(month), 15)  # month mid end date
-		med = datetime.date(msd.year, cint(month), month_days)  # month end date
-		return frappe._dict(
-			{
-				"year": msd.year,
-				"month_start_date": msd,
-				"month_end_date": med,
-				"month_mid_start_date": mid_start,
-				"month_mid_end_date": mid_end,
-				"month_days": month_days,
-			}
-		)
-	else:
-		frappe.throw(_("Fiscal Year {0} not found").format(year))
+	ysd = frappe.db.get_value("Fiscal Year", year, "year_start_date") if year else None
+	if not ysd:
+		from hrms.overrides.fiscal_year import calendar_year_period
+
+		year_text = str(year or "")
+		year_num = next((cint(part) for part in year_text.replace("-", " ").split() if cint(part) >= 1900), 0)
+		if not year_num:
+			year_num = calendar_year_period(None)[0].year
+		ysd = datetime.date(year_num, 1, 1)
+
+	diff_mnt = cint(month) - cint(ysd.month)
+	if diff_mnt < 0:
+		diff_mnt = 12 - int(ysd.month) + cint(month)
+	msd = ysd + relativedelta(months=diff_mnt)  # month start date
+	month_days = cint(calendar.monthrange(cint(msd.year), cint(month))[1])  # days in month
+	mid_start = datetime.date(msd.year, cint(month), 16)  # month mid start date
+	mid_end = datetime.date(msd.year, cint(month), 15)  # month mid end date
+	med = datetime.date(msd.year, cint(month), month_days)  # month end date
+	return frappe._dict(
+		{
+			"year": msd.year,
+			"month_start_date": msd,
+			"month_end_date": med,
+			"month_mid_start_date": mid_start,
+			"month_mid_end_date": mid_end,
+			"month_days": month_days,
+		}
+	)
 
 
 def log_payroll_failure(process, payroll_entry, error):
@@ -3131,15 +3135,14 @@ def _slip_social_amounts(slip) -> tuple[float, float]:
 
 
 def _ytd_social_by_employee(entry) -> dict[str, tuple[float, float]]:
-	"""Social security totals per agent from the start of the fiscal year up to this period."""
+	"""Social security totals per agent from January 1 of the period year up to this period."""
 	employees = [row.employee for row in (entry.employees or []) if row.employee]
 	if not employees or not entry.end_date:
 		return {}
 
-	try:
-		year_start = get_fiscal_year(entry.end_date, company=entry.company)[1]
-	except Exception:
-		year_start = datetime.date(getdate(entry.end_date).year, 1, 1)
+	from hrms.overrides.fiscal_year import calendar_year_period
+
+	year_start, _year_end = calendar_year_period(entry.end_date)
 
 	slips = frappe.get_all(
 		"Salary Slip",

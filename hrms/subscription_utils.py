@@ -72,16 +72,14 @@ def update_erpnext_workspaces(disable: bool = True):
 
 
 def _set_workspace_visibility(name: str, hidden: bool = True):
+	"""Hide with set_value so Desk does not save and export Workspace Home."""
 	if not frappe.db.exists("Workspace", name):
 		return
 	try:
-		workspace_doc = frappe.get_doc("Workspace", name)
-		workspace_doc.flags.ignore_links = True
-		workspace_doc.flags.ignore_validate = True
-		workspace_doc.public = 0 if hidden else 1
-		if workspace_doc.meta.has_field("is_hidden"):
-			workspace_doc.is_hidden = 1 if hidden else 0
-		workspace_doc.save()
+		values = {"public": 0 if hidden else 1}
+		if frappe.get_meta("Workspace").has_field("is_hidden"):
+			values["is_hidden"] = 1 if hidden else 0
+		frappe.db.set_value("Workspace", name, values, update_modified=False)
 	except Exception:
 		frappe.clear_messages()
 

@@ -17,6 +17,13 @@ frappe.pages["day-view"].on_page_show = function () {
 hrms.day_view = {
 	page: null,
 	$body: null,
+
+	pay_fields() {
+		return window.hrms?.role_access?.pay_fields
+			? hrms.role_access.pay_fields()
+			: { salary: true, ss: true, billing: true };
+	},
+
 	rows: [],
 	totals: {},
 	approval: "",
@@ -505,10 +512,10 @@ hrms.day_view = {
 							<th>${frappe.utils.escape_html(__("Paid"))}</th>
 							<th>${frappe.utils.escape_html(__("Unpaid"))}</th>
 							<th>${frappe.utils.escape_html(__("Total"))}</th>
-							<th>${frappe.utils.escape_html(__("Gross"))}</th>
-							<th>${frappe.utils.escape_html(__("Net"))}</th>
-							<th>${frappe.utils.escape_html(__("SS"))}</th>
-							<th>${frappe.utils.escape_html(__("Tax"))}</th>
+							${this.pay_fields().salary ? `<th>${frappe.utils.escape_html(__("Gross"))}</th>` : ""}
+							${this.pay_fields().salary ? `<th>${frappe.utils.escape_html(__("Net"))}</th>` : ""}
+							${this.pay_fields().ss ? `<th>${frappe.utils.escape_html(__("SS"))}</th>` : ""}
+							${this.pay_fields().ss ? `<th>${frappe.utils.escape_html(__("Tax"))}</th>` : ""}
 							<th>${frappe.utils.escape_html(__("Job/Absence"))}</th>
 							<th>${frappe.utils.escape_html(__("Shift"))}</th>
 							<th></th>
@@ -535,11 +542,14 @@ hrms.day_view = {
 		const attendance = rows.filter((row) => row.kind !== "pair");
 		const morning = pairs[0] || attendance[0] || null;
 		const afternoon = pairs[1] || null;
+		const lunch_in = morning?.out_time && afternoon?.in_time ? morning.out_time : null;
+		const lunch_out = morning?.out_time && afternoon?.in_time ? afternoon.in_time : null;
 		const lunch = {
 			kind: "lunch",
 			name: morning?.name || afternoon?.name || "",
-			in_time: morning?.out_time && afternoon?.in_time ? morning.out_time : null,
-			out_time: morning?.out_time && afternoon?.in_time ? afternoon.in_time : null,
+			in_time: lunch_in,
+			out_time: lunch_out,
+			break_hours: this.lunch_break_hours({ kind: "lunch", in_time: lunch_in, out_time: lunch_out }),
 			reg: 0,
 			ot: 0,
 			dt: 0,
@@ -616,6 +626,7 @@ hrms.day_view = {
 				: "";
 		const label = show_employee ? row.employee_label || row.employee_name || "" : this.date_label(date);
 		const check_disabled = !name || is_lunch ? "disabled" : "";
+		const reg_hours = is_lunch ? this.lunch_break_hours(row) : row?.reg;
 		const punch_class = punch_variant
 			? ` sp-dayview__foot sp-dayview__foot--${punch_variant}`
 			: "";
@@ -638,17 +649,17 @@ hrms.day_view = {
 				</td>
 				<td>${frappe.utils.escape_html(this.clock(row?.in_time))}</td>
 				<td>${frappe.utils.escape_html(this.clock(row?.out_time))}</td>
-				<td>${frappe.utils.escape_html(this.hours(row?.reg))}</td>
+				<td>${frappe.utils.escape_html(this.hours(reg_hours))}</td>
 				<td>${frappe.utils.escape_html(this.hours(row?.ot))}</td>
 				<td>${frappe.utils.escape_html(this.hours(row?.dt))}</td>
 				<td>${frappe.utils.escape_html(this.hours(row?.pto))}</td>
 				<td>${frappe.utils.escape_html(this.hours(row?.paid))}</td>
 				<td>${frappe.utils.escape_html(this.hours(row?.unpaid))}</td>
 				<td>${frappe.utils.escape_html(this.hours(this.entry_hours(row)))}</td>
-				<td>${frappe.utils.escape_html(this.money(row?.daily_pay))}</td>
-				<td>${frappe.utils.escape_html(this.money(row?.net_daily_pay))}</td>
-				<td>${frappe.utils.escape_html(this.money(row?.ss_deduction))}</td>
-				<td>${frappe.utils.escape_html(this.money(row?.tax_deduction))}</td>
+				${this.pay_fields().salary ? `<td>${frappe.utils.escape_html(this.money(row?.daily_pay))}</td>` : ""}
+				${this.pay_fields().salary ? `<td>${frappe.utils.escape_html(this.money(row?.net_daily_pay))}</td>` : ""}
+				${this.pay_fields().ss ? `<td>${frappe.utils.escape_html(this.money(row?.ss_deduction))}</td>` : ""}
+				${this.pay_fields().ss ? `<td>${frappe.utils.escape_html(this.money(row?.tax_deduction))}</td>` : ""}
 				<td${this.is_late_absence(row, punch_variant) ? ' class="sp-dayview__late"' : ""}>${frappe.utils.escape_html(this.job_absence_cell(row, punch_variant))}</td>
 				<td>${frappe.utils.escape_html(row?.shift || "")}</td>
 				<td class="sp-dayview__actions">${actions}</td>
@@ -665,10 +676,10 @@ hrms.day_view = {
 			<td>${frappe.utils.escape_html(this.hours(totals.paid, true))}</td>
 			<td>${frappe.utils.escape_html(this.hours(totals.unpaid, true))}</td>
 			<td>${frappe.utils.escape_html(this.hours(totals.total, true))}</td>
-			<td>${frappe.utils.escape_html(this.money(totals.daily_pay, true))}</td>
-			<td>${frappe.utils.escape_html(this.money(totals.net_daily_pay, true))}</td>
-			<td>${frappe.utils.escape_html(this.money(totals.ss_deduction, true))}</td>
-			<td>${frappe.utils.escape_html(this.money(totals.tax_deduction, true))}</td>
+			${this.pay_fields().salary ? `<td>${frappe.utils.escape_html(this.money(totals.daily_pay, true))}</td>` : ""}
+			${this.pay_fields().salary ? `<td>${frappe.utils.escape_html(this.money(totals.net_daily_pay, true))}</td>` : ""}
+			${this.pay_fields().ss ? `<td>${frappe.utils.escape_html(this.money(totals.ss_deduction, true))}</td>` : ""}
+			${this.pay_fields().ss ? `<td>${frappe.utils.escape_html(this.money(totals.tax_deduction, true))}</td>` : ""}
 			<td colspan="3"></td>`;
 	},
 
@@ -775,14 +786,20 @@ hrms.day_view = {
 	},
 
 	totals_label(totals) {
-		return __("Total Hours: {0} | Paid: {1} | Gross: {2} | Net: {3} | SS: {4} | Tax: {5}", [
-			this.hours(totals.total, true),
-			this.hours(totals.paid, true),
-			this.money(totals.daily_pay, true),
-			this.money(totals.net_daily_pay, true),
-			this.money(totals.ss_deduction, true),
-			this.money(totals.tax_deduction, true),
-		]);
+		const flags = this.pay_fields();
+		const parts = [
+			__("Total Hours: {0}", [this.hours(totals.total, true)]),
+			__("Paid: {0}", [this.hours(totals.paid, true)]),
+		];
+		if (flags.salary) {
+			parts.push(__("Gross: {0}", [this.money(totals.daily_pay, true)]));
+			parts.push(__("Net: {0}", [this.money(totals.net_daily_pay, true)]));
+		}
+		if (flags.ss) {
+			parts.push(__("SS: {0}", [this.money(totals.ss_deduction, true)]));
+			parts.push(__("Tax: {0}", [this.money(totals.tax_deduction, true)]));
+		}
+		return parts.join(" | ");
 	},
 
 	date_label(value) {
@@ -797,13 +814,26 @@ hrms.day_view = {
 		return Boolean(row?.late || cint(row?.late_entry));
 	},
 
+	lunch_break_hours(row) {
+		if (!row || row.kind !== "lunch") return 0;
+		if (Number(row.break_hours)) return Number(row.break_hours);
+		if (hrms.time?.hours_between && row.in_time && row.out_time) {
+			return hrms.time.hours_between(row.in_time, row.out_time);
+		}
+		return 0;
+	},
+
 	job_absence_cell(row, punch_variant) {
+		const premium = String(row?.holiday_premium_label || "").trim();
+		const job = String(row?.job || "").trim();
+		const with_premium = premium ? (job ? `${job} — ${premium}` : premium) : job;
 		if (!this.is_late_absence(row, punch_variant)) {
-			return row?.job || "";
+			return with_premium;
 		}
 		const late_by = String(row?.late_label || "").trim();
 		const status = row?.in_time && !row?.out_time ? __("IN") : __("OUT");
-		return late_by ? `${status} - ${late_by} ${__("late")}` : `${status} - ${__("late")}`;
+		const late = late_by ? `${status} - ${late_by} ${__("late")}` : `${status} - ${__("late")}`;
+		return premium ? `${late} — ${premium}` : late;
 	},
 
 	clock(value) {
@@ -818,7 +848,7 @@ hrms.day_view = {
 	},
 
 	entry_hours(row) {
-		if (!row) return 0;
+		if (!row || row.kind === "lunch") return 0;
 		if (Number(row.total)) return row.total;
 		if (Number(row.working_hours)) return row.working_hours;
 		if (hrms.time?.hours_for_row) return hrms.time.hours_for_row(row);
@@ -1010,7 +1040,7 @@ hrms.day_view = {
 						<td>${frappe.utils.escape_html(week.employee_name || week.employee || "")}</td>
 						<td>${frappe.utils.escape_html(this.approved_week_label(week))}</td>
 						<td colspan="2">${frappe.utils.escape_html(
-							__("Days: {0}", [this.approved_hours_value(week.day_hours)]),
+							__("Hours: {0}", [this.approved_hours_value(week.day_hours)]),
 						)}</td>
 						<td></td>
 						<td>
@@ -1081,7 +1111,7 @@ hrms.day_view = {
 					return $(this).find(".sp-approved__payroll").attr("data-week") === week.week_start
 						&& $(this).find(".sp-approved__payroll").attr("data-employee") === week.employee;
 				});
-				$days.find("td").eq(2).text(__("Days: {0}", [me.approved_hours_value(week.day_hours)]));
+				$days.find("td").eq(2).text(__("Hours: {0}", [me.approved_hours_value(week.day_hours)]));
 				if (!week.payroll_dirty) {
 					week.payroll_hours = week.day_hours;
 					$root

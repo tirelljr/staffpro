@@ -129,21 +129,58 @@ def _message_dict(row) -> dict:
 	}
 
 
+def _supports_employee() -> bool:
+	meta = frappe.get_meta("AI Conversation")
+	return bool(meta.has_field("employee") and frappe.db.has_column("AI Conversation", "employee"))
+
+
+def _clean_employee(employee: str | None) -> str:
+	employee = cstr(employee).strip()
+	if not employee:
+		return ""
+	if not frappe.db.exists("Employee", employee):
+		frappe.throw(_("Select an agent."))
+	if not frappe.has_permission("Employee", "read", doc=employee):
+		frappe.throw(_("You cannot attach this agent."), frappe.PermissionError)
+	return employee
+
+
+def _employee_label(employee: str) -> str:
+	if not employee:
+		return ""
+	return frappe.db.get_value("Employee", employee, "employee_name") or employee
+
+
+def _assign_employee(doc, employee: str) -> None:
+	if _supports_employee():
+		doc.employee = employee or ""
+
+
+def _conversation_employee(doc) -> str:
+	if not _supports_employee():
+		return ""
+	return cstr(getattr(doc, "employee", "") or "")
+
+
 def _conversation_dict(doc) -> dict:
+	employee = _conversation_employee(doc)
 	return {
 		"name": doc.name,
 		"title": doc.title,
 		"last_message_at": doc.last_message_at,
+		"employee": employee,
+		"employee_name": _employee_label(employee),
 		"messages": [_message_dict(row) for row in doc.messages],
 	}
 
 
-def _new_conversation(title: str | None = None):
+def _new_conversation(title: str | None = None, employee: str = ""):
 	doc = frappe.new_doc("AI Conversation")
 	doc.user = frappe.session.user
 	doc.owner = frappe.session.user
 	doc.title = (strip_html(title or "").strip() or _("New conversation"))[:140]
 	doc.last_message_at = now_datetime()
+	_assign_employee(doc, employee)
 	doc.insert()
 	return doc
 
@@ -221,7 +258,24 @@ def delete_conversation(name: str) -> dict:
 
 
 @frappe.whitelist()
-def chat(message: str, conversation: str | None = None) -> dict:
+def set_attached_agent(conversation: str | None = None, employee: str | None = None) -> dict:
+	"""Remember which agent this chat is limited to. An empty employee clears it."""
+	ensure_ai_access()
+	employee_id = _clean_employee(employee)
+	if conversation and _supports_employee():
+		doc = ensure_conversation_access(conversation)
+		doc.check_permission("write")
+		_assign_employee(doc, employee_id)
+		doc.save()
+	return {
+		"conversation": conversation,
+		"employee": employee_id,
+		"employee_name": _employee_label(employee_id),
+	}
+
+
+@frappe.whitelist()
+def chat(message: str, conversation: str | None = None, employee: str | None = None) -> dict:
 	ensure_ai_access()
 	message = strip_html(message or "").strip()
 	if not message:
@@ -229,25 +283,41 @@ def chat(message: str, conversation: str | None = None) -> dict:
 	if len(message) > 4000:
 		frappe.throw(_("Messages cannot exceed 4,000 characters."))
 
-	doc = ensure_conversation_access(conversation) if conversation else _new_conversation(message[:80])
+	if conversation:
+		doc = ensure_conversation_access(conversation)
+		if employee is None:
+			employee_id = _conversation_employee(doc)
+		else:
+			employee_id = _clean_employee(employee)
+			_assign_employee(doc, employee_id)
+	else:
+		employee_id = _clean_employee(employee) if employee is not None else ""
+		doc = _new_conversation(message[:80], employee_id)
 	doc.check_permission("write")
 	pending_row = _pending_message_row(doc) if conversation else None
 	reply = _normalized_reply(message)
-	if pending_row and reply in _AFFIRM_REPLIES:
-		return confirm_action(doc.name, pending_row.action_id, 1)
-	if pending_row and reply in _DENY_REPLIES:
-		return confirm_action(doc.name, pending_row.action_id, 0)
+	if pending_row and reply in _AFFIRM_REPLIES | _DENY_REPLIES:
+		if conversation and employee is not None and _supports_employee():
+			doc.save()
+		approved = 1 if reply in _AFFIRM_REPLIES else 0
+		return confirm_action(doc.name, pending_row.action_id, approved)
 
 	history = [{"role": row.role, "content": row.content or ""} for row in doc.messages]
 	agent_message = message
 	if reply in _AFFIRM_REPLIES:
-		agent_message = (
-			f"{message}\n\nThe user confirmed. Call the write tool now using the people from the previous lookup. "
-			"Do not ask for confirmation in chat."
-		)
+		if employee_id:
+			agent_message = (
+				f"{message}\n\nThe user confirmed. Call the write tool now for employee '{employee_id}' only. "
+				"Do not include anyone else. Do not ask for confirmation in chat."
+			)
+		else:
+			agent_message = (
+				f"{message}\n\nThe user confirmed. Call the write tool now using the people from the previous lookup. "
+				"Do not ask for confirmation in chat."
+			)
 	history.append({"role": "user", "content": agent_message})
 	try:
-		response = run_agent(history, memory=get_user_memory())
+		response = run_agent(history, memory=get_user_memory(), focus_employee=employee_id)
 	except frappe.ValidationError:
 		raise
 	except Exception as exc:
@@ -273,6 +343,8 @@ def chat(message: str, conversation: str | None = None) -> dict:
 	remember_exchange(doc.title, message, response["content"], conversation=doc.name)
 	payload = _conversation_dict(doc)
 	payload["conversation"] = doc.name
+	payload["employee"] = employee_id or ""
+	payload["employee_name"] = _employee_label(employee_id or "")
 	return payload
 
 

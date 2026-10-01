@@ -1475,15 +1475,12 @@ def _hours_buckets(row, lwp_map: dict, holiday_ctx: dict | None = None) -> dict:
 			paid = pto
 		total = pto
 	elif holiday_ctx:
-		# Public holiday: show premium hours in OT/DT; statutory day still counts as reg.
+		# Public holiday hours stay in Reg. Premium is a pay note, not an OT/DT bucket.
+		# Period-threshold overtime is still split out of Reg the same way as a normal day.
 		worked = hours if hours else std
-		reg = worked
-		if holiday_ctx.get("pay_double_time") and hours > 0:
-			dt = hours
-			ot = 0
-		elif holiday_ctx.get("pay_time_and_a_half") and hours > 0:
-			ot = hours
-			dt = 0
+		ot = flt(ot_raw)
+		dt = 0
+		reg = max(flt(worked - ot - dt, 2), 0)
 		total = worked
 		if hours_paid:
 			paid = worked
@@ -1509,7 +1506,18 @@ def _hours_buckets(row, lwp_map: dict, holiday_ctx: dict | None = None) -> dict:
 		"unpaid": flt(unpaid, 2),
 		"total": flt(total, 2),
 		"job": job,
+		"holiday_premium_label": _holiday_premium_label(holiday_ctx),
 	}
+
+
+def _holiday_premium_label(holiday_ctx: dict | None) -> str:
+	if not holiday_ctx:
+		return ""
+	if holiday_ctx.get("pay_double_time"):
+		return _("Paid at double time")
+	if holiday_ctx.get("pay_time_and_a_half"):
+		return _("Paid at time and a half")
+	return ""
 
 
 def _threshold_overtime_by_row(rows: list) -> dict[int, float]:
@@ -1523,7 +1531,8 @@ def _threshold_overtime_by_row(rows: list) -> dict[int, float]:
 		if not employee or not attendance_date:
 			continue
 		day = getdate(attendance_date)
-		periods.add((employee, get_first_day(day), get_last_day(day)))
+		start, end = _pay_period_bounds(day)
+		periods.add((employee, start, end))
 
 	overtime_by_attendance: dict[str, float] = {}
 	for employee, start_date, end_date in periods:
@@ -1531,6 +1540,9 @@ def _threshold_overtime_by_row(rows: list) -> dict[int, float]:
 			employee, start_date, end_date, ensure_holidays=False
 		)
 		for allocation in result["allocations"]:
+			# Holiday premium is paid on the holiday itself. Day View OT is ordinary threshold OT.
+			if allocation.get("is_holiday"):
+				continue
 			reference = allocation.get("reference_document")
 			if reference:
 				overtime_by_attendance[reference] = overtime_by_attendance.get(reference, 0) + flt(
@@ -1932,6 +1944,8 @@ def get_hours_totals(
 		from hrms.payroll.daily_pay import ensure_paid_holiday_attendance
 
 		ensure_paid_holiday_attendance(from_date, to_date, employee=employee, department=department)
+	from hrms.hr.role_access import redact_hours_payload
+
 	rows = _decorate_hours_rows(
 		_expand_attendance_to_hour_rows(
 			frappe.get_list(
@@ -1942,7 +1956,7 @@ def get_hours_totals(
 			)
 		)
 	)
-	return _sum_hour_buckets(rows)
+	return redact_hours_payload(_sum_hour_buckets(rows))
 
 
 @frappe.whitelist()
@@ -1966,13 +1980,17 @@ def get_hours_rows(
 	)
 	expanded = _expand_attendance_to_hour_rows(rows)
 	decorated = _decorate_hours_rows(expanded)
+	from hrms.hr.role_access import redact_hours_payload
+
 	_attach_hours_row_late(decorated)
 	_attach_hours_row_notes(decorated, [row.name for row in rows])
-	return {
-		"rows": decorated,
-		"totals": _sum_hour_buckets(decorated),
-		"approval": _hours_approval_status(decorated),
-	}
+	return redact_hours_payload(
+		{
+			"rows": decorated,
+			"totals": _sum_hour_buckets(decorated),
+			"approval": _hours_approval_status(decorated),
+		}
+	)
 
 
 def _add_hours_comment(name: str, comment: str | None, doctype: str = "Attendance") -> None:

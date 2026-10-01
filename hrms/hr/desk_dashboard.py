@@ -351,6 +351,10 @@ def get_payroll_board(
 	months: int | str | None = None,
 ) -> dict:
 	"""Salary, overtime, and department totals for the Payroll dashboard."""
+	from hrms.hr.role_access import can_see
+
+	if not can_see("see_agent_salary"):
+		frappe.throw(_("You cannot view payroll amounts."), frappe.PermissionError)
 	company = company or frappe.defaults.get_user_default("Company")
 	department = department or None
 	currency = frappe.db.get_value("Company", company, "default_currency") if company else None
@@ -390,7 +394,7 @@ def get_payroll_board(
 	kpis = _payroll_board_kpis(current_rows, previous_rows, len(employees), currency)
 	trend = _payroll_board_trend(rows, trend_periods, currency)
 	departments = _payroll_board_departments(current_rows, currency, previous_rows)
-	return {
+	payload = {
 		"from_date": str(start_date),
 		"to_date": str(end_date),
 		"period_label": _payroll_board_period_label(start_date, end_date),
@@ -403,6 +407,10 @@ def get_payroll_board(
 		"periods": periods,
 		"filter_departments": _payroll_board_filter_departments(employees, current_rows),
 	}
+	if not can_see("see_social_security"):
+		for row in payload["rows"]:
+			row["ss_contribution"] = None
+	return payload
 
 
 @frappe.whitelist()

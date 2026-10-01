@@ -14,6 +14,7 @@ from hrms.hr.bpo_user_permissions import (
 	filter_user_modules_onload,
 	get_all_roles,
 	get_allowed_bpo_sidebar_keys,
+	get_permission_query_conditions,
 	is_agent_account,
 	lock_portal_roles_without_desk_access,
 	parse_blocked_bpo_modules,
@@ -22,6 +23,12 @@ from hrms.tests.utils import HRMSTestSuite
 
 
 class TestBpoUserPermissions(HRMSTestSuite):
+	def test_hr_assistant_is_a_desk_role(self):
+		from hrms.hr.bpo_user_permissions import staff_desk_roles
+
+		self.assertIn("HR Assistant", BPO_ROLES)
+		self.assertIn("HR Assistant", staff_desk_roles())
+
 	def test_get_all_roles_is_staff_pro_only(self):
 		roles = get_all_roles()
 		for role in roles:
@@ -106,6 +113,57 @@ class TestBpoUserPermissions(HRMSTestSuite):
 		enforce_agent_portal_user(user)
 		self.assertEqual(user.user_type, "System User")
 		self.assertFalse(is_agent_account("hr.staff.desk@example.com", {"HR User", "Employee"}))
+		self.assertFalse(is_agent_account("hr.assistant@example.com", {"HR Assistant", "Employee Self Service"}))
+
+	def test_user_list_shows_desk_roles_only(self):
+		agent = "agent.hidden.from.user.list@example.com"
+		desk = "desk.visible.on.user.list@example.com"
+		for email in (agent, desk):
+			if frappe.db.exists("User", email):
+				frappe.delete_doc("User", email, force=True, ignore_permissions=True)
+
+		agent_user = frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": agent,
+				"first_name": "Owen",
+				"last_name": "Agent",
+				"send_welcome_email": 0,
+				"user_type": "Website User",
+			}
+		)
+		agent_user.flags.ignore_permissions = True
+		agent_user.insert()
+		agent_user.add_roles("Employee", "Employee Self Service")
+
+		desk_user = frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": desk,
+				"first_name": "Desk",
+				"last_name": "Admin",
+				"send_welcome_email": 0,
+				"user_type": "System User",
+			}
+		)
+		desk_user.flags.ignore_permissions = True
+		desk_user.insert()
+		desk_user.add_roles("HR User")
+
+		condition = get_permission_query_conditions()
+		self.assertIn("`tabUser`.`name` = 'Administrator'", condition)
+		self.assertIn("HR Assistant", condition)
+		self.assertNotIn("Employee Self Service", condition)
+
+		visible = frappe.get_list(
+			"User",
+			filters={"name": ["in", [agent, desk, "Administrator"]]},
+			pluck="name",
+			ignore_permissions=False,
+		)
+		self.assertIn(desk, visible)
+		self.assertIn("Administrator", visible)
+		self.assertNotIn(agent, visible)
 
 	def test_sidebar_hides_unreadable_doctypes(self):
 		from hrms.boot import _can_open_sidebar_item

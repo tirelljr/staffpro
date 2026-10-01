@@ -241,6 +241,22 @@ class TestPayrollEntry(HRMSTestSuite):
 		self.assertEqual(get_end_date("2017-02-15", "monthly"), {"end_date": "2017-03-14"})
 		self.assertEqual(get_end_date("2017-02-15", "daily"), {"end_date": "2017-02-15"})
 
+	def test_month_details_without_fiscal_year(self):
+		from hrms.payroll.doctype.payroll_entry.payroll_entry import get_month_details
+
+		details = get_month_details("Missing FY 2026-09-16", 9)
+		self.assertEqual(getdate(details.month_start_date), getdate("2026-09-01"))
+		self.assertEqual(getdate(details.month_end_date), getdate("2026-09-30"))
+
+	def test_salary_slip_ytd_period_without_fiscal_year(self):
+		slip = frappe.new_doc("Salary Slip")
+		slip.start_date = "2026-09-16"
+		slip.company = "Staff Pro BPO"
+		slip._SalarySlip__payroll_period = None
+		start, end = slip.get_year_to_date_period()
+		self.assertEqual(getdate(start), getdate("2026-01-01"))
+		self.assertEqual(getdate(end), getdate("2026-12-31"))
+
 	def test_get_payroll_entries_for_jv_filters_docstatus(self):
 		from hrms.payroll.doctype.payroll_entry.payroll_entry import get_payroll_entries_for_jv
 

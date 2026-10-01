@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from langchain_core.tools import tool
 
-from hrms.ai.tools.common import tool_result
+from hrms.ai.tools.common import resolve_employee, tool_result
 from hrms.hr.clock_format import parse_work_date
 from hrms.hr.doctype.attendance.attendance import get_hours_rows
 from hrms.hr.page.in_out_today.in_out_today import get_in_out_today
@@ -32,8 +32,8 @@ def _compact_who_is_in_row(person: dict) -> dict:
 
 
 @tool
-def who_is_in(department: str = "", attendance_date: str = "", status: str = "") -> str:
-	"""Who is clocked in or not in. status: in, out, or all. Use out for people not clocked in that day."""
+def who_is_in(department: str = "", attendance_date: str = "", status: str = "", employee: str = "") -> str:
+	"""Who is clocked in or not in. status: in, out, or all. Use out for people not clocked in that day. Pass employee to limit the result to one agent."""
 	result = get_in_out_today(department=department or None, attendance_date=str(parse_work_date(attendance_date)))
 	wanted = _who_is_in_status(status)
 	rows = []
@@ -42,10 +42,17 @@ def who_is_in(department: str = "", attendance_date: str = "", status: str = "")
 		if wanted in {"in", "out"} and row["status"] != wanted:
 			continue
 		rows.append(row)
+	if employee:
+		employee_id = resolve_employee(employee)
+		rows = [row for row in rows if row.get("employee") == employee_id]
 	totals = result.get("totals") or {}
 	when = attendance_date or result.get("date") or "today"
 	where = f" in {department}" if department else ""
-	if wanted == "out":
+	if employee:
+		person = rows[0]["employee_name"] if rows else employee
+		state = rows[0]["status"] if rows else "not scheduled"
+		summary = f"{person} is {state} on {when}."
+	elif wanted == "out":
 		summary = f"{len(rows)} employee(s) not in {when}{where}."
 	elif wanted == "in":
 		summary = f"{len(rows)} employee(s) clocked in {when}{where}."
@@ -63,7 +70,7 @@ def who_is_in(department: str = "", attendance_date: str = "", status: str = "")
 	}
 	blocks = []
 	summary_rows = result.get("summary") or []
-	if wanted == "all" and summary_rows:
+	if wanted == "all" and summary_rows and not employee:
 		blocks.append(
 			{
 				"type": "chart",

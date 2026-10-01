@@ -20,6 +20,7 @@ hrms.ai.ask_ai = {
 	conversation: null,
 	conversations: [],
 	messages: [],
+	agent: null,
 	busy: false,
 	user: null,
 
@@ -42,6 +43,140 @@ hrms.ai.ask_ai = {
 		} catch {
 			/* ignore quota / private mode */
 		}
+	},
+
+	agent_storage_key() {
+		return `staff-pro-ask-ai-agent:${frappe.session.user}`;
+	},
+
+	read_agent_map() {
+		try {
+			const parsed = JSON.parse(localStorage.getItem(this.agent_storage_key()) || "{}");
+			return parsed && typeof parsed === "object" ? parsed : {};
+		} catch {
+			return {};
+		}
+	},
+
+	remember_agent() {
+		try {
+			const all = this.read_agent_map();
+			const key = this.conversation || "draft";
+			if (this.agent?.name) all[key] = this.agent;
+			else delete all[key];
+			localStorage.setItem(this.agent_storage_key(), JSON.stringify(all));
+		} catch {
+			/* ignore quota / private mode */
+		}
+	},
+
+	recall_agent(conversation) {
+		const saved = this.read_agent_map()[conversation || "draft"];
+		if (!saved?.name) return null;
+		return { name: saved.name, employee_name: saved.employee_name || saved.name };
+	},
+
+	forget_draft_agent() {
+		try {
+			const all = this.read_agent_map();
+			delete all.draft;
+			localStorage.setItem(this.agent_storage_key(), JSON.stringify(all));
+		} catch {
+			/* ignore quota / private mode */
+		}
+	},
+
+	pick_agent() {
+		if (this.busy) return;
+		const dialog = new frappe.ui.Dialog({
+			title: __("Attach agent"),
+			fields: [
+				{
+					fieldname: "employee",
+					fieldtype: "Link",
+					label: __("Agent"),
+					options: "Employee",
+					reqd: 1,
+					default: this.agent?.name || "",
+				},
+				{
+					fieldtype: "HTML",
+					fieldname: "help",
+					options: `<p class="text-muted" style="margin:0">${this.escape(__("Questions and changes in this chat apply only to this agent."))}</p>`,
+				},
+			],
+			primary_action_label: __("Attach"),
+			primary_action: (values) => {
+				dialog.hide();
+				this.attach_agent(values.employee);
+			},
+		});
+		dialog.show();
+	},
+
+	async attach_agent(employee) {
+		if (!employee || this.busy) return;
+		let employee_name = employee;
+		try {
+			const loaded = await frappe.db.get_value("Employee", employee, "employee_name");
+			employee_name = loaded?.message?.employee_name || loaded?.employee_name || employee;
+		} catch {
+			employee_name = employee;
+		}
+		this.agent = { name: employee, employee_name };
+		this.remember_agent();
+		this.render_agent();
+		if (!this.messages.length) this.render_thread();
+		if (!this.conversation) return;
+		try {
+			const data = await this.call("set_attached_agent", {
+				conversation: this.conversation,
+				employee,
+			});
+			if (data?.employee) {
+				this.agent = {
+					name: data.employee,
+					employee_name: data.employee_name || employee_name,
+				};
+				this.remember_agent();
+				this.render_agent();
+			}
+		} catch (error) {
+			this.render_error(error);
+		}
+	},
+
+	async clear_agent() {
+		if (this.busy) return;
+		this.agent = null;
+		this.remember_agent();
+		this.render_agent();
+		if (!this.messages.length) this.render_thread();
+		if (!this.conversation) return;
+		try {
+			await this.call("set_attached_agent", { conversation: this.conversation, employee: "" });
+		} catch (error) {
+			this.render_error(error);
+		}
+	},
+
+	render_agent() {
+		const $chip = this.$body.find(".sp-ai__agent-chip");
+		const $button = this.$body.find(".sp-ai__composer-tools .sp-ai__tool--agent");
+		const $input = this.$body.find(".sp-ai__composer textarea");
+		if (!this.agent?.name) {
+			$chip.attr("hidden", true).empty();
+			$button.removeAttr("hidden");
+			$input.attr("placeholder", __("Ask me anything about Staff Pro…"));
+			return;
+		}
+		const label = this.agent.employee_name || this.agent.name;
+		$button.attr("hidden", true);
+		$chip.removeAttr("hidden").html(`
+			<button type="button" class="sp-ai__agent-chip-name" data-ai-action="attach-agent" title="${this.escape(__("Change agent"))}">⊕ ${this.escape(label)}</button>
+			<button type="button" class="sp-ai__agent-clear" data-ai-action="clear-agent" aria-label="${this.escape(__("Remove agent"))}">×</button>
+		`);
+		$input.attr("placeholder", __("Ask about {0}…", [label]));
 	},
 
 	conversation_rows(payload) {
@@ -104,8 +239,8 @@ hrms.ai.ask_ai = {
 						<textarea rows="1" maxlength="4000" placeholder="${this.escape(__("Ask me anything about Staff Pro…"))}" aria-label="${this.escape(__("Message Ask AI"))}"></textarea>
 						<div class="sp-ai__composer-actions">
 							<div class="sp-ai__composer-tools">
-								<button type="button" class="sp-ai__tool" disabled title="${this.escape(__("Attachments are coming soon"))}">⌕ ${this.escape(__("Attach"))}</button>
-								<button type="button" class="sp-ai__tool" disabled title="${this.escape(__("Voice is coming soon"))}">◉ ${this.escape(__("Voice"))}</button>
+								<button type="button" class="sp-ai__tool sp-ai__tool--agent" data-ai-action="attach-agent" title="${this.escape(__("Limit this chat to one agent"))}">⊕ ${this.escape(__("Agent"))}</button>
+								<div class="sp-ai__agent-chip" hidden></div>
 							</div>
 							<button type="submit" class="sp-ai__send" aria-label="${this.escape(__("Send message"))}">➤</button>
 						</div>
@@ -118,6 +253,12 @@ hrms.ai.ask_ai = {
 
 	bind() {
 		this.$body.on("click", "[data-ai-action='new-chat']", () => this.new_chat());
+		this.$body.on("click", "[data-ai-action='attach-agent']", () => this.pick_agent());
+		this.$body.on("click", "[data-ai-action='clear-agent']", (event) => {
+			event.preventDefault();
+			event.stopPropagation();
+			this.clear_agent();
+		});
 		this.$body.on("click", "[data-ai-action='toggle-rail']", () => this.$body.toggleClass("sp-ai--rail-hidden"));
 		this.$body.on("click", "[data-ai-action='close']", () => this.close());
 		this.$body.on("click", ".sp-ai__history-item", (event) => {
@@ -149,6 +290,7 @@ hrms.ai.ask_ai = {
 			$input.val("").trigger("input");
 			this.send(message);
 		});
+		this.render_agent();
 		this.$body.find(".sp-ai__composer textarea")
 			.on("input", (event) => {
 				event.currentTarget.style.height = "auto";
@@ -171,6 +313,7 @@ hrms.ai.ask_ai = {
 		if (this.user && this.user !== frappe.session.user) {
 			this.conversation = null;
 			this.messages = [];
+			this.agent = null;
 		}
 		this.user = frappe.session.user;
 		try {
@@ -184,7 +327,9 @@ hrms.ai.ask_ai = {
 			} else {
 				this.conversation = null;
 				this.messages = [];
+				this.agent = this.recall_agent("");
 				this.save_conversation("");
+				this.render_agent();
 				this.render_thread();
 			}
 		} catch (error) {
@@ -214,7 +359,10 @@ hrms.ai.ask_ai = {
 			if (this.conversation === name) {
 				this.conversation = null;
 				this.messages = [];
+				this.agent = null;
 				this.save_conversation("");
+				this.remember_agent();
+				this.render_agent();
 				this.render_thread();
 			}
 			this.render_history();
@@ -230,7 +378,10 @@ hrms.ai.ask_ai = {
 		if (this.busy) return;
 		this.conversation = null;
 		this.messages = [];
+		this.agent = null;
 		this.save_conversation("");
+		this.remember_agent();
+		this.render_agent();
 		this.render_history();
 		this.render_thread();
 		this.$body.find("textarea").trigger("focus");
@@ -242,7 +393,11 @@ hrms.ai.ask_ai = {
 			const data = await this.call("get_conversation", { name });
 			this.conversation = data.name;
 			this.messages = data.messages || [];
+			this.agent = data.employee
+				? { name: data.employee, employee_name: data.employee_name || data.employee }
+				: this.recall_agent(data.name);
 			this.save_conversation(data.name);
+			this.render_agent();
 			this.render_thread();
 			if (refresh_history) {
 				const payload = await this.call("list_conversations");
@@ -272,10 +427,23 @@ hrms.ai.ask_ai = {
 			const data = await this.call("chat", {
 				conversation: this.conversation,
 				message,
+				employee: this.agent?.name || "",
 			});
+			const draft = !this.conversation;
 			this.conversation = data.conversation;
 			this.messages = data.messages || this.messages;
+			if (data.employee) {
+				this.agent = {
+					name: data.employee,
+					employee_name: data.employee_name || this.agent?.employee_name || data.employee,
+				};
+			} else {
+				this.agent = null;
+			}
 			this.save_conversation(this.conversation);
+			this.remember_agent();
+			if (draft) this.forget_draft_agent();
+			this.render_agent();
 			const payload = await this.call("list_conversations");
 			this.conversations = this.conversation_rows(payload);
 			this.render_history();
@@ -428,27 +596,57 @@ hrms.ai.ask_ai = {
 	},
 
 	empty_state_html() {
-		const prompts = [
-			__("Who is in today and which department has the most absences?"),
-			__("Show total regular and overtime hours for this month."),
-			__("List pending time clock adjustments."),
-		];
+		const agent = this.agent?.employee_name || this.agent?.name;
+		const prompts = agent
+			? [
+				__("What are {0}'s hours this month?", [agent]),
+				__("Is {0} in today?", [agent]),
+				__("Show {0}'s pending adjustments and documents.", [agent]),
+			]
+			: [
+				__("Who is in today and which department has the most absences?"),
+				__("Show total regular and overtime hours for this month."),
+				__("List pending time clock adjustments."),
+			];
+		const intro = agent
+			? __("This chat is only about {0}. Ask about their hours, attendance, time off, or documents.", [agent])
+			: __("Ask about your workforce, hours, attendance, or payroll.");
+		const agent_control = agent
+			? `<div class="sp-ai__empty-agent-wrap">
+					<button type="button" class="sp-ai__empty-agent is-attached" data-ai-action="attach-agent" title="${this.escape(__("Change agent"))}">⊕ ${this.escape(agent)}</button>
+					<button type="button" class="sp-ai__empty-agent-clear" data-ai-action="clear-agent" aria-label="${this.escape(__("Remove agent"))}">×</button>
+				</div>`
+			: `<button type="button" class="sp-ai__empty-agent" data-ai-action="attach-agent" title="${this.escape(__("Limit this chat to one agent"))}">⊕ ${this.escape(__("Agent"))}</button>`;
+		const tags = agent
+			? [__("Hours"), __("Attendance"), __("Documents")]
+			: [__("Live attendance"), __("Hours analysis"), __("Approvals")];
+		const shortcuts = agent
+			? [
+				[__("Is {0} in today?", [agent]), "◉", __("Who Is In")],
+				[__("Show {0}'s pending adjustments.", [agent]), "◷", __("Pending Adjustments")],
+				[__("Show {0}'s documents.", [agent]), "▤", __("Documents")],
+			]
+			: [
+				[__("Who is in today?"), "◉", __("Who Is In")],
+				[__("Show pending time clock adjustments."), "◷", __("Pending Adjustments")],
+				[__("Summarize upcoming payroll."), "＄", __("Upcoming Payroll")],
+			];
 		return `
 			<div class="sp-ai__empty">
 				<div class="sp-ai__orb" aria-hidden="true">✦</div>
-				<h1>${this.escape(__("Hi, there"))}</h1>
-				<p>${this.escape(__("Ask about your workforce, hours, attendance, or payroll."))}</p>
+				<h1>${this.escape(agent ? agent : __("Hi, there"))}</h1>
+				<p>${this.escape(intro)}</p>
+				${agent_control}
 				<div class="sp-ai__suggestions">
 					${prompts.map((prompt, index) => `
 						<button type="button" class="sp-ai__suggestion" data-prompt="${this.escape(prompt)}">
-							<span class="sp-ai__suggestion-tag">${this.escape(index === 0 ? __("Live attendance") : index === 1 ? __("Hours analysis") : __("Approvals"))}</span>
+							<span class="sp-ai__suggestion-tag">${this.escape(tags[index])}</span>
 							<strong>${this.escape(prompt)}</strong>
 						</button>`).join("")}
 				</div>
 				<div class="sp-ai__shortcuts">
-					<button type="button" data-prompt="${this.escape(__("Who is in today?"))}">◉ ${this.escape(__("Who Is In"))}</button>
-					<button type="button" data-prompt="${this.escape(__("Show pending time clock adjustments."))}">◷ ${this.escape(__("Pending Adjustments"))}</button>
-					<button type="button" data-prompt="${this.escape(__("Summarize upcoming payroll."))}">＄ ${this.escape(__("Upcoming Payroll"))}</button>
+					${shortcuts.map(([prompt, icon, label]) => `
+						<button type="button" data-prompt="${this.escape(prompt)}">${this.escape(icon)} ${this.escape(label)}</button>`).join("")}
 				</div>
 			</div>`;
 	},

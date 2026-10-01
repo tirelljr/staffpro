@@ -592,6 +592,100 @@ class TestAttendance(HRMSTestSuite):
 		self.assertFalse(on_time_rows[0]["late"])
 		self.assertEqual(on_time_rows[0]["late_label"], "")
 
+	def test_hours_buckets_keep_holiday_premium_out_of_overtime(self):
+		from hrms.hr.doctype.attendance.attendance import _hours_buckets
+
+		row = frappe._dict(
+			working_hours=4,
+			status="Present",
+			hours_paid=0,
+			threshold_overtime_duration=0,
+		)
+		time_and_a_half = _hours_buckets(
+			row, {}, {"pay_time_and_a_half": 1, "pay_double_time": 0}
+		)
+		self.assertEqual(time_and_a_half["reg"], 4)
+		self.assertEqual(time_and_a_half["ot"], 0)
+		self.assertEqual(time_and_a_half["dt"], 0)
+		self.assertEqual(time_and_a_half["job"], "Holiday")
+		self.assertEqual(time_and_a_half["holiday_premium_label"], "Paid at time and a half")
+
+		double_time = _hours_buckets(row, {}, {"pay_time_and_a_half": 0, "pay_double_time": 1})
+		self.assertEqual(double_time["reg"], 4)
+		self.assertEqual(double_time["ot"], 0)
+		self.assertEqual(double_time["dt"], 0)
+		self.assertEqual(double_time["holiday_premium_label"], "Paid at double time")
+
+		row.threshold_overtime_duration = 1
+		with_period_ot = _hours_buckets(row, {}, {"pay_time_and_a_half": 1, "pay_double_time": 0})
+		self.assertEqual(with_period_ot["reg"], 3)
+		self.assertEqual(with_period_ot["ot"], 1)
+		self.assertEqual(with_period_ot["dt"], 0)
+
+	def test_short_day_hours_stay_regular(self):
+		employee = make_employee("test_hours_short_reg@example.com", company="_Test Company")
+		if frappe.get_meta("Employee").has_field("overtime_threshold_hours"):
+			frappe.db.set_value("Employee", employee, "overtime_threshold_hours", 90)
+		date = nowdate()
+		add_hours_entry(employee, date, "09:00:00", "12:00:00")
+		payload = get_hours_rows(from_date=date, to_date=date, employee=employee)
+		rows = [row for row in payload["rows"] if row.get("kind") != "lunch"]
+		self.assertEqual(flt(sum(row["reg"] for row in rows)), 3)
+		self.assertEqual(flt(sum(row["ot"] for row in rows)), 0)
+		self.assertEqual(flt(sum(row["dt"] for row in rows)), 0)
+
+	def test_holiday_hours_rows_keep_premium_as_note(self):
+		from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+
+		from hrms.patches.v16_0.seed_belize_holidays_and_pay_fields import _holiday_list_pay_fields
+		from hrms.payroll.doctype.salary_slip.test_salary_slip import make_holiday_list
+		from hrms.payroll.doctype.salary_structure.test_salary_structure import make_salary_structure
+
+		create_custom_fields(_holiday_list_pay_fields(), update=True)
+		frappe.clear_cache(doctype="Holiday List")
+
+		holiday_date = getdate("2026-09-21")
+		list_name = make_holiday_list(
+			"Day View Holiday Buckets",
+			from_date=get_year_start(holiday_date),
+			to_date=get_year_ending(holiday_date),
+			add_weekly_offs=False,
+		)
+		doc = frappe.get_doc("Holiday List", list_name)
+		doc.append(
+			"holidays",
+			{"holiday_date": holiday_date, "description": "Independence Day", "weekly_off": 0},
+		)
+		doc.pay_time_and_a_half = 1
+		doc.pay_double_time = 0
+		doc.save()
+
+		employee = make_employee("test_hours_holiday_buckets@example.com", company="_Test Company")
+		if frappe.get_meta("Employee").has_field("overtime_threshold_hours"):
+			frappe.db.set_value("Employee", employee, "overtime_threshold_hours", 90)
+		create_holiday_list_assignment("Employee", employee, list_name)
+		make_salary_structure(
+			"Day View Holiday Structure",
+			"Weekly",
+			employee=employee,
+			company="_Test Company",
+			from_date=get_year_start(holiday_date),
+			base=500,
+			other_details={"hour_rate": 12.5},
+		)
+		name = add_hours_entry(employee, holiday_date, "09:00:00", "13:00:00")
+		attendance_pay = flt(frappe.db.get_value("Attendance", name, "daily_pay"))
+		self.assertEqual(attendance_pay, 125)
+
+		payload = get_hours_rows(from_date=holiday_date, to_date=holiday_date, employee=employee)
+		rows = [row for row in payload["rows"] if row.get("kind") != "lunch"]
+		self.assertTrue(rows)
+		self.assertEqual(flt(sum(row["reg"] for row in rows)), 4)
+		self.assertEqual(flt(sum(row["ot"] for row in rows)), 0)
+		self.assertEqual(flt(sum(row["dt"] for row in rows)), 0)
+		self.assertEqual(flt(sum(row["daily_pay"] for row in rows)), 125)
+		self.assertTrue(all(row["holiday_premium_label"] == "Paid at time and a half" for row in rows))
+
 	def test_cancel_hours_entries_removes_selected(self):
 		employee = make_employee("test_hours_bulk_cancel@example.com", company="_Test Company")
 		date = nowdate()

@@ -211,13 +211,17 @@ def get_employee_profile_stats(employee: str) -> dict:
 		frappe.db.get_value("Company", emp.company, "default_currency") if emp.company else "BZD"
 	) or "BZD"
 
+	from hrms.hr.staff_pro_roles import employee_is_client_billable
+
 	hours = _total_hours(employee)
 	income = _salary_totals(employee)
-	billed = _billed_totals(employee)
+	has_client_billing = employee_is_client_billable(employee, user_id=emp.user_id)
+	billed = _billed_totals(employee) if has_client_billing else {"amount": 0.0, "currency": "USD"}
 	leave_remaining = _leave_remaining(employee)
 	leave_money_remaining = _leave_money_remaining(employee)
+	vacation = _vacation_balance(employee)
 	billed_company = _convert_amount(billed["amount"], billed["currency"], company_currency)
-	agent_profit = flt(billed_company) - flt(income["gross_pay"])
+	agent_profit = flt(billed_company) - flt(income["gross_pay"]) if has_client_billing else 0.0
 
 	from hrms.hr.staff_pro_desk_permissions import filter_profile_stats_payload
 	from hrms.hr.role_access import redact_profile_stats
@@ -228,6 +232,7 @@ def get_employee_profile_stats(employee: str) -> dict:
 		"user_id": emp.user_id or "",
 		"company_currency": company_currency,
 		"billing_currency": billed["currency"],
+		"has_client_billing": has_client_billing,
 		"total_hours": hours,
 		"total_income": flt(income["gross_pay"], 2),
 		"total_ss": flt(income["ss"], 2),
@@ -236,8 +241,20 @@ def get_employee_profile_stats(employee: str) -> dict:
 		"agent_profit": flt(agent_profit, 2),
 		"leave_remaining": leave_remaining,
 		"leave_money_remaining": leave_money_remaining,
+		"vacation_usable": vacation["usable_days"],
+		"vacation_accruing": vacation["accruing_days"],
 	}
 	return filter_profile_stats_payload(redact_profile_stats(payload))
+
+
+def _vacation_balance(employee: str) -> dict:
+	empty = {"usable_days": 0.0, "accruing_days": 0.0, "granted_days": 0.0, "eligible": 0}
+	try:
+		from hrms.hr.pto_anniversary import vacation_balance
+
+		return vacation_balance(employee) or empty
+	except Exception:
+		return empty
 
 
 def _leave_remaining(employee: str) -> float:
@@ -255,17 +272,15 @@ def _leave_remaining(employee: str) -> float:
 
 
 def _leave_money_remaining(employee: str) -> float:
-	from hrms.hr.pto_anniversary import PTO_LEAVE_TYPE, pto_money_value
-
 	try:
 		from hrms.hr.doctype.leave_application.leave_application import get_leave_details
+		from hrms.hr.pto_anniversary import PTO_LEAVE_TYPE, pto_money_value
 
 		details = get_leave_details(employee, getdate())
+		remaining = flt((details.get("leave_allocation") or {}).get(PTO_LEAVE_TYPE, {}).get("remaining_leaves"))
+		return pto_money_value(employee, remaining)
 	except Exception:
 		return 0.0
-
-	remaining = flt((details.get("leave_allocation") or {}).get(PTO_LEAVE_TYPE, {}).get("remaining_leaves"))
-	return pto_money_value(employee, remaining)
 
 
 def _total_hours(employee: str) -> float:

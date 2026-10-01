@@ -54,6 +54,13 @@
 				color: var(--text-color, #171717);
 				line-height: 1.3;
 			}
+			.staff-pro-access__title a {
+				color: inherit;
+				text-decoration: none;
+			}
+			.staff-pro-access__title a:hover {
+				text-decoration: underline;
+			}
 			.staff-pro-access__desc {
 				margin-top: 2px;
 				font-size: 13px;
@@ -163,24 +170,33 @@
 		}
 		(section.rows || []).forEach((row) => {
 			const on = !!row.on;
+			const readonly = !!(section.readonly || row.readonly);
+			const title = row.href
+				? `<a href="${frappe.utils.escape_html(row.href)}">${frappe.utils.escape_html(row.label)}</a>`
+				: frappe.utils.escape_html(row.label);
+			const switch_html = readonly
+				? ""
+				: `<button type="button" class="staff-pro-switch ${on ? "is-on" : ""}" role="switch"
+					aria-checked="${on ? "true" : "false"}" data-fieldname="${frappe.utils.escape_html(row.id)}">
+					<span class="staff-pro-switch__knob"></span>
+				</button>`;
 			const $row = $(`
 				<div class="staff-pro-access__row">
-					<button type="button" class="staff-pro-switch ${on ? "is-on" : ""}" role="switch"
-						aria-checked="${on ? "true" : "false"}" data-fieldname="${frappe.utils.escape_html(row.id)}">
-						<span class="staff-pro-switch__knob"></span>
-					</button>
+					${switch_html}
 					<div>
-						<div class="staff-pro-access__title">${frappe.utils.escape_html(row.label)}</div>
+						<div class="staff-pro-access__title">${title}</div>
 						<div class="staff-pro-access__desc">${frappe.utils.escape_html(row.description || "")}</div>
 					</div>
 				</div>
 			`);
-			$row.find(".staff-pro-switch").on("click", function () {
-				const next = !this.classList.contains("is-on");
-				this.classList.toggle("is-on", next);
-				this.setAttribute("aria-checked", next ? "true" : "false");
-				if (on_change) on_change(row.id, next ? 1 : 0, read_switches($host));
-			});
+			if (!readonly) {
+				$row.find(".staff-pro-switch").on("click", function () {
+					const next = !this.classList.contains("is-on");
+					this.classList.toggle("is-on", next);
+					this.setAttribute("aria-checked", next ? "true" : "false");
+					if (on_change) on_change(row.id, next ? 1 : 0, read_switches($host));
+				});
+			}
 			$section.append($row);
 		});
 		$parent.empty().append($host);
@@ -193,16 +209,199 @@
 		return !!access[flag];
 	}
 
+	function pay_fields() {
+		return {
+			salary: can("see_agent_salary"),
+			ss: can("see_social_security"),
+			billing: can("see_bill_to_client") || can("see_client_invoices"),
+		};
+	}
+
+	function slug(value) {
+		return String(value || "")
+			.toLowerCase()
+			.replace(/&/g, "and")
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-+|-+$/g, "");
+	}
+
+	function href_blocked(href) {
+		const blocks = frappe.boot?.staff_pro_access_blocks;
+		if (!blocks || !href) return false;
+		const hay = String(href).toLowerCase();
+		const parts = hay
+			.replace(/^https?:\/\/[^/]+/i, "")
+			.replace(/^\/desk\/?/, "")
+			.split(/[/?#]/)
+			.filter(Boolean)
+			.map((part) => decodeURIComponent(part).toLowerCase());
+		const match = (list) =>
+			(list || []).some((item) => {
+				const raw = String(item).toLowerCase();
+				const key = slug(item);
+				return (
+					parts.includes(raw) ||
+					parts.includes(key) ||
+					parts.includes(raw.replace(/\s+/g, "-")) ||
+					hay.includes(`/${key}`) ||
+					hay.includes(`/${encodeURIComponent(item).toLowerCase()}`)
+				);
+			});
+		return (
+			match(blocks.doctypes) ||
+			match(blocks.pages) ||
+			match(blocks.workspaces) ||
+			match(blocks.dashboards) ||
+			match(blocks.urls)
+		);
+	}
+
+	const REMOVED_SIDEBAR_LABELS = new Set([
+		"Data Analytics",
+		"Email Account",
+		"Customization",
+		"Customize Form",
+		"Print Format",
+		"Role Profile",
+		"Error Log",
+	]);
+
+	function hide_blocked_desk_items() {
+		document
+			.querySelectorAll(".body-sidebar a.item-anchor, .desk-sidebar a, .sidebar-item-container a")
+			.forEach((anchor) => {
+				const href = anchor.getAttribute("href") || "";
+				const label = (anchor.textContent || "").replace(/\s+/g, " ").trim();
+				const box = anchor.closest(".sidebar-item-container") || anchor.closest(".standard-sidebar-item");
+				if (!box) return;
+				const removed =
+					REMOVED_SIDEBAR_LABELS.has(label) ||
+					/data-analytics|email-account|customize-form|print-format|role-profile|error-log/i.test(
+						href
+					);
+				if (href_blocked(href) || removed) {
+					box.style.display = "none";
+					box.setAttribute("data-sp-access-hidden", "1");
+					return;
+				}
+				if (box.getAttribute("data-sp-access-hidden") === "1") {
+					box.style.display = "";
+					box.removeAttribute("data-sp-access-hidden");
+				}
+			});
+		if (window.hrms?.desk_sidebar?.refresh_dock) {
+			window.hrms.desk_sidebar.refresh_dock();
+		}
+	}
+
+	function apply_session_access(payload) {
+		if (!payload || !frappe.boot) return;
+		const next_access = payload.access || {};
+		const next_blocks = payload.blocks || {};
+		const gained = Object.keys(next_access).some((key) => next_access[key] && frappe.boot.staff_pro_access && !frappe.boot.staff_pro_access[key]);
+		frappe.boot.staff_pro_access = next_access;
+		frappe.boot.staff_pro_access_blocks = next_blocks;
+		hide_blocked_desk_items();
+		guard_route();
+		$(document).trigger("staff-pro-access-changed");
+		if (gained && !window._staff_pro_access_reloading) {
+			window._staff_pro_access_reloading = true;
+			window.location.reload();
+		}
+	}
+
+	function listen_access_changes() {
+		if (!frappe.realtime || frappe.realtime._staffProAccess) return;
+		frappe.realtime._staffProAccess = true;
+		frappe.realtime.on("staff_pro_access_changed", (payload) => {
+			apply_session_access(payload);
+		});
+	}
+
 	function hide_role_chrome(frm) {
 		["home_page", "restrict_to_domain", "two_factor_auth"].forEach((fieldname) => {
 			if (frm.fields_dict?.[fieldname]) frm.set_df_property(fieldname, "hidden", 1);
 		});
 		const hidden = new Set(["Documents", "Reports", "Pages", "Workspaces"]);
-		const $nav = $(frm.page?.wrapper || frm.$wrapper).find("#form-tabs");
-		$nav.find("li, .nav-item").each(function () {
+		const $page = $(frm.page?.wrapper || frm.$wrapper);
+		$page.find("#form-tabs li, #form-tabs .nav-item").each(function () {
 			const label = ($(this).text() || "").replace(/\s+/g, " ").trim();
 			if (hidden.has(label)) $(this).hide();
 		});
+		$page.find(".inner-group-button").each(function () {
+			const text = ($(this).find("button").first().text() || "").replace(/\s+/g, " ").trim();
+			if (text === __("View") || text === "View" || text === __("Action") || text === "Action") {
+				$(this).addClass("hidden hide").hide();
+			}
+		});
+	}
+
+	function apply_role_flag(frm, fieldname, value) {
+		const next = value ? 1 : 0;
+		frm.doc[fieldname] = next;
+		if (locals?.[frm.doc.doctype]?.[frm.doc.name]) {
+			locals[frm.doc.doctype][frm.doc.name][fieldname] = next;
+		}
+		const field = frm.fields_dict?.[fieldname];
+		if (field) {
+			field.value = next;
+			field.last_value = next;
+			if (typeof field.set_input === "function") {
+				field.set_input(next);
+			}
+		}
+	}
+
+	function role_form_host(frm) {
+		const $page = $(frm?.page?.wrapper || frm?.$wrapper || "#page-Role");
+		return $page.find(".staff-pro-access-host").first();
+	}
+
+	function sync_role_form(frm) {
+		if (!frm?.doc || frm.doc.doctype !== "Role") return false;
+		const $host = role_form_host(frm);
+		if (!$host.length) return false;
+		const access = read_switches($host);
+		let changed = false;
+		Object.entries(access).forEach(([fieldname, value]) => {
+			const next = value ? 1 : 0;
+			const was_on = switch_on(frm.doc, fieldname) ? 1 : 0;
+			if (was_on !== next) {
+				changed = true;
+			}
+			apply_role_flag(frm, fieldname, next);
+		});
+		window._staff_pro_role_access = access;
+		if (changed) {
+			frm.dirty();
+		}
+		return changed;
+	}
+
+	function bind_role_save(frm) {
+		if (!frm || frm.save?._staffProRoleSave) return;
+		const original_save = frm.save.bind(frm);
+		function save_with_access(...args) {
+			sync_role_form(frm);
+			return original_save(...args);
+		}
+		save_with_access._staffProRoleSave = true;
+		frm.save = save_with_access;
+		if (typeof frm.is_dirty === "function" && !frm.is_dirty._staffProRoleSave) {
+			const original_is_dirty = frm.is_dirty.bind(frm);
+			function dirty_with_access() {
+				if (original_is_dirty()) return true;
+				const $host = role_form_host(frm);
+				if (!$host.length) return false;
+				const access = read_switches($host);
+				return Object.entries(access).some(([fieldname, value]) => {
+					const next = value ? 1 : 0;
+					return (switch_on(frm.doc, fieldname) ? 1 : 0) !== next;
+				});
+			}
+			dirty_with_access._staffProRoleSave = true;
+			frm.is_dirty = dirty_with_access;
+		}
 	}
 
 	function mount_role_form(frm) {
@@ -221,20 +420,30 @@
 			});
 		}
 		render($host, frm.doc, (fieldname, value) => {
-			frm.doc[fieldname] = value;
-			if (frm.fields_dict[fieldname]) {
-				frm.set_value(fieldname, value);
-			} else {
-				frm.dirty();
-			}
+			apply_role_flag(frm, fieldname, value);
+			window._staff_pro_role_access = read_switches($host);
+			frm.dirty();
 		});
+		window._staff_pro_role_access = read_switches($host);
+		bind_role_save(frm);
 	}
 
 	function watch_role_form(frm) {
-		const nav = $(frm.page?.wrapper || frm.$wrapper).find("#form-tabs").get(0);
-		if (!nav || nav._staffProRoleAccess) return;
-		nav._staffProRoleAccess = true;
-		new MutationObserver(() => hide_role_chrome(frm)).observe(nav, { childList: true, subtree: true });
+		const $page = $(frm.page?.wrapper || frm.$wrapper);
+		const nav = $page.find("#form-tabs").get(0);
+		if (nav && !nav._staffProRoleAccess) {
+			nav._staffProRoleAccess = true;
+			new MutationObserver(() => hide_role_chrome(frm)).observe(nav, { childList: true, subtree: true });
+		}
+		const actions = $page.find(".page-actions, .custom-actions").get(0);
+		if (actions && !actions._staffProRoleActions) {
+			actions._staffProRoleActions = true;
+			new MutationObserver(() => hide_role_chrome(frm)).observe(actions, {
+				childList: true,
+				subtree: true,
+			});
+		}
+		bind_role_save(frm);
 	}
 
 	function attach_quick_entry($modal) {
@@ -265,11 +474,18 @@
 		});
 	}
 
+	function form_role_access() {
+		const $host = $("#page-Role .staff-pro-access-host").first();
+		if (!$host.length) return null;
+		const access = read_switches($host);
+		return Object.keys(access).length ? access : null;
+	}
+
 	function patch_role_save() {
 		if (!frappe.call || frappe.call._staffProRoleAccess) return;
 		const original = frappe.call.bind(frappe);
 		function wrapped(opts, ...rest) {
-			const access = window._staff_pro_role_access;
+			const access = window._staff_pro_role_access || form_role_access();
 			const method = opts && opts.method;
 			if (access && opts?.args && (method === "frappe.client.insert" || method === "frappe.client.save" || method === "frappe.desk.form.save.savedocs")) {
 				merge_role_doc(opts.args, access);
@@ -341,7 +557,14 @@
 		});
 	}
 
-	const USER_ACTION_LABELS = new Set(["Impersonate", "Create User Email", "Reset Password"]);
+	const USER_ACTION_LABELS = new Set([
+		"Impersonate",
+		"Create User Email",
+		"Reset Password",
+		"Set Password",
+		"Password",
+		"Permissions",
+	]);
 
 	function strip_user_buttons(root) {
 		if (!root) return;
@@ -370,15 +593,22 @@
 		ensure_styles();
 		patch_role_save();
 		watch_new_role_modal();
+		listen_access_changes();
 		guard_route();
+		hide_blocked_desk_items();
 	}
 
 	frappe.provide("hrms.role_access");
 	hrms.role_access.can = can;
+	hrms.role_access.pay_fields = pay_fields;
+	hrms.role_access.href_blocked = href_blocked;
+	hrms.role_access.apply_session_access = apply_session_access;
+	hrms.role_access.hide_blocked_desk_items = hide_blocked_desk_items;
 	hrms.role_access.ensure_styles = ensure_styles;
 	hrms.role_access.render_section = render_section;
 	hrms.role_access.mount_role_form = mount_role_form;
 	hrms.role_access.watch_role_form = watch_role_form;
+	hrms.role_access.sync_role_form = sync_role_form;
 	hrms.role_access.hide_role_chrome = hide_role_chrome;
 	hrms.role_access.strip_user_buttons = strip_user_buttons;
 
@@ -386,6 +616,7 @@
 	if (window.frappe?.boot) start();
 	$(document).on("page-change", () => {
 		guard_route();
+		hide_blocked_desk_items();
 		if ((frappe.get_route?.() || [])[1] === "User" || (frappe.get_route?.() || [])[0] === "user") {
 			strip_user_buttons(document.getElementById("page-User") || document.body);
 		}

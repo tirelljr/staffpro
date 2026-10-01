@@ -12,6 +12,7 @@ frappe.ui.form.on("Payroll Settings", {
 		});
 
 		hide_payroll_settings_menu(frm);
+		hide_payroll_email_section(frm);
 
 		if (frm.doc.enable_automatic_payroll && !frm.is_new()) {
 			frm.add_custom_button(__("Run Payroll Now"), () => {
@@ -57,6 +58,32 @@ frappe.ui.form.on("Payroll Settings", {
 		}
 	},
 });
+
+function hide_payroll_email_section(frm) {
+	[
+		"email_section",
+		"email_salary_slip_to_employee",
+		"sender",
+		"sender_copy",
+		"sender_email",
+		"email_template",
+		"encrypt_salary_slips_in_emails",
+		"password_policy",
+		"column_break_iewr",
+	].forEach((fieldname) => {
+		if (frm.fields_dict?.[fieldname]) {
+			frm.set_df_property(fieldname, "hidden", 1);
+		}
+	});
+	$(frm.page?.wrapper || frm.$wrapper)
+		.find(".form-section .section-head")
+		.each(function () {
+			const text = ($(this).text() || "").replace(/\s+/g, " ").trim();
+			if (text === "Email" || text === __("Email")) {
+				$(this).closest(".form-section").addClass("hidden hide").hide();
+			}
+		});
+}
 
 function hide_payroll_settings_menu(frm) {
 	const page = frm?.page;

@@ -16,6 +16,41 @@ USER_HIDDEN_SETTINGS_FIELDS = (
 	"default_app",
 	"third_party_authentication",
 	"social_logins",
+	"role_profiles",
+	"role_profile_name",
+	"form_settings",
+	"report_settings",
+	"document_follow",
+	"document_follow_notify",
+	"follow_created_documents",
+	"follow_commented_documents",
+	"follow_liked_documents",
+	"follow_assigned_documents",
+	"follow_shared_documents",
+	"email_settings",
+	"thread_notify",
+	"send_me_a_copy",
+	"allowed_in_mentions",
+	"email_signature",
+	"workspace",
+	"default_workspace",
+	"connections_tab",
+	"send_welcome_email",
+	"search_bar",
+	"notifications",
+	"list_sidebar",
+	"bulk_actions",
+	"view_switcher",
+	"form_sidebar",
+	"timeline",
+	"dashboard",
+)
+SYSTEM_HIDDEN_SETTINGS_FIELDS = (
+	"default_app",
+	"app_tab",
+	"email_tab",
+	"advanced_tab",
+	"backups_tab",
 )
 _LOGO_DATA_URI = None
 
@@ -238,25 +273,19 @@ def _sync_site_config_timezone() -> None:
 
 
 def hide_system_settings_app_tab() -> None:
-	"""Hide Default App so login always stays on Staff Pro BPO."""
+	"""Hide Default App and unused System Settings tabs."""
 	if not frappe.db.exists("DocType", "System Settings"):
 		return
 
 	meta = frappe.get_meta("System Settings")
 	if meta.has_field("default_app"):
 		frappe.db.set_single_value("System Settings", "default_app", "hrms", update_modified=False)
+	for fieldname in SYSTEM_HIDDEN_SETTINGS_FIELDS:
+		if not meta.has_field(fieldname):
+			continue
 		make_property_setter(
 			"System Settings",
-			"default_app",
-			"hidden",
-			1,
-			"Check",
-			validate_fields_for_doctype=False,
-		)
-	if meta.has_field("app_tab"):
-		make_property_setter(
-			"System Settings",
-			"app_tab",
+			fieldname,
 			"hidden",
 			1,
 			"Check",

@@ -145,6 +145,56 @@ def _money_value(value):
 	return flt(value)
 
 
+def _with_vacation(rows: list[dict], employee: str | None = None) -> list[dict]:
+	"""Show vacation that can be taken separately from time that is only accruing."""
+	from hrms.hr.pto_anniversary import PTO_LEAVE_TYPE, vacation_balance
+
+	targets: list[str] = []
+	seen: set[str] = set()
+	if employee:
+		targets.append(employee)
+		seen.add(employee)
+	else:
+		for row in rows:
+			name = row.get("employee")
+			if name and name not in seen:
+				seen.add(name)
+				targets.append(name)
+		for emp in _active_employees():
+			if emp["name"] not in seen:
+				seen.add(emp["name"])
+				targets.append(emp["name"])
+
+	for name in targets:
+		status = vacation_balance(name)
+		match = next(
+			(row for row in rows if row.get("employee") == name and row.get("leave_type") == PTO_LEAVE_TYPE),
+			None,
+		)
+		if match:
+			match["usable_days"] = status["usable_days"]
+			match["accruing_days"] = status["accruing_days"]
+			continue
+		if not status["usable_days"] and not status["accruing_days"]:
+			continue
+		employee_name = frappe.db.get_value("Employee", name, "employee_name") or name
+		rows.append(
+			{
+				"leave_type": PTO_LEAVE_TYPE,
+				"employee": name,
+				"employee_name": employee_name,
+				"opening_balance": 0,
+				"leaves_allocated": status["granted_days"],
+				"leaves_taken": flt(status["granted_days"]) - flt(status["usable_days"]),
+				"leaves_expired": 0,
+				"closing_balance": status["usable_days"],
+				"usable_days": status["usable_days"],
+				"accruing_days": status["accruing_days"],
+			}
+		)
+	return rows
+
+
 def _absence_rows(employee: str | None = None, company: str | None = None) -> list[dict]:
 	company = company or _employee_company(employee)
 	if not company:
@@ -207,7 +257,7 @@ def get_page_context(employee: str | None = None) -> dict:
 	return {
 		"employees": _active_employees(),
 		"leave_types": _leave_types(),
-		"balances": _balance_rows(employee),
+		"balances": _with_vacation(_balance_rows(employee), employee),
 		"absences": _absence_rows(employee, company),
 		"from_date": from_date,
 		"to_date": to_date,
@@ -225,6 +275,10 @@ def book_time_off(employee: str, leave_type: str, from_date: str, to_date: str |
 	to_date = getdate(to_date or from_date)
 	if to_date < from_date:
 		frappe.throw(_("End date cannot be before start date."))
+
+	from hrms.hr.pto_anniversary import assert_can_take_vacation
+
+	assert_can_take_vacation(employee, leave_type, from_date)
 
 	approver = get_employee_leave_approver(employee) or frappe.session.user
 	leave = frappe.get_doc(

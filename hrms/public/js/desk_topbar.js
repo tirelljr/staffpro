@@ -943,20 +943,29 @@ hrms.ui.TopBar = class {
 			return;
 		}
 		const $actions = this.ensure_actions_wrap();
-		if (this.$wrapper.find(".staff-pro-topbar__ask-ai").length) return;
+		let $ask = this.$wrapper.find(".staff-pro-topbar__ask-ai");
+		if (!$ask.length) {
+			$ask = $(this.ask_ai_button_html());
+		}
 		const $right = this.$wrapper.find(".staff-pro-topbar__right");
-		const html = this.ask_ai_button_html();
 		if ($right.length) {
-			$right.before(html);
+			$right.before($ask);
 			return;
 		}
 		if ($actions.length) {
-			$actions.prepend(html);
+			$actions.prepend($ask);
 		}
 	}
 
 	ask_ai_enabled() {
-		return Boolean(frappe.boot?.staff_pro_ask_ai?.enabled);
+		const boot = frappe.boot?.staff_pro_ask_ai;
+		if (boot && Object.prototype.hasOwnProperty.call(boot, "enabled")) {
+			return Boolean(boot.enabled);
+		}
+		const roles = frappe.boot?.user?.roles || [];
+		return ["Administrator", "System Manager", "HR Manager", "HR User", "HR Assistant"].some((role) =>
+			roles.includes(role),
+		);
 	}
 
 	ensure_notifications_picker() {

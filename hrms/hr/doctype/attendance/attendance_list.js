@@ -6,7 +6,9 @@ frappe.listview_settings["Attendance"] = {
 		"in_time",
 		"out_time",
 		"working_hours",
-		"daily_pay",
+		...((window.hrms?.role_access?.can && !hrms.role_access.can("see_agent_salary"))
+			? []
+			: ["daily_pay"]),
 		"shift",
 	],
 	hide_name_column: true,

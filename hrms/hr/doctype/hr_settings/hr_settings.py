@@ -58,6 +58,10 @@ class HRSettings(Document):
 		show_leaves_of_all_department_members_in_calendar: DF.Check
 		standard_working_hours: DF.Float
 		unlink_payment_on_cancellation_of_employee_advance: DF.Check
+		vacation_accrual_wait_days: DF.Int
+		vacation_hours_per_accrual_unit: DF.Float
+		vacation_max_days: DF.Float
+		vacation_minutes_per_hours_worked: DF.Float
 	# end: auto-generated types
 
 	def validate(self):

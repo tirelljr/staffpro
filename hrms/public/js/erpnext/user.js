@@ -30,19 +30,10 @@ function hide_module_profile(frm) {
 	}
 }
 
-function checkbox_value($input) {
-	return (
-		$input.attr("data-unit") ||
-		$input.data("unit") ||
-		$input.attr("data-value") ||
-		$input.val() ||
-		""
-	).toString();
-}
-
 const ROLE_ORDER = [
 	"HR Manager",
 	"HR User",
+	"HR Assistant",
 	"Leave Approver",
 	"Payroll Manager",
 	"Payroll User",
@@ -59,6 +50,7 @@ const ROLE_ORDER = [
 const ROLE_DESCRIPTIONS = {
 	"HR Manager": "Runs people, hiring, time, and HR setup.",
 	"HR User": "Day-to-day work on agents, attendance, and requests.",
+	"HR Assistant": "Helps with agents, attendance, and day-to-day HR work.",
 	"Leave Approver": "Approves time off and schedule changes.",
 	"Payroll Manager": "Runs payroll and can see agent pay.",
 	"Payroll User": "Views pay stubs and payroll records.",
@@ -90,32 +82,36 @@ function hide_section_head(fieldname) {
 		.hide();
 }
 
-function role_checkbox_rows($wrapper) {
+function attached_role_names(frm) {
 	const allowlist = bpo_role_allowlist();
-	const by_name = new Map();
-	$wrapper.find("input[type=checkbox]").each(function () {
-		const value = checkbox_value($(this));
-		if (!value || (allowlist.size && !allowlist.has(value))) return;
-		by_name.set(value, this);
+	const seen = new Set();
+	(frm.doc.roles || []).forEach((row) => {
+		const role = (row.role || "").toString();
+		if (!role || seen.has(role)) return;
+		if (allowlist.size && !allowlist.has(role)) return;
+		seen.add(role);
 	});
-	const ordered = ROLE_ORDER.filter((role) => by_name.has(role));
-	by_name.forEach((_input, role) => {
+	const ordered = ROLE_ORDER.filter((role) => seen.has(role));
+	seen.forEach((role) => {
 		if (!ordered.includes(role)) ordered.push(role);
 	});
-	return ordered.map((role) => ({
+	return ordered;
+}
+
+function attached_role_rows(frm) {
+	return attached_role_names(frm).map((role) => ({
 		id: role,
 		label: role,
 		description: ROLE_DESCRIPTIONS[role] || "",
-		on: !!by_name.get(role).checked,
-		input: by_name.get(role),
+		href: `/desk/role/${encodeURIComponent(role)}`,
+		readonly: true,
 	}));
 }
 
 function mount_role_switches(frm) {
 	const $wrapper = frm.fields_dict.roles_html?.$wrapper;
 	if (!$wrapper?.length || !window.hrms?.role_access?.render_section) return;
-	const rows = role_checkbox_rows($wrapper);
-	if (!rows.length) return;
+	const rows = attached_role_rows(frm);
 
 	$wrapper.children().not(".staff-pro-access-host").hide();
 	hide_section_head("sb1");
@@ -123,28 +119,20 @@ function mount_role_switches(frm) {
 		frm.set_df_property("role_profiles", "hidden", 1);
 	}
 
-	const signature = rows.map((row) => `${row.id}:${row.on ? 1 : 0}`).join("|");
+	const signature = rows.map((row) => row.id).join("|") || "empty";
 	let $host = $wrapper.children(".staff-pro-access-host");
 	if ($host.length && $host.attr("data-signature") === signature) return;
 	if (!$host.length) {
 		$host = $('<div class="staff-pro-access-host">').appendTo($wrapper);
 	}
 	$host.attr("data-signature", signature);
-	window.hrms.role_access.render_section(
-		$host,
-		{
-			title: __("Roles"),
-			intro: __("What this person can sign in as."),
-			rows,
-		},
-		(role, on) => {
-			const input = rows.find((row) => row.id === role)?.input;
-			if (!input || input.checked === !!on) return;
-			input.checked = !!on;
-			input.dispatchEvent(new Event("change", { bubbles: true }));
-			$host.attr("data-signature", role_checkbox_rows($wrapper).map((row) => `${row.id}:${row.on ? 1 : 0}`).join("|"));
-		},
-	);
+	window.hrms.role_access.render_section($host, {
+		title: __("Roles"),
+		intro: rows.length
+			? __("Roles this person is attached to. Permissions and access come from those roles.")
+			: __("No roles yet. Attach this user from the Role page."),
+		rows,
+	});
 }
 
 function parse_blocked_modules(raw) {
@@ -234,25 +222,115 @@ function lock_belize_user_timezone(frm) {
 	frm.refresh_field("time_zone");
 }
 
+const HIDDEN_USER_FIELDS = [
+	"app_section",
+	"default_app",
+	"third_party_authentication",
+	"social_logins",
+	"role_profiles",
+	"role_profile_name",
+	"form_settings",
+	"report_settings",
+	"document_follow",
+	"document_follow_notify",
+	"follow_created_documents",
+	"follow_commented_documents",
+	"follow_liked_documents",
+	"follow_assigned_documents",
+	"follow_shared_documents",
+	"email_settings",
+	"thread_notify",
+	"send_me_a_copy",
+	"allowed_in_mentions",
+	"email_signature",
+	"workspace",
+	"default_workspace",
+	"connections_tab",
+	"send_welcome_email",
+	"search_bar",
+	"notifications",
+	"list_sidebar",
+	"bulk_actions",
+	"view_switcher",
+	"form_sidebar",
+	"timeline",
+	"dashboard",
+];
+
+const HIDDEN_USER_TABS = ["Connections"];
+const HIDDEN_USER_SECTIONS = [
+	"Form Settings",
+	"Report Settings",
+	"Document Follow",
+	"Email",
+	"Workspace",
+	"Role Profiles",
+];
+
 function hide_unused_user_settings(frm) {
-	["app_section", "default_app", "third_party_authentication", "social_logins"].forEach(
-		(fieldname) => {
-			if (frm.fields_dict[fieldname]) {
-				frm.set_df_property(fieldname, "hidden", 1);
-			}
+	HIDDEN_USER_FIELDS.forEach((fieldname) => {
+		if (frm.fields_dict[fieldname]) {
+			frm.set_df_property(fieldname, "hidden", 1);
 		}
-	);
+	});
+	hide_form_tabs(frm, HIDDEN_USER_TABS);
+	hide_form_sections(frm, HIDDEN_USER_SECTIONS);
+	hide_user_sidebar_chrome(frm);
+}
+
+function hide_form_tabs(frm, labels) {
+	const hidden = new Set(labels.map((label) => __(label)));
+	labels.forEach((label) => hidden.add(label));
+	$(frm.page?.wrapper || frm.$wrapper)
+		.find("#form-tabs .nav-item, .form-tabs .nav-item, .form-tabs-list .nav-item")
+		.each(function () {
+			const text = ($(this).text() || "").replace(/\s+/g, " ").trim();
+			if (hidden.has(text)) {
+				$(this).addClass("hidden hide").hide();
+			}
+		});
+}
+
+function hide_form_sections(frm, labels) {
+	const hidden = new Set(labels.map((label) => __(label)));
+	labels.forEach((label) => hidden.add(label));
+	$(frm.page?.wrapper || frm.$wrapper)
+		.find(".form-section .section-head")
+		.each(function () {
+			const text = ($(this).text() || "").replace(/\s+/g, " ").trim();
+			if (!hidden.has(text)) return;
+			$(this).closest(".form-section").addClass("hidden hide").hide();
+		});
+}
+
+function hide_user_sidebar_chrome(frm) {
+	const $sidebar = $(frm.page?.wrapper || frm.$wrapper).find(".form-sidebar");
+	if (!$sidebar.length) return;
+	$sidebar
+		.find(".form-print, .liked-by, .like-action, .form-assignments")
+		.addClass("hidden hide")
+		.hide();
+	$sidebar.find(".sidebar-section.form-assignments, .sidebar-section:has(.form-print)").hide();
 }
 
 function strip_unused_user_actions(frm) {
-	["Impersonate", "Create User Email", "Reset Password"].forEach((label) => {
+	["Impersonate", "Create User Email", "Reset Password", "Set Password"].forEach((label) => {
 		frm.remove_custom_button(__(label), __("Password"));
+		frm.remove_custom_button(__(label), __("Permissions"));
 		frm.remove_custom_button(__(label));
 		frm.page?.remove_inner_button?.(__(label));
 		frm.page?.remove_inner_button?.(__(label), __("Password"));
+		frm.page?.remove_inner_button?.(__(label), __("Permissions"));
 	});
 	window.hrms?.role_access?.strip_user_buttons?.(frm.page?.wrapper || frm.$wrapper);
-	ensure_set_password_button(frm);
+	$(frm.page?.wrapper || frm.$wrapper)
+		.find(".inner-group-button")
+		.each(function () {
+			const text = ($(this).find("button").first().text() || "").replace(/\s+/g, " ").trim();
+			if (text === __("Password") || text === "Password" || text === __("Permissions") || text === "Permissions") {
+				$(this).addClass("hidden hide").hide();
+			}
+		});
 }
 
 const USER_PASSWORD_ADMIN_ROLES = ["System Manager", "HR Manager", "HR User", "Administrator"];
@@ -271,17 +349,6 @@ function can_change_user_password(frm) {
 		!["Administrator", "Guest"].includes(frm.doc.name) &&
 		is_user_password_admin()
 	);
-}
-
-function ensure_set_password_button(frm) {
-	if (!can_change_user_password(frm)) return;
-	const label = __("Set Password");
-	const $actions = $(frm.page?.wrapper).find(".page-actions, .custom-actions");
-	const exists = $actions.find("button, a").filter(function () {
-		return $(this).text().replace(/\s+/g, " ").trim() === label;
-	}).length;
-	if (exists) return;
-	frm.add_custom_button(label, () => open_set_password_dialog(frm), __("Password"));
 }
 
 function setup_user_password_panel(frm) {
@@ -419,66 +486,30 @@ function setup_user_password_panel(frm) {
 	}, 150);
 }
 
-function open_set_password_dialog(frm) {
-	const dialog = new frappe.ui.Dialog({
-		title: __("Set Password"),
-		fields: [
-			{
-				fieldname: "new_password",
-				fieldtype: "Password",
-				label: __("New Password"),
-				reqd: 1,
-			},
-			{
-				fieldname: "confirm_password",
-				fieldtype: "Password",
-				label: __("Confirm Password"),
-				reqd: 1,
-			},
-		],
-		primary_action_label: __("Save"),
-		primary_action(values) {
-			const password = String(values.new_password || "");
-			const confirm = String(values.confirm_password || "");
-			if (password.length < 8) {
-				frappe.msgprint(__("Password must be at least 8 characters."));
-				return;
-			}
-			if (password !== confirm) {
-				frappe.msgprint(__("Passwords do not match."));
-				return;
-			}
-			dialog.get_primary_btn().prop("disabled", true);
-			frappe.call({
-				method: "hrms.overrides.employee_master.set_user_password",
-				args: {
-					user: frm.doc.name,
-					new_password: password,
-				},
-				callback(r) {
-					if (!r?.message) return;
-					dialog.hide();
-					frappe.show_alert({
-						message: __("Password updated"),
-						indicator: "green",
-					});
-				},
-				error() {
-					dialog.get_primary_btn().prop("disabled", false);
-				},
-			});
-		},
-	});
-	dialog.show();
-}
-
 function use_username_for_new_user(frm) {
-	if (!frm.is_new() || !frm.fields_dict.email || frm._username_login) return;
-	frm._username_login = true;
-	frm.set_df_property("email", "label", __("Username"));
-	frm.set_df_property("email", "options", "");
-	frm.fields_dict.email.df.options = "";
-	frm.refresh_field("email");
+	if (frm.fields_dict.username) {
+		frm.set_df_property("username", "hidden", 0);
+		frm.set_df_property("username", "reqd", frm.is_new() ? 1 : 0);
+	}
+	if (frm.is_new() && frm.fields_dict.email) {
+		if (frm.fields_dict.username) {
+			frm.set_df_property("email", "hidden", 1);
+			frm.set_df_property("email", "reqd", 0);
+			frm.set_df_property("email", "options", "");
+		} else {
+			frm.set_df_property("email", "label", __("Username"));
+			frm.set_df_property("email", "options", "");
+			frm.set_df_property("email", "reqd", 1);
+			frm.fields_dict.email.df.options = "";
+			frm.refresh_field("email");
+		}
+	}
+	if (frm.fields_dict.send_welcome_email) {
+		frm.set_df_property("send_welcome_email", "hidden", 1);
+		if (frm.is_new()) {
+			frm.doc.send_welcome_email = 0;
+		}
+	}
 }
 
 function apply_bpo_user_form(frm) {
@@ -518,6 +549,15 @@ function watch_user_pickers(frm) {
 			subtree: true,
 		});
 	}
+
+	const tabs = frm.page?.wrapper?.find("#form-tabs").get(0);
+	if (tabs && !tabs._staffProUserTabs) {
+		tabs._staffProUserTabs = true;
+		new MutationObserver(() => hide_unused_user_settings(frm)).observe(tabs, {
+			childList: true,
+			subtree: true,
+		});
+	}
 }
 
 frappe.ui.form.on("User", {
@@ -532,7 +572,7 @@ frappe.ui.form.on("User", {
 	},
 	before_save(frm) {
 		if (!frm.is_new()) return;
-		const typed = (frm.doc.email || "").trim();
+		const typed = (frm.doc.username || frm.doc.email || "").trim();
 		if (!typed || typed.includes("@")) return;
 		frm.doc.username = typed;
 		frm.doc.email = `${typed.toLowerCase()}@users.staffpro.local`;

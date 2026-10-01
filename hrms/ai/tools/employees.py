@@ -18,7 +18,10 @@ def find_employees(query: str = "", department: str = "", status: str = "Active"
 	if status:
 		filters["status"] = status
 	or_filters = None
-	if query:
+	query = (query or "").strip()
+	if query and frappe.db.exists("Employee", query):
+		filters["name"] = query
+	elif query:
 		term = f"%{query.strip()}%"
 		or_filters = {
 			"employee_name": ["like", term],

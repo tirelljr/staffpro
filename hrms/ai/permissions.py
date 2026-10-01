@@ -6,7 +6,7 @@ from __future__ import annotations
 import frappe
 from frappe import _
 
-AI_ROLES = frozenset({"HR User", "HR Manager", "System Manager", "Administrator"})
+AI_ROLES = frozenset({"HR User", "HR Manager", "HR Assistant", "System Manager", "Administrator"})
 
 PERMISSION_DENIED = "Permission not granted by admin."
 
@@ -43,7 +43,7 @@ TOOL_USER_ACCESS = {
 		"perms": (("Attendance", "write"), ("Employee Checkin", "create")),
 	},
 	"book_time_off": {
-		"any_flags": ("see_paid_time_off", "see_time_off_admin"),
+		"any_flags": ("see_paid_time_off", "see_time_off"),
 		"perms": (("Leave Application", "create"), ("Leave Allocation", "create")),
 	},
 	"run_payroll": {"flags": ("see_agent_salary",), "perms": (("Payroll Entry", "create"),)},
@@ -259,14 +259,29 @@ def _has_perm(doctype: str, ptype: str, user: str) -> bool:
 		return False
 
 
+def can_use_ask_ai(user: str | None = None) -> bool:
+	"""Desk users see Ask AI; tools still follow that user's role switches."""
+	from hrms.ai.settings import is_ask_ai_enabled
+	from hrms.boot import is_staff_pro_desk_admin
+
+	user = user or frappe.session.user
+	if not user or user == "Guest":
+		return False
+	if not is_ask_ai_enabled():
+		return False
+	if is_staff_pro_desk_admin(user):
+		return True
+	return bool(AI_ROLES.intersection(frappe.get_roles(user)))
+
+
 def ensure_ai_access(user: str | None = None) -> None:
 	from hrms.ai.settings import is_ask_ai_enabled
 
 	user = user or frappe.session.user
-	if user == "Guest" or not AI_ROLES.intersection(frappe.get_roles(user)):
-		frappe.throw(_("You do not have permission to use Ask AI."), frappe.PermissionError)
 	if not is_ask_ai_enabled():
 		frappe.throw(_("Ask AI is turned off. Enable it in System Settings > AI."))
+	if not can_use_ask_ai(user):
+		frappe.throw(_("You do not have permission to use Ask AI."), frappe.PermissionError)
 
 
 def ensure_conversation_access(name: str):

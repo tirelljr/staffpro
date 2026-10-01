@@ -159,35 +159,6 @@
                       "link_to":  "Salary Structure",
                       "link_type":  "DocType",
                       "icon":  "layers"
-                  },
-                  {
-                      "child":  0,
-                      "collapsible":  1,
-                      "default_workspace":  0,
-                      "indent":  0,
-                      "keep_closed":  0,
-                      "label":  "Payroll Settings",
-                      "open_in_new_tab":  0,
-                      "show_arrow":  0,
-                      "type":  "Link",
-                      "icon":  "settings",
-                      "link_to":  "Payroll Settings",
-                      "link_type":  "DocType"
-                  },
-                  {
-                      "child":  0,
-                      "collapsible":  1,
-                      "default_workspace":  0,
-                      "indent":  0,
-                      "keep_closed":  0,
-                      "label":  "HR Settings",
-                      "open_in_new_tab":  0,
-                      "show_arrow":  0,
-                      "type":  "Link",
-                      "icon":  "settings",
-                      "link_to":  "HR Settings",
-                      "link_type":  "DocType",
-                      "navigate_to_tab":  "employee_tab"
                   }
               ],
     "modified":  "2026-08-14 14:30:00.000000",

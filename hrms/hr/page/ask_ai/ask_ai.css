@@ -272,9 +272,58 @@ body.staff-pro-alive #page-ask-ai .layout-main-section {
 }
 
 .sp-ai__empty > p {
-	margin: 7px 0 30px;
+	margin: 7px 0 16px;
 	color: #575766;
 	font-size: 14px;
+}
+
+.sp-ai__empty-agent-wrap {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0 0 28px;
+}
+
+.sp-ai__empty-agent {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: 42px;
+	margin: 0 0 28px;
+	padding: 8px 20px;
+	border: 1px solid #d9d6f5;
+	border-radius: 999px;
+	background: #fff;
+	box-shadow: 0 8px 20px rgba(118, 103, 239, 0.12);
+	color: #3d348c;
+	font-size: 14px;
+	font-weight: 650;
+	cursor: pointer;
+}
+
+.sp-ai__empty-agent-wrap .sp-ai__empty-agent {
+	margin: 0;
+}
+
+.sp-ai__empty-agent:hover,
+.sp-ai__empty-agent-clear:hover {
+	border-color: #b8b2ee;
+	background: #f4f2ff;
+}
+
+.sp-ai__empty-agent-clear {
+	display: grid;
+	width: 34px;
+	height: 34px;
+	place-items: center;
+	border: 1px solid #e8e8ee;
+	border-radius: 50%;
+	background: #fff;
+	color: #6a6a7a;
+	font-size: 18px;
+	line-height: 1;
+	cursor: pointer;
 }
 
 .sp-ai__suggestions {
@@ -560,6 +609,7 @@ body.staff-pro-alive #page-ask-ai .layout-main-section {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	min-height: 40px;
 }
 
 .sp-ai__composer-tools {
@@ -575,10 +625,68 @@ body.staff-pro-alive #page-ask-ai .layout-main-section {
 	font-size: 10px;
 }
 
+.sp-ai__tool--agent {
+	min-height: 36px;
+	padding: 7px 16px;
+	border: 1px solid #d9d6f5;
+	border-radius: 999px;
+	background: #f4f2ff;
+	color: #3d348c;
+	font-size: 13px;
+	font-weight: 650;
+	cursor: pointer;
+}
+
+.sp-ai__tool--agent:hover {
+	border-color: #b8b2ee;
+	background: #ebe8ff;
+	color: #2f2878;
+}
+
+.sp-ai__agent-chip {
+	display: inline-flex;
+	align-items: center;
+	max-width: 260px;
+	min-height: 36px;
+	padding: 4px 4px 4px 12px;
+	border: 1px solid #d9d6f5;
+	border-radius: 999px;
+	background: #efeefe;
+	color: #3d348c;
+}
+
+.sp-ai__agent-chip[hidden],
+.sp-ai__tool--agent[hidden] {
+	display: none;
+}
+
+.sp-ai__agent-chip-name,
+.sp-ai__agent-clear {
+	border: 0;
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	font-size: 13px;
+	font-weight: 650;
+	line-height: 1.2;
+}
+
+.sp-ai__agent-chip-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.sp-ai__agent-clear {
+	padding: 0 6px;
+	font-size: 14px;
+}
+
 .sp-ai__send {
 	display: grid;
-	width: 32px;
-	height: 32px;
+	width: 36px;
+	height: 36px;
 	place-items: center;
 	border: 0;
 	border-radius: 50%;

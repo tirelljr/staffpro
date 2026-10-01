@@ -188,26 +188,42 @@
 		(document.head || document.documentElement).appendChild(style);
 	}
 
+	function add_class_if_missing(el, name) {
+		if (!el || el.classList.contains(name)) return false;
+		el.classList.add(name);
+		return true;
+	}
+
+	function remove_class_if_present(el, name) {
+		if (!el || !el.classList.contains(name)) return false;
+		el.classList.remove(name);
+		return true;
+	}
+
 	function mark_staff_pro_alive() {
-		if (document.body) {
-			document.body.classList.add("staff-pro-alive");
-		}
+		add_class_if_missing(document.body, "staff-pro-alive");
 	}
 
 	/** Keep dock + workspace menu visible when Frappe boots collapsed (v17). */
 	function pin_staff_pro_sidebar_dom() {
 		mark_staff_pro_alive();
-		document.body.classList.add("dock-pinned", "dock-open", "dock-active");
+		const body = document.body;
+		if (!body) return;
+		["dock-pinned", "dock-open", "dock-active"].forEach((name) => add_class_if_missing(body, name));
 		document.querySelectorAll(".body-sidebar-container").forEach((el) => {
-			el.classList.add("expanded");
-			el.classList.remove("sidebar-hidden");
+			add_class_if_missing(el, "expanded");
+			remove_class_if_present(el, "sidebar-hidden");
 		});
 		document.querySelectorAll(".dock, .workspace-dock").forEach((el) => {
-			el.classList.remove("hidden");
-			el.setAttribute("aria-hidden", "false");
+			remove_class_if_present(el, "hidden");
+			if (el.getAttribute("aria-hidden") !== "false") {
+				el.setAttribute("aria-hidden", "false");
+			}
 		});
 		try {
-			localStorage.setItem("sidebar-expanded", "true");
+			if (localStorage.getItem("sidebar-expanded") !== "true") {
+				localStorage.setItem("sidebar-expanded", "true");
+			}
 		} catch (e) {
 			/* ignore */
 		}
@@ -222,11 +238,16 @@
 		pin_staff_pro_sidebar_dom();
 	});
 	if (typeof MutationObserver !== "undefined" && document.body) {
-		new MutationObserver(() => pin_staff_pro_sidebar_dom()).observe(document.body, {
+		let pinTimer = null;
+		new MutationObserver(() => {
+			if (pinTimer) return;
+			pinTimer = setTimeout(() => {
+				pinTimer = null;
+				pin_staff_pro_sidebar_dom();
+			}, 50);
+		}).observe(document.body, {
 			childList: true,
 			subtree: true,
-			attributes: true,
-			attributeFilter: ["class"],
 		});
 	}
 
@@ -250,6 +271,8 @@
 	}
 
 	function workspace_dashboard_route(route = []) {
+		if (route[0] === "dashboard-view" || route[0] === "dashboard") return null;
+		if (route[0] !== "Workspaces" && route.length > 1) return null;
 		const raw = route[0] === "Workspaces" ? route[1] : route[0];
 		return WORKSPACE_DASHBOARD_ALIASES[normalize_route_key(raw)] || null;
 	}
@@ -258,14 +281,19 @@
 		return left[0] === right[0] && (left[1] || "") === (right[1] || "");
 	}
 
+	function is_dashboard_path(path) {
+		return /\/desk\/(?:[^/]+\/)?dashboard-view\/Human(?:\+| |%20)Resource$/i.test(path);
+	}
+
 	function redirect_target(route = frappe.get_route?.() || []) {
 		if (!frappe.boot?.staff_pro_skip_desktop || window._staff_pro_desk_redirecting) return null;
 
 		const homeRoute = staff_pro_home_route();
 		if (same_route(route, homeRoute)) return null;
+		if (route[0] === "dashboard-view" && route[1]) return null;
 
 		const path = (window.location.pathname || "").replace(/\/$/, "") || "/";
-		if (path === staff_pro_home_path()) return null;
+		if (path === staff_pro_home_path() || is_dashboard_path(path)) return null;
 
 		const on_apps = route[0] === "apps" || path === "/apps" || path.endsWith("/apps") || path === "/app/apps";
 		const on_desktop_page = route[0] === "desktop" || path.endsWith("/desktop");

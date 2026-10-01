@@ -16,12 +16,13 @@ import EmptyState from "@/components/EmptyState.vue"
 
 import { IonicVue } from "@ionic/vue"
 
-import { session, sessionUser } from "@/data/session"
+import { adoptBootSession, session, sessionUser } from "@/data/session"
 import { userResource } from "@/data/user"
 import { employeeResource } from "@/data/employee"
 import { syncNotificationResources } from "@/data/notifications"
 import { canOpenDesk, canUseMyWorkPortal } from "@/utils/deskAccess"
 import { consumeKioskPortalLoginIntent } from "@/utils/kioskPortal"
+import { consumeMyWorkHandoff } from "@/utils/myWorkHandoff"
 
 import dayjs from "@/utils/dayjs"
 import getIonicConfig from "@/utils/ionicConfig"
@@ -99,28 +100,35 @@ const registerServiceWorker = async () => {
 }
 
 router.isReady().then(async () => {
-	if (import.meta.env.DEV) {
-		try {
-			await frappeRequest({
-				url: "/api/method/hrms.www.hrms.get_context_for_dev",
-			}).then(async (values) => {
-				if (!window.frappe) window.frappe = {}
-				window.frappe.boot = values
-			})
-		} catch (error) {
-			console.error("Failed to load HRMS boot context", error)
-		}
-	}
-
 	await translationsPlugin.isReady();
 	registerServiceWorker()
 	app.mount("#app")
 })
 
+let devBootLoaded = !import.meta.env.DEV
+
+async function ensureBoot() {
+	if (devBootLoaded) return
+	devBootLoaded = true
+	try {
+		const values = await frappeRequest({
+			url: "/api/method/hrms.www.hrms.get_context_for_dev",
+		})
+		if (!window.frappe) window.frappe = {}
+		window.frappe.boot = values
+	} catch (error) {
+		console.error("Failed to load HRMS boot context", error)
+	}
+}
+
 const KIOSK_ROUTES = new Set(["Login", "ForgotPassword"])
 const KIOSK_HOME_ROUTES = new Set(["AttendanceDashboard"])
 
 router.beforeEach(async (to, _, next) => {
+	await ensureBoot()
+	await consumeMyWorkHandoff()
+	adoptBootSession()
+
 	let isLoggedIn = session.isLoggedIn
 
 	try {
@@ -133,6 +141,10 @@ router.beforeEach(async (to, _, next) => {
 		isLoggedIn = Boolean(session.user || sessionUser())
 	}
 
+	const myWork =
+		isLoggedIn &&
+		(Boolean(window.frappe?.boot?.staff_pro_my_work) || canUseMyWorkPortal(userResource.data))
+
 	if (!isLoggedIn) {
 		// password reset page is outside the PWA scope
 		if (to.path === "/update-password") {
@@ -144,6 +156,11 @@ router.beforeEach(async (to, _, next) => {
 		return next()
 	}
 
+	// Already signed in on the desk: My Work opens the portal, not the password form.
+	if (myWork && to.name === "Login") {
+		return next({ name: "AttendanceDashboard" })
+	}
+
 	// Kiosk and password reset stay on-screen even if a desk session cookie exists.
 	if (KIOSK_ROUTES.has(to.name) || to.name === "InvalidEmployee") {
 		return next()
@@ -152,10 +169,7 @@ router.beforeEach(async (to, _, next) => {
 	// Desk admins opening /agents land on the kiosk, except HR Assistants using My Work
 	// or a kiosk that just signed an agent into the portal.
 	if (canOpenDesk(userResource.data) && KIOSK_HOME_ROUTES.has(to.name)) {
-		if (consumeKioskPortalLoginIntent()) {
-			return next()
-		}
-		if (canUseMyWorkPortal(userResource.data)) {
+		if (consumeKioskPortalLoginIntent() || myWork) {
 			return next()
 		}
 		return next({ name: "Login" })

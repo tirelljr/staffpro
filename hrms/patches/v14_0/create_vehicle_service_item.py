@@ -2,6 +2,9 @@ import frappe
 
 
 def execute():
+	if not frappe.db.exists("DocType", "Vehicle Service Item"):
+		return
+
 	service_items = [
 		"Brake Oil",
 		"Brake Pad",

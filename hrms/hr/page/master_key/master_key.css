@@ -1,0 +1,75 @@
+.sp-mk-page {
+	max-width: 720px;
+	padding: 0 0 32px;
+}
+
+.sp-mk-card {
+	background: var(--card-bg, #fff);
+	border: 1px solid var(--border-color, #e5e5e5);
+	border-radius: 12px;
+	margin: 0 0 16px;
+	padding: 20px;
+}
+
+.sp-mk-card h2 {
+	font-size: 16px;
+	font-weight: 600;
+	margin: 0 0 8px;
+}
+
+.sp-mk-card p,
+.sp-mk-note {
+	color: var(--text-muted, #5c5c5c);
+	margin: 0 0 16px;
+}
+
+.sp-mk-status {
+	align-items: center;
+	display: flex;
+	gap: 10px;
+	font-weight: 600;
+}
+
+.sp-mk-status.is-locked {
+	color: #9f2d2d;
+}
+
+.sp-mk-status.is-open {
+	color: #1f7a3a;
+}
+
+.sp-mk-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 0 0 12px;
+}
+
+.sp-mk-field span {
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.sp-mk-field input {
+	background: var(--control-bg, #fff);
+	border: 1px solid var(--border-color, #d8d8d8);
+	border-radius: 8px;
+	padding: 8px 10px;
+}
+
+.sp-mk-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 8px;
+}
+
+.sp-mk-actions .btn-danger {
+	background: #9f2d2d;
+	border-color: #9f2d2d;
+	color: #fff;
+}
+
+.sp-mk-until {
+	margin: 8px 0 12px;
+}

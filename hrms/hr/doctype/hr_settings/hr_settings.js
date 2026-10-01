@@ -17,8 +17,26 @@ frappe.ui.form.on("HR Settings", {
 				},
 			};
 		});
+		hide_hr_settings_expenses(frm);
 	},
 });
+
+function hide_hr_settings_expenses(frm) {
+	["expenses_tab", "expenses_settings_section"].forEach((fieldname) => {
+		if (frm.fields_dict?.[fieldname]) {
+			frm.set_df_property(fieldname, "hidden", 1);
+		}
+	});
+	frm.$wrapper?.find("#hr-settings-expenses_tab").hide();
+	frm.$wrapper
+		?.find("#form-tabs .nav-item, .form-tabs .nav-item, .form-tabs-list .nav-item")
+		.each(function () {
+			const text = ($(this).text() || "").replace(/\s+/g, " ").trim();
+			if (text === "Expenses" || text === __("Expenses")) {
+				$(this).addClass("hidden hide").hide();
+			}
+		});
+}
 
 frappe.tour["HR Settings"] = [
 	{

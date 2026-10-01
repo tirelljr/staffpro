@@ -110,11 +110,14 @@ hrms.time.hours_for_row = function (row) {
 	if (!row) {
 		return 0;
 	}
+	if (row.kind === "lunch") {
+		if (row.in_time && row.out_time) {
+			return hrms.time.hours_between(row.in_time, row.out_time);
+		}
+		return flt(row.working_hours);
+	}
 	const stored = flt(row.working_hours);
 	if (stored) {
-		return stored;
-	}
-	if (row.kind === "lunch") {
 		return stored;
 	}
 	return hrms.time.hours_between(row.in_time, row.out_time);
@@ -298,16 +301,23 @@ hrms.time.refresh_hours_totals = function (listview) {
 		},
 		callback(r) {
 			const totals = r.message || {};
-			hrms.time.render_totals(
-				listview,
-				__("Total Hours: {0}    Paid Hours: {1}    Gross: {2}    SS: {3}    Net: {4}", [
-					hrms.time.format_hours(totals.total),
-					hrms.time.format_hours(totals.paid),
-					format_currency(Number(totals.daily_pay || 0)),
-					format_currency(Number(totals.ss_deduction || 0)),
-					format_currency(Number(totals.net_daily_pay || 0)),
-				]),
-			);
+			const flags = window.hrms?.role_access?.pay_fields
+				? hrms.role_access.pay_fields()
+				: { salary: true, ss: true };
+			const parts = [
+				__("Total Hours: {0}", [hrms.time.format_hours(totals.total)]),
+				__("Paid Hours: {0}", [hrms.time.format_hours(totals.paid)]),
+			];
+			if (flags.salary) {
+				parts.push(__("Gross: {0}", [format_currency(Number(totals.daily_pay || 0))]));
+			}
+			if (flags.ss) {
+				parts.push(__("SS: {0}", [format_currency(Number(totals.ss_deduction || 0))]));
+			}
+			if (flags.salary) {
+				parts.push(__("Net: {0}", [format_currency(Number(totals.net_daily_pay || 0))]));
+			}
+			hrms.time.render_totals(listview, parts.join("    "));
 		},
 	});
 };

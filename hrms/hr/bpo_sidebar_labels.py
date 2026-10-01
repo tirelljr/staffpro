@@ -3,7 +3,6 @@
 # Maps link_to (DocType, Page, Report, Dashboard) to user-facing label.
 LINK_LABELS: dict[str, str] = {
 	"Employee": "Agents",
-	"Data Analytics": "Data Analytics",
 	"in-out-today": "Who Is In",
 	"holiday-work-list": "Holiday Work List",
 	"day-view": "Day View",

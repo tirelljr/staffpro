@@ -17,6 +17,7 @@ BPO_ROLES = frozenset(
 		"System Manager",
 		"HR Manager",
 		"HR User",
+		"HR Assistant",
 		"Leave Approver",
 		"Expense Approver",
 		"Employee",
@@ -192,7 +193,23 @@ def apply_bpo_user_permissions():
 
 
 def staff_desk_roles() -> frozenset[str]:
+	"""Roles that belong on the Admin User list. Portal roles stay off that list."""
 	return BPO_ROLES - PORTAL_ONLY_ROLES
+
+
+def get_permission_query_conditions(user=None) -> str:
+	"""User list shows Administrator and people with a desk role, not agents or employees."""
+	roles = ", ".join(frappe.db.escape(role) for role in sorted(staff_desk_roles()))
+	return f"""(
+		`tabUser`.`name` = 'Administrator'
+		or exists (
+			select 1
+			from `tabHas Role`
+			where `tabHas Role`.parent = `tabUser`.`name`
+				and `tabHas Role`.parenttype = 'User'
+				and `tabHas Role`.role in ({roles})
+		)
+	)"""
 
 
 def user_role_names(doc_or_user) -> set[str]:

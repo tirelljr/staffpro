@@ -14,7 +14,10 @@ export function sessionUser() {
 	if (_sessionUser === "Guest") {
 		_sessionUser = null
 	}
-	return _sessionUser
+	if (_sessionUser) return _sessionUser
+	const bootUser = window.frappe?.boot?.session_user
+	if (bootUser && bootUser !== "Guest") return bootUser
+	return null
 }
 
 function shouldEnterPortal(response) {
@@ -86,3 +89,10 @@ export const session = reactive({
 	user: sessionUser(),
 	isLoggedIn: computed(() => !!session.user),
 })
+
+export function adoptBootSession() {
+	const bootUser = window.frappe?.boot?.session_user
+	if (!session.user && bootUser && bootUser !== "Guest") {
+		session.user = bootUser
+	}
+}

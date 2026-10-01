@@ -252,7 +252,8 @@ import { IonPage, IonContent } from "@ionic/vue"
 import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { Input, Button, ErrorMessage, Dialog, createResource, call, debounce } from "frappe-ui"
 import { STAFF_PRO_LOGO_URL } from "@/utils/branding"
-import { canOpenDesk, canUseMyWorkPortal } from "@/utils/deskAccess"
+import { PORTAL_HOME_URL } from "@/data/session"
+import { canOpenDesk, canUseMyWorkPortal, isMyWorkSession } from "@/utils/deskAccess"
 import { getKioskLoginDeviceId, markKioskPortalLoginIntent } from "@/utils/kioskPortal"
 import { scanClientIpv4, isPlaceholderPeerIpv4 } from "@/utils/clientIp"
 import {
@@ -670,6 +671,10 @@ async function scanKioskIp() {
 }
 
 onMounted(() => {
+	if (session?.isLoggedIn && (isMyWorkSession() || canUseMyWorkPortal(userResource?.data))) {
+		window.location.assign(PORTAL_HOME_URL)
+		return
+	}
 	tickClock()
 	clockTimer = setInterval(tickClock, 1000)
 	applyRememberedUser()

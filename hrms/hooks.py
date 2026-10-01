@@ -41,10 +41,10 @@ update_website_context = ["hrms.branding.update_website_context"]
 # include js, css files in header of desk.html
 # app_include_css = "/assets/hrms/css/hrms.css"
 app_include_js = [
-	"/assets/hrms/js/staff_pro_home_redirect.js",
+	"/assets/hrms/js/staff_pro_home_redirect.js?v=sp-dash-4",
 	"/assets/hrms/js/client_ip.js",
 	"/assets/hrms/js/role_access.js",
-	"/assets/hrms/js/user_quick_entry.js",
+	"/assets/hrms/js/user_quick_entry.js?v=user-login-2",
 	"hrms.bundle.js",
 ]
 app_include_css = "hrms.bundle.css"
@@ -116,6 +116,7 @@ website_route_rules = [
 	{"from_route": "/agents", "to_route": "hrms"},
 	{"from_route": "/agents/<path:app_path>", "to_route": "hrms"},
 	{"from_route": "/hr/<path:app_path>", "to_route": "roster"},
+	{"from_route": "/system-lock", "to_route": "system_lock"},
 ]
 
 website_redirects = [
@@ -146,6 +147,7 @@ after_migrate = [
 	"hrms.hr.bpo_bank_account.apply_bank_account_layout",
 	"hrms.payroll.bpo_customer.apply_bpo_customer_layout",
 	"hrms.payroll.bpo_sales_invoice.apply_bpo_sales_invoice_layout",
+	"hrms.overrides.desk_compat.install_desk_compat",
 	"hrms.payroll.bpo_client_accounts.setup_usd_client_billing",
 	"hrms.patches.v16_0.hide_cost_center.hide_cost_center_fields",
 	"hrms.patches.v16_0.remove_workspace_sidebar_home_links.execute",
@@ -156,18 +158,22 @@ after_migrate = [
 	"hrms.hr.doctype.document_category.document_category.seed_document_categories",
 	"hrms.hr.agent_filesystem.ensure_employee_documents_tab",
 	"hrms.hr.staff_pro_holiday_list.ensure_staff_pro_holiday_list",
+	"hrms.overrides.fiscal_year.ensure_company_fiscal_years",
 	"hrms.hr.staff_pro_shift_locations.ensure_staff_pro_shift_locations",
 	"hrms.hr.doctype.office_floor.office_floor.seed_office_floors",
 	"hrms.boot.hide_unused_erpnext_workspaces",
 	"hrms.hr.bpo_user_permissions.apply_bpo_user_permissions",
 	"hrms.hr.role_access.ensure_role_access_fields",
+	"hrms.hr.role_access.sync_all_role_switch_permissions",
 	"hrms.boot.prepare_staff_pro_first_login",
 	"hrms.overrides.bpo_dashboards.hide_non_bpo_dashboard_records",
 	"hrms.hr.force_delete.install_force_delete_patch",
 ]
 
 before_request = [
+	"hrms.hr.master_key.enforce_system_lock",
 	"hrms.hr.force_delete.install_force_delete_patch",
+	"hrms.overrides.desk_compat.install_desk_compat",
 	"hrms.hr.timezone.apply_request_timezone",
 	"hrms.hr.role_access.install_list_redaction",
 ]
@@ -214,6 +220,7 @@ before_app_uninstall = "hrms.setup.before_app_uninstall"
 # Permissions evaluated in scripted ways
 
 permission_query_conditions = {
+	"User": "hrms.hr.bpo_user_permissions.get_permission_query_conditions",
 	"Employee": "hrms.overrides.employee_master.get_permission_query_conditions",
 	"AI Conversation": "hrms.hr.doctype.ai_conversation.ai_conversation.get_permission_query_conditions",
 	"AI User Memory": "hrms.hr.doctype.ai_user_memory.ai_user_memory.get_permission_query_conditions",
@@ -271,13 +278,27 @@ doc_events = {
 			"hrms.hr.bpo_user_permissions.enforce_agent_portal_user",
 			"hrms.hr.timezone.lock_user_timezone",
 		],
+		"on_update": "hrms.hr.role_access.on_user_update",
+	},
+	"Role": {
+		"on_update": "hrms.hr.role_access.on_role_update",
+	},
+	"Has Role": {
+		"after_insert": "hrms.hr.role_access.on_has_role_change",
+		"on_trash": "hrms.hr.role_access.on_has_role_change",
 	},
 	"Module Profile": {
 		"onload": "hrms.hr.bpo_user_permissions.filter_user_modules_onload",
 	},
+	"Fiscal Year": {
+		"before_validate": "hrms.overrides.fiscal_year.align_fiscal_year_dates",
+	},
 	"Company": {
 		"validate": "hrms.overrides.company.validate_default_accounts",
-		"after_insert": "hrms.hr.staff_pro_holiday_list.assign_default_holiday_list_to_company",
+		"after_insert": [
+			"hrms.hr.staff_pro_holiday_list.assign_default_holiday_list_to_company",
+			"hrms.overrides.fiscal_year.ensure_company_fiscal_years",
+		],
 		"on_update": [
 			"hrms.overrides.company.make_company_fixtures",
 			"hrms.overrides.company.set_default_hr_accounts",
@@ -385,6 +406,7 @@ scheduler_events = {
 	"daily": [
 		"hrms.controllers.employee_reminders.send_birthday_reminders",
 		"hrms.controllers.employee_reminders.send_work_anniversary_reminders",
+		"hrms.hr.pto_anniversary.process_pto_anniversaries",
 		"hrms.hr.doctype.daily_work_summary_group.daily_work_summary_group.send_summary",
 		"hrms.hr.doctype.interview.interview.send_daily_feedback_reminder",
 		"hrms.hr.doctype.shift_assignment.shift_assignment.mark_expired_shift_assignments_as_inactive",
@@ -398,6 +420,7 @@ scheduler_events = {
 		"hrms.hr.doctype.leave_ledger_entry.leave_ledger_entry.process_expired_allocation",
 		"hrms.hr.utils.generate_leave_encashment",
 		"hrms.hr.utils.allocate_earned_leaves",
+		"hrms.hr.backups.run_scheduled_backup",
 	],
 	"weekly": ["hrms.controllers.employee_reminders.send_reminders_in_advance_weekly"],
 	"monthly": ["hrms.controllers.employee_reminders.send_reminders_in_advance_monthly"],
@@ -459,6 +482,7 @@ override_whitelisted_methods = {
 	"frappe.core.api.file.get_attached_images": "hrms.overrides.attached_images.get_attached_images",
 	"frappe.desk.reportview.delete_items": "hrms.hr.force_delete.delete_items",
 	"frappe.client.delete": "hrms.hr.force_delete.client_delete",
+	"frappe.desk.desktop.get_workspace_sidebar_items": "hrms.overrides.desk_compat.get_workspace_sidebar_items",
 }
 #
 # each overriding function accepts a `data` argument;
