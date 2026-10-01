@@ -1,0 +1,87 @@
+{
+ "actions": [],
+ "creation": "2026-09-20 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "role",
+  "content",
+  "blocks_json",
+  "action_id",
+  "action_status",
+  "pending_action_json",
+  "action_result_json",
+  "confirmed_by",
+  "confirmed_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "role",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Role",
+   "options": "user\nassistant\nsystem\ntool",
+   "reqd": 1
+  },
+  {
+   "fieldname": "content",
+   "fieldtype": "Long Text",
+   "in_list_view": 1,
+   "label": "Content"
+  },
+  {
+   "fieldname": "blocks_json",
+   "fieldtype": "Code",
+   "label": "Rich Blocks",
+   "options": "JSON"
+  },
+  {
+   "fieldname": "action_id",
+   "fieldtype": "Data",
+   "label": "Action ID"
+  },
+  {
+   "fieldname": "action_status",
+   "fieldtype": "Select",
+   "label": "Action Status",
+   "options": "\npending\napproved\nrejected\nfailed"
+  },
+  {
+   "fieldname": "pending_action_json",
+   "fieldtype": "Code",
+   "label": "Pending Action",
+   "options": "JSON"
+  },
+  {
+   "fieldname": "action_result_json",
+   "fieldtype": "Code",
+   "label": "Action Result",
+   "options": "JSON"
+  },
+  {
+   "fieldname": "confirmed_by",
+   "fieldtype": "Link",
+   "label": "Confirmed By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "confirmed_on",
+   "fieldtype": "Datetime",
+   "label": "Confirmed On",
+   "read_only": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-20 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HR",
+ "name": "AI Conversation Message",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": []
+}

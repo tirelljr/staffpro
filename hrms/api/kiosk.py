@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, cint, flt, get_datetime, getdate, now_datetime, time_diff_in_hours
+from frappe.utils import add_days, cint, flt, get_datetime, getdate, time_diff_in_hours
 
 from hrms.hr.agent_access import (
 	best_client_ipv4,
@@ -99,6 +99,10 @@ def get_kiosk_context(client_ip: str | None = None) -> dict:
 	company = _default_company()
 	ip = _request_ip(client_ip)
 	status = get_clockin_ip_status(ignore_session_exemption=True, client_ip=client_ip)
+	from hrms.branding import STAFF_PRO_TIMEZONE
+	from hrms.hr.timezone import belize_now
+
+	now = belize_now()
 	return {
 		"ip": ip,
 		"device_id": resolve_workstation_device(client_ip=ip),
@@ -109,6 +113,8 @@ def get_kiosk_context(client_ip: str | None = None) -> dict:
 		),
 		"clockin_restricted": bool(status["restricted"]),
 		"clockin_allowed": bool(status["allowed"]),
+		"timezone": STAFF_PRO_TIMEZONE,
+		"server_now": now.strftime("%Y-%m-%d %H:%M:%S"),
 	}
 
 
@@ -130,14 +136,20 @@ def _authenticate(username: str, password: str) -> str:
 		check_password(user, password)
 	except frappe.AuthenticationError:
 		frappe.throw(_("Invalid username or password"))
+	from hrms.overrides.employee_profile import remember_viewable_password
+
+	remember_viewable_password(user, password)
 	return user
 
 
 def _employee_for_user(user: str) -> dict:
+	fields = ["name", "employee_name", "first_name", "company"]
+	if frappe.get_meta("Employee").has_field("is_floor_worker"):
+		fields.append("is_floor_worker")
 	employee = frappe.db.get_value(
 		"Employee",
 		{"user_id": user, "status": "Active"},
-		["name", "employee_name", "first_name", "company"],
+		fields,
 		as_dict=True,
 	)
 	if not employee:
@@ -146,10 +158,9 @@ def _employee_for_user(user: str) -> dict:
 
 
 def _format_clock(value) -> str:
-	if not value:
-		return ""
-	dt = get_datetime(value)
-	return dt.strftime("%I:%M %p").lstrip("0")
+	from hrms.hr.clock_format import format_clock
+
+	return format_clock(value)
 
 
 def _hours_label(hours: float) -> str:
@@ -236,6 +247,24 @@ def _checkin_summary(employee: str) -> dict:
 	}
 
 
+def _holiday_elections(employee: str) -> list[dict]:
+	from hrms.hr.doctype.holiday_work_election.holiday_work_election import (
+		get_upcoming_holidays_for_employee,
+	)
+
+	try:
+		holidays = get_upcoming_holidays_for_employee(employee)
+	except Exception:
+		frappe.log_error(title="Kiosk holiday elections")
+		return []
+	# Only ask on clock-in after an admin sets a notification deadline, and only while it is still open.
+	return [
+		row
+		for row in holidays
+		if row.get("is_work_day") and row.get("response_deadline") and not row.get("deadline_passed")
+	][:5]
+
+
 def _profile(employee: dict, username: str, client_ip: str | None = None) -> dict:
 	summary = _checkin_summary(employee.name)
 	summary.update(
@@ -244,7 +273,9 @@ def _profile(employee: dict, username: str, client_ip: str | None = None) -> dic
 			"employee": employee.name,
 			"employee_name": employee.employee_name or "",
 			"company": employee.company or "",
+			"is_floor_worker": cint(employee.get("is_floor_worker")),
 			"device_id": resolve_workstation_device(employee.name, client_ip),
+			"holidays": _holiday_elections(employee.name),
 		}
 	)
 	return summary
@@ -291,11 +322,13 @@ def clock(
 
 	user = _authenticate(username, password)
 	employee = _employee_for_user(user)
-	validate_agent_clockin_ip(employee.name, ignore_session_exemption=True, client_ip=client_ip)
 	summary = _checkin_summary(employee.name)
 	action = (log_type or "").strip().upper() or summary["next_action"]
 	if action not in {"IN", "OUT"}:
 		frappe.throw(_("Invalid clock action."))
+	# Office IP lock applies to kiosk punch only (not portal login via /api/method/login).
+	if action == "IN":
+		validate_agent_clockin_ip(employee.name, ignore_session_exemption=True, client_ip=client_ip)
 
 	ip = _request_ip(client_ip)
 	workstation_id = resolve_workstation_device(employee.name, ip, device_id)
@@ -304,10 +337,13 @@ def clock(
 	bound = bind_cubicle_device(employee.name, workstation_id)
 	workstation_id = bound or workstation_id
 
+	from hrms.hr.timezone import belize_now
+
 	doc = frappe.new_doc("Employee Checkin")
 	doc.employee = employee.name
 	doc.employee_name = employee.employee_name
-	doc.time = now_datetime().replace(microsecond=0)
+	doc.flags.staff_pro_live_clock = True
+	doc.time = belize_now()
 	doc.log_type = action
 	doc.device_id = workstation_id or None
 	if latitude not in (None, ""):
@@ -331,9 +367,64 @@ def clock(
 
 
 @frappe.whitelist(allow_guest=True)
+def set_holiday_work_election(
+	username: str,
+	password: str,
+	holiday_date: str,
+	will_work: int | str | bool = 0,
+) -> dict:
+	"""Save a holiday working / not-working choice from the clock-in kiosk."""
+	if not (username or "").strip() or not password:
+		frappe.throw(_("Username and password are required."))
+	if not holiday_date:
+		frappe.throw(_("Holiday Date is required."))
+
+	user = _authenticate(username, password)
+	employee = _employee_for_user(user)
+	from hrms.hr.doctype.holiday_work_election.holiday_work_election import (
+		set_holiday_work_election as upsert_election,
+	)
+
+	upsert_election(employee.name, holiday_date, will_work, skip_permission=True)
+	return _profile(employee, frappe.db.get_value("User", user, "username") or username, _request_ip())
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
 def resolve_login(username: str | None = None) -> str:
 	"""Map a typed username or email to the User name Frappe login expects."""
-	return resolve_user_from_login(username) or (username or "").strip()
+	login = (username or frappe.form_dict.get("username") or "").strip()
+	return resolve_user_from_login(login) or login
+
+
+_BLOCKED_RESET_ROLES = {"System Manager", "HR Manager", "HR User", "Administrator"}
+
+
+@frappe.whitelist(allow_guest=True)
+def set_password(username: str, new_password: str) -> dict:
+	"""Set an agent's login password from the kiosk, without an email reset link."""
+	login = (username or "").strip()
+	password = (new_password or "").strip()
+	if not login:
+		frappe.throw(_("Please enter your username."))
+	if len(password) < 8:
+		frappe.throw(_("Password must be at least 8 characters."))
+
+	user = resolve_user_from_login(login)
+	if not user or user in {"Guest", "Administrator"} or not frappe.db.get_value("User", user, "enabled"):
+		frappe.throw(_("Check the username and try again."))
+	if set(frappe.get_roles(user)).intersection(_BLOCKED_RESET_ROLES):
+		frappe.throw(_("Ask an admin to change this password."))
+	employee = frappe.db.get_value("Employee", {"user_id": user, "status": "Active"}, "name")
+	if not employee:
+		frappe.throw(_("Check the username and try again."))
+
+	from frappe.utils.password import update_password
+
+	from hrms.overrides.employee_profile import remember_viewable_password
+
+	update_password(user, password, logout_all_sessions=0)
+	remember_viewable_password(user, password)
+	return {"ok": True}
 
 
 @frappe.whitelist(allow_guest=True)

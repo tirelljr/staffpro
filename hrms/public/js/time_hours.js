@@ -1,5 +1,66 @@
 frappe.provide("hrms.time");
 
+hrms.time.CLOCK_FORMAT = "h:mm A";
+hrms.time.FRAPPE_TIME_FORMAT = "hh:mm A";
+hrms.time.TIMEZONE = "America/Belize";
+
+hrms.time.apply_belize_timezone = function () {
+	const tz = hrms.time.TIMEZONE;
+	if (frappe.sys_defaults) {
+		frappe.sys_defaults.time_zone = tz;
+	}
+	if (frappe.boot) {
+		if (frappe.boot.sysdefaults) {
+			frappe.boot.sysdefaults.time_zone = tz;
+		}
+		frappe.boot.time_zone = frappe.boot.time_zone || {};
+		frappe.boot.time_zone.system = tz;
+		frappe.boot.time_zone.user = tz;
+		frappe.boot.staff_pro_timezone = tz;
+	}
+	if (frappe.boot?.user?.time_zone) {
+		frappe.boot.user.time_zone = tz;
+	}
+	if (typeof moment !== "undefined" && moment.tz) {
+		moment.tz.setDefault(tz);
+	}
+	if (frappe.datetime && typeof moment !== "undefined" && moment.tz) {
+		frappe.datetime.now_datetime = function (as_obj) {
+			const now = moment.tz(tz);
+			return as_obj ? now : now.format(frappe.defaultDatetimeFormat || "YYYY-MM-DD HH:mm:ss");
+		};
+		frappe.datetime.now_date = function (as_obj) {
+			const now = moment.tz(tz);
+			return as_obj ? now : now.format("YYYY-MM-DD");
+		};
+		frappe.datetime.get_today = function () {
+			return moment.tz(tz).format("YYYY-MM-DD");
+		};
+		frappe.datetime.nowdate = frappe.datetime.get_today;
+	}
+};
+
+hrms.time.apply_twelve_hour_clock = function () {
+	const fmt = hrms.time.FRAPPE_TIME_FORMAT;
+	if (frappe.sys_defaults) {
+		frappe.sys_defaults.time_format = fmt;
+	}
+	if (frappe.boot?.sysdefaults) {
+		frappe.boot.sysdefaults.time_format = fmt;
+	}
+	if (frappe.datetime) {
+		frappe.datetime.get_user_time_fmt = function () {
+			return fmt;
+		};
+	}
+};
+hrms.time.apply_belize_timezone();
+hrms.time.apply_twelve_hour_clock();
+$(document).on("app_ready", function () {
+	hrms.time.apply_belize_timezone();
+	hrms.time.apply_twelve_hour_clock();
+});
+
 function escape_html(text) {
 	if (text == null) {
 		return "";
@@ -23,12 +84,13 @@ hrms.time.parse_clock = function (value) {
 	if (!value) {
 		return null;
 	}
-	const parsed = moment(value);
-	if (parsed.isValid()) {
-		return parsed;
+	const text = String(value).trim();
+	const as_time = moment(text, ["h:mm A", "hh:mm A", "h:mm a", "hh:mm a", "HH:mm:ss", "HH:mm"], true);
+	if (as_time.isValid()) {
+		return as_time;
 	}
-	const as_time = moment(String(value), ["HH:mm:ss", "HH:mm", "hh:mm a", "hh:mm A"], true);
-	return as_time.isValid() ? as_time : null;
+	const parsed = moment(value);
+	return parsed.isValid() ? parsed : null;
 };
 
 hrms.time.hours_between = function (in_time, out_time) {
@@ -74,8 +136,8 @@ hrms.time.format_clock = function (value) {
 	if (!value) {
 		return "";
 	}
-	const parsed = moment(value);
-	return parsed.isValid() ? parsed.format("hh:mm a") : "";
+	const parsed = hrms.time.parse_clock(value);
+	return parsed ? parsed.format(hrms.time.CLOCK_FORMAT) : "";
 };
 
 hrms.time.format_gps = function (_value, _df, doc) {
@@ -292,6 +354,113 @@ hrms.time.refresh_hours_views = function (listview) {
 	if (hrms.day_view?.$body?.length && listview?.refresh !== hrms.day_view.refresh) {
 		hrms.day_view.refresh();
 	}
+	if (hrms.in_out_today?.$body?.length) {
+		hrms.in_out_today.refresh();
+	}
+	if (frappe.time_clock_adjustment?.$body?.length) {
+		frappe.time_clock_adjustment.refresh();
+	}
+	$(document).trigger("sp:hours-refresh");
+};
+
+hrms.time.format_hours_comment = function (comment) {
+	if (!comment) {
+		return "";
+	}
+	const when = moment(comment.creation);
+	const time = when.isValid() ? when.format(hrms.time.CLOCK_FORMAT) : "";
+	const date = when.isValid() ? when.format("MM/DD/YYYY") : "";
+	return __("Comment ({0}, {1}, {2}): {3}", [
+		comment.comment_by || __("Admin"),
+		time,
+		date,
+		comment.content || "",
+	]);
+};
+
+hrms.time.format_adjustment_clock = function (value) {
+	if (!value) {
+		return "—";
+	}
+	if (hrms.time.format_clock) {
+		const formatted = hrms.time.format_clock(value);
+		if (formatted) {
+			return formatted;
+		}
+	}
+	const parsed = moment(String(value), ["HH:mm:ss", "HH:mm", "hh:mm a", "hh:mm A", "h:mm A"], true);
+	return parsed.isValid() ? parsed.format(hrms.time.CLOCK_FORMAT) : String(value);
+};
+
+hrms.time.adjustment_range = function (in_time, out_time) {
+	return `${hrms.time.format_adjustment_clock(in_time)} – ${hrms.time.format_adjustment_clock(out_time)}`;
+};
+
+hrms.time.render_adjustment_actions = function (adjustment) {
+	if (!adjustment?.name || adjustment.status !== "Pending") {
+		return "";
+	}
+	const name = escape_html(adjustment.name);
+	return `
+		<span class="sp-tca-banner__actions">
+			<button type="button" class="sp-tca-btn is-approve" data-act="approve" data-adjustment="${name}">${escape_html(__("Approve"))}</button>
+			<button type="button" class="sp-tca-btn is-reject" data-act="reject" data-adjustment="${name}">${escape_html(__("Reject"))}</button>
+		</span>`;
+};
+
+hrms.time.render_adjustment_html = function (adjustment) {
+	if (!adjustment?.name || adjustment.status !== "Pending") {
+		return "";
+	}
+	const note = adjustment.note ? `<div class="sp-tca-banner__note">${escape_html(adjustment.note)}</div>` : "";
+	return `
+		<div class="sp-tca-banner" data-adjustment="${escape_html(adjustment.name)}">
+			<div class="sp-tca-banner__text">
+				<strong>${escape_html(__("Pending time change"))}</strong>
+				${escape_html(hrms.time.adjustment_range(adjustment.current_in_time, adjustment.current_out_time))}
+				→
+				${escape_html(hrms.time.adjustment_range(adjustment.requested_in_time, adjustment.requested_out_time))}
+				${note}
+			</div>
+			${hrms.time.render_adjustment_actions(adjustment)}
+		</div>`;
+};
+
+hrms.time.bind_adjustment_actions = function ($root, on_done) {
+	if (!$root || !$root.length) {
+		return;
+	}
+	$root.off("click.sp-tca").on("click.sp-tca", ".sp-tca-btn", function (event) {
+		event.preventDefault();
+		event.stopPropagation();
+		const $button = $(this);
+		const name = $(this).data("adjustment");
+		const act = $(this).data("act");
+		if (!name || !act) {
+			return;
+		}
+		const message =
+			act === "approve"
+				? __("Approve and apply this time change?")
+				: __("Reject this time change request?");
+		frappe.confirm(message, () => {
+			const $actions = $button.closest(".sp-tca-banner__actions").find(".sp-tca-btn");
+			$actions.prop("disabled", true);
+			frappe.call({
+				method: "hrms.hr.doctype.time_clock_adjustment.time_clock_adjustment.review_time_clock_adjustment",
+				args: { name, action: act },
+				callback() {
+					if (typeof on_done === "function") {
+						on_done();
+					}
+					hrms.time.refresh_hours_views();
+				},
+				error() {
+					$actions.prop("disabled", false);
+				},
+			});
+		});
+	});
 };
 
 hrms.time.to_hhmm = function (value) {
@@ -322,21 +491,145 @@ hrms.time.compare_hhmm = function (a, b) {
 	return String(a).localeCompare(String(b));
 };
 
+hrms.time.to_ampm_parts = function (value) {
+	const hhmm = hrms.time.to_hhmm(value);
+	const match = /^(\d{1,2}):(\d{2})/.exec(hhmm || "");
+	if (!match) {
+		return { display: "", period: "AM", hhmm: "" };
+	}
+	const hours = parseInt(match[1], 10);
+	const minutes = match[2];
+	if (hours > 23 || parseInt(minutes, 10) > 59) {
+		return { display: "", period: "AM", hhmm: "" };
+	}
+	const period = hours >= 12 ? "PM" : "AM";
+	let hour12 = hours % 12;
+	if (hour12 === 0) {
+		hour12 = 12;
+	}
+	return {
+		display: `${hour12}:${minutes}`,
+		period,
+		hhmm: `${String(hours).padStart(2, "0")}:${minutes}`,
+	};
+};
+
+hrms.time.parse_entry_time = function (text, period) {
+	let raw = String(text || "")
+		.trim()
+		.toLowerCase()
+		.replace(/\./g, ":")
+		.replace(/\s+/g, "");
+	if (!raw) {
+		return null;
+	}
+	let hinted = String(period || "AM").toUpperCase() === "PM" ? "PM" : "AM";
+	const suffix = raw.match(/(am|pm|a|p)$/);
+	if (suffix) {
+		hinted = suffix[1].charAt(0) === "p" ? "PM" : "AM";
+		raw = raw.slice(0, -suffix[1].length);
+	}
+	if (!raw) {
+		return null;
+	}
+	let hours;
+	let minutes;
+	if (raw.includes(":")) {
+		const bits = raw.split(":");
+		if (bits.length !== 2 || !/^\d{1,2}$/.test(bits[0]) || (bits[1] !== "" && !/^\d{1,2}$/.test(bits[1]))) {
+			return null;
+		}
+		hours = parseInt(bits[0], 10);
+		minutes = bits[1] === "" ? 0 : parseInt(bits[1], 10);
+	} else if (/^\d{1,4}$/.test(raw)) {
+		if (raw.length <= 2) {
+			hours = parseInt(raw, 10);
+			minutes = 0;
+		} else if (raw.length === 3) {
+			hours = parseInt(raw.slice(0, 1), 10);
+			minutes = parseInt(raw.slice(1), 10);
+		} else {
+			const head = parseInt(raw.slice(0, 2), 10);
+			if (head > 23) {
+				return null;
+			}
+			hours = head;
+			minutes = parseInt(raw.slice(2), 10);
+		}
+	} else {
+		return null;
+	}
+	if (!Number.isFinite(hours) || !Number.isFinite(minutes) || minutes > 59 || hours > 23) {
+		return null;
+	}
+	if (hours >= 13 || hours === 0) {
+		return hrms.time.to_ampm_parts(
+			`${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`,
+		);
+	}
+	let hour24 = hours;
+	if (hours === 12) {
+		hour24 = hinted === "AM" ? 0 : 12;
+	} else if (hinted === "PM") {
+		hour24 = hours + 12;
+	}
+	return hrms.time.to_ampm_parts(
+		`${String(hour24).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`,
+	);
+};
+
+hrms.time.entry_ampm = function ($input) {
+	return $input.closest(".sp-entry__time-wrap").find(".sp-entry__ampm");
+};
+
+hrms.time.ampm_options_html = function (period) {
+	const pm = period === "PM";
+	return `<option value="AM"${pm ? "" : " selected"}>AM</option><option value="PM"${pm ? " selected" : ""}>PM</option>`;
+};
+
+hrms.time.read_entry_time = function ($input) {
+	const parsed = hrms.time.parse_entry_time($input.val(), hrms.time.entry_ampm($input).val());
+	return parsed && parsed.hhmm ? parsed.hhmm : "";
+};
+
+hrms.time.write_entry_time = function ($input, value) {
+	const parts = hrms.time.to_ampm_parts(value);
+	$input.val(parts.display);
+	$input.attr("data-hhmm", parts.hhmm || "");
+	$input.removeClass("is-invalid");
+	if (parts.hhmm) {
+		hrms.time.entry_ampm($input).val(parts.period);
+	}
+};
+
+hrms.time.commit_entry_time = function ($input) {
+	const text = String($input.val() || "").trim();
+	if (!text) {
+		$input.val("");
+		$input.attr("data-hhmm", "");
+		$input.removeClass("is-invalid");
+		return { hhmm: "", invalid: false };
+	}
+	const parsed = hrms.time.parse_entry_time(text, hrms.time.entry_ampm($input).val());
+	if (!parsed || !parsed.hhmm) {
+		$input.attr("data-hhmm", "");
+		$input.addClass("is-invalid");
+		return { hhmm: "", invalid: true };
+	}
+	hrms.time.write_entry_time($input, parsed.hhmm);
+	return { hhmm: parsed.hhmm, invalid: false };
+};
+
 hrms.time.sync_entry_end_after_start = function ($root) {
 	const $start = $root.find(".sp-entry__start");
 	const $end = $root.find(".sp-entry__end");
 	if ($end.prop("disabled")) {
 		return;
 	}
-	const start = $start.val();
-	if (start) {
-		$end.attr("min", start);
-	} else {
-		$end.removeAttr("min");
-	}
-	const end = $end.val();
+	const start = hrms.time.read_entry_time($start);
+	const end = hrms.time.read_entry_time($end);
 	if (start && end && hrms.time.compare_hhmm(end, start) < 0) {
-		$end.val(start);
+		hrms.time.write_entry_time($end, start);
 	}
 };
 
@@ -490,9 +783,10 @@ hrms.time.show_add_entry_dialog = function (listview, opts) {
 		hrms.time.to_date_string(opts.attendance_date) || hrms.time.default_entry_date(listview);
 	const preset_start = hrms.time.to_hhmm(opts.in_time) || "09:00";
 	const preset_end = hrms.time.to_hhmm(opts.out_time) || "18:00";
+	const start_parts = hrms.time.to_ampm_parts(preset_start);
+	const end_parts = hrms.time.to_ampm_parts(preset_end);
 	const preset_shift = opts.shift || "";
 	const calendar_icon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`;
-	const clock_icon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v6l4 2"/></svg>`;
 
 	const dialog = new frappe.ui.Dialog({
 		title: __("Add Working Entry"),
@@ -526,15 +820,15 @@ hrms.time.show_add_entry_dialog = function (listview, opts) {
 						<div class="sp-entry__time-field">
 							<label class="sp-entry__label">${hrms.time.escape_html(__("Start Time"))}</label>
 							<div class="sp-entry__time-wrap">
-								<input type="time" class="sp-entry__start" value="${hrms.time.escape_html(preset_start)}" />
-								<button type="button" class="sp-entry__icon-btn" data-time="start" aria-label="${hrms.time.escape_html(__("Pick start time"))}">${clock_icon}</button>
+								<input type="text" class="sp-entry__start" inputmode="text" autocomplete="off" spellcheck="false" maxlength="8" placeholder="h:mm" aria-label="${hrms.time.escape_html(__("Start Time"))}" value="${hrms.time.escape_html(start_parts.display)}" data-hhmm="${hrms.time.escape_html(start_parts.hhmm)}" />
+								<select class="sp-entry__ampm" aria-label="${hrms.time.escape_html(__("Start time AM or PM"))}">${hrms.time.ampm_options_html(start_parts.period)}</select>
 							</div>
 						</div>
 						<div class="sp-entry__time-field">
 							<label class="sp-entry__label">${hrms.time.escape_html(__("End Time"))}</label>
 							<div class="sp-entry__time-wrap">
-								<input type="time" class="sp-entry__end" value="${hrms.time.escape_html(preset_end)}" />
-								<button type="button" class="sp-entry__icon-btn" data-time="end" aria-label="${hrms.time.escape_html(__("Pick end time"))}">${clock_icon}</button>
+								<input type="text" class="sp-entry__end" inputmode="text" autocomplete="off" spellcheck="false" maxlength="8" placeholder="h:mm" aria-label="${hrms.time.escape_html(__("End Time"))}" value="${hrms.time.escape_html(end_parts.display)}" data-hhmm="${hrms.time.escape_html(end_parts.hhmm)}" />
+								<select class="sp-entry__ampm" aria-label="${hrms.time.escape_html(__("End time AM or PM"))}">${hrms.time.ampm_options_html(end_parts.period)}</select>
 							</div>
 						</div>
 					</div>
@@ -622,7 +916,7 @@ hrms.time.show_add_entry_dialog = function (listview, opts) {
 	const toggle_working_now = () => {
 		const on = $root.find(".sp-entry__working-now").is(":checked");
 		$root.find(".sp-entry__end").prop("disabled", on);
-		$root.find('.sp-entry__icon-btn[data-time="end"]').prop("disabled", on);
+		$root.find(".sp-entry__time-field").eq(1).find(".sp-entry__ampm").prop("disabled", on);
 		$root.find(".sp-entry__time-field").eq(1).toggleClass("is-disabled", on);
 		if (!on) {
 			hrms.time.sync_entry_end_after_start($root);
@@ -635,15 +929,30 @@ hrms.time.show_add_entry_dialog = function (listview, opts) {
 			return null;
 		}
 		const attendance_date = $root.find(".sp-entry__date").val();
-		const in_time = $root.find(".sp-entry__start").val();
 		const working_now = $root.find(".sp-entry__working-now").is(":checked") ? 1 : 0;
-		const out_time = $root.find(".sp-entry__end").val();
+		const start_time = hrms.time.commit_entry_time($root.find(".sp-entry__start"));
+		const end_time = working_now
+			? { hhmm: "", invalid: false }
+			: hrms.time.commit_entry_time($root.find(".sp-entry__end"));
+		if (!working_now) {
+			hrms.time.sync_entry_end_after_start($root);
+		}
+		const in_time = hrms.time.read_entry_time($root.find(".sp-entry__start"));
+		const out_time = working_now ? "" : hrms.time.read_entry_time($root.find(".sp-entry__end"));
 		if (!attendance_date) {
 			frappe.msgprint(__("Date is required."));
 			return null;
 		}
+		if (start_time.invalid) {
+			frappe.msgprint(__("Enter a start time like 3:34."));
+			return null;
+		}
 		if (!in_time) {
 			frappe.msgprint(__("Start time is required."));
+			return null;
+		}
+		if (!working_now && end_time.invalid) {
+			frappe.msgprint(__("Enter an end time like 6:00."));
 			return null;
 		}
 		if (!working_now && !out_time) {
@@ -721,30 +1030,34 @@ hrms.time.show_add_entry_dialog = function (listview, opts) {
 		const start = hrms.time.to_hhmm(shift.start_time);
 		const end = hrms.time.to_hhmm(shift.end_time);
 		if (start) {
-			$root.find(".sp-entry__start").val(start);
+			hrms.time.write_entry_time($root.find(".sp-entry__start"), start);
 		}
 		if (end) {
-			$root.find(".sp-entry__end").val(end);
+			hrms.time.write_entry_time($root.find(".sp-entry__end"), end);
 		}
+		hrms.time.sync_entry_end_after_start($root);
 	});
-	$root.on("change input", ".sp-entry__start", function () {
+	$root.on("focus", ".sp-entry__start, .sp-entry__end", function () {
+		this.select();
+	});
+	$root.on("input", ".sp-entry__start, .sp-entry__end", function () {
+		$(this).removeClass("is-invalid");
+	});
+	$root.on("blur", ".sp-entry__start, .sp-entry__end", function () {
+		hrms.time.commit_entry_time($(this));
+		hrms.time.sync_entry_end_after_start($root);
+	});
+	$root.on("change", ".sp-entry__ampm", function () {
+		const $input = $(this).closest(".sp-entry__time-wrap").find(".sp-entry__start, .sp-entry__end");
+		if ($input.prop("disabled")) {
+			return;
+		}
+		hrms.time.commit_entry_time($input);
 		hrms.time.sync_entry_end_after_start($root);
 	});
 	$root.on("change", ".sp-entry__working-now", toggle_working_now);
 	$root.on("click", ".sp-entry__date-btn", () => {
 		const input = $root.find(".sp-entry__date").get(0);
-		if (input?.showPicker) {
-			input.showPicker();
-		} else {
-			input?.focus();
-		}
-	});
-	$root.on("click", ".sp-entry__icon-btn[data-time]", function () {
-		const which = $(this).data("time");
-		const input = $root.find(which === "end" ? ".sp-entry__end" : ".sp-entry__start").get(0);
-		if (input?.disabled) {
-			return;
-		}
 		if (input?.showPicker) {
 			input.showPicker();
 		} else {
@@ -789,15 +1102,16 @@ hrms.time.show_add_entry_dialog = function (listview, opts) {
 			if (opts.in_time) {
 				const start = hrms.time.to_hhmm(opts.in_time);
 				if (start) {
-					$root.find(".sp-entry__start").val(start);
+					hrms.time.write_entry_time($root.find(".sp-entry__start"), start);
 				}
 			}
 			if (opts.out_time) {
 				const end = hrms.time.to_hhmm(opts.out_time);
 				if (end) {
-					$root.find(".sp-entry__end").val(end);
+					hrms.time.write_entry_time($root.find(".sp-entry__end"), end);
 				}
 			}
+			hrms.time.sync_entry_end_after_start($root);
 			render_users();
 			render_selected();
 		},

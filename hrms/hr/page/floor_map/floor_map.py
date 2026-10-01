@@ -129,17 +129,35 @@ def assign_cubicle(
 		frappe.throw(_("Not permitted"), frappe.PermissionError)
 
 	doc = frappe.get_doc("Cubicle", cubicle)
-	if cint(clear):
-		doc.employee = None
-		doc.employee_name = None
-	elif employee:
-		doc.employee = employee
-	if device_id is not None:
-		doc.device_id = device_id
-	if ip_address is not None:
-		doc.ip_address = ip_address
-	doc.save()
+	frappe.db.savepoint("assign_cubicle")
+	try:
+		if cint(clear):
+			doc.employee = None
+			doc.employee_name = None
+		elif employee:
+			_vacate_other_seats(employee, cubicle)
+			doc.employee = employee
+		if device_id is not None:
+			doc.device_id = device_id
+		if ip_address is not None:
+			doc.ip_address = ip_address
+		doc.save()
+	except Exception:
+		frappe.db.rollback(save_point="assign_cubicle")
+		raise
 	return {"name": doc.name, "status": doc.status}
+
+
+def _vacate_other_seats(employee: str, cubicle: str):
+	for name in frappe.get_all(
+		"Cubicle",
+		filters={"employee": employee, "name": ["!=", cubicle]},
+		pluck="name",
+	):
+		old = frappe.get_doc("Cubicle", name)
+		old.employee = None
+		old.employee_name = None
+		old.save()
 
 
 @frappe.whitelist()

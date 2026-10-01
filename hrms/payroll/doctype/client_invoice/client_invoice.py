@@ -43,6 +43,7 @@ class ClientInvoice(Document):
 	# end: auto-generated types
 
 	def before_validate(self):
+		self.drop_floor_workers()
 		self.set_billing_currency()
 		self.fill_missing_agent_billing()
 		self.calculate_totals()
@@ -59,6 +60,24 @@ class ClientInvoice(Document):
 
 	def set_billing_currency(self):
 		self.currency = CLIENT_BILLING_CURRENCY
+
+	def drop_floor_workers(self):
+		"""Floor worker hours stay on payroll and are never billed to a client."""
+		if not self.agents or not frappe.get_meta("Employee").has_field("is_floor_worker"):
+			return
+		names = [row.employee for row in self.agents if row.employee]
+		if not names:
+			return
+		flagged = set(
+			frappe.get_all(
+				"Employee",
+				filters={"name": ("in", names), "is_floor_worker": 1},
+				pluck="name",
+			)
+		)
+		for row in list(self.agents):
+			if row.employee in flagged:
+				self.remove(row)
 
 	def fill_missing_agent_billing(self):
 		"""Fill hours and USD billing rate when an agent is added without values."""
@@ -113,6 +132,9 @@ class ClientInvoice(Document):
 		if not self.customer or not self.company:
 			frappe.throw(_("Client and Company are required before fetching agents"))
 
+		fields = ["name", "employee_name", "billing_rate"]
+		if frappe.get_meta("Employee").has_field("is_floor_worker"):
+			fields.append("is_floor_worker")
 		employees = frappe.get_all(
 			"Employee",
 			filters={
@@ -120,8 +142,9 @@ class ClientInvoice(Document):
 				"company": self.company,
 				"status": "Active",
 			},
-			fields=["name", "employee_name", "billing_rate"],
+			fields=fields,
 		)
+		employees = [row for row in employees if not cint(row.get("is_floor_worker"))]
 		if not employees:
 			frappe.throw(
 				_("No active agents are assigned to client {0}").format(frappe.bold(self.customer))

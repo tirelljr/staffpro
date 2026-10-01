@@ -158,11 +158,23 @@ def run_automatic_payroll_now(start_date: str | None = None, end_date: str | Non
 
 
 @frappe.whitelist()
-def run_payroll_for_every_agent_now(start_date: str | None = None, end_date: str | None = None) -> dict:
-	"""Create one payroll covering every agent, regardless of client."""
+def run_payroll_for_every_agent_now(
+	start_date: str | None = None,
+	end_date: str | None = None,
+	employees: list[str] | str | None = None,
+	force_employees: list[str] | str | None = None,
+) -> dict:
+	"""Create one payroll covering the selected agents and calculate their salary."""
 	if not frappe.has_permission("Payroll Entry", "create"):
 		frappe.throw(_("Not permitted to run payroll"))
-	return process_payroll_for_every_agent(force=True, start_date=start_date, end_date=end_date)
+	return process_payroll_for_every_agent(
+		force=True,
+		start_date=start_date,
+		end_date=end_date,
+		employees=employees,
+		force_employees=force_employees,
+		one_payroll=True,
+	)
 
 
 @frappe.whitelist()
@@ -313,8 +325,15 @@ def process_automatic_payroll(force: bool = False, start_date=None, end_date=Non
 	return process_payroll_for_every_agent(force=force, start_date=start_date, end_date=end_date)
 
 
-def process_payroll_for_every_agent(force: bool = False, start_date=None, end_date=None) -> dict:
-	"""Create one payroll per pay template covering every agent, regardless of client."""
+def process_payroll_for_every_agent(
+	force: bool = False,
+	start_date=None,
+	end_date=None,
+	employees=None,
+	force_employees=None,
+	one_payroll: bool = False,
+) -> dict:
+	"""Create payroll covering every agent, regardless of client."""
 	settings = frappe.get_single("Payroll Settings")
 	if not cint(settings.get("enable_automatic_payroll")):
 		return _result(_("Automatic payroll is turned off in Payroll Settings."))
@@ -327,6 +346,20 @@ def process_payroll_for_every_agent(force: bool = False, start_date=None, end_da
 	created = []
 	skipped = []
 	custom_period = bool(start_date or end_date)
+
+	if one_payroll:
+		if not start_date or not end_date:
+			period = get_last_working_period()
+			start_date = start_date or period["start_date"]
+			end_date = end_date or period["end_date"]
+		return _run_simple_agent_payroll(
+			settings,
+			company,
+			start_date,
+			end_date,
+			employees=employees,
+			force_employees=force_employees,
+		)
 
 	if not custom_period:
 		draft_result = submit_due_drafts(settings, company, as_of, force=force)
@@ -393,17 +426,26 @@ def plan_payroll(every_agent: bool = True, force: bool = True, start_date=None, 
 	if not company:
 		return _preview_result(_("Set a company in Payroll Settings or Global Defaults."))
 
+	if every_agent:
+		if not start_date or not end_date:
+			period = get_last_working_period()
+			start_date = start_date or period["start_date"]
+			end_date = end_date or period["end_date"]
+		return _plan_simple_agent_payroll(
+			company,
+			start_date,
+			end_date,
+			branch=settings.get("automatic_payroll_branch"),
+		)
+
 	templates = get_enabled_templates(settings)
 	if not templates:
 		return _preview_result(_("Set auto-run days for Weekly, 2-weeks, or Monthly."))
 
-	if every_agent:
-		buckets = get_payroll_agent_buckets(company)
-	else:
-		buckets = [
-			{"customer": customer, "customer_is_unassigned": 0}
-			for customer in (get_payroll_customers(company) or [None])
-		]
+	buckets = [
+		{"customer": customer, "customer_is_unassigned": 0}
+		for customer in (get_payroll_customers(company) or [None])
+	]
 	if not buckets:
 		return _preview_result(_("No agents found."))
 
@@ -522,13 +564,240 @@ def plan_payroll(every_agent: bool = True, force: bool = True, start_date=None, 
 		preview_start = min(getdate(row["start_date"]) for row in entries)
 		preview_end = max(getdate(row["end_date"]) for row in entries)
 
-	return _preview_result(
+	result = _preview_result(
 		message,
 		entries=entries,
 		skipped=skipped,
 		start_date=preview_start,
 		end_date=preview_end,
 	)
+	if preview_start and preview_end:
+		result["joined_after"] = _late_joiner_rows(company, preview_start, preview_end)
+	return result
+
+
+def _plan_simple_agent_payroll(company, start_date, end_date, branch=None) -> dict:
+	"""One payroll for the selected dates. Pay templates are not split out."""
+	from hrms.payroll.doctype.client_invoice.client_invoice import get_hours_by_employee
+
+	start, end = resolve_custom_pay_period({"interval": 1}, start_date, end_date)
+	employees = _bucket_employees(
+		company, start_date=start, end_date=end, include_joined_after=True
+	)
+	if not employees:
+		return _preview_result(_("No agents found."), start_date=start, end_date=end, simple=True)
+
+	existing = find_existing_entry(company, start, end, branch=branch, customer=None)
+	if existing and existing.docstatus == 1:
+		return _preview_result(
+			_("Payroll for {0} to {1} already exists.").format(
+				frappe.format(start, {"fieldtype": "Date"}),
+				frappe.format(end, {"fieldtype": "Date"}),
+			),
+			start_date=start,
+			end_date=end,
+			simple=True,
+		)
+
+	hours_by_employee = get_hours_by_employee([row.name for row in employees], start, end)
+	agent_rows = [
+		{
+			"employee": row.name,
+			"employee_name": row.employee_name or row.name,
+			"hours": flt(hours_by_employee.get(row.name)),
+			"date_of_joining": str(getdate(row.date_of_joining)) if row.get("date_of_joining") else None,
+			"joined_after_period": cint(row.get("joined_after_period")),
+		}
+		for row in employees
+	]
+	return _preview_result(
+		_("Review the agents below, then approve to calculate their salary."),
+		entries=[
+			{
+				"customer": None,
+				"customer_label": _("All Agents"),
+				"frequency": "",
+				"label": "",
+				"start_date": str(start),
+				"end_date": str(end),
+				"agents": len(agent_rows),
+				"agent_names": [row["employee_name"] for row in agent_rows],
+				"agent_rows": agent_rows,
+				"hours": flt(sum(row["hours"] for row in agent_rows)),
+				"existing": existing.name if existing else None,
+				"action": "submit" if existing else "create",
+				"note": "",
+			}
+		],
+		start_date=start,
+		end_date=end,
+		simple=True,
+	)
+
+
+def _run_simple_agent_payroll(
+	settings, company, start_date, end_date, employees=None, force_employees=None
+) -> dict:
+	"""Create one payroll and calculate salary for the agents who are still included."""
+	start, end = resolve_custom_pay_period({"interval": 1}, start_date, end_date)
+	selected = _selected_agent_ids(company, employees, start_date=start, end_date=end)
+	forced = _forced_late_joiner_ids(company, force_employees, start, end)
+	combined = list(selected)
+	seen = set(selected)
+	for name in forced:
+		if name not in seen:
+			combined.append(name)
+			seen.add(name)
+	if not combined:
+		return _result(_("Select at least one agent."))
+
+	existing = find_existing_entry(
+		company,
+		start,
+		end,
+		branch=settings.get("automatic_payroll_branch"),
+		customer=None,
+	)
+	if existing and existing.docstatus == 1:
+		return _result(
+			_("Payroll for this period already exists: {0}.").format(existing.name),
+			skipped=[existing.name],
+		)
+
+	frequency = payroll_frequency_for_employee(combined[0], start, end) or "Fortnightly"
+	frappe.flags.payroll_use_employee_frequency = True
+	try:
+		entry = create_or_submit_payroll_entry(
+			settings,
+			company,
+			start,
+			end,
+			existing if existing and existing.docstatus == 0 else None,
+			frequency=frequency,
+			employee_ids=combined,
+			force_employee_ids=forced,
+		)
+	except Exception:
+		frappe.log_error(title=_("Automatic payroll failed"))
+		return _result(_("Automatic payroll failed. Check Error Log."))
+	finally:
+		frappe.flags.payroll_use_employee_frequency = False
+
+	if not entry:
+		return _result(_("No agents found."))
+
+	mark_last_run(getdate(nowdate()), entry.name)
+	return _result(
+		_("Created payroll entry: {0}.").format(entry.name),
+		created=[entry.name],
+		details={"created_by_bucket": {_("All Agents"): [entry.name]}},
+	)
+
+
+def _selected_agent_ids(company: str, employees, start_date=None, end_date=None) -> list[str]:
+	"""Active agents to pay. None means everyone. An empty list means the user dropped them all."""
+	active = [
+		row.name
+		for row in _bucket_employees(company, start_date=start_date, end_date=end_date)
+	]
+	if employees is None:
+		return active
+	if isinstance(employees, str):
+		employees = frappe.parse_json(employees) or []
+	active_set = set(active)
+	selected = []
+	seen = set()
+	for name in employees:
+		if name in active_set and name not in seen:
+			selected.append(name)
+			seen.add(name)
+	return selected
+
+
+def _forced_late_joiner_ids(company: str, employees, start_date, end_date) -> list[str]:
+	"""Agents the user chose to pay even though their company join date is after the period."""
+	if not employees or not end_date:
+		return []
+	if isinstance(employees, str):
+		employees = frappe.parse_json(employees) or []
+	wanted = []
+	seen = set()
+	for name in employees:
+		if name and name not in seen:
+			wanted.append(name)
+			seen.add(name)
+	if not wanted:
+		return []
+	rows = frappe.get_all(
+		"Employee",
+		filters={"name": ("in", wanted), "company": company, "status": "Active"},
+		fields=["name", "date_of_joining", "relieving_date"],
+	)
+	by_name = {row.name: row for row in rows}
+	start = getdate(start_date) if start_date else None
+	forced = []
+	for name in wanted:
+		row = by_name.get(name)
+		if not row or not _joined_after(row, end_date):
+			continue
+		if start and _left_before(row, start):
+			continue
+		forced.append(name)
+	return forced
+
+
+def payroll_frequency_for_employee(employee: str, start_date, end_date) -> str:
+	"""Frequency on the agent's salary structure, so salary is calculated from that structure."""
+	from frappe.query_builder import Order
+
+	salary_structure = frappe.qb.DocType("Salary Structure")
+	assignment = frappe.qb.DocType("Salary Structure Assignment")
+	rows = (
+		frappe.qb.from_(assignment)
+		.join(salary_structure)
+		.on(assignment.salary_structure == salary_structure.name)
+		.select(salary_structure.payroll_frequency)
+		.where(
+			(assignment.docstatus == 1)
+			& (salary_structure.docstatus == 1)
+			& (salary_structure.is_active == "Yes")
+			& (assignment.employee == employee)
+			& (assignment.from_date <= getdate(end_date))
+		)
+		.orderby(assignment.from_date, order=Order.desc)
+		.limit(1)
+	).run(pluck=True)
+	return canonical_frequency(rows[0]) if rows else ""
+
+
+def _assign_payroll_employees(entry, employee_ids: list[str], force_ids: set | None = None):
+	rows = []
+	if employee_ids:
+		rows = frappe.get_all(
+			"Employee",
+			filters={"name": ("in", employee_ids), "status": "Active"},
+			fields=["name", "employee_name", "department", "designation"],
+		)
+	by_name = {row.name: row for row in rows}
+	force_ids = force_ids or set()
+	can_force = frappe.get_meta("Payroll Employee Detail").has_field("force_include")
+	entry.set("employees", [])
+	for name in employee_ids:
+		row = by_name.get(name)
+		if not row:
+			continue
+		payload = {
+			"employee": row.name,
+			"employee_name": row.employee_name,
+			"department": row.department,
+			"designation": row.designation,
+		}
+		if can_force and name in force_ids:
+			payload["force_include"] = 1
+		entry.append("employees", payload)
+	entry.number_of_employees = len(entry.employees)
+	if entry.employees:
+		entry.update_employees_with_withheld_salaries()
 
 
 def _bucket_label(bucket: dict) -> str:
@@ -548,7 +817,9 @@ def _preview_row(company, template, start_date, end_date, bucket, existing=None)
 	customer_is_unassigned = cint(bucket.get("customer_is_unassigned"))
 	customer_label = _bucket_label(bucket)
 
-	employees = _bucket_employees(company, customer, bool(customer_is_unassigned))
+	employees = _bucket_employees(
+		company, customer, bool(customer_is_unassigned), start_date=start_date, end_date=end_date
+	)
 	hours_by_employee = get_hours_by_employee(
 		[row.name for row in employees], start_date, end_date
 	)
@@ -573,7 +844,36 @@ def _preview_row(company, template, start_date, end_date, bucket, existing=None)
 	}
 
 
-def _bucket_employees(company: str, customer: str | None = None, customer_is_unassigned: bool = False):
+def _employed_during(row, start_date, end_date) -> bool:
+	if not start_date or not end_date:
+		return True
+	if _left_before(row, start_date) or _joined_after(row, end_date):
+		return False
+	return True
+
+
+def _joined_after(row, end_date) -> bool:
+	joined = row.get("date_of_joining") if hasattr(row, "get") else None
+	if not joined or not end_date:
+		return False
+	return getdate(joined) > getdate(end_date)
+
+
+def _left_before(row, start_date) -> bool:
+	left = row.get("relieving_date") if hasattr(row, "get") else None
+	if not left or not start_date:
+		return False
+	return getdate(left) < getdate(start_date)
+
+
+def _bucket_employees(
+	company: str,
+	customer: str | None = None,
+	customer_is_unassigned: bool = False,
+	start_date=None,
+	end_date=None,
+	include_joined_after: bool = False,
+):
 	from hrms.payroll.doctype.payroll_entry.payroll_entry import is_all_clients
 
 	filters = {"company": company, "status": "Active"}
@@ -582,12 +882,43 @@ def _bucket_employees(company: str, customer: str | None = None, customer_is_una
 			filters["bill_to_customer"] = ("is", "not set")
 		elif customer and not is_all_clients(customer):
 			filters["bill_to_customer"] = customer
-	return frappe.get_all(
+	rows = frappe.get_all(
 		"Employee",
 		filters=filters,
-		fields=["name", "employee_name"],
+		fields=["name", "employee_name", "date_of_joining", "relieving_date"],
 		order_by="employee_name asc",
 	)
+	if start_date and end_date:
+		kept = []
+		for row in rows:
+			if _left_before(row, start_date):
+				continue
+			late = _joined_after(row, end_date)
+			if late and not include_joined_after:
+				continue
+			row["joined_after_period"] = 1 if late else 0
+			kept.append(row)
+		rows = kept
+	return rows
+
+
+def _late_joiner_rows(company: str, start_date, end_date) -> list[dict]:
+	"""Active agents whose company join date is after the pay period."""
+	rows = _bucket_employees(
+		company, start_date=start_date, end_date=end_date, include_joined_after=True
+	)
+	late = []
+	for row in rows:
+		if not cint(row.get("joined_after_period")):
+			continue
+		late.append(
+			{
+				"employee": row.name,
+				"employee_name": row.employee_name or row.name,
+				"date_of_joining": str(getdate(row.date_of_joining)) if row.get("date_of_joining") else None,
+			}
+		)
+	return late
 
 
 def _preview_result(
@@ -596,9 +927,10 @@ def _preview_result(
 	skipped: list | None = None,
 	start_date=None,
 	end_date=None,
+	simple: bool = False,
 ) -> dict:
 	entries = entries or []
-	return {
+	result = {
 		"message": message,
 		"entries": entries,
 		"skipped": skipped or [],
@@ -606,6 +938,9 @@ def _preview_result(
 		"start_date": str(getdate(start_date)) if start_date else None,
 		"end_date": str(getdate(end_date)) if end_date else None,
 	}
+	if simple:
+		result["simple"] = True
+	return result
 
 
 def resolve_custom_pay_period(template: dict | None, start_date=None, end_date=None) -> tuple[date, date]:
@@ -1031,6 +1366,8 @@ def create_or_submit_payroll_entry(
 	frequency: str | None = None,
 	customer: str | None = None,
 	customer_is_unassigned: bool = False,
+	employee_ids: list[str] | None = None,
+	force_employee_ids: list[str] | None = None,
 ):
 	frappe.flags.skip_payroll_enqueue = True
 
@@ -1038,7 +1375,12 @@ def create_or_submit_payroll_entry(
 	if existing and existing.docstatus == 0:
 		entry = existing
 		_set_payroll_customer(entry, customer)
-		if not entry.employees:
+		if employee_ids is not None:
+			_assign_payroll_employees(entry, employee_ids, force_ids=set(force_employee_ids or []))
+			if not entry.employees:
+				return None
+			entry.save(ignore_permissions=True)
+		elif not entry.employees:
 			try:
 				entry.fill_employee_details(customer_is_unassigned=customer_is_unassigned)
 			except frappe.ValidationError:
@@ -1049,10 +1391,15 @@ def create_or_submit_payroll_entry(
 		frequencies = [frequency] if frequency else get_payroll_frequencies(company, settings)
 		for freq in frequencies:
 			entry = build_payroll_entry(settings, company, start_date, end_date, freq, customer=customer)
-			try:
-				entry.fill_employee_details(customer_is_unassigned=customer_is_unassigned)
-			except frappe.ValidationError:
-				continue
+			if employee_ids is not None:
+				_assign_payroll_employees(entry, employee_ids, force_ids=set(force_employee_ids or []))
+				if not entry.employees:
+					continue
+			else:
+				try:
+					entry.fill_employee_details(customer_is_unassigned=customer_is_unassigned)
+				except frappe.ValidationError:
+					continue
 			entry.flags.ignore_permissions = True
 			entry.insert()
 			to_submit.append(entry)

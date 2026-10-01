@@ -21,12 +21,10 @@ frappe.ui.form.on("Payroll Entry", {
 		frm.toggle_reqd("customer", 0);
 		frm.set_df_property("customer", "hidden", 1);
 		if (frm.is_new()) {
-			if (!cint(frm.doc.salary_slip_based_on_timesheet)) {
-				frm.set_value("salary_slip_based_on_timesheet", 1);
-			}
 			if (!frm.doc.payroll_frequency) {
 				frm.set_value("payroll_frequency", "Fortnightly");
 			}
+			frm.set_value("salary_slip_based_on_timesheet", 0);
 			frm.set_value("deduct_social_security", 1);
 		}
 
@@ -143,9 +141,11 @@ frappe.ui.form.on("Payroll Entry", {
 					});
 				} else {
 					frm.page.set_primary_action(__("Create Salary Slips"), () => {
-						frm.save("Submit").then(() => {
-							frm.page.clear_primary_action();
-							frm.refresh();
+						confirm_late_joiners(frm, () => {
+							frm.save("Submit").then(() => {
+								frm.page.clear_primary_action();
+								frm.refresh();
+							});
 						});
 					});
 				}
@@ -178,6 +178,8 @@ frappe.ui.form.on("Payroll Entry", {
 		} else if (frm.doc.error_message) {
 			frm.dashboard.set_headline(frappe.utils.escape_html(frm.doc.error_message));
 		}
+
+		warn_joined_after_period(frm);
 	},
 
 	queue_fill_employees: function (frm, opts) {
@@ -300,7 +302,7 @@ frappe.ui.form.on("Payroll Entry", {
 			(frm.doc.status === "Failed" || frm.doc.status === "Submitted")
 		) {
 			frm.add_custom_button(__("Create Salary Slips"), function () {
-				frm.trigger("create_salary_slip");
+				confirm_late_joiners(frm, () => frm.trigger("create_salary_slip"));
 			}).addClass("btn-primary");
 		}
 	},
@@ -564,6 +566,168 @@ frappe.ui.form.on("Payroll Entry", {
 		frm.refresh_field("employees");
 	},
 });
+
+function payroll_employee_ids(frm) {
+	return (frm.doc.employees || []).map((row) => row.employee).filter(Boolean);
+}
+
+function warn_joined_after_period(frm) {
+	if (frm.doc.docstatus === 2 || frm.is_new() || !frm.doc.end_date) {
+		return;
+	}
+	const employees = payroll_employee_ids(frm);
+	if (!employees.length) {
+		return;
+	}
+	frappe.call({
+		method: "hrms.payroll.doctype.payroll_entry.payroll_entry.get_agents_joining_after_period",
+		args: { employees, end_date: frm.doc.end_date },
+		callback(r) {
+			const late = r.message || [];
+			if (!late.length || frm.doc.docstatus === 2 || frm.doc.status === "Failed") {
+				return;
+			}
+			const names = late
+				.map((row) => frappe.utils.escape_html(row.employee_name || row.employee))
+				.join(", ");
+			frm.dashboard.set_headline(
+				__("Joined after this pay period: {0}. You can remove them or force add them before creating salary slips.", [
+					names,
+				]),
+			);
+			frm.dashboard.headline?.css?.("color", "");
+		},
+	});
+}
+
+function confirm_late_joiners(frm, proceed) {
+	const employees = payroll_employee_ids(frm);
+	if (!employees.length || !frm.doc.end_date) {
+		proceed();
+		return;
+	}
+	frappe.call({
+		method: "hrms.payroll.doctype.payroll_entry.payroll_entry.get_agents_joining_after_period",
+		args: { employees, end_date: frm.doc.end_date },
+		freeze: true,
+		freeze_message: __("Checking join dates..."),
+		callback(r) {
+			const late = r.message || [];
+			const already_forced = new Set(
+				(frm.doc.employees || [])
+					.filter((row) => cint(row.force_include))
+					.map((row) => row.employee),
+			);
+			const pending = late.filter((row) => !already_forced.has(row.employee));
+			if (!pending.length) {
+				proceed();
+				return;
+			}
+			show_late_joiner_dialog(frm, pending, proceed);
+		},
+	});
+}
+
+function show_late_joiner_dialog(frm, late, proceed) {
+	const rows = late
+		.map((row) => {
+			const joined = row.date_of_joining ? frappe.datetime.str_to_user(row.date_of_joining) : "";
+			return `<tr>
+				<td><input type="checkbox" class="late-joiner-force" data-employee="${frappe.utils.escape_html(
+					row.employee || "",
+				)}"></td>
+				<td>${frappe.utils.escape_html(row.employee_name || row.employee || "")}</td>
+				<td>${frappe.utils.escape_html(joined)}</td>
+			</tr>`;
+		})
+		.join("");
+	const dialog = new frappe.ui.Dialog({
+		title: __("Joined After Pay Period"),
+		fields: [
+			{
+				fieldname: "warning",
+				fieldtype: "HTML",
+				options: `
+					<p>${__(
+						"These agents joined the company after this pay period. Leave Force add unchecked to remove them, or check it to pay them anyway.",
+					)}</p>
+					<table class="table table-bordered">
+						<thead>
+							<tr>
+								<th>${__("Force add")}</th>
+								<th>${__("Agent")}</th>
+								<th>${__("Joined")}</th>
+							</tr>
+						</thead>
+						<tbody>${rows}</tbody>
+					</table>
+				`,
+			},
+		],
+		primary_action_label: __("Continue"),
+		primary_action() {
+			const forced = new Set();
+			dialog.$wrapper.find(".late-joiner-force:checked").each(function () {
+				const employee = this.getAttribute("data-employee");
+				if (employee) {
+					forced.add(employee);
+				}
+			});
+			dialog.hide();
+			apply_late_joiner_choice(frm, late, forced, proceed);
+		},
+	});
+	dialog.set_secondary_action_label(__("Cancel"));
+	dialog.set_secondary_action(() => dialog.hide());
+	dialog.show();
+}
+
+function apply_late_joiner_choice(frm, late, forced, proceed) {
+	const late_ids = new Set(late.map((row) => row.employee));
+	if (frm.doc.docstatus === 0) {
+		(frm.doc.employees || []).slice().forEach((row) => {
+			if (!late_ids.has(row.employee)) {
+				return;
+			}
+			if (forced.has(row.employee)) {
+				row.force_include = 1;
+				return;
+			}
+			if (row.doctype && row.name) {
+				frappe.model.clear_doc(row.doctype, row.name);
+			}
+		});
+		if (late_ids.size) {
+			frm.doc.employees = (frm.doc.employees || []).filter(
+				(row) => !late_ids.has(row.employee) || forced.has(row.employee),
+			);
+		}
+		frm.doc.number_of_employees = (frm.doc.employees || []).length;
+		frm.refresh_field("employees");
+		frm.refresh_field("number_of_employees");
+		if (!(frm.doc.employees || []).length) {
+			frm.dirty();
+			frappe.msgprint(__("No agents left on this payroll."));
+			return;
+		}
+		frm.dirty();
+		proceed();
+		return;
+	}
+
+	frappe.call({
+		method: "hrms.payroll.doctype.payroll_entry.payroll_entry.set_agents_force_included",
+		args: {
+			payroll_entry: frm.doc.name,
+			employees: Array.from(forced),
+		},
+		freeze: true,
+		freeze_message: __("Updating payroll..."),
+		callback() {
+			proceed();
+		},
+	});
+}
 
 // Submit salary slips
 

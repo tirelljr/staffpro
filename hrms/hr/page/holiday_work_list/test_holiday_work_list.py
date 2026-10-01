@@ -28,6 +28,8 @@ class TestHolidayWorkList(HRMSTestSuite):
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
+		frappe.db.delete("Holiday Work Deadline", {"holiday_date": self.weekday})
+		frappe.db.delete("Holiday Work Election", {"holiday_date": self.weekday})
 
 	def test_working_list_only_includes_elections(self):
 		working, _working_user = make_election_employee("hwe.admin.work@example.com", self.holiday_list)
@@ -53,3 +55,25 @@ class TestHolidayWorkList(HRMSTestSuite):
 		frappe.set_user(user)
 		self.assertRaises(frappe.PermissionError, get_upcoming_holidays)
 		self.assertRaises(frappe.PermissionError, get_holiday_work_list, str(self.weekday))
+
+	def test_admin_can_set_notification_deadline(self):
+		from datetime import timedelta
+
+		from frappe.utils import now_datetime
+
+		from hrms.hr.page.holiday_work_list.holiday_work_list import set_holiday_work_deadline
+
+		silent, _user = make_election_employee("hwe.admin.silent@example.com", self.holiday_list)
+		deadline = now_datetime() + timedelta(days=1)
+		result = set_holiday_work_deadline(str(self.weekday), deadline)
+		self.assertTrue(result["response_deadline"])
+
+		roster = get_holiday_work_list(str(self.weekday))
+		by_employee = {row["employee"]: row for row in roster["details"]}
+		self.assertTrue(by_employee[silent]["will_work"])
+		self.assertTrue(by_employee[silent]["assumed_working"])
+
+		set_holiday_work_deadline(str(self.weekday), "")
+		roster = get_holiday_work_list(str(self.weekday))
+		by_employee = {row["employee"]: row for row in roster["details"]}
+		self.assertFalse(by_employee[silent]["will_work"])

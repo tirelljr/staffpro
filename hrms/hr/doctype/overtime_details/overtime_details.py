@@ -15,14 +15,11 @@ class OvertimeDetails(Document):
 		from frappe.types import DF
 
 		date: DF.Date
-		maximum_overtime_hours_allowed: DF.Float
 		overtime_duration: DF.Float
-		overtime_type: DF.Link
 		parent: DF.Data
 		parentfield: DF.Data
 		parenttype: DF.Data
 		reference_document: DF.Link | None
-		standard_working_hours: DF.Float
 	# end: auto-generated types
 
 	pass

@@ -40,6 +40,14 @@
   {
    "added": 0,
    "hidden": 0,
+   "icon": "folder",
+   "link_to": "Filesystem",
+   "link_type": "Sidebar",
+   "title": "Filesystem"
+  },
+  {
+   "added": 0,
+   "hidden": 0,
    "icon": "layout-grid",
    "link_to": "Floor",
    "link_type": "Sidebar",
@@ -70,7 +78,7 @@
    "title": "Admin"
   }
  ],
- "modified": "2026-09-09 14:59:15.124981",
+ "modified": "2026-09-30 02:26:08.312164",
  "modified_by": "Administrator",
  "name": "hrms",
  "owner": "Administrator",

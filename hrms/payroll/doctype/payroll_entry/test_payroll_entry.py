@@ -447,6 +447,35 @@ class TestPayrollEntry(HRMSTestSuite):
 			_is_missing_salary_structure_error("Please set account in Salary Component Bonus")
 		)
 
+	def test_joining_after_period_error_is_detected_from_the_message_log(self):
+		from hrms.payroll.doctype.payroll_entry.payroll_entry import (
+			_is_outside_payroll_period_error,
+			joined_after_pay_period,
+		)
+
+		self.assertTrue(joined_after_pay_period("2026-08-01", "2026-07-24"))
+		self.assertFalse(joined_after_pay_period("2026-07-24", "2026-07-24"))
+		self.assertFalse(joined_after_pay_period("2026-07-01", "2026-07-24"))
+		self.assertFalse(joined_after_pay_period(None, "2026-07-24"))
+		self.assertTrue(
+			_is_outside_payroll_period_error(
+				"Cannot create Salary Slip for Employee joining after Payroll Period"
+			)
+		)
+
+		class EmptyError(Exception):
+			def __str__(self):
+				return ""
+
+		previous = list(frappe.message_log or [])
+		frappe.message_log = [
+			{"message": "Cannot create Salary Slip for Employee joining after Payroll Period"}
+		]
+		try:
+			self.assertTrue(_is_outside_payroll_period_error(EmptyError()))
+		finally:
+			frappe.message_log = previous
+
 	def test_missing_salary_structure_skips_employee_and_keeps_payroll_entry(self):
 		company_doc = frappe.get_doc("Company", "_Test Company")
 		employee = make_employee("test_pe_has_structure@payroll.com", company=company_doc.name)
@@ -1747,6 +1776,7 @@ class TestPayrollEntry(HRMSTestSuite):
 
 		company = frappe.get_doc("Company", "_Test Company")
 		employee = make_employee("payroll.excel.hours@example.com", company=company.name)
+		frappe.db.set_value("Employee", employee, "overtime_threshold_hours", 8)
 		setup_salary_structure(employee, company)
 		dates = get_start_end_dates("Monthly", nowdate())
 		attendance = frappe.get_doc(
@@ -1757,7 +1787,6 @@ class TestPayrollEntry(HRMSTestSuite):
 				"attendance_date": dates.start_date,
 				"status": "Present",
 				"working_hours": 10,
-				"actual_overtime_duration": 2,
 			}
 		)
 		attendance.flags.ignore_validate = True
@@ -1779,8 +1808,13 @@ class TestPayrollEntry(HRMSTestSuite):
 	def test_hourly_gross_formula_uses_hours_times_rate(self):
 		from hrms.payroll.hourly_gross import compute_hourly_gross_pay
 
+		frappe.db.set_single_value("HR Settings", "overtime_pay_multiplier", 1.5)
 		self.assertEqual(compute_hourly_gross_pay(17, 0, 12.5), 212.50)
 		self.assertEqual(compute_hourly_gross_pay(17, 2, 12.5, holiday_pay=20, bonus=10), 280.00)
+
+		frappe.db.set_single_value("HR Settings", "overtime_pay_multiplier", 2)
+		self.assertEqual(compute_hourly_gross_pay(17, 2, 12.5), 262.50)
+		frappe.db.set_single_value("HR Settings", "overtime_pay_multiplier", 1.5)
 
 	def test_payroll_excel_gross_is_hours_times_rate(self):
 		from hrms.payroll.doctype.payroll_entry.payroll_entry import get_payroll_excel_data
@@ -1842,6 +1876,76 @@ class TestPayrollEntry(HRMSTestSuite):
 		self.assertAlmostEqual(flt(agent_row["hourly_rate"]), 12.5, places=2)
 		self.assertAlmostEqual(flt(agent_row["gross_pay"]), 212.50, places=2)
 		self.assertNotAlmostEqual(flt(agent_row["gross_pay"]), 500, places=2)
+		self.assertGreater(flt(agent_row["pay_period_ee_social"]), 0)
+		self.assertLess(flt(agent_row["net_pay"]), flt(agent_row["gross_pay"]))
+
+	def test_payroll_excel_overtime_starts_after_eighty_hours(self):
+		from hrms.payroll.doctype.payroll_entry.payroll_entry import get_payroll_excel_data
+		from hrms.payroll.hourly_gross import HOURLY_BASIC_COMPONENT, HOURLY_GROSS_FORMULA
+
+		frappe.db.set_single_value("HR Settings", "overtime_threshold_hours", 80)
+		frappe.db.set_single_value("HR Settings", "overtime_pay_multiplier", 1.5)
+		company = frappe.get_doc("Company", "_Test Company")
+		employee = make_employee("payroll.excel.ot80@example.com", company=company.name)
+		if frappe.get_meta("Employee").has_field("overtime_threshold_hours"):
+			frappe.db.set_value("Employee", employee, "overtime_threshold_hours", 80)
+		frappe.db.set_value("Employee", employee, "ctc", 10)
+		_ensure_basic_hourly_component()
+		make_salary_structure(
+			"Staff Pro Fortnightly OT Test",
+			"Fortnightly",
+			employee=employee,
+			company=company.name,
+			from_date=add_days(nowdate(), -30),
+			base=800,
+			earnings=[
+				{
+					"salary_component": HOURLY_BASIC_COMPONENT,
+					"abbr": "BH",
+					"amount_based_on_formula": 1,
+					"formula": HOURLY_GROSS_FORMULA,
+					"depends_on_payment_days": 0,
+				}
+			],
+		)
+		start = getdate("2026-01-05")
+		end = add_days(start, 10)
+		for offset in range(11):
+			attendance = frappe.get_doc(
+				{
+					"doctype": "Attendance",
+					"employee": employee,
+					"company": company.name,
+					"attendance_date": add_days(start, offset),
+					"status": "Present",
+					"working_hours": 8,
+				}
+			)
+			attendance.flags.ignore_validate = True
+			attendance.insert()
+
+		payroll_entry = frappe.new_doc("Payroll Entry")
+		payroll_entry.company = company.name
+		payroll_entry.start_date = start
+		payroll_entry.end_date = end
+		payroll_entry.payroll_frequency = "Fortnightly"
+		payroll_entry.currency = company.default_currency
+		payroll_entry.exchange_rate = 1
+		payroll_entry.cost_center = "Main - _TC"
+		payroll_entry.payment_account = get_payment_account()
+		payroll_entry.append(
+			"employees",
+			{"employee": employee, "employee_name": frappe.db.get_value("Employee", employee, "employee_name")},
+		)
+		payroll_entry.insert()
+
+		payload = get_payroll_excel_data(payroll_entry.name)
+		agent_row = next(row for row in payload["rows"] if row["employee"] == employee)
+		self.assertEqual(flt(agent_row["regular_hours"]), 80)
+		self.assertEqual(flt(agent_row["overtime_hours"]), 8)
+		self.assertAlmostEqual(flt(agent_row["gross_pay"]), 80 * 10 + 8 * 10 * 1.5, places=2)
+		self.assertGreater(flt(agent_row["pay_period_ee_social"]), 0)
+		self.assertLess(flt(agent_row["net_pay"]), flt(agent_row["gross_pay"]))
 
 	def test_split_full_name_into_first_and_last(self):
 		from hrms.payroll.doctype.payroll_entry.payroll_entry import _split_full_name

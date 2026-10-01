@@ -14,6 +14,7 @@ from hrms.hr.doctype.leave_application.leave_application import (
 	get_leave_balance_on,
 	get_leaves_for_period,
 )
+from hrms.hr.pto_anniversary import PTO_LEAVE_TYPE, pto_money_value
 
 Filters = frappe._dict
 
@@ -50,6 +51,12 @@ def get_columns() -> list[dict]:
 			"fieldname": "employee_name",
 			"width": 100,
 			"options": "employee",
+		},
+		{
+			"label": _("PTO Money Value"),
+			"fieldtype": "Currency",
+			"fieldname": "pto_money_value",
+			"width": 150,
 		},
 		{
 			"label": _("Opening Balance"),
@@ -133,6 +140,9 @@ def get_data(filters: Filters) -> list:
 
 			closing = allocated_leaves + opening - (row.leaves_expired + leaves_taken)
 			row.closing_balance = flt(closing, precision)
+			row.pto_money_value = (
+				pto_money_value(employee.name, row.closing_balance) if leave_type == PTO_LEAVE_TYPE else None
+			)
 			row.indent = 1
 			data.append(row)
 

@@ -19,9 +19,13 @@ def compute_hourly_gross_pay(
 	hourly_rate=0,
 	holiday_pay=0,
 	bonus=0,
-	overtime_multiplier=OVERTIME_MULTIPLIER,
+	overtime_multiplier=None,
 ) -> float:
 	"""Gross from the payroll spreadsheet inputs, rounded to cents."""
+	if overtime_multiplier is None:
+		from hrms.hr.doctype.overtime_slip.overtime_slip import get_overtime_pay_multiplier
+
+		overtime_multiplier = get_overtime_pay_multiplier()
 	return flt(
 		flt(regular_hours) * flt(hourly_rate)
 		+ flt(overtime_hours) * flt(hourly_rate) * flt(overtime_multiplier)

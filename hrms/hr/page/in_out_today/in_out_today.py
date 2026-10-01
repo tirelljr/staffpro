@@ -8,6 +8,8 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, get_datetime, get_time, getdate, now_datetime
 
+from hrms.hr.clock_format import parse_work_date
+
 
 @frappe.whitelist()
 def get_attendance_late_label(
@@ -39,7 +41,7 @@ def get_attendance_late_label(
 @frappe.whitelist()
 def get_in_out_today(department: str | None = None, attendance_date: str | None = None):
 	frappe.only_for(["HR Manager", "HR User", "System Manager", "Administrator"])
-	today = getdate(attendance_date) if attendance_date else getdate()
+	today = parse_work_date(attendance_date)
 	all_employees = _get_active_employees(today)
 	departments = sorted({row.department for row in all_employees if row.department})
 
@@ -87,6 +89,13 @@ def _build_details(employees, today):
 	leave_by_employee = _get_todays_leave(employee_ids, today)
 	shift_map = _get_shift_map(employees, punches_by_employee, attendance_by_employee)
 	as_of = _as_of_datetime(today)
+	from hrms.hr.doctype.attendance.attendance import _hours_comments_by_attendance
+	from hrms.hr.doctype.time_clock_adjustment.time_clock_adjustment import pending_by_employee_date
+
+	comments = _hours_comments_by_attendance(
+		[row.name for row in attendance_by_employee.values() if row and row.name]
+	)
+	adjustments = pending_by_employee_date(employee_ids, today)
 
 	details = []
 	for employee in employees:
@@ -97,8 +106,12 @@ def _build_details(employees, today):
 			as_of,
 		)
 		latest = punches[-1] if punches else None
-		first_in = next((punch for punch in punches if (punch.log_type or "IN") == "IN"), None)
-		status = "IN" if latest and (latest.log_type or "IN") != "OUT" else "OUT"
+		day_punches = punches_by_employee.get(employee.name) or punches
+		first_in = next(
+			(punch for punch in day_punches if (punch.log_type or "IN").upper() == "IN"),
+			None,
+		)
+		status = "IN" if latest and (latest.log_type or "IN").upper() != "OUT" else "OUT"
 		leave = leave_by_employee.get(employee.name)
 		late, late_minutes, late_label = _late_status(
 			employee=employee,
@@ -111,8 +124,9 @@ def _build_details(employees, today):
 		)
 
 		punch_dt = get_datetime(latest.time) if latest and latest.time else None
-		in_dt = _first_in_datetime(punches, attendance)
-		out_dt = _last_out_datetime(punches, attendance, as_of)
+		in_dt = _first_in_datetime(day_punches, attendance)
+		out_dt = _last_out_datetime(day_punches, attendance, as_of)
+		clock_dt = punch_dt or out_dt or in_dt
 
 		details.append(
 			{
@@ -126,13 +140,15 @@ def _build_details(employees, today):
 				"late_label": late_label,
 				"attendance_status": (attendance.status if attendance else "") or "",
 				"attendance": (attendance.name if attendance else "") or "",
-				"date": punch_dt.date().isoformat() if punch_dt else str(today),
+				"date": clock_dt.date().isoformat() if clock_dt else str(today),
 				"time": _format_time(punch_dt) if punch_dt else "",
 				"in_time": _format_time(in_dt) if in_dt else "",
 				"out_time": _format_time(out_dt) if out_dt else "",
 				"leave_type": (leave.leave_type or "").strip() if leave else "",
 				"pto_code": _pto_code(leave),
 				"device_id": (latest.device_id or "") if latest else "",
+				"comments": comments.get(attendance.name, []) if attendance else [],
+				"adjustment": adjustments.get(employee.name),
 			}
 		)
 
@@ -185,7 +201,7 @@ def _as_of_datetime(day):
 
 def _first_in_datetime(punches, attendance):
 	for punch in punches:
-		if (punch.log_type or "IN") == "IN" and punch.time:
+		if (punch.log_type or "IN").upper() == "IN" and punch.time:
 			return get_datetime(punch.time)
 	if attendance and attendance.in_time:
 		return get_datetime(attendance.in_time)
@@ -193,15 +209,19 @@ def _first_in_datetime(punches, attendance):
 
 
 def _last_out_datetime(punches, attendance, as_of):
-	out_times = [
-		get_datetime(punch.time)
-		for punch in punches
-		if (punch.log_type or "IN") == "OUT" and punch.time and get_datetime(punch.time) <= as_of
-	]
+	out_times = []
+	for punch in punches:
+		if (punch.log_type or "IN").upper() != "OUT" or not punch.time:
+			continue
+		when = get_datetime(punch.time)
+		if when <= as_of or getdate(when) == getdate(as_of):
+			out_times.append(when)
 	if out_times:
 		return out_times[-1]
-	if attendance and attendance.out_time and get_datetime(attendance.out_time) <= as_of:
-		return get_datetime(attendance.out_time)
+	if attendance and attendance.out_time:
+		out_dt = get_datetime(attendance.out_time)
+		if out_dt <= as_of or getdate(out_dt) == getdate(as_of):
+			return out_dt
 	return None
 
 
@@ -212,23 +232,12 @@ def _clocks_as_of_now(punches, attendance, now):
 		return occurred
 
 	# Employee Checkin.time can come back as UTC-naive while now_datetime() is local.
-	# A real clock-in then looks "in the future" and would hide the agent as OUT.
-	same_day_ins = [
-		punch
-		for punch in punches
-		if punch.time
-		and getdate(punch.time) == getdate(now)
-		and (punch.log_type or "IN") == "IN"
+	# AI-set clocks then look "in the future" and would hide IN/OUT times as dashes.
+	same_day = [
+		punch for punch in punches if punch.time and getdate(punch.time) == getdate(now)
 	]
-	if same_day_ins:
-		latest_in = get_datetime(same_day_ins[-1].time)
-		return [
-			punch
-			for punch in punches
-			if punch.time
-			and getdate(punch.time) == getdate(now)
-			and get_datetime(punch.time) <= latest_in
-		]
+	if same_day:
+		return same_day
 
 	if not attendance:
 		return []
@@ -245,7 +254,9 @@ def _clocks_as_of_now(punches, attendance, now):
 				shift=attendance.shift,
 			)
 		)
-	if attendance.out_time and get_datetime(attendance.out_time) <= now:
+	if attendance.out_time and (
+		get_datetime(attendance.out_time) <= now or getdate(attendance.out_time) == getdate(now)
+	):
 		synthetic.append(
 			frappe._dict(
 				log_type="OUT",
@@ -324,7 +335,14 @@ def _late_status(employee, first_in, attendance, leave, shift_map, as_of, attend
 			return True, 0, ""
 		return False, 0, ""
 
-	grace_minutes = cint(shift.late_entry_grace_period) if shift and cint(shift.enable_late_entry_marking) else 0
+	from hrms.hr.late_entry import late_entry_grace_for_shift, system_late_entry_defaults
+
+	shift_name = shift.name if shift else shift_name
+	enabled, grace_minutes = (
+		late_entry_grace_for_shift(shift_name) if shift_name else system_late_entry_defaults()
+	)
+	if not enabled:
+		grace_minutes = 0
 	deadline = baseline + timedelta(minutes=grace_minutes)
 	compare_at = get_datetime(first_in.time) if first_in and first_in.time else as_of
 	if not first_in:
@@ -376,7 +394,9 @@ def _pto_code(leave):
 
 
 def _format_time(value):
-	return get_datetime(value).strftime("%I:%M %p")
+	from hrms.hr.clock_format import format_clock
+
+	return format_clock(value)
 
 
 def _build_summary(details):

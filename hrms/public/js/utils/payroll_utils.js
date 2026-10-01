@@ -85,6 +85,10 @@ hrms.payroll_utils = {
 		let current = preview || {};
 		const dates = hrms.payroll_utils.preview_period_dates(current);
 		const can_create = Boolean(current.can_create && (current.entries || []).length);
+		const dropped = new Set();
+		const forced = new Set();
+		let editing = false;
+		let $edit = null;
 		const dialog = new frappe.ui.Dialog({
 			title: title || __("Approve Payroll"),
 			size: "large",
@@ -104,14 +108,18 @@ hrms.payroll_utils = {
 				},
 				{
 					fieldtype: "Section Break",
-					description: __(
-						"Change the pay period to recalculate agents, hours, and who is included.",
-					),
+					description: current.simple
+						? __(
+								"Salary is calculated for these agents. Use Edit to drop anyone who should not be paid. Agents who joined the company after this pay period are listed separately.",
+							)
+						: __(
+								"Change the pay period to recalculate agents, hours, and who is included.",
+							),
 				},
 				{
 					fieldname: "summary",
 					fieldtype: "HTML",
-					options: hrms.payroll_utils.render_payroll_preview_html(current),
+					options: render_current_html(current),
 				},
 			],
 			primary_action_label: can_create ? __("Approve & Create") : __("Close"),
@@ -129,10 +137,19 @@ hrms.payroll_utils = {
 					frappe.msgprint(__("End Date cannot be before Start Date"));
 					return;
 				}
+				const args = { start_date: period.start, end_date: period.end };
+				if (current.simple) {
+					args.employees = selected_employee_ids();
+					args.force_employees = forced_employee_ids();
+					if (!args.employees.length && !args.force_employees.length) {
+						frappe.msgprint(__("Select at least one agent."));
+						return;
+					}
+				}
 				dialog.hide();
 				frappe.call({
 					method: run_method,
-					args: { start_date: period.start, end_date: period.end },
+					args,
 					freeze: true,
 					freeze_message: freeze_message || __("Creating payroll..."),
 					callback(r) {
@@ -155,16 +172,63 @@ hrms.payroll_utils = {
 			};
 		}
 
+		function agent_rows() {
+			const entry = (current.entries || [])[0] || {};
+			return entry.agent_rows || [];
+		}
+
+		function selected_employee_ids() {
+			return agent_rows()
+				.filter((row) => row.employee && !cint(row.joined_after_period) && !dropped.has(row.employee))
+				.map((row) => row.employee);
+		}
+
+		function forced_employee_ids() {
+			return agent_rows()
+				.filter((row) => row.employee && cint(row.joined_after_period) && forced.has(row.employee))
+				.map((row) => row.employee);
+		}
+
+		function sync_late_defaults() {
+			for (const row of agent_rows()) {
+				if (cint(row.joined_after_period) && row.employee && !forced.has(row.employee)) {
+					dropped.add(row.employee);
+				}
+			}
+		}
+
+		function render_current_html(payload) {
+			sync_late_defaults();
+			if (payload && payload.simple) {
+				return hrms.payroll_utils.render_simple_agent_preview(payload, {
+					editing,
+					dropped,
+					forced,
+				});
+			}
+			return hrms.payroll_utils.render_payroll_preview_html(payload);
+		}
+
 		function apply_preview(next) {
 			current = next || {};
 			const summary = dialog.fields_dict.summary;
 			if (summary && summary.$wrapper) {
-				summary.$wrapper.html(hrms.payroll_utils.render_payroll_preview_html(current));
+				summary.$wrapper.html(render_current_html(current));
 			}
 			const $btn = typeof dialog.get_primary_btn === "function" ? dialog.get_primary_btn() : null;
 			if ($btn && $btn.length) {
 				$btn.text(can_create_from(current) ? __("Approve & Create") : __("Close"));
 			}
+			sync_edit_button();
+		}
+
+		function sync_edit_button() {
+			if (!$edit || !$edit.length) {
+				return;
+			}
+			const show = Boolean(current.simple && can_create_from(current));
+			$edit.toggle(show);
+			$edit.text(editing ? __("Done") : __("Edit"));
 		}
 
 		let last_start = dates.start || "";
@@ -188,6 +252,8 @@ hrms.payroll_utils = {
 			}
 			last_start = period.start;
 			last_end = period.end;
+			dropped.clear();
+			forced.clear();
 			frappe.call({
 				method: preview_method,
 				args: { start_date: period.start, end_date: period.end },
@@ -203,7 +269,45 @@ hrms.payroll_utils = {
 			dialog.set_secondary_action_label(__("Cancel"));
 			dialog.set_secondary_action(() => dialog.hide());
 		}
+		if (current.simple && typeof dialog.add_custom_action === "function") {
+			const edit_button = dialog.add_custom_action(__("Edit"), () => {
+				editing = !editing;
+				apply_preview(current);
+			});
+			$edit = edit_button && edit_button.jquery ? edit_button : $(edit_button);
+		}
 		dialog.show();
+		sync_edit_button();
+
+		const summary = dialog.fields_dict.summary;
+		if (summary && summary.$wrapper) {
+			summary.$wrapper.on("change", ".payroll-agent-include", function () {
+				const employee = this.getAttribute("data-employee");
+				if (!employee) {
+					return;
+				}
+				if (this.checked) {
+					dropped.delete(employee);
+				} else {
+					dropped.add(employee);
+				}
+				apply_preview(current);
+			});
+			summary.$wrapper.on("change", ".payroll-agent-force", function () {
+				const employee = this.getAttribute("data-employee");
+				if (!employee) {
+					return;
+				}
+				if (this.checked) {
+					forced.add(employee);
+					dropped.delete(employee);
+				} else {
+					forced.delete(employee);
+					dropped.add(employee);
+				}
+				apply_preview(current);
+			});
+		}
 
 		const start_field = dialog.get_field("start_date");
 		const end_field = dialog.get_field("end_date");
@@ -215,6 +319,104 @@ hrms.payroll_utils = {
 		}
 		ready = true;
 		return dialog;
+	},
+
+	render_simple_agent_preview(preview, state) {
+		preview = preview || {};
+		state = state || {};
+		const editing = Boolean(state.editing);
+		const dropped = state.dropped || new Set();
+		const forced = state.forced || new Set();
+		const rows = (((preview.entries || [])[0] || {}).agent_rows || []).slice();
+		const regular = rows.filter((row) => !cint(row.joined_after_period));
+		const late = rows.filter((row) => cint(row.joined_after_period));
+		const included = regular.filter((row) => !dropped.has(row.employee));
+		const visible = editing ? regular : included;
+		const forced_rows = late.filter((row) => forced.has(row.employee));
+		const hours = included.concat(forced_rows).reduce((total, row) => total + flt(row.hours), 0);
+		const body = visible.length
+			? visible
+					.map((row) => {
+						const checked = dropped.has(row.employee) ? "" : "checked";
+						const include = editing
+							? `<td><input type="checkbox" class="payroll-agent-include" data-employee="${frappe.utils.escape_html(
+									row.employee || "",
+								)}" ${checked}></td>`
+							: "";
+						return `<tr>
+							${include}
+							<td>${frappe.utils.escape_html(row.employee_name || row.employee || "")}</td>
+							<td>${flt(row.hours).toFixed(2)}</td>
+						</tr>`;
+					})
+					.join("")
+			: `<tr><td colspan="${editing ? 3 : 2}" class="text-muted">${__(
+					"No agents selected. Use Edit to add agents back.",
+				)}</td></tr>`;
+		const forced_count = forced_rows.length;
+		const include_header = editing ? `<th>${__("Include")}</th>` : "";
+		const count_line = forced_count
+			? `<p><b>${included.length}</b> ${__("agents")}, <b>${forced_count}</b> ${__(
+					"force added",
+				)}, <b>${hours.toFixed(2)}</b> ${__("hours")}</p>`
+			: `<p><b>${included.length}</b> ${__("agents")}, <b>${hours.toFixed(2)}</b> ${__("hours")}</p>`;
+		return `
+			<div>
+				<p>${frappe.utils.escape_html(preview.message || "")}</p>
+				${hrms.payroll_utils.render_late_joining_warning(late, forced)}
+				${count_line}
+				<table class="table table-bordered" style="margin-top: 12px;">
+					<thead>
+						<tr>
+							${include_header}
+							<th>${__("Agent")}</th>
+							<th>${__("Hours")}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+				</table>
+			</div>
+		`;
+	},
+	render_late_joining_warning(rows, forced) {
+		rows = rows || [];
+		forced = forced || new Set();
+		if (!rows.length) {
+			return "";
+		}
+		const body = rows
+			.map((row) => {
+				const checked = forced.has(row.employee) ? "checked" : "";
+				const joined = row.date_of_joining
+					? frappe.datetime.str_to_user(row.date_of_joining)
+					: "";
+				return `<tr>
+					<td><input type="checkbox" class="payroll-agent-force" data-employee="${frappe.utils.escape_html(
+						row.employee || "",
+					)}" ${checked}></td>
+					<td>${frappe.utils.escape_html(row.employee_name || row.employee || "")}</td>
+					<td>${frappe.utils.escape_html(joined)}</td>
+				</tr>`;
+			})
+			.join("");
+		return `
+			<div class="alert alert-warning" style="margin-top: 12px;">
+				<div><b>${__("Joined after this pay period")}</b></div>
+				<div style="margin-top: 4px;">${__(
+					"These agents joined the company after the pay period ends. Leave Force add unchecked to remove them from this payroll, or check it to pay them anyway.",
+				)}</div>
+				<table class="table table-bordered" style="margin-top: 8px; background: #fff;">
+					<thead>
+						<tr>
+							<th>${__("Force add")}</th>
+							<th>${__("Agent")}</th>
+							<th>${__("Joined")}</th>
+						</tr>
+					</thead>
+					<tbody>${body}</tbody>
+				</table>
+			</div>
+		`;
 	},
 
 	render_payroll_preview_html(preview) {
@@ -269,9 +471,31 @@ hrms.payroll_utils = {
 			</div>`
 			: "";
 
+		const late_html = (preview.joined_after || []).length
+			? `<div class="alert alert-warning" style="margin-top: 12px;">
+				<div><b>${__("Joined after this pay period")}</b></div>
+				<div style="margin-top: 4px;">${__(
+					"These agents joined the company after the pay period, so they are not included. To pay them anyway, approve payroll for every agent and choose Force add.",
+				)}</div>
+				<ul style="margin: 6px 0 0; padding-left: 18px;">
+					${preview.joined_after
+						.map((row) => {
+							const joined = row.date_of_joining
+								? frappe.datetime.str_to_user(row.date_of_joining)
+								: "";
+							return `<li>${frappe.utils.escape_html(row.employee_name || row.employee || "")}${
+								joined ? ` — ${frappe.utils.escape_html(joined)}` : ""
+							}</li>`;
+						})
+						.join("")}
+				</ul>
+			</div>`
+			: "";
+
 		return `
 			<div>
 				<p>${frappe.utils.escape_html(preview.message || "")}</p>
+				${late_html}
 				${table}
 				${skipped_html}
 			</div>

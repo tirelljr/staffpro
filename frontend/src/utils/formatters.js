@@ -32,8 +32,10 @@ export const formatCurrency = (value, currency) => {
 	)
 }
 
+export const CLOCK_FORMAT = "h:mm A"
+
 export const formatTimestamp = (timestamp) => {
-	const formattedTime = dayjs(timestamp).format("hh:mm a")
+	const formattedTime = dayjs(timestamp).format(CLOCK_FORMAT)
 
 	if (dayjs(timestamp).isToday()) return formattedTime
 	else if (dayjs(timestamp).isYesterday()) return `${formattedTime} yesterday`
@@ -56,19 +58,47 @@ export const formatHours = (value, keepZero = false) => {
 	return `${sign}${hours}h ${minutes}m`
 }
 
+const TIME_PART = /(\d{1,2}):(\d{2})(?::(\d{2}))?/
+
+function formatWallClock(hours, minutes) {
+	const hour = Number(hours)
+	const minute = Number(minutes)
+	if (!Number.isFinite(hour) || !Number.isFinite(minute)) return ""
+	if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return ""
+	const suffix = hour >= 12 ? "PM" : "AM"
+	const hour12 = hour % 12 || 12
+	return `${hour12}:${String(minute).padStart(2, "0")} ${suffix}`
+}
+
 export const formatClock = (value) => {
-	if (!value) return ""
-	const parsed = dayjs(value)
-	return parsed.isValid() ? parsed.format("hh:mm a") : ""
+	try {
+		if (value === null || value === undefined || value === "") return ""
+		const raw = String(value).trim()
+		if (!raw) return ""
+		const match = raw.match(TIME_PART)
+		if (!match) return ""
+		return formatWallClock(match[1], match[2])
+	} catch {
+		return ""
+	}
 }
 
 export const formatHoursNote = (comment) => {
-	if (!comment) return ""
-	const when = dayjs(comment.creation)
-	const time = when.isValid() ? when.format("hh:mm A") : ""
-	const date = when.isValid() ? when.format("MM/DD/YYYY") : ""
-	const author = comment.comment_by || "Admin"
-	const text = comment.content || ""
-	if (time && date) return `Note (${author}, ${time}, ${date}): ${text}`
-	return text ? `Note (${author}): ${text}` : ""
+	try {
+		if (!comment) return ""
+		if (typeof comment === "string") return comment
+		const when = dayjs(comment.creation)
+		let time = ""
+		let date = ""
+		if (when?.isValid?.()) {
+			time = when.format(CLOCK_FORMAT)
+			date = when.format("MM/DD/YYYY")
+		}
+		const author = comment.comment_by || "Admin"
+		const text = comment.content || ""
+		if (time && date) return `Note (${author}, ${time}, ${date}): ${text}`
+		return text ? `Note (${author}): ${text}` : ""
+	} catch {
+		return comment?.content || ""
+	}
 }

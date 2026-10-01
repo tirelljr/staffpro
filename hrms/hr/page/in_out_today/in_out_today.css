@@ -67,3 +67,18 @@ body.staff-pro-alive .page-container[data-page-route="in-out-today"] .page-head 
 	background: #e9a04f;
 	color: #fff;
 }
+
+.sp-inout-page .sp-inout-dash__item {
+	border-bottom: 1px solid #eef1f4;
+}
+
+.sp-inout-page .sp-inout-dash__notes {
+	padding: 0 4px 10px;
+}
+
+.sp-inout-page .sp-inout-dash__comment {
+	font-size: 12px;
+	line-height: 1.35;
+	color: var(--sp-muted, #6b7280);
+	white-space: normal;
+}

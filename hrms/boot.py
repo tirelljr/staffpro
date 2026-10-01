@@ -67,6 +67,7 @@ BPO_WORKSPACE_SIDEBARS = frozenset(
 		"pay",
 		"ss and taxes",
 		"talent",
+		"filesystem",
 		"floor",
 		"finance",
 		"admin",
@@ -110,9 +111,11 @@ def is_staff_pro_desk_admin(user=None):
 
 
 def get_staff_pro_home_page(user):
-	"""Send desk admins to the People dashboard after login."""
+	"""Desk admins open the People dashboard. Agents open the employee portal."""
 	if is_staff_pro_desk_admin(user):
 		return STAFF_PRO_DESK_HOME
+	if is_employee_self_service_user(user):
+		return "/agents"
 	return None
 
 
@@ -129,6 +132,9 @@ def on_staff_pro_login(login_manager=None):
 	user = getattr(login_manager, "user", None) or frappe.session.user
 	validate_or_bind_login_device(user)
 	if not is_staff_pro_desk_admin(user):
+		if is_employee_self_service_user(user):
+			frappe.local.response["home_page"] = "/agents"
+			frappe.local.response["redirect_to"] = "/agents"
 		return
 
 	frappe.local.flags.home_page = STAFF_PRO_DESK_HOME
@@ -239,6 +245,9 @@ _patch_get_home_page()
 
 def extend_bootinfo(bootinfo):
 	"""Keep Staff Pro BPO as the only app on the desk apps screen."""
+	from hrms.hr.force_delete import install_force_delete_patch
+
+	install_force_delete_patch()
 	apps = bootinfo.get("apps") or []
 	filtered = [app for app in apps if app.get("name") == "hrms"]
 	if filtered:
@@ -261,6 +270,11 @@ def extend_bootinfo(bootinfo):
 		desk_settings["dock_mode"] = "Pinned"
 
 	_disable_app_onboarding_bootinfo(bootinfo)
+	_force_twelve_hour_clock(bootinfo)
+	from hrms.hr.timezone import apply_request_timezone
+
+	apply_request_timezone()
+	_force_belize_timezone(bootinfo)
 
 	first_name = ""
 	user = frappe.session.user
@@ -273,11 +287,35 @@ def extend_bootinfo(bootinfo):
 	bootinfo["staff_pro_my_work_portal"] = MY_WORK_PORTAL_PATH
 	bootinfo["staff_pro_show_my_work_portal"] = can_use_my_work_portal(user)
 	bootinfo["staff_pro_bpo_sidebar_labels"] = get_sidebar_label_maps()
+	from hrms.hr.bpo_user_permissions import BPO_ROLES, sidebar_module_boot_list
+
+	bootinfo["staff_pro_bpo_roles"] = sorted(BPO_ROLES)
+	bootinfo["staff_pro_bpo_modules"] = sidebar_module_boot_list()
+	from hrms.hr.role_access import access_groups_boot
+
+	bootinfo["staff_pro_access_groups"] = access_groups_boot()
+	if frappe.session.user and frappe.session.user != "Guest":
+		from hrms.hr.role_access import blocked_routes, ensure_role_access_fields, full_access, user_access
+
+		try:
+			ensure_role_access_fields()
+			access = user_access()
+		except Exception:
+			access = full_access()
+			frappe.log_error(title="Role access boot")
+		bootinfo["staff_pro_access"] = access
+		bootinfo["staff_pro_access_blocks"] = blocked_routes(access)
+	from hrms.ai.settings import is_ask_ai_enabled
+
+	bootinfo["staff_pro_ask_ai"] = {
+		"enabled": bool(is_staff_pro_desk_admin() and is_ask_ai_enabled()),
+	}
 	apply_payroll_frequency_translations(bootinfo)
 	_filter_bpo_workspace_sidebars(bootinfo)
 	_filter_bpo_module_sidebars(bootinfo)
 	_filter_bpo_app_workspaces(bootinfo)
 	_apply_staff_pro_desk_permissions(bootinfo)
+	_filter_unpermitted_sidebar_items(bootinfo)
 
 
 def apply_payroll_frequency_translations(bootinfo):
@@ -295,6 +333,9 @@ def apply_payroll_frequency_translations(bootinfo):
 	messages["New Sales Invoice"] = "New Client Invoice"
 	messages["Sales Invoice"] = "Client Invoice"
 	messages.update(BPO_DOCTYPE_UI_MESSAGES)
+	from hrms.hr.bpo_user_permissions import BPO_MODULE_LABELS
+
+	messages.update(BPO_MODULE_LABELS)
 
 
 def _normalize_workspace_key(name) -> str:
@@ -307,15 +348,36 @@ def _is_bpo_workspace_name(name) -> bool:
 	return _normalize_workspace_key(name) in BPO_WORKSPACE_SIDEBARS
 
 
+def _allowed_sidebar_keys():
+	from hrms.hr.bpo_user_permissions import get_allowed_bpo_sidebar_keys
+
+	return get_allowed_bpo_sidebar_keys()
+
+
+def _is_allowed_bpo_workspace(name, allowed_keys=None) -> bool:
+	if not _is_bpo_workspace_name(name):
+		return False
+	from hrms.hr.role_access import workspace_allowed
+
+	if not workspace_allowed(name):
+		return False
+	if allowed_keys is None:
+		return True
+	from hrms.hr.bpo_user_permissions import canonical_sidebar_key
+
+	return canonical_sidebar_key(name) in allowed_keys
+
+
 def _filter_bpo_workspace_sidebars(bootinfo):
 	"""Drop Stock/Buying/Selling/etc. from the Desk workspace switcher payload."""
 	sidebars = bootinfo.get("workspace_sidebar_item")
 	if not isinstance(sidebars, dict):
 		return
+	allowed = _allowed_sidebar_keys()
 	bootinfo["workspace_sidebar_item"] = {
 		key: value
 		for key, value in sidebars.items()
-		if _normalize_workspace_key(key) in BPO_WORKSPACE_SIDEBARS
+		if _is_allowed_bpo_workspace(key, allowed)
 	}
 
 
@@ -329,13 +391,17 @@ def _is_bpo_dock_entry(entry) -> bool:
 
 def _filter_bpo_module_sidebars(bootinfo):
 	"""Keep Frappe v17 shells and the hrms dock on Staff Pro portals only."""
+	allowed = _allowed_sidebar_keys()
 	sidebars = bootinfo.get("module_sidebars")
 	if isinstance(sidebars, dict):
 		bootinfo["module_sidebars"] = {
 			key: value
 			for key, value in sidebars.items()
-			if _is_bpo_workspace_name(key)
-			or (isinstance(value, dict) and _is_bpo_workspace_name(value.get("title")))
+			if _is_allowed_bpo_workspace(key, allowed)
+			or (
+				isinstance(value, dict)
+				and _is_allowed_bpo_workspace(value.get("title"), allowed)
+			)
 		}
 
 	dock = bootinfo.get("dock")
@@ -343,7 +409,9 @@ def _filter_bpo_module_sidebars(bootinfo):
 		hrms_dock = dock.get("hrms")
 		bootinfo["dock"] = {"hrms": hrms_dock} if isinstance(hrms_dock, list) else {}
 		if isinstance(hrms_dock, list):
-			bootinfo["dock"]["hrms"] = [entry for entry in hrms_dock if _is_bpo_dock_entry(entry)]
+			bootinfo["dock"]["hrms"] = [
+				entry for entry in hrms_dock if _is_allowed_bpo_dock_entry(entry, allowed)
+			]
 
 	app_data = bootinfo.get("app_data")
 	if not isinstance(app_data, list):
@@ -354,14 +422,79 @@ def _filter_bpo_module_sidebars(bootinfo):
 		if app.get("app_name") == "hrms":
 			entries = app.get("dock")
 			if isinstance(entries, list):
-				app["dock"] = [entry for entry in entries if _is_bpo_dock_entry(entry)]
+				app["dock"] = [entry for entry in entries if _is_allowed_bpo_dock_entry(entry, allowed)]
 		else:
 			app["dock"] = []
 			app["on_apps_screen"] = False
 
 
+def _is_allowed_bpo_dock_entry(entry, allowed_keys=None) -> bool:
+	if not _is_bpo_dock_entry(entry):
+		return False
+	if isinstance(entry, dict):
+		return _is_allowed_bpo_workspace(
+			entry.get("link_to") or entry.get("title") or entry.get("name") or entry.get("label"),
+			allowed_keys,
+		)
+	return _is_allowed_bpo_workspace(entry, allowed_keys)
+
+
+def _can_open_sidebar_item(item) -> bool:
+	if not isinstance(item, dict):
+		return True
+	from hrms.hr.role_access import sidebar_item_allowed
+
+	if not sidebar_item_allowed(item):
+		return False
+	if frappe.session.user in {"Administrator", "Guest"}:
+		return True
+	link_type = str(item.get("link_type") or "").strip().lower()
+	link_to = item.get("link_to")
+	if not link_to or item.get("type") in {"Section Break", "section"}:
+		return True
+	try:
+		if link_type == "doctype":
+			return bool(frappe.has_permission(link_to, "read"))
+		if link_type == "page":
+			return bool(frappe.has_permission("Page", "read", link_to) or frappe.has_permission(link_to, "read"))
+		if link_type == "report":
+			return bool(frappe.has_permission(link_to, "read") or frappe.has_permission("Report", "read", link_to))
+	except Exception:
+		return True
+	return True
+
+
+def _filter_sidebar_item_rows(rows):
+	if not isinstance(rows, list):
+		return rows
+	from hrms.hr.role_access import drop_empty_sections
+
+	return drop_empty_sections([row for row in rows if _can_open_sidebar_item(row)])
+
+
+def _filter_unpermitted_sidebar_items(bootinfo):
+	"""Hide doctypes, pages, and reports the signed-in user cannot open."""
+	if frappe.session.user in {"Administrator", "Guest"}:
+		return
+
+	sidebars = bootinfo.get("module_sidebars")
+	if isinstance(sidebars, dict):
+		for sidebar in sidebars.values():
+			if isinstance(sidebar, dict) and "items" in sidebar:
+				sidebar["items"] = _filter_sidebar_item_rows(sidebar.get("items"))
+
+	workspace_items = bootinfo.get("workspace_sidebar_item")
+	if isinstance(workspace_items, dict):
+		for key, sidebar in list(workspace_items.items()):
+			if isinstance(sidebar, dict) and "items" in sidebar:
+				sidebar["items"] = _filter_sidebar_item_rows(sidebar.get("items"))
+			elif isinstance(sidebar, list):
+				workspace_items[key] = _filter_sidebar_item_rows(sidebar)
+
+
 def _filter_bpo_app_workspaces(bootinfo):
 	"""Keep dock / apps-screen workspace lists on call-center HR and payroll."""
+	allowed = _allowed_sidebar_keys()
 	app_data = bootinfo.get("app_data")
 	if isinstance(app_data, list):
 		for app in app_data:
@@ -369,13 +502,15 @@ def _filter_bpo_app_workspaces(bootinfo):
 				continue
 			workspaces = app.get("workspaces")
 			if isinstance(workspaces, list):
-				app["workspaces"] = [name for name in workspaces if _is_bpo_workspace_name(name)]
+				app["workspaces"] = [
+					name for name in workspaces if _is_allowed_bpo_workspace(name, allowed)
+				]
 
 	workspaces = bootinfo.get("workspaces")
 	if isinstance(workspaces, dict):
 		pages = workspaces.get("pages")
 		if isinstance(pages, list):
-			workspaces["pages"] = [page for page in pages if _is_bpo_workspace_name(page)]
+			workspaces["pages"] = [page for page in pages if _is_allowed_bpo_workspace(page, allowed)]
 
 
 def _apply_staff_pro_desk_permissions(bootinfo):
@@ -412,6 +547,47 @@ def _disable_app_onboarding_bootinfo(bootinfo):
 		bootinfo["sysdefaults"] = {"enable_onboarding": 0}
 	else:
 		sysdefaults["enable_onboarding"] = 0
+
+
+def _force_twelve_hour_clock(bootinfo):
+	"""Frappe only ships 24-hour System Settings presets; Staff Pro always shows 12-hour clocks."""
+	from hrms.hr.clock_format import FRAPPE_TIME_FORMAT
+
+	sysdefaults = bootinfo.get("sysdefaults")
+	if sysdefaults is None:
+		bootinfo["sysdefaults"] = {"time_format": FRAPPE_TIME_FORMAT}
+	else:
+		sysdefaults["time_format"] = FRAPPE_TIME_FORMAT
+	sys_defaults = bootinfo.get("sys_defaults")
+	if isinstance(sys_defaults, dict):
+		sys_defaults["time_format"] = FRAPPE_TIME_FORMAT
+
+
+def _force_belize_timezone(bootinfo):
+	"""Staff Pro always uses Belize time, even if System Settings still has a leftover value."""
+	from hrms.branding import STAFF_PRO_TIMEZONE
+
+	sysdefaults = bootinfo.get("sysdefaults")
+	if sysdefaults is None:
+		bootinfo["sysdefaults"] = {"time_zone": STAFF_PRO_TIMEZONE}
+	else:
+		sysdefaults["time_zone"] = STAFF_PRO_TIMEZONE
+	sys_defaults = bootinfo.get("sys_defaults")
+	if isinstance(sys_defaults, dict):
+		sys_defaults["time_zone"] = STAFF_PRO_TIMEZONE
+	time_zone = bootinfo.get("time_zone")
+	if isinstance(time_zone, dict):
+		time_zone["system"] = STAFF_PRO_TIMEZONE
+		time_zone["user"] = STAFF_PRO_TIMEZONE
+	else:
+		bootinfo["time_zone"] = {"system": STAFF_PRO_TIMEZONE, "user": STAFF_PRO_TIMEZONE}
+	user_info = bootinfo.get("user_info")
+	if isinstance(user_info, dict):
+		user_info["time_zone"] = STAFF_PRO_TIMEZONE
+	user = bootinfo.get("user")
+	if isinstance(user, dict) and "time_zone" in user:
+		user["time_zone"] = STAFF_PRO_TIMEZONE
+	bootinfo["staff_pro_timezone"] = STAFF_PRO_TIMEZONE
 
 
 def get_sidebar_label_maps():

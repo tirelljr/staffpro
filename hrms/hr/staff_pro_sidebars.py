@@ -13,6 +13,33 @@ import frappe
 
 from hrms.hr.bpo_sidebar_labels import apply_bpo_labels
 
+# Company/Branch live on Work Site. Expense claims are not part of this app.
+REMOVED_SIDEBAR_LABELS = frozenset(
+	{
+		"Company",
+		"Branch",
+		"Reimbursements",
+		"Cash Advances",
+		"Pay Register",
+		"Salary Register",
+		"Unpaid Reimbursements",
+		"Unpaid Expense Claim",
+		"Team Structure",
+		"Organizational Chart",
+	}
+)
+REMOVED_SIDEBAR_LINKS = frozenset(
+	{
+		"Company",
+		"Branch",
+		"Expense Claim",
+		"Employee Advance",
+		"Salary Register",
+		"Unpaid Expense Claim",
+		"organizational-chart",
+	}
+)
+
 SIDEBAR_ITEM_FIELDS = (
 	"type",
 	"label",
@@ -65,6 +92,14 @@ SIDEBAR_SOURCES = (
 		"header_icon": "users",
 		"dock_title": "Talent",
 		"dock_icon": "user-plus",
+	},
+	{
+		"source": "workspace_sidebar/filesystem.json",
+		"title": "Filesystem",
+		"module": "HR",
+		"header_icon": "folder",
+		"dock_title": "Filesystem",
+		"dock_icon": "folder",
 	},
 	{
 		"source": "workspace_sidebar/floor.json",
@@ -125,9 +160,41 @@ def _clean_item(row: dict) -> dict:
 	return item
 
 
+def _is_removed_sidebar_item(row: dict) -> bool:
+	label = (row.get("label") or "").strip()
+	link_to = (row.get("link_to") or "").strip()
+	return label in REMOVED_SIDEBAR_LABELS or link_to in REMOVED_SIDEBAR_LINKS
+
+
+def _drop_empty_sections(items: list[dict]) -> list[dict]:
+	kept: list[dict] = []
+	index = 0
+	while index < len(items):
+		row = items[index]
+		if row.get("type") == "Section Break" and (row.get("label") or "").strip() == "Reports":
+			index += 1
+			children = []
+			while index < len(items) and items[index].get("child"):
+				children.append(items[index])
+				index += 1
+			if children:
+				kept.append(row)
+				kept.extend(children)
+			continue
+		kept.append(row)
+		index += 1
+	return kept
+
+
+def filter_removed_sidebar_items(items: list[dict]) -> list[dict]:
+	return _drop_empty_sections([row for row in items if not _is_removed_sidebar_item(row)])
+
+
 def sidebar_doc_from_source(spec: dict) -> dict:
 	data = _load_json(spec["source"])
-	items = apply_bpo_labels([_clean_item(dict(row)) for row in (data.get("items") or [])])
+	items = apply_bpo_labels(
+		filter_removed_sidebar_items([_clean_item(dict(row)) for row in (data.get("items") or [])])
+	)
 	return {
 		"doctype": "Sidebar",
 		"name": spec["title"],
@@ -216,14 +283,25 @@ def sync_staff_pro_sidebars():
 	if frappe.db.table_exists("Dock"):
 		_save_doc("Dock", dock_doc(), "items")
 
-	# Older Workspace Sidebar docs are unused on Frappe v17; keep them if the table still exists.
-	try:
-		from hrms.patches.v16_0.apply_bpo_sidebar_labels import execute as sync_legacy_sidebars
+	# v16 Workspace Sidebar leftovers. Skip once the v17 Sidebar doctype is present.
+	_sync_legacy_workspace_sidebars()
 
-		if frappe.db.table_exists("Workspace Sidebar"):
-			sync_legacy_sidebars()
-	except Exception:
-		frappe.log_error(title="Staff Pro legacy workspace sidebar sync")
+
+def _sync_legacy_workspace_sidebars():
+	# Frappe v17 Desk reads Sidebar + Dock. Leftover Workspace Sidebar tables can
+	# still exist after upgrade and must not be rewritten.
+	if frappe.db.table_exists("Sidebar"):
+		return
+	has_workspace_items = frappe.db.exists("DocType", "Workspace") and frappe.get_meta("Workspace").has_field(
+		"sidebar_items"
+	)
+	has_workspace_sidebar = frappe.db.table_exists("Workspace Sidebar")
+	if not has_workspace_items and not has_workspace_sidebar:
+		return
+
+	from hrms.patches.v16_0.apply_bpo_sidebar_labels import execute as sync_legacy_sidebars
+
+	sync_legacy_sidebars()
 
 
 def verify_staff_pro_navigation():

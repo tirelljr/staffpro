@@ -18,6 +18,7 @@ class PayrollEmployeeDetail(Document):
 		designation: DF.Data | None
 		employee: DF.Link | None
 		employee_name: DF.Data | None
+		force_include: DF.Check
 		is_salary_withheld: DF.Check
 		parent: DF.Data
 		parentfield: DF.Data

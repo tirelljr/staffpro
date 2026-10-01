@@ -8,6 +8,10 @@ requires-python = ">=3.10"
 readme = "README.md"
 dynamic = ["version"]
 dependencies = [
+	"langchain-core>=1.0,<2",
+	"langchain-deepseek>=1.0,<2",
+	"langchain-openai>=1.0,<2",
+	"langgraph>=1.0,<2",
 	"scapy>=2.5.0",
 ]
 

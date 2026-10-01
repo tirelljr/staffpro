@@ -11,6 +11,22 @@
    "child": 0,
    "collapsible": 1,
    "hidden": 0,
+   "icon": "hard-hat",
+   "indent": 0,
+   "is_default_module": 0,
+   "keep_closed": 0,
+   "label": "Floor Workers",
+   "link_to": "Employee",
+   "link_type": "DocType",
+   "open_in_new_tab": 0,
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "added": 0,
+   "child": 0,
+   "collapsible": 1,
+   "hidden": 0,
    "icon": "layout-grid",
    "indent": 0,
    "is_default_module": 0,
@@ -55,7 +71,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-09 14:59:14.970342",
+ "modified": "2026-09-30 02:26:08.000003",
  "modified_by": "Administrator",
  "module": "HR",
  "name": "Floor",

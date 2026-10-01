@@ -19,7 +19,7 @@ from hrms.first_admins import (
 	ensure_staff_pro_first_admins,
 )
 from hrms.overrides.employee_master import resolve_user_from_login
-from hrms.branding import publish_hashed_bundle
+from hrms.branding import css_bundle_is_ltr, publish_hashed_bundle
 from hrms.tests.utils import HRMSTestSuite
 
 
@@ -53,6 +53,60 @@ class TestStaffProDeskHome(HRMSTestSuite):
 		if frappe.get_meta("System Settings").has_field("default_app"):
 			self.assertEqual(frappe.db.get_single_value("System Settings", "default_app"), "hrms")
 
+	def test_user_settings_hide_default_app_and_social_login(self):
+		from hrms.branding import USER_HIDDEN_SETTINGS_FIELDS, hide_user_settings_fields
+
+		hide_user_settings_fields()
+		meta = frappe.get_meta("User")
+		for fieldname in USER_HIDDEN_SETTINGS_FIELDS:
+			if not meta.has_field(fieldname):
+				continue
+			self.assertTrue(meta.get_field(fieldname).hidden, fieldname)
+		if meta.has_field("default_app"):
+			self.assertEqual(frappe.db.get_value("User", "Administrator", "default_app"), "hrms")
+
+	def test_branding_locks_belize_timezone(self):
+		from hrms.branding import STAFF_PRO_TIMEZONE, apply_branding, lock_system_timezone
+
+		if not frappe.get_meta("System Settings").has_field("time_zone"):
+			return
+		frappe.db.set_single_value("System Settings", "time_zone", "Asia/Kolkata")
+		apply_branding()
+		self.assertEqual(frappe.db.get_single_value("System Settings", "time_zone"), STAFF_PRO_TIMEZONE)
+
+		settings = frappe.get_doc("System Settings")
+		settings.time_zone = "Asia/Kolkata"
+		lock_system_timezone(settings)
+		self.assertEqual(settings.time_zone, STAFF_PRO_TIMEZONE)
+
+	def test_user_timezone_locks_to_belize(self):
+		from datetime import datetime
+
+		from hrms.branding import STAFF_PRO_TIMEZONE
+		from hrms.hr.timezone import belize_now, lock_user_timezone, stamp_live_checkin_time
+
+		if not frappe.get_meta("User").has_field("time_zone"):
+			return
+		user = frappe.new_doc("User")
+		user.time_zone = "Asia/Kolkata"
+		lock_user_timezone(user)
+		self.assertEqual(user.time_zone, STAFF_PRO_TIMEZONE)
+		now = belize_now()
+		self.assertIsNone(now.tzinfo)
+		self.assertEqual(now.microsecond, 0)
+
+		live = frappe._dict(time=None, flags=frappe._dict(staff_pro_live_clock=True), is_new=lambda: True)
+		stamp_live_checkin_time(live)
+		self.assertLess(abs((live.time - belize_now()).total_seconds()), 2)
+
+		historic = frappe._dict(
+			time=datetime(2026, 1, 15, 8, 30, 0),
+			flags=frappe._dict(),
+			is_new=lambda: True,
+		)
+		stamp_live_checkin_time(historic)
+		self.assertEqual(historic.time, datetime(2026, 1, 15, 8, 30, 0))
+
 	def test_missing_hashed_js_bundle_is_copied_from_newest_build(self):
 		with tempfile.TemporaryDirectory() as tmp:
 			app_dist = Path(tmp) / "dist"
@@ -68,3 +122,33 @@ class TestStaffProDeskHome(HRMSTestSuite):
 			self.assertEqual(dest.name, "hrms.bundle.PYHPJZB7.js")
 			self.assertTrue(dest.exists())
 			self.assertIn("window.hrms", dest.read_text(encoding="utf-8"))
+
+	def test_rtl_css_is_not_published_as_the_ltr_bundle(self):
+		with tempfile.TemporaryDirectory() as tmp:
+			app_dist = Path(tmp) / "dist"
+			ltr = app_dist / "css"
+			rtl = app_dist / "css-rtl"
+			ltr.mkdir(parents=True)
+			rtl.mkdir(parents=True)
+			ltr_file = ltr / "hrms.bundle.OLD.css"
+			rtl_file = rtl / "hrms.bundle.NEW.css"
+			ltr_file.write_text(
+				".body-sidebar{position:absolute;left:0;top:0}",
+				encoding="utf-8",
+			)
+			rtl_file.write_text(
+				".body-sidebar{position:absolute;right:0;top:0}",
+				encoding="utf-8",
+			)
+			self.assertTrue(css_bundle_is_ltr(ltr_file))
+			self.assertFalse(css_bundle_is_ltr(rtl_file))
+			manifest = Path(tmp) / "assets.json"
+			manifest.write_text(
+				json.dumps({"hrms.bundle.css": "/assets/hrms/dist/css/hrms.bundle.LTR999.css"}),
+				encoding="utf-8",
+			)
+
+			dest = publish_hashed_bundle(app_dist, manifest, "hrms.bundle.css", ("css", "css-rtl"))
+			self.assertIsNotNone(dest)
+			self.assertEqual(dest.parent.name, "css")
+			self.assertIn("left:0", dest.read_text(encoding="utf-8"))

@@ -550,6 +550,92 @@ def _hours_between(start, end) -> float:
 	return flt(hours, 2) if hours > 0 else 0.0
 
 
+def shift_window_on_day(day, start_time, end_time) -> tuple[datetime | None, datetime | None]:
+	"""Scheduled shift start and end on `day`. Overnight shifts end the next day."""
+	start = _combine_shift_time(day, start_time)
+	end = _combine_shift_time(day, end_time)
+	if start and end and end <= start:
+		end += timedelta(days=1)
+	return start, end
+
+
+def _combine_shift_time(day, value) -> datetime | None:
+	parsed = _as_datetime(value)
+	if not parsed:
+		return None
+	return datetime.combine(getdate(day), parsed.time())
+
+
+def shift_window_from_logs(logs, day, shift_name: str | None = None) -> tuple[datetime | None, datetime | None]:
+	"""Prefer the punch's stored shift window, then the Shift Type clock times."""
+	for log in logs or []:
+		start = _log_value(log, "shift_start")
+		end = _log_value(log, "shift_end")
+		if start and end:
+			start_dt = _as_datetime(start)
+			end_dt = _as_datetime(end)
+			if start_dt and end_dt and end_dt <= start_dt:
+				end_dt += timedelta(days=1)
+			return start_dt, end_dt
+
+	shift_name = shift_name or next((_log_shift(log) for log in (logs or []) if _log_shift(log)), None)
+	if not shift_name or not frappe.db.exists("Shift Type", shift_name):
+		return None, None
+	start_time, end_time = frappe.db.get_value("Shift Type", shift_name, ["start_time", "end_time"])
+	return shift_window_on_day(day, start_time, end_time)
+
+
+def credited_hours_for_pairs(pairs, raw_hours, shift_start, shift_end) -> float:
+	"""Single IN/OUT on a shift longer than 8 hours drops the extra window as unpaid lunch.
+
+	A 6:45–3:45 shift is 9 hours on the clock and 8 paid hours. Arriving at 7:00 and
+	leaving at 4:00 still covers that 8 hours. A punched lunch is already excluded
+	from pair hours and is not deducted again.
+	"""
+	all_pairs = list(pairs or [])
+	completed = [pair for pair in all_pairs if not pair.get("open")]
+	hours = flt(raw_hours, 2)
+	if len(all_pairs) != 1 or len(completed) != 1 or not shift_start or not shift_end:
+		return hours
+	lunch = flt(max(_hours_between(shift_start, shift_end) - STANDARD_DAY_HOURS, 0.0), 2)
+	if lunch <= 0:
+		return hours
+	return flt(max(hours - lunch, 0.0), 2)
+
+
+def apply_single_pair_lunch(result: dict, logs, day, shift_name: str | None = None) -> float:
+	"""Write credited hours back onto a one-pair day. Multi-pair days stay unchanged."""
+	start, end = shift_window_from_logs(logs, day, shift_name)
+	credited = credited_hours_for_pairs(result.get("pairs"), result.get("working_hours"), start, end)
+	completed = [pair for pair in result.get("pairs") or [] if not pair.get("open")]
+	if len(completed) == 1:
+		completed[0]["hours"] = credited
+		result["pair_hours"] = credited
+	result["working_hours"] = credited
+	return credited
+
+
+def punch_is_late(in_time, shift_start, shift_name: str | None) -> int | None:
+	"""1 when the first IN is after shift start plus the shift's grace period."""
+	from hrms.hr.late_entry import late_entry_grace_for_shift, system_late_entry_defaults
+
+	if not in_time or not shift_start:
+		return None
+	enabled, grace = (
+		late_entry_grace_for_shift(shift_name)
+		if shift_name
+		else system_late_entry_defaults()
+	)
+	if not enabled:
+		return 0
+	deadline = _as_datetime(shift_start) + timedelta(minutes=cint(grace))
+	return 1 if _as_datetime(in_time) > deadline else 0
+
+
+def _log_value(log, field):
+	return getattr(log, field, None) if not isinstance(log, dict) else log.get(field)
+
+
 def ensure_working_hours_from_times(doc) -> float:
 	"""Fill working_hours from in/out when it was left at 0."""
 	if (getattr(doc, "status", None) or "") in ("Absent", "On Leave"):
@@ -644,9 +730,132 @@ def get_day_checkins(employee: str, day) -> list[dict]:
 	return frappe.get_all(
 		"Employee Checkin",
 		filters={"employee": employee, "time": ["between", [f"{day} 00:00:00", f"{day} 23:59:59"]]},
-		fields=["name", "log_type", "time", "shift", "attendance"],
+		fields=["name", "log_type", "time", "shift", "shift_start", "shift_end", "attendance"],
 		order_by="time asc",
 	)
+
+
+def _row_hours_for_scale(row) -> float:
+	hours = flt(row.get("working_hours") if isinstance(row, dict) else getattr(row, "working_hours", 0))
+	if hours:
+		return hours
+	return flt(ensure_working_hours_from_times(row))
+
+
+def _scaled_hours_for_week(employee: str, week_start, target: float) -> dict[str, float]:
+	"""Map attendance name to hours so the week sums to the typed payroll total."""
+	start, end = week_bounds(week_start)
+	fields = ["name", "working_hours", "status", "attendance_date", "daily_pay"]
+	if frappe.db.has_column("Attendance", "in_time"):
+		fields.extend(["in_time", "out_time"])
+	stored = frappe.get_all(
+		"Attendance",
+		filters={
+			"employee": employee,
+			"attendance_date": ["between", [start, end]],
+			"docstatus": ["<", 2],
+		},
+		fields=fields,
+		order_by="attendance_date asc, name asc",
+	)
+	weights = [(row.name, max(_row_hours_for_scale(row), 0.0)) for row in stored]
+	total = flt(sum(weight for _name, weight in weights), 2)
+	target = flt(target, 2)
+	scaled: dict[str, float] = {}
+	if not weights:
+		return scaled
+	if total <= 0:
+		for name, _weight in weights:
+			scaled[name] = 0.0
+		scaled[weights[-1][0]] = target
+		return scaled
+
+	running = 0.0
+	last_name = None
+	for name, weight in weights:
+		if weight <= 0:
+			scaled[name] = 0.0
+			continue
+		last_name = name
+		scaled[name] = flt(weight * target / total, 2)
+		running = flt(running + scaled[name], 2)
+	if last_name is not None:
+		scaled[last_name] = flt(scaled[last_name] + (target - running), 2)
+	return scaled
+
+
+def apply_approved_week_hours(employee: str, rows: list) -> list:
+	"""Replace in-memory working hours with a typed week total when one is saved.
+
+	Clock rows stay in the database. Payroll math uses the scaled hours.
+	"""
+	if not employee or not rows or not frappe.db.table_exists("Approved Week Hours"):
+		return rows
+
+	starts = []
+	for row in rows:
+		day = row.get("attendance_date") if isinstance(row, dict) else getattr(row, "attendance_date", None)
+		if day:
+			starts.append(week_bounds(day)[0])
+	if not starts:
+		return rows
+
+	overrides = {
+		getdate(rec.week_start): flt(rec.hours)
+		for rec in frappe.get_all(
+			"Approved Week Hours",
+			filters={"employee": employee, "week_start": ["in", list(set(starts))]},
+			fields=["week_start", "hours"],
+			ignore_permissions=True,
+		)
+	}
+	if not overrides:
+		return rows
+
+	scaled_by_week = {
+		start: _scaled_hours_for_week(employee, start, target) for start, target in overrides.items()
+	}
+	for row in rows:
+		day = row.get("attendance_date") if isinstance(row, dict) else getattr(row, "attendance_date", None)
+		name = row.get("name") if isinstance(row, dict) else getattr(row, "name", None)
+		if not day or not name:
+			continue
+		scaled = scaled_by_week.get(week_bounds(day)[0])
+		if not scaled or name not in scaled:
+			continue
+		if isinstance(row, dict):
+			row["working_hours"] = scaled[name]
+			row["_week_override"] = 1
+		else:
+			row.working_hours = scaled[name]
+			row._week_override = 1
+	return rows
+
+
+def payroll_hours_for_period(employee: str, start_date, end_date) -> float:
+	"""Hours payroll should pay between two dates, honoring week overrides and manual days."""
+	if not employee or not start_date or not end_date:
+		return 0.0
+	fields = ["name", "attendance_date", "working_hours", "status", "daily_pay"]
+	if frappe.db.has_column("Attendance", "in_time"):
+		fields.extend(["in_time", "out_time"])
+	rows = frappe.get_all(
+		"Attendance",
+		filters={
+			"employee": employee,
+			"attendance_date": ["between", [getdate(start_date), getdate(end_date)]],
+			"docstatus": ["<", 2],
+		},
+		fields=fields,
+		order_by="attendance_date asc, name asc",
+	)
+	apply_approved_week_hours(employee, rows)
+	total = 0.0
+	for row in rows:
+		if (row.get("status") or "") == "Absent":
+			continue
+		total += flt(row.working_hours) or flt(ensure_working_hours_from_times(row))
+	return flt(total, 2)
 
 
 def resync_attendance_from_day_logs(employee: str, day, attendance_name: str | None = None) -> str | None:
@@ -660,6 +869,11 @@ def resync_attendance_from_day_logs(employee: str, day, attendance_name: str | N
 		"name",
 	)
 	shift = next((_log_shift(log) for log in logs if _log_shift(log)), None)
+	if existing and not shift:
+		shift = frappe.db.get_value("Attendance", existing, "shift")
+	apply_single_pair_lunch(result, logs, day, shift)
+	window_start, _window_end = shift_window_from_logs(logs, day, shift)
+	late_entry = punch_is_late(result.get("in_time"), window_start, shift)
 
 	frappe.flags.in_daily_pay_sync = True
 	try:
@@ -676,12 +890,16 @@ def resync_attendance_from_day_logs(employee: str, day, attendance_name: str | N
 			doc = frappe.get_doc("Attendance", existing)
 			if doc.docstatus == 2:
 				return existing
+			keep_manual_hours = bool(doc.meta.has_field("manual_hours") and cint(doc.get("manual_hours")))
 			updates = {
 				"in_time": result["in_time"],
 				"out_time": result["out_time"],
-				"working_hours": result["working_hours"],
 				"status": "Present" if doc.status not in ("On Leave", "Half Day") else doc.status,
 			}
+			if not keep_manual_hours:
+				updates["working_hours"] = result["working_hours"]
+			if late_entry is not None:
+				updates["late_entry"] = late_entry
 			if shift and not doc.shift:
 				updates["shift"] = shift
 			if doc.docstatus == 1:
@@ -721,6 +939,7 @@ def resync_attendance_from_day_logs(employee: str, day, attendance_name: str | N
 				"out_time": result["out_time"],
 				"working_hours": result["working_hours"],
 				"shift": shift,
+				"late_entry": late_entry or 0,
 				"hours_paid": 0,
 			}
 		)

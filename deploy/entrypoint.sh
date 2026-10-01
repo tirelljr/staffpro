@@ -46,8 +46,9 @@ PY
 }
 
 mkdir -p sites/assets logs
+# Persistent sites disk keeps old files. Never use cp -n here or hrms JS stays stale.
 if [ -d "$BENCH/assets" ]; then
-	cp -an "$BENCH/assets/." sites/assets/ || true
+	cp -a "$BENCH/assets/." sites/assets/ || true
 fi
 ls -1 apps > sites/apps.txt
 
@@ -112,8 +113,8 @@ create_or_migrate_site() {
 			bench --site "$SITE_NAME" set-config host_name "https://${RENDER_EXTERNAL_HOSTNAME}"
 		fi
 		bench --site "$SITE_NAME" enable-scheduler
-		bench --site "$SITE_NAME" execute hrms.branding.apply_branding || true
-		bench --site "$SITE_NAME" execute hrms.boot.prepare_staff_pro_first_login || true
+		bench --site "$SITE_NAME" execute "frappe.get_attr('hrms.branding.apply_branding')()" || true
+		bench --site "$SITE_NAME" execute "frappe.get_attr('hrms.boot.prepare_staff_pro_first_login')()" || true
 		bench --site "$SITE_NAME" clear-cache || true
 		echo "Site ${SITE_NAME} is ready. Sign in as Matt Chavez, Micheal Graylord, or Myra Chavez (password: admin)."
 	else
@@ -126,10 +127,21 @@ create_or_migrate_site() {
 	fi
 }
 
+refresh_desk_assets() {
+	# bench build during the Docker image build has no Redis; assets.json may be stale.
+	echo "Refreshing desk assets (Redis is available at runtime)..."
+	yarn --cwd apps/hrms build || true
+	bench build --app hrms || true
+	bench --site "$SITE_NAME" execute "frappe.get_attr('hrms.branding.repair_desk_ltr_bundles')()" || true
+	bench --site "$SITE_NAME" execute "frappe.get_attr('hrms.branding.apply_branding')()" || true
+	bench --site "$SITE_NAME" clear-cache || true
+}
+
 trap 'kill $(jobs -p) 2>/dev/null; wait' SIGTERM SIGINT
 
 start_nginx
 create_or_migrate_site
+refresh_desk_assets
 
 GUNICORN_BIND="127.0.0.1:8000"
 if ! command -v nginx >/dev/null 2>&1; then

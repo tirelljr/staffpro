@@ -92,6 +92,7 @@ class TestEmployeeLeaveBalance(HRMSTestSuite):
 				"employee_name": "test_emp_leave_balance@example.com",
 				"leaves_allocated": flt(allocation1.new_leaves_allocated + allocation2.new_leaves_allocated),
 				"leaves_expired": flt(allocation1.new_leaves_allocated),
+				"pto_money_value": None,
 				"opening_balance": flt(0),
 				"leaves_taken": flt(leave_application.total_leave_days),
 				"closing_balance": flt(allocation2.new_leaves_allocated - leave_application.total_leave_days),

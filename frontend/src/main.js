@@ -16,11 +16,12 @@ import EmptyState from "@/components/EmptyState.vue"
 
 import { IonicVue } from "@ionic/vue"
 
-import { session } from "@/data/session"
+import { session, sessionUser } from "@/data/session"
 import { userResource } from "@/data/user"
 import { employeeResource } from "@/data/employee"
 import { syncNotificationResources } from "@/data/notifications"
 import { canOpenDesk, canUseMyWorkPortal } from "@/utils/deskAccess"
+import { consumeKioskPortalLoginIntent } from "@/utils/kioskPortal"
 
 import dayjs from "@/utils/dayjs"
 import getIonicConfig from "@/utils/ionicConfig"
@@ -128,7 +129,8 @@ router.beforeEach(async (to, _, next) => {
 			syncNotificationResources()
 		}
 	} catch (error) {
-		isLoggedIn = false
+		// Keep kiosk portal entry working when reload races the new session cookie.
+		isLoggedIn = Boolean(session.user || sessionUser())
 	}
 
 	if (!isLoggedIn) {
@@ -147,12 +149,15 @@ router.beforeEach(async (to, _, next) => {
 		return next()
 	}
 
-	// Desk admins opening /agents land on the kiosk, except HR Assistants using My Work.
-	if (
-		canOpenDesk(userResource.data) &&
-		!canUseMyWorkPortal(userResource.data) &&
-		KIOSK_HOME_ROUTES.has(to.name)
-	) {
+	// Desk admins opening /agents land on the kiosk, except HR Assistants using My Work
+	// or a kiosk that just signed an agent into the portal.
+	if (canOpenDesk(userResource.data) && KIOSK_HOME_ROUTES.has(to.name)) {
+		if (consumeKioskPortalLoginIntent()) {
+			return next()
+		}
+		if (canUseMyWorkPortal(userResource.data)) {
+			return next()
+		}
 		return next({ name: "Login" })
 	}
 

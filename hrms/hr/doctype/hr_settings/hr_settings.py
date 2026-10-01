@@ -23,6 +23,8 @@ class HRSettings(Document):
 		allow_employee_checkin_from_mobile_app: DF.Check
 		allow_geolocation_tracking: DF.Check
 		allow_multiple_shift_assignments: DF.Check
+		enable_late_entry_marking: DF.Check
+		late_entry_grace_period: DF.Int
 		auto_leave_encashment: DF.Check
 		check_vacancies: DF.Check
 		emp_created_by: DF.Literal["Naming Series", "Employee Number", "Full Name"]
@@ -37,6 +39,8 @@ class HRSettings(Document):
 		leave_approval_notification_template: DF.Link | None
 		leave_approver_mandatory_in_leave_application: DF.Check
 		leave_status_notification_template: DF.Link | None
+		overtime_pay_multiplier: DF.Float
+		overtime_threshold_hours: DF.Float
 		prevent_self_expense_approval: DF.Check
 		prevent_self_leave_approval: DF.Check
 		remind_before: DF.Time | None
@@ -57,6 +61,14 @@ class HRSettings(Document):
 	# end: auto-generated types
 
 	def validate(self):
+		from hrms.hr.job_letter import fill_letterhead_on_settings
+
+		fill_letterhead_on_settings(self)
+		if not self.overtime_threshold_hours:
+			self.overtime_threshold_hours = 90
+		if not self.overtime_pay_multiplier:
+			self.overtime_pay_multiplier = 1.5
+
 		self.set_naming_series()
 
 		# Based on proceed flag

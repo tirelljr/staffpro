@@ -78,6 +78,7 @@
 			v-else-if="activeView === 'day' || activeView === 'list'"
 			class="flex flex-col gap-4 bg-white py-6 px-3.5 rounded-lg border-none"
 		>
+			<div v-if="hoursError" class="text-sm text-red-600">{{ hoursError }}</div>
 			<AttendanceHoursView
 				:mode="activeView"
 				:from-date="fromDate"
@@ -104,7 +105,6 @@ import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { createResource } from "frappe-ui"
 
 import AttendanceHoursView from "@/components/AttendanceHoursView.vue"
-import { employeeUpcomingPay } from "@/data/hours"
 
 const dayjs = inject("$dayjs")
 const __ = inject("$translate")
@@ -115,6 +115,7 @@ const fromDate = ref(dayjs().format("YYYY-MM-DD"))
 const toDate = ref(dayjs().format("YYYY-MM-DD"))
 const preset = ref("current_pay_period")
 const jobFilter = ref("")
+const hoursError = ref("")
 
 const viewOptions = [
 	{ key: "calendar", label: __("Calendar") },
@@ -198,8 +199,12 @@ const hoursBoard = createResource({
 		}
 	},
 	onSuccess(data) {
+		hoursError.value = ""
 		if (data?.from_date) fromDate.value = data.from_date
 		if (data?.to_date) toDate.value = data.to_date
+	},
+	onError(error) {
+		hoursError.value = error?.messages?.[0] || error?.message || __("Could not load hours.")
 	},
 })
 
@@ -243,7 +248,6 @@ watch(
 function onHoursListUpdate(data) {
 	if (data.doctype === "Attendance" || data.doctype === "Employee Checkin") {
 		if (activeView.value !== "calendar") fetchHours()
-		employeeUpcomingPay.reload()
 	}
 }
 

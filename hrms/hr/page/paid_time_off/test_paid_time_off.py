@@ -46,6 +46,7 @@ class TestPaidTimeOff(HRMSTestSuite):
 		vacation = next(row for row in after_allocate["balances"] if row["leave_type"] == self.leave_type)
 		self.assertGreaterEqual(vacation["leaves_allocated"], 8)
 		self.assertGreaterEqual(vacation["closing_balance"], 8)
+		self.assertIsNone(vacation["pto_money_value"])
 
 		booked = book_time_off(employee, self.leave_type, from_date, to_date)
 		self.assertTrue(booked["name"])

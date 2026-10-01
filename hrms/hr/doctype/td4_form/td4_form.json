@@ -1,0 +1,313 @@
+{
+ "actions": [],
+ "allow_copy": 0,
+ "autoname": "format:TD4-{YYYY}-{#####}",
+ "creation": "2026-09-29 23:20:00.000000",
+ "description": "Belize TD4 Supplementary statement of emoluments paid.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "employee",
+  "employee_name",
+  "status",
+  "filled_by",
+  "filled_by_name",
+  "filled_on",
+  "dismiss_count",
+  "column_break_identity",
+  "company",
+  "reporting_year",
+  "date_signed",
+  "employer_section",
+  "employer_name",
+  "employer_address",
+  "column_break_employer",
+  "employer_tin",
+  "employee_section",
+  "employee_address",
+  "social_security",
+  "column_break_employee",
+  "employee_tin",
+  "emoluments_section",
+  "number_of_weeks",
+  "total_income",
+  "total_taxable_income",
+  "column_break_emoluments",
+  "non_taxable_income",
+  "commissions",
+  "tax_deducted",
+  "signature_section",
+  "signature",
+  "signed_pdf"
+ ],
+ "fields": [
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Agent",
+   "options": "Employee",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fetch_from": "employee.employee_name",
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Agent Name",
+   "read_only": 1
+  },
+  {
+   "default": "Requested",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "no_copy": 1,
+   "options": "Requested\nSubmitted",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "filled_by",
+   "fieldtype": "Link",
+   "label": "Filled By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "filled_by_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Filled By Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "filled_on",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Filled On",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "dismiss_count",
+   "fieldtype": "Int",
+   "label": "Times Closed",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_identity",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "reporting_year",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Reporting Year"
+  },
+  {
+   "fieldname": "date_signed",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date Signed",
+   "no_copy": 1
+  },
+  {
+   "fieldname": "employer_section",
+   "fieldtype": "Section Break",
+   "label": "Employer"
+  },
+  {
+   "fieldname": "employer_name",
+   "fieldtype": "Data",
+   "label": "Employer Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "employer_address",
+   "fieldtype": "Small Text",
+   "label": "Employer Address",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_employer",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "employer_tin",
+   "fieldtype": "Data",
+   "label": "(H) Employer TIN",
+   "read_only": 1
+  },
+  {
+   "fieldname": "employee_section",
+   "fieldtype": "Section Break",
+   "label": "Employee"
+  },
+  {
+   "fieldname": "employee_address",
+   "fieldtype": "Small Text",
+   "label": "Employee Address"
+  },
+  {
+   "fieldname": "social_security",
+   "fieldtype": "Data",
+   "label": "(A) Social Security"
+  },
+  {
+   "fieldname": "column_break_employee",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "employee_tin",
+   "fieldtype": "Data",
+   "label": "(I) Employee TIN"
+  },
+  {
+   "fieldname": "emoluments_section",
+   "fieldtype": "Section Break",
+   "label": "Emoluments"
+  },
+  {
+   "fieldname": "number_of_weeks",
+   "fieldtype": "Int",
+   "label": "(B) Number of Weeks",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "total_income",
+   "fieldtype": "Currency",
+   "label": "(C) Total Income from Employment",
+   "precision": "2"
+  },
+  {
+   "fieldname": "total_taxable_income",
+   "fieldtype": "Currency",
+   "label": "(D) Total Taxable Income",
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_emoluments",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "non_taxable_income",
+   "fieldtype": "Currency",
+   "label": "(E) Non-Taxable Income",
+   "precision": "2"
+  },
+  {
+   "fieldname": "commissions",
+   "fieldtype": "Currency",
+   "label": "(F) Commissions",
+   "precision": "2"
+  },
+  {
+   "fieldname": "tax_deducted",
+   "fieldtype": "Currency",
+   "label": "(G) Tax Deducted at Source",
+   "precision": "2"
+  },
+  {
+   "fieldname": "signature_section",
+   "fieldtype": "Section Break",
+   "label": "Signature"
+  },
+  {
+   "fieldname": "signature",
+   "fieldtype": "Long Text",
+   "label": "Employee Signature",
+   "no_copy": 1
+  },
+  {
+   "fieldname": "signed_pdf",
+   "fieldtype": "Attach",
+   "label": "Signed PDF",
+   "no_copy": 1,
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-29 23:20:00.000000",
+ "modified_by": "Administrator",
+ "module": "HR",
+ "name": "TD4 Form",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR User",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Employee",
+   "select": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Employee Self Service",
+   "select": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "employee_name",
+ "track_changes": 1
+}

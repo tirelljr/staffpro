@@ -2,10 +2,6 @@
  "cards": [],
  "charts": [
   {
-   "chart": "Hours Worked",
-   "width": "Full"
-  },
-  {
    "chart": "Floor Attendance",
    "width": "Half"
   },

@@ -981,8 +981,6 @@ def setup_shift_type(**args):
 				"process_attendance_after": add_days(date, -2),
 				"last_sync_of_checkin": args.last_sync_of_checkin or now_datetime() + timedelta(days=1),
 				"mark_auto_attendance_on_holidays": args.mark_auto_attendance_on_holidays or 0,
-				"allow_overtime": args.allow_overtime or 0,
-				"overtime_type": args.overtime_type or None,
 			}
 		)
 	else:

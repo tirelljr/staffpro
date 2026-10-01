@@ -6,6 +6,7 @@ export const userResource = createResource({
 	cache: "hrms:user",
 	onError(error) {
 		if (error && error.exc_type === "AuthenticationError") {
+			if (window.location.pathname.includes("/login")) return
 			router.push({ name: "Login" })
 		}
 	},

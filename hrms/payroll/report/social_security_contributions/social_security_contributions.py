@@ -224,7 +224,7 @@ def get_years() -> str:
 
 
 @frappe.whitelist()
-def download_excel(filters=None):
+def download_excel(filters: str | dict | None = None):
 	"""Download Social Security contributions as Excel."""
 	if isinstance(filters, str):
 		filters = frappe.parse_json(filters)
@@ -339,7 +339,7 @@ def download_excel(filters=None):
 
 
 @frappe.whitelist()
-def download_pdf(filters=None):
+def download_pdf(filters: str | dict | None = None):
 	"""Download Social Security contributions as a remittance-style PDF."""
 	if isinstance(filters, str):
 		filters = frappe.parse_json(filters)

@@ -266,7 +266,6 @@ async function submit_checkin(listview, next, time, coordinates) {
 			doctype: "Employee Checkin",
 			employee: listview.checkin_employee.name,
 			log_type: next.log_type,
-			time: time,
 			...(coordinates || {}),
 		});
 

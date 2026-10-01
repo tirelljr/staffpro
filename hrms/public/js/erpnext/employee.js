@@ -3,6 +3,52 @@
 
 const assignable_masters = {};
 
+function staff_pro_can(flag) {
+	const can = window.hrms?.role_access?.can;
+	if (typeof can === "function") return can(flag);
+	const access = frappe.boot?.staff_pro_access;
+	if (!access || !(flag in access)) return true;
+	return !!access[flag];
+}
+
+function hide_employee_access_fields(frm) {
+	const hidden = [];
+	if (!staff_pro_can("see_agent_salary")) {
+		hidden.push(
+			"ctc",
+			"salary_currency",
+			"salary_cb",
+			"user_bonus",
+			"user_bonus_period_months",
+			"user_bonus_attendance_target",
+			"user_bonus_if_below",
+			"user_bonus_attendance",
+			"user_bonus_missed_days",
+			"user_bonus_status",
+		);
+	}
+	if (!staff_pro_can("see_bill_to_client")) {
+		hidden.push("billing_section", "bill_to_customer", "billing_rate", "billing_currency");
+	}
+	if (!staff_pro_can("see_bank_details")) {
+		hidden.push("salary_mode", "bank_name", "bank_ac_no");
+	}
+	if (!staff_pro_can("see_social_security")) {
+		hidden.push("social_security_number");
+	}
+	hidden.forEach((fieldname) => {
+		if (frm.fields_dict[fieldname]) frm.set_df_property(fieldname, "hidden", 1);
+	});
+	if (!staff_pro_can("see_agent_salary")) {
+		frm.remove_custom_button(__("Change Hourly Rate"));
+		frm.remove_custom_button(__("Salary Structure"), __("Create Assignments"));
+		frm.remove_custom_button(__("Add Bonus"));
+	}
+	if (!staff_pro_can("see_td4_forms")) {
+		frm.remove_custom_button(__("Request TD4"));
+	}
+}
+
 function get_assignment_actions() {
 	return [
 		{
@@ -194,9 +240,11 @@ frappe.ui.form.on("Employee", {
 			"health_insurance_no",
 			"holiday_list",
 			"iban",
+			"expense_approver",
 		]) {
 			frm.set_df_property(fieldname, "hidden", 1);
 		}
+		set_default_hr_approvers(frm);
 		frm.set_df_property("grade", "label", __("Campaign"));
 		lock_employee_salary_currency(frm);
 		setup_employee_username_field(frm);
@@ -210,11 +258,23 @@ frappe.ui.form.on("Employee", {
 		frm.trigger("add_assignment_actions");
 		frm.trigger("add_hourly_rate_action");
 		setup_employee_form_chrome(frm);
+		setup_employee_documents_tab(frm);
 		setup_employee_password_panel(frm);
 		setup_employee_profile_stats(frm);
 		apply_staff_pro_employee_field_restrictions(frm);
+		setup_employee_delete_action(frm);
 		set_employee_salary_defaults(frm);
+		set_working_day_defaults(frm);
+		setup_floor_worker_form(frm);
 		refresh_user_bonus_status(frm);
+		setup_td4_request(frm);
+		hide_employee_access_fields(frm);
+		setTimeout(() => hide_employee_access_fields(frm), 250);
+	},
+
+	is_floor_worker(frm) {
+		apply_floor_worker_group_days(frm);
+		setup_floor_worker_form(frm, true);
 	},
 
 	user_bonus: function (frm) {
@@ -242,11 +302,13 @@ frappe.ui.form.on("Employee", {
 	},
 
 	add_hourly_rate_action: function (frm) {
+		if (!staff_pro_can("see_agent_salary")) return;
 		if (frm.is_new() || !frappe.model.can_write("Employee")) return;
 		frm.add_custom_button(__("Change Hourly Rate"), () => open_apply_hourly_rate_dialog(frm));
 	},
 
 	ctc: function (frm) {
+		if (!staff_pro_can("see_agent_salary")) return;
 		if (frm._skip_hourly_prompt || !flt(frm.doc.ctc)) return;
 		frappe.confirm(
 			__("Apply this hourly rate to other agents, a branch, campaign, or team?"),
@@ -262,6 +324,7 @@ frappe.ui.form.on("Employee", {
 		for (const action of get_assignment_actions()) {
 			if (action.master && !available_masters[action.master]) continue;
 			if (!frappe.model.can_create(action.doctype)) continue;
+			if (action.doctype === "Salary Structure Assignment" && !staff_pro_can("see_agent_salary")) continue;
 
 			frm.add_custom_button(
 				action.label,
@@ -439,6 +502,95 @@ function lock_employee_salary_currency(frm) {
 	frm.set_value("salary_currency", "BZD");
 }
 
+const WORK_WEEKDAYS = ["work_monday", "work_tuesday", "work_wednesday", "work_thursday", "work_friday"];
+const WORK_WEEKEND = ["work_saturday", "work_sunday"];
+const EMPLOYEE_ROSTER_KEY = "staff_pro_employee_roster";
+
+function floor_worker_badge_html() {
+	return `<span class="sp-floor-worker-badge" style="display:inline-block;margin-left:6px;padding:0 6px;border-radius:999px;background:#e7f6ec;color:#146c43;font-size:11px;font-weight:600;line-height:18px;vertical-align:middle;">floorworkers</span>`;
+}
+
+function set_default_hr_approvers(frm) {
+	if (frm.doc.leave_approver && frm.doc.shift_request_approver) return;
+	if (frm._sp_hr_approver_pending) return;
+	frm._sp_hr_approver_pending = true;
+	frappe.call({
+		method: "hrms.overrides.employee_master.get_default_hr_approver",
+		callback(r) {
+			frm._sp_hr_approver_pending = false;
+			const approver = r.message;
+			if (!approver) return;
+			if (!frm.doc.leave_approver && frm.fields_dict.leave_approver) {
+				frm.set_value("leave_approver", approver);
+			}
+			if (!frm.doc.shift_request_approver && frm.fields_dict.shift_request_approver) {
+				frm.set_value("shift_request_approver", approver);
+			}
+		},
+	});
+}
+
+function set_working_day_defaults(frm) {
+	if (!frm.is_new() || frm._sp_working_days_ready) return;
+	frm._sp_working_days_ready = true;
+	const fields = [...WORK_WEEKDAYS, ...WORK_WEEKEND].filter((fieldname) => frm.fields_dict[fieldname]);
+	if (!fields.length) return;
+	const any_checked = fields.some((fieldname) => cint(frm.doc[fieldname]));
+	if (any_checked) return;
+	WORK_WEEKDAYS.forEach((fieldname) => {
+		if (frm.fields_dict[fieldname]) frm.set_value(fieldname, 1);
+	});
+}
+
+function working_days_are_default(frm) {
+	return WORK_WEEKDAYS.every((fieldname) => !frm.fields_dict[fieldname] || cint(frm.doc[fieldname]))
+		&& WORK_WEEKEND.every((fieldname) => !frm.fields_dict[fieldname] || !cint(frm.doc[fieldname]));
+}
+
+function apply_floor_worker_group_days(frm) {
+	if (!cint(frm.doc.is_floor_worker) || !working_days_are_default(frm)) return;
+	frappe.xcall("hrms.hr.floor_workers.get_floor_worker_group_defaults").then((defaults) => {
+		const days = defaults?.working_days || {};
+		Object.entries(days).forEach(([fieldname, value]) => {
+			if (frm.fields_dict[fieldname] && cint(frm.doc[fieldname]) !== cint(value)) {
+				frm.set_value(fieldname, cint(value));
+			}
+		});
+	});
+}
+
+function setup_floor_worker_form(frm, clear_shift) {
+	const is_floor = cint(frm.doc.is_floor_worker);
+	if (frm.is_new() && !frm._sp_floor_worker_default) {
+		frm._sp_floor_worker_default = true;
+		try {
+			if (!is_floor && sessionStorage.getItem(EMPLOYEE_ROSTER_KEY) === "floor") {
+				frm.set_value("is_floor_worker", 1);
+				return;
+			}
+		} catch (err) {
+			/* ignore */
+		}
+	}
+
+	["billing_section", "bill_to_customer", "billing_rate", "default_shift"].forEach((fieldname) => {
+		if (frm.fields_dict[fieldname]) {
+			frm.toggle_display(fieldname, !cint(frm.doc.is_floor_worker));
+		}
+	});
+	if (clear_shift && cint(frm.doc.is_floor_worker) && frm.doc.default_shift) {
+		frm.set_value("default_shift", "");
+	}
+
+	const $page = frm.page?.wrapper || frm.$wrapper;
+	$page?.find(".sp-floor-worker-badge").remove();
+	if (!cint(frm.doc.is_floor_worker) || !$page?.length) return;
+	const $title = $page.find(".page-title .title-text").first();
+	if ($title.length) {
+		$title.append(floor_worker_badge_html());
+	}
+}
+
 function set_employee_salary_defaults(frm) {
 	lock_employee_salary_currency(frm);
 	if (!frm.is_new()) return;
@@ -457,6 +609,7 @@ function set_employee_salary_defaults(frm) {
 }
 
 function refresh_user_bonus_status(frm) {
+	if (!staff_pro_can("see_agent_salary")) return;
 	if (frm.is_new() || !frm.doc.name || !frm.fields_dict.user_bonus) return;
 	frappe.call({
 		method: "hrms.payroll.user_bonus.get_user_bonus",
@@ -666,6 +819,271 @@ function open_apply_hourly_rate_dialog(frm) {
 	}
 }
 
+function setup_employee_delete_action(frm) {
+	if (frm.is_new() || !frappe.model.can_delete("Employee")) return;
+
+	frm.page.add_inner_button(
+		__("Delete Agent"),
+		() => {
+			const label = frm.doc.employee_name || frm.doc.name;
+			frappe.confirm(
+				__(
+					"Delete {0} and remove all linked attendance, payroll, leave, and related records? This cannot be undone.",
+					[label],
+				),
+				() => {
+					frappe.call({
+						method: "hrms.hr.employee_cleanup.delete_employee_with_unlink",
+						args: { employee: frm.doc.name },
+						freeze: true,
+						freeze_message: __("Removing linked records..."),
+						callback(r) {
+							if (r.exc) return;
+							frappe.show_alert({
+								message: __("Agent deleted"),
+								indicator: "green",
+							});
+							frappe.set_route("List", "Employee");
+						},
+					});
+				},
+			);
+		},
+		__("Actions"),
+	);
+}
+
+function place_documents_tab_before_profile(frm) {
+	const $nav = $(frm.page?.wrapper || frm.$wrapper).find("#form-tabs");
+	if (!$nav.length) return;
+
+	const tab_label = (el) => ($(el).text() || "").replace(/\s+/g, " ").trim();
+	const $items = $nav.find("li.nav-item, .nav-item");
+	const $profile = $items.filter((_, el) => tab_label(el) === __("Profile") || tab_label(el) === "Profile").first();
+	const $docs = $items
+		.filter((_, el) => tab_label(el) === __("Documents") || tab_label(el) === "Documents")
+		.first();
+	if ($profile.length && $docs.length && !$docs.next().is($profile)) {
+		$docs.insertBefore($profile);
+	}
+}
+
+function open_document_viewer(filename, url) {
+	if (!url) return;
+	const name = filename || __("Document");
+	const is_image = /\.(gif|jpg|jpeg|png|svg|webp)$/i.test(name);
+	const dialog = new frappe.ui.Dialog({
+		title: name,
+		size: "extra-large",
+	});
+	const safe_url = frappe.utils.escape_html(url);
+	dialog.$body.html(
+		is_image
+			? `<img src="${safe_url}" style="max-width:100%;height:auto" alt="">`
+			: `<iframe src="${safe_url}" title="${frappe.utils.escape_html(name)}" style="width:100%;height:70vh;border:0"></iframe>`,
+	);
+	dialog.show();
+}
+
+function setup_employee_documents_tab(frm) {
+	place_documents_tab_before_profile(frm);
+	const field = frm.get_field("agent_documents_html");
+	if (!field?.$wrapper?.length) return;
+
+	field.$wrapper.addClass("sp-emp-docs-field");
+	frm.set_df_property("agent_documents_html", "label", "");
+
+	if (frm.is_new()) {
+		field.$wrapper.html(
+			`<div class="sp-emp-docs"><p class="sp-emp-docs__empty">${frappe.utils.escape_html(
+				__("Save this agent to attach documents."),
+			)}</p></div>`,
+		);
+		return;
+	}
+
+	const state = (frm._agent_docs = frm._agent_docs || {
+		employee: frm.doc.name,
+		categories: [],
+		files: {},
+		open: "",
+		loading: false,
+	});
+	state.employee = frm.doc.name;
+
+	const escape = (value) => frappe.utils.escape_html(value == null ? "" : String(value));
+	const file_count = (count) => {
+		const total = cint(count);
+		return total === 1 ? __("{0} file", [total]) : __("{0} files", [total]);
+	};
+
+	const $host = field.$wrapper;
+	$host.off(".spEmpDocs");
+
+	const render = () => {
+		if (state.loading && !state.categories.length) {
+			$host.html(
+				`<div class="sp-emp-docs"><p class="sp-emp-docs__empty">${escape(__("Loading..."))}</p></div>`,
+			);
+			return;
+		}
+		const cards = (state.categories || [])
+			.map((category) => {
+				const open = state.open === category.name;
+				const files = state.files[category.name] || [];
+				const file_rows = files.length
+					? `<ul class="sp-emp-docs__files">${files
+							.map((file) => {
+								const when = file.uploaded_on ? frappe.datetime.str_to_user(file.uploaded_on) : "";
+								const view = file.file_url
+									? `<button type="button" class="sp-emp-docs__link" data-view="${escape(file.file_url)}" data-file-name="${escape(file.file_name || file.name)}">${escape(__("View"))}</button>`
+									: "";
+								const download = file.file_url
+									? `<a class="sp-emp-docs__link" href="${escape(file.file_url)}" target="_blank" rel="noopener">${escape(__("Download"))}</a>`
+									: "";
+								const remove = file.can_delete
+									? `<button type="button" class="sp-emp-docs__link is-danger" data-delete="${escape(file.name)}" data-file-name="${escape(file.file_name)}">${escape(__("Delete"))}</button>`
+									: "";
+								return `<li class="sp-emp-docs__file">
+									<div>
+										<div class="sp-emp-docs__file-name">${escape(file.file_name || file.name)}</div>
+										<div class="sp-emp-docs__file-meta">${escape(when)}${file.uploaded_by_name ? ` · ${escape(file.uploaded_by_name)}` : ""}</div>
+									</div>
+									<div class="sp-emp-docs__actions">${view}${download}${remove}</div>
+								</li>`;
+							})
+							.join("")}</ul>`
+					: `<p class="sp-emp-docs__empty">${escape(__("No files in this folder yet."))}</p>`;
+				return `<section class="sp-emp-docs__folder${open ? " is-open" : ""}">
+					<button type="button" class="sp-emp-docs__folder-head" data-category="${escape(category.name)}">
+						<span class="sp-emp-docs__folder-name">${escape(category.category_name || category.name)}</span>
+						<span class="sp-emp-docs__folder-count">${escape(file_count(category.file_count))}</span>
+					</button>
+					${
+						open
+							? `<div class="sp-emp-docs__folder-body">
+								<div class="sp-emp-docs__upload">
+									<button type="button" class="btn btn-primary btn-sm" data-upload="${escape(category.name)}">${escape(__("Upload"))}</button>
+									<input type="file" multiple hidden data-file-input="${escape(category.name)}" />
+								</div>
+								${file_rows}
+							</div>`
+							: ""
+					}
+				</section>`;
+			})
+			.join("");
+
+		$host.html(`
+			<div class="sp-emp-docs">
+				<p class="sp-emp-docs__help">${escape(__("Social security, job letters, bank declarations, IDs, writeups, and other files for this agent."))}</p>
+				${cards || `<p class="sp-emp-docs__empty">${escape(__("No document categories yet."))}</p>`}
+			</div>
+		`);
+	};
+
+	const load_files = (category, then_render = true) =>
+		frappe
+			.call({
+				method: "hrms.hr.agent_filesystem.list_files",
+				args: { employee: state.employee, category },
+			})
+			.then((response) => {
+				state.files[category] = response.message || [];
+				if (then_render) render();
+			});
+
+	const load = () => {
+		state.loading = true;
+		render();
+		frappe
+			.call({
+				method: "hrms.hr.agent_filesystem.list_categories",
+				args: { employee: state.employee },
+			})
+			.then((response) => {
+				state.categories = response.message || [];
+				state.loading = false;
+				const open = state.open;
+				const after = open ? load_files(open, false) : Promise.resolve();
+				return after.then(render);
+			})
+			.catch(() => {
+				state.loading = false;
+				$host.html(
+					`<div class="sp-emp-docs"><p class="sp-emp-docs__empty">${escape(__("Documents could not be loaded."))}</p></div>`,
+				);
+			});
+	};
+
+	const upload_files = (category, file_list) => {
+		const files = Array.from(file_list || []);
+		if (!files.length) return;
+		let pending = files.length;
+		files.forEach((file) => {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const done = () => {
+					pending -= 1;
+					if (!pending) load();
+				};
+				frappe
+					.call({
+						method: "hrms.hr.agent_filesystem.upload_file",
+						args: {
+							employee: state.employee,
+							category,
+							filename: file.name,
+							content: String(reader.result || "").split(",")[1] || "",
+						},
+					})
+					.then(done, done);
+			};
+			reader.readAsDataURL(file);
+		});
+	};
+
+	$host.on("click.spEmpDocs", "[data-view]", function (event) {
+		event.preventDefault();
+		event.stopPropagation();
+		open_document_viewer($(this).attr("data-file-name"), $(this).attr("data-view"));
+	});
+
+	$host.on("click.spEmpDocs", "[data-category]", function () {
+		const category = $(this).attr("data-category");
+		state.open = state.open === category ? "" : category;
+		if (state.open) {
+			load_files(state.open);
+		} else {
+			render();
+		}
+	});
+
+	$host.on("click.spEmpDocs", "[data-upload]", function () {
+		$host.find(`[data-file-input="${$(this).attr("data-upload")}"]`).trigger("click");
+	});
+
+	$host.on("change.spEmpDocs", "[data-file-input]", function () {
+		const category = $(this).attr("data-file-input");
+		upload_files(category, this.files);
+		this.value = "";
+	});
+
+	$host.on("click.spEmpDocs", "[data-delete]", function () {
+		const name = $(this).attr("data-delete");
+		const label = $(this).attr("data-file-name") || name;
+		frappe.confirm(__("Delete {0}?", [label]), () => {
+			frappe.call({
+				method: "hrms.hr.agent_filesystem.delete_file",
+				args: { name },
+				callback: () => load(),
+			});
+		});
+	});
+
+	load();
+}
+
 function setup_employee_form_chrome(frm) {
 	const $page = frm.page?.wrapper || frm.$wrapper;
 	if (!$page?.length) {
@@ -736,13 +1154,27 @@ function setup_employee_password_panel(frm) {
 		$page.find(".sp-emp-password").not($host.find(".sp-emp-password")).remove();
 
 		let $panel = $host.children(".sp-emp-password");
+		const canViewPassword = (frappe.user_roles || []).some((role) =>
+			["System Manager", "HR Manager", "HR User", "Administrator"].includes(role),
+		);
 		if (!$panel.length) {
+			const currentPassword = canViewPassword
+				? `<label class="sp-emp-password__label">
+						<span>${frappe.utils.escape_html(__("Current password"))}</span>
+						<div class="sp-emp-password__reveal" style="display:flex;gap:8px;align-items:center">
+							<input type="password" class="form-control sp-emp-password__current" readonly autocomplete="off" placeholder="${frappe.utils.escape_html(__("Hidden"))}" />
+							<button type="button" class="btn btn-default btn-sm sp-emp-password__toggle">${frappe.utils.escape_html(__("Show"))}</button>
+						</div>
+						<div class="sp-emp-password__current-note text-muted"></div>
+					</label>`
+				: "";
 			$panel = $(`
 				<div class="sp-emp-password">
 					<div class="sp-emp-password__title">${frappe.utils.escape_html(__("HRMS Password"))}</div>
 					<p class="sp-emp-password__help">${frappe.utils.escape_html(
 						__("Set or change this agent's login password for Staff Pro."),
 					)}</p>
+					${currentPassword}
 					<label class="sp-emp-password__label">
 						<span>${frappe.utils.escape_html(__("New password"))}</span>
 						<input type="password" class="form-control sp-emp-password__input" autocomplete="new-password" />
@@ -761,6 +1193,34 @@ function setup_employee_password_panel(frm) {
 					<div class="sp-emp-password__user text-muted"></div>
 				</div>
 			`).appendTo($host);
+
+			$panel.on("click", ".sp-emp-password__toggle", () => {
+				const $input = $panel.find(".sp-emp-password__current");
+				const $note = $panel.find(".sp-emp-password__current-note");
+				const $button = $panel.find(".sp-emp-password__toggle");
+				if ($input.attr("type") === "text") {
+					$input.attr("type", "password").val("");
+					$note.text("");
+					$button.text(__("Show"));
+					return;
+				}
+				frappe.call({
+					method: "hrms.overrides.employee_profile.get_employee_user_password",
+					args: { employee: frm.doc.name },
+					freeze: true,
+					freeze_message: __("Loading password..."),
+				}).then((r) => {
+					const password = r.message?.password || "";
+					if (!password) {
+						$input.attr("type", "password").val("");
+						$note.text(__("No saved password yet. It is stored when you set one here, or the next time this agent signs in."));
+						return;
+					}
+					$input.attr("type", "text").val(password);
+					$note.text("");
+					$button.text(__("Hide"));
+				});
+			});
 
 			$panel.on("click", ".sp-emp-password__save", () => {
 				const password = String($panel.find(".sp-emp-password__input").val() || "");
@@ -789,6 +1249,9 @@ function setup_employee_password_panel(frm) {
 				}).then(() => {
 					$panel.find(".sp-emp-password__input, .sp-emp-password__confirm").val("");
 					$panel.find(".sp-emp-password__logout").prop("checked", false);
+					$panel.find(".sp-emp-password__current").attr("type", "password").val("");
+					$panel.find(".sp-emp-password__current-note").text("");
+					$panel.find(".sp-emp-password__toggle").text(__("Show"));
 					frappe.show_alert({
 						message: __("Password updated for {0}", [frm._displayed_username || frm.doc.user_id]),
 						indicator: "green",
@@ -901,38 +1364,49 @@ function setup_employee_profile_stats(frm) {
 		};
 		const hours = Number(stats.total_hours || 0);
 		const leave_remaining = Number(stats.leave_remaining || 0);
-		const rows = [];
-		if (visibility.payroll_totals !== false) {
-			rows.push(
-				{ label: __("Total SS contributions"), value: money(stats.total_ss, company_currency) },
-				{ label: __("Total income"), value: money(stats.total_income, company_currency) },
-				{ label: __("Tax total"), value: money(stats.total_tax, company_currency) },
-			);
-		}
-		if (visibility.total_billed !== false) {
-			rows.push({
+		const sees_billing = staff_pro_can("see_bill_to_client") || staff_pro_can("see_client_invoices");
+		const rows = [
+			{
+				label: __("Total SS contributions"),
+				value: money(stats.total_ss, company_currency),
+				show: visibility.payroll_totals !== false && staff_pro_can("see_social_security"),
+			},
+			{
+				label: __("Total income"),
+				value: money(stats.total_income, company_currency),
+				show: visibility.payroll_totals !== false && staff_pro_can("see_agent_salary"),
+			},
+			{
 				label: __("Total Billed to Client"),
 				value: money(stats.total_billed, billing_currency),
-			});
-		}
-		if (visibility.agent_profit !== false) {
-			rows.push({
+				show: visibility.total_billed !== false && sees_billing,
+			},
+			{
 				label: __("Agent Profit"),
 				value: money(stats.agent_profit, company_currency),
-			});
-		}
-		if (visibility.total_hours !== false) {
-			rows.push({
+				show: visibility.agent_profit !== false && staff_pro_can("see_agent_salary") && sees_billing,
+			},
+			{
+				label: __("Tax total"),
+				value: money(stats.total_tax, company_currency),
+				show: visibility.payroll_totals !== false && staff_pro_can("see_social_security"),
+			},
+			{
 				label: __("Total hours worked"),
 				value: hours ? `${hours.toLocaleString(undefined, { maximumFractionDigits: 1 })}h` : "—",
-			});
-		}
-		if (visibility.leave_remaining !== false) {
-			rows.push({
+				show: visibility.total_hours !== false,
+			},
+			{
 				label: __("Leave remaining"),
 				value: `${leave_remaining.toLocaleString(undefined, { maximumFractionDigits: 1 })} days`,
-			});
-		}
+				show: visibility.leave_remaining !== false,
+			},
+			{
+				label: __("Leave Money Value remaining"),
+				value: money(stats.leave_money_remaining, company_currency),
+				show: visibility.payroll_totals !== false && staff_pro_can("see_agent_salary"),
+			},
+		].filter((row) => row.show);
 		if (!rows.length) {
 			$stats.find(".sp-emp-stats__list").removeClass("is-loading").html(
 				`<div class="sp-emp-stats__empty">${frappe.utils.escape_html(__("No totals available for your access level."))}</div>`,
@@ -1103,4 +1577,28 @@ function render_bank_display($disp, bank_name) {
 	$disp.contents().filter(function () {
 		return this.nodeType === 3 && String(this.nodeValue || "").trim() === bank_name;
 	}).remove();
+}
+
+function setup_td4_request(frm) {
+	if (!staff_pro_can("see_td4_forms")) return;
+	if (frm.is_new() || !frappe.model.can_create("TD4 Form")) return;
+	frm.add_custom_button(__("Request TD4"), () => {
+		frappe.call({
+			method: "hrms.hr.doctype.td4_form.td4_form.request_td4",
+			args: { employee: frm.doc.name },
+			freeze: true,
+			freeze_message: __("Sending TD4 request..."),
+			callback(response) {
+				const message = response.message || {};
+				if (!message.name) return;
+				frappe.show_alert({
+					message: message.created
+						? __("TD4 request sent")
+						: __("This agent already has an open TD4 request"),
+					indicator: message.created ? "green" : "blue",
+				});
+				frappe.set_route("Form", "TD4 Form", message.name);
+			},
+		});
+	});
 }

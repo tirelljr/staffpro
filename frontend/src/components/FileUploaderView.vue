@@ -30,12 +30,29 @@
 					:key="index"
 				>
 					<div
-						class="flex flex-row items-center justify-between text-gray-700 text-sm"
+						class="flex flex-row items-center justify-between gap-3 text-gray-700 text-sm"
 					>
-						<span class="grow" @click="showFilePreview(file)">
+						<span class="grow cursor-pointer" @click="showFilePreview(file)">
 							{{ file.file_name || file.name }}
 						</span>
+						<button
+							v-if="allowPrint && file.file_url"
+							type="button"
+							class="shrink-0 text-gray-700 underline"
+							@click.stop="downloadFile(file)"
+						>
+							{{ __("Download") }}
+						</button>
+						<button
+							v-if="allowPrint && file.hr_request"
+							type="button"
+							class="shrink-0 text-gray-700 underline"
+							@click.stop="emit('request-print', file)"
+						>
+							{{ __("Request print") }}
+						</button>
 						<FeatherIcon
+							v-if="canDelete(file)"
 							name="x"
 							class="h-4 w-4 cursor-pointer text-gray-700"
 							@click="() => confirmDeleteAttachment(file)"
@@ -100,12 +117,30 @@ const props = defineProps({
 		type: Object,
 		required: true,
 	},
+	allowPrint: {
+		type: Boolean,
+		default: false,
+	},
 })
 let showDialog = ref(false)
 let showPreviewModal = ref(false)
 let selectedFile = ref({})
 
-const emit = defineEmits(["handle-file-select", "handle-file-delete"])
+const emit = defineEmits(["handle-file-select", "handle-file-delete", "request-print"])
+
+function downloadFile(file) {
+	if (!file?.file_url) return
+	const link = document.createElement("a")
+	link.href = file.file_url
+	link.download = file.file_name || file.name || "document"
+	link.target = "_blank"
+	link.rel = "noopener"
+	link.click()
+}
+
+function canDelete(file) {
+	return file?.can_delete !== false && file?.can_delete !== 0
+}
 
 function showFilePreview(fileObj) {
 	selectedFile.value = fileObj

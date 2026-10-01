@@ -137,6 +137,17 @@ class TestAgentAccess(HRMSTestSuite):
 		with self.assertRaises(frappe.ValidationError):
 			clock("KioskIpDeny", "KioskPass123", "IN")
 
+	def test_clock_out_allowed_off_office_ip(self):
+		_set_ip_restriction(1, OFFICE_IP)
+		employee, _user = _make_agent_user("kiosk.ip.out@example.com", "KioskIpOut")
+		frappe.local.request_ip = OFFICE_IP
+		frappe.set_user("Guest")
+		clock("KioskIpOut", "KioskPass123", "IN")
+		frappe.local.request_ip = OTHER_IP
+		result = clock("KioskIpOut", "KioskPass123", "OUT")
+		self.assertEqual(result["log_type"], "OUT")
+		self.assertEqual(result["employee"], employee)
+
 	def test_clock_allows_office_ip(self):
 		_set_ip_restriction(1, OFFICE_IP)
 		employee, _user = _make_agent_user("kiosk.ip.allow@example.com", "KioskIpAllow")

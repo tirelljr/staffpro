@@ -200,16 +200,15 @@ def apply_bpo_sales_invoice_layout():
 		return
 
 	_hide_fields("Sales Invoice", HIDDEN_SALES_INVOICE_FIELDS)
-	_unrequire_fields(
-		"Sales Invoice",
-		("selling_price_list", "price_list_currency", "plc_conversion_rate"),
-	)
+	_ensure_hidden_series_has_default("Sales Invoice", "naming_series")
+	_unrequire_hidden_fields_without_default("Sales Invoice", HIDDEN_SALES_INVOICE_FIELDS)
 	_relabel_fields("Sales Invoice", SALES_INVOICE_LABELS)
 	_sync_custom_field_labels("Sales Invoice", SALES_INVOICE_LABELS)
 	remove_unused_selling_price_list()
 
 	if frappe.db.exists("DocType", "Sales Invoice Item"):
 		_hide_fields("Sales Invoice Item", HIDDEN_SALES_INVOICE_ITEM_FIELDS)
+		_unrequire_hidden_fields_without_default("Sales Invoice Item", HIDDEN_SALES_INVOICE_ITEM_FIELDS)
 		_relabel_fields("Sales Invoice Item", SALES_INVOICE_ITEM_LABELS)
 
 	frappe.clear_cache(doctype="Sales Invoice")
@@ -232,10 +231,34 @@ def _hide_fields(doctype: str, fieldnames: tuple[str, ...]):
 		)
 
 
-def _unrequire_fields(doctype: str, fieldnames: tuple[str, ...]):
+def _ensure_hidden_series_has_default(doctype: str, fieldname: str):
+	"""Hidden + mandatory fields need a default or DocType validation fails on any custom field save."""
+	meta = frappe.get_meta(doctype)
+	df = meta.get_field(fieldname)
+	if not df:
+		return
+	default = (df.default or "").strip()
+	if not default and df.options:
+		default = str(df.options).split("\n", 1)[0].strip()
+	if not default:
+		default = "ACC-SINV-.YYYY.-"
+	make_property_setter(
+		doctype,
+		fieldname,
+		"default",
+		default,
+		"Text",
+		validate_fields_for_doctype=False,
+	)
+
+
+def _unrequire_hidden_fields_without_default(doctype: str, fieldnames: tuple[str, ...]):
+	"""Hidden + mandatory fields fail DocType validation unless they have a default."""
+	frappe.clear_cache(doctype=doctype)
 	meta = frappe.get_meta(doctype)
 	for fieldname in fieldnames:
-		if not meta.has_field(fieldname):
+		df = meta.get_field(fieldname)
+		if not df or not df.reqd or (df.default or "").strip():
 			continue
 		make_property_setter(
 			doctype,

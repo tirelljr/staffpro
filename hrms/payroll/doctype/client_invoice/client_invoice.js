@@ -10,10 +10,17 @@ frappe.ui.form.on("Client Invoice", {
 
 	refresh(frm) {
 		frm.trigger("toggle_get_agents_button");
+		if (window.hrms?.role_access?.can && !hrms.role_access.can("see_bill_to_client")) {
+			const grid = frm.fields_dict.agents?.grid;
+			if (grid?.update_docfield_property) {
+				grid.update_docfield_property("billing_rate", "hidden", 1);
+			}
+		}
 		frm.set_query("employee", "agents", () => ({
 			filters: {
 				status: "Active",
 				company: frm.doc.company,
+				is_floor_worker: 0,
 				...(frm.doc.customer ? { bill_to_customer: frm.doc.customer } : {}),
 			},
 		}));

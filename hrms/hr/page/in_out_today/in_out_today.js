@@ -25,7 +25,7 @@ frappe.in_out_today = {
 	make(page) {
 		this.page = page;
 		const $existing = page.main.find(".sp-inout-page");
-		if ($existing.length && $existing.find(".sp-dash-inout").length && $existing.find(".sp-clock-btn").length) {
+		if ($existing.length && $existing.find(".sp-dash-inout").length && $existing.find(".sp-clock-btn").length && $existing.find(".sp-inout-dash__table-head span").length >= 6) {
 			this.$body = $existing;
 			this.refresh();
 			return;
@@ -99,7 +99,8 @@ frappe.in_out_today = {
 					<div class="sp-inout-dash__table-head">
 						<span>${this.escape(__("Name"))}</span>
 						<span>${this.escape(__("In / Out"))}</span>
-						<span>${this.escape(__("Time"))}</span>
+						<span>${this.escape(__("Check In"))}</span>
+						<span>${this.escape(__("Check Out"))}</span>
 						<span>${this.escape(__("Job / Pto Code"))}</span>
 						<span>${this.escape(__("Device ID"))}</span>
 					</div>
@@ -130,6 +131,9 @@ frappe.in_out_today = {
 				frappe.set_route("Form", "Employee", employee);
 			}
 		});
+		if (hrms.time && typeof hrms.time.bind_adjustment_actions === "function") {
+			hrms.time.bind_adjustment_actions(this.$body, () => me.refresh());
+		}
 	},
 
 	open_clock() {
@@ -281,6 +285,16 @@ frappe.in_out_today = {
 		return row.status || __("OUT");
 	},
 
+	clock_label(value) {
+		if (!value) {
+			return "—";
+		}
+		if (hrms.time?.format_clock) {
+			return hrms.time.format_clock(value) || value || "—";
+		}
+		return value;
+	},
+
 	status_class(row) {
 		if (row.late) {
 			return "is-late";
@@ -310,22 +324,43 @@ frappe.in_out_today = {
 			rows
 				.map(
 					(row) => `
-				<button type="button" class="sp-inout-dash__row" data-employee="${this.escape(row.employee)}">
-					<span class="sp-inout-dash__agent">
-						<span class="sp-inout-dash__avatar">${this.avatar(row)}</span>
-						<span class="sp-inout-dash__agent-meta">
-							<span class="sp-inout-dash__name">${this.escape(row.employee_name || row.employee || "")}</span>
-							${row.department ? `<span class="sp-inout-dash__dept">${this.escape(row.department)}</span>` : ""}
+				<div class="sp-inout-dash__item">
+					<button type="button" class="sp-inout-dash__row" data-employee="${this.escape(row.employee)}">
+						<span class="sp-inout-dash__agent">
+							<span class="sp-inout-dash__avatar">${this.avatar(row)}</span>
+							<span class="sp-inout-dash__agent-meta">
+								<span class="sp-inout-dash__name">${this.escape(row.employee_name || row.employee || "")}</span>
+								${row.department ? `<span class="sp-inout-dash__dept">${this.escape(row.department)}</span>` : ""}
+							</span>
 						</span>
-					</span>
-					<span class="sp-inout-dash__status-pill ${this.status_class(row)}">${this.escape(this.status_label(row))}</span>
-					<span class="sp-inout-dash__time">${this.escape(row.time || "—")}</span>
-					<span class="sp-inout-dash__pto">${this.escape(row.pto_code || "—")}</span>
-					<span class="sp-inout-dash__device">${this.escape(row.device_id || "—")}</span>
-				</button>
+						<span class="sp-inout-dash__status-pill ${this.status_class(row)}">${this.escape(this.status_label(row))}</span>
+						<span class="sp-inout-dash__time">${this.escape(this.clock_label(row.in_time))}</span>
+						<span class="sp-inout-dash__time">${this.escape(this.clock_label(row.out_time))}</span>
+						<span class="sp-inout-dash__pto">${this.escape(row.pto_code || "—")}</span>
+						<span class="sp-inout-dash__device">${this.escape(row.device_id || "—")}</span>
+					</button>
+					${this.notes_html(row)}
+				</div>
 			`,
 				)
 				.join(""),
 		);
+	},
+
+	notes_html(row) {
+		const comments = (row.comments || [])
+			.slice(0, 2)
+			.map((comment) => {
+				const text = hrms.time?.format_hours_comment
+					? hrms.time.format_hours_comment(comment)
+					: comment.content || "";
+				return `<div class="sp-inout-dash__comment">${this.escape(text)}</div>`;
+			})
+			.join("");
+		const adjustment = hrms.time?.render_adjustment_html ? hrms.time.render_adjustment_html(row.adjustment) : "";
+		if (!comments && !adjustment) {
+			return "";
+		}
+		return `<div class="sp-inout-dash__notes">${comments}${adjustment}</div>`;
 	},
 };

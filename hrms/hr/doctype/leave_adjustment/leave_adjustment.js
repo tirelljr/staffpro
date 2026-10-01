@@ -2,6 +2,9 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Leave Adjustment", {
+	onload(frm) {
+		frm.ignore_doctypes_on_cancel_all = ["Leave Ledger Entry"];
+	},
 	refresh(frm) {
 		hrms.leave_utils.add_view_ledger_button(frm);
 

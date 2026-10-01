@@ -1,9 +1,12 @@
 import { computed, reactive } from "vue"
-import { createResource, call } from "frappe-ui"
+import { createResource, frappeRequest } from "frappe-ui"
+import { frappeFormLogin } from "@/utils/frappeFormLogin"
 import { getDeviceId } from "@/utils/rememberedUsers"
 import { userResource } from "./user"
 import { employeeResource } from "./employee"
 import router from "@/router"
+
+export const PORTAL_HOME_URL = "/agents/dashboard/attendance"
 
 export function sessionUser() {
 	let cookies = new URLSearchParams(document.cookie.split("; ").join("&"))
@@ -14,32 +17,59 @@ export function sessionUser() {
 	return _sessionUser
 }
 
-function handleLogin(response) {
-	if (response.message === "Logged In") {
-		userResource.reload()
-		employeeResource.reload()
+function shouldEnterPortal(response) {
+	if (!response || response.verification) return false
+	if (response.message === "Password Reset") return false
+	if (response.message === "Logged In") return true
+	// Some Frappe builds only return home_page on success.
+	return Boolean(response.home_page)
+}
 
-		session.user = sessionUser()
-		router.replace({ path: "/" })
+function enterPortalAfterLogin(usr) {
+	session.user = sessionUser() || usr
+	// Full navigation so session cookies and router guards load cleanly (Ionic + Frappe).
+	window.location.assign(PORTAL_HOME_URL)
+}
+
+async function resolveKioskLoginUsername(username) {
+	const value = (username || "").trim()
+	if (!value) return value
+	try {
+		const response = await frappeRequest({
+			url: "/api/method/hrms.api.kiosk.resolve_login",
+			method: "GET",
+			params: { username: value },
+		})
+		if (typeof response === "string" && response) return response
+		if (response?.message) return response.message
+		return value
+	} catch {
+		return value
 	}
 }
 
 export const session = reactive({
-	login: async (username, password) => {
-		let usr = username
-		try {
-			const resolved = await call("hrms.api.kiosk.resolve_login", { username })
-			if (resolved) usr = resolved
-		} catch {
-			// Fall back to the typed value; Frappe login still accepts email.
+	login: async (username, password, deviceId) => {
+		const usr = await resolveKioskLoginUsername(username)
+		const response = await frappeFormLogin({
+			usr,
+			pwd: password,
+			device_id: deviceId || getDeviceId(),
+		})
+		if (shouldEnterPortal(response)) {
+			enterPortalAfterLogin(usr)
 		}
-		const response = await call("login", { usr, pwd: password, device_id: getDeviceId() })
-		handleLogin(response)
 		return response
 	},
-	otp: async (tmp_id, otp) => {
-		const response = await call("login", { tmp_id, otp, device_id: getDeviceId() })
-		handleLogin(response)
+	otp: async (tmp_id, otp, deviceId) => {
+		const response = await frappeFormLogin({
+			tmp_id,
+			otp,
+			device_id: deviceId || getDeviceId(),
+		})
+		if (shouldEnterPortal(response)) {
+			enterPortalAfterLogin(session.user)
+		}
 		return response
 	},
 	logout: createResource({

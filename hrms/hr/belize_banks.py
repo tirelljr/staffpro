@@ -241,7 +241,9 @@ def _is_usable_payroll_bank(name: str, company: str) -> bool:
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def payroll_bank_account_query(doctype, txt, searchfield, start, page_len, filters):
+def payroll_bank_account_query(
+	doctype: str, txt: str, searchfield: str, start: int, page_len: int, filters: dict
+):
 	"""Link search for Pay From Bank Account: company-connected banks, no company-account flag."""
 	from frappe.desk.reportview import get_match_cond
 

@@ -5,7 +5,9 @@ import frappe
 from frappe import _
 from frappe.utils import flt, formatdate, get_year_ending, get_year_start, getdate
 
+from hrms.hr.desk_dashboard import _absence_date_label
 from hrms.hr.doctype.leave_application.leave_application import get_employee_leave_approver
+from hrms.hr.pto_anniversary import PTO_LEAVE_TYPE, process_pto_anniversaries
 from hrms.hr.report.employee_leave_balance.employee_leave_balance import get_data as get_leave_balance_data
 from hrms.hr.utils import get_leave_period
 
@@ -80,14 +82,6 @@ def _absence_status_label(status: str | None) -> str:
 	return status or _("—")
 
 
-def _absence_date_label(from_date, to_date) -> str:
-	if not from_date:
-		return ""
-	if from_date == to_date:
-		return formatdate(from_date)
-	return f"{formatdate(from_date)} – {formatdate(to_date)}"
-
-
 def _employee_company(employee: str | None) -> str | None:
 	if employee:
 		return frappe.db.get_value("Employee", employee, "company")
@@ -114,19 +108,41 @@ def _balance_rows(employee: str | None = None) -> list[dict]:
 	for row in get_leave_balance_data(filters) or []:
 		if not row.get("employee"):
 			continue
-		rows.append(
-			{
-				"leave_type": row.get("leave_type"),
-				"employee": row.get("employee"),
-				"employee_name": row.get("employee_name"),
-				"opening_balance": flt(row.get("opening_balance")),
-				"leaves_allocated": flt(row.get("leaves_allocated")),
-				"leaves_taken": flt(row.get("leaves_taken")),
-				"leaves_expired": flt(row.get("leaves_expired")),
-				"closing_balance": flt(row.get("closing_balance")),
-			}
-		)
+		balance = {
+			"leave_type": row.get("leave_type"),
+			"employee": row.get("employee"),
+			"employee_name": row.get("employee_name"),
+			"opening_balance": flt(row.get("opening_balance")),
+			"leaves_allocated": flt(row.get("leaves_allocated")),
+			"leaves_taken": flt(row.get("leaves_taken")),
+			"leaves_expired": flt(row.get("leaves_expired")),
+			"closing_balance": flt(row.get("closing_balance")),
+			"pto_money_value": _money_value(row.get("pto_money_value")),
+		}
+		if balance["leave_type"] != PTO_LEAVE_TYPE and not _has_leave_activity(balance):
+			continue
+		rows.append(balance)
+	rows.sort(key=lambda row: (0 if row["leave_type"] == PTO_LEAVE_TYPE else 1, row["employee_name"] or ""))
 	return rows
+
+
+def _has_leave_activity(row: dict) -> bool:
+	return any(
+		flt(row.get(field))
+		for field in (
+			"opening_balance",
+			"leaves_allocated",
+			"leaves_taken",
+			"leaves_expired",
+			"closing_balance",
+		)
+	)
+
+
+def _money_value(value):
+	if value is None or value == "":
+		return None
+	return flt(value)
 
 
 def _absence_rows(employee: str | None = None, company: str | None = None) -> list[dict]:
@@ -184,8 +200,10 @@ def get_page_context(employee: str | None = None) -> dict:
 	if employee:
 		frappe.has_permission("Employee", "read", employee, throw=True)
 
+	process_pto_anniversaries()
 	company = _employee_company(employee)
 	from_date, to_date = _balance_period(company)
+	currency = frappe.db.get_value("Company", company, "default_currency") if company else None
 	return {
 		"employees": _active_employees(),
 		"leave_types": _leave_types(),
@@ -194,6 +212,7 @@ def get_page_context(employee: str | None = None) -> dict:
 		"from_date": from_date,
 		"to_date": to_date,
 		"period_label": f"{formatdate(from_date)} – {formatdate(to_date)}",
+		"currency": currency,
 	}
 
 

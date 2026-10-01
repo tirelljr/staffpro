@@ -17,7 +17,7 @@
 				>
 					<FeatherIcon name="search" class="h-4 w-4 shrink-0 text-gray-400" />
 					<span class="app-topbar__search-placeholder">
-						{{ __("Search attendance, leaves, expenses, help") }}
+						{{ __("Search attendance, leaves, help") }}
 					</span>
 					<kbd class="app-topbar__shortcut">{{ searchShortcut }}</kbd>
 				</button>
@@ -84,7 +84,7 @@
 					:title="__('Profile')"
 				>
 					<Avatar
-						:image="user.data?.user_image"
+						:image="profileImage"
 						:label="user.data?.first_name || user.data?.full_name"
 						size="xl"
 					/>
@@ -106,7 +106,7 @@
 						ref="searchInput"
 						v-model="query"
 						type="search"
-						:placeholder="__('Search attendance, leaves, expenses, help')"
+						:placeholder="__('Search attendance, leaves, help')"
 						@keydown="onSearchKeydown"
 					/>
 					<kbd class="app-topbar__shortcut">ESC</kbd>
@@ -153,6 +153,9 @@ const __ = inject("$translate")
 const router = useRouter()
 
 const showDeskShortcuts = computed(() => canOpenDesk(user.data))
+const profileImage = computed(
+	() => user.data?.user_image || employee.data?.image || ""
+)
 
 const searchItems = computed(() => {
 	const items = [
@@ -167,6 +170,7 @@ const searchItems = computed(() => {
 		{ title: __("Leave Applications"), group: __("Leaves"), icon: "sun", route: "LeaveApplicationListView" },
 		{ title: __("Requests"), group: __("Requests"), icon: "inbox", route: "HRRequestListView" },
 		{ title: __("Job Letter"), group: __("Requests"), icon: "file-text", route: "HRRequestFormView", query: { request_type: "Job Letter" } },
+		{ title: __("My Documents"), group: __("Account"), icon: "folder", route: "MyDocuments" },
 		{ title: __("Notifications"), group: __("Account"), icon: "bell", route: "Notifications" },
 		{ title: __("Settings"), group: __("Account"), icon: "settings", route: "Settings" },
 		{ title: __("Profile"), group: __("Account"), icon: "user", route: "Profile" },

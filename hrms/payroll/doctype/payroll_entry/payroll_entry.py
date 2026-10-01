@@ -138,6 +138,7 @@ class PayrollEntry(Document):
 	def validate(self):
 		self.number_of_employees = len(self.employees)
 		self.deduct_social_security = 1
+		self.salary_slip_based_on_timesheet = 0
 		self.sync_payment_account_from_bank()
 		self.set_status()
 
@@ -1712,13 +1713,21 @@ def get_employees_for_client(
 	offset=None,
 	ignore_match_conditions=False,
 ) -> list:
-	"""Agents billed to the selected client. Currency and pay period are not used."""
+	"""Agents billed to the selected client who were employed during the pay period."""
 	Employee = frappe.qb.DocType("Employee")
 
 	query = (
 		frappe.qb.from_(Employee)
 		.where((Employee.status != "Inactive") & (Employee.company == filters.company))
 	)
+	if filters.get("end_date"):
+		query = query.where(
+			(Employee.date_of_joining <= filters.end_date) | (Employee.date_of_joining.isnull())
+		)
+	if filters.get("start_date"):
+		query = query.where(
+			(Employee.relieving_date >= filters.start_date) | (Employee.relieving_date.isnull())
+		)
 
 	query = set_fields_to_select(query, fields)
 	query = set_searchfield(query, searchfield, search_string, qb_object=Employee)
@@ -2000,8 +2009,114 @@ def log_payroll_failure(process, payroll_entry, error):
 	payroll_entry.db_set({"error_message": error_message, "status": "Failed"})
 
 
+def joined_after_pay_period(date_of_joining, end_date) -> bool:
+	"""True when the agent's company join date is after the pay period ends."""
+	if not date_of_joining or not end_date:
+		return False
+	return getdate(date_of_joining) > getdate(end_date)
+
+
+def _joining_dates_for(employees) -> dict:
+	employees = [name for name in (employees or []) if name]
+	if not employees:
+		return {}
+	rows = frappe.get_all(
+		"Employee",
+		filters={"name": ("in", employees)},
+		fields=["name", "date_of_joining"],
+	)
+	return {row.name: row.date_of_joining for row in rows}
+
+
+def agents_joining_after_period(employees, end_date) -> list[dict]:
+	"""Agents on this payroll whose company join date is after the pay period."""
+	if isinstance(employees, str):
+		employees = frappe.parse_json(employees) or []
+	employees = [name for name in (employees or []) if name]
+	if not employees or not end_date:
+		return []
+	rows = frappe.get_all(
+		"Employee",
+		filters={"name": ("in", employees)},
+		fields=["name", "employee_name", "date_of_joining"],
+		order_by="employee_name asc",
+	)
+	late = []
+	for row in rows:
+		if not joined_after_pay_period(row.date_of_joining, end_date):
+			continue
+		late.append(
+			{
+				"employee": row.name,
+				"employee_name": row.employee_name or row.name,
+				"date_of_joining": str(getdate(row.date_of_joining)),
+			}
+		)
+	return late
+
+
+@frappe.whitelist()
+def get_agents_joining_after_period(employees=None, end_date=None):
+	if not frappe.has_permission("Payroll Entry", "read"):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
+	return agents_joining_after_period(employees, end_date)
+
+
+def employee_force_included(payroll_entry: str | None, employee: str | None) -> bool:
+	if not payroll_entry or not employee:
+		return False
+	if not frappe.get_meta("Payroll Employee Detail").has_field("force_include"):
+		return False
+	return bool(
+		cint(
+			frappe.db.get_value(
+				"Payroll Employee Detail",
+				{"parent": payroll_entry, "parenttype": "Payroll Entry", "employee": employee},
+				"force_include",
+			)
+		)
+	)
+
+
+@frappe.whitelist()
+def set_agents_force_included(payroll_entry: str, employees=None):
+	"""Mark submitted-payroll agents to pay even though they joined after the period."""
+	if not frappe.has_permission("Payroll Entry", "write"):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
+	if isinstance(employees, str):
+		employees = frappe.parse_json(employees) or []
+	forced = {name for name in (employees or []) if name}
+	doc = frappe.get_doc("Payroll Entry", payroll_entry)
+	if not frappe.get_meta("Payroll Employee Detail").has_field("force_include"):
+		frappe.throw(_("Reload after migrate so payroll can force-add agents who joined late."))
+	for row in doc.employees:
+		if not row.employee or not row.name or row.employee not in forced:
+			continue
+		if cint(row.force_include):
+			continue
+		frappe.db.set_value(
+			"Payroll Employee Detail", row.name, "force_include", 1, update_modified=False
+		)
+	return {"force_included": sorted(forced)}
+
+
+def _error_text(error) -> str:
+	parts = [str(error or "")]
+	for entry in list(getattr(frappe, "message_log", None) or []):
+		if isinstance(entry, dict):
+			parts.append(str(entry.get("message") or ""))
+		else:
+			parts.append(str(entry))
+	return "\n".join(parts).lower()
+
+
+def _is_outside_payroll_period_error(error) -> bool:
+	message = error.lower() if isinstance(error, str) else _error_text(error)
+	return "joining after payroll period" in message or "left before payroll period" in message
+
+
 def _is_missing_salary_structure_error(error) -> bool:
-	message = str(error).lower()
+	message = error.lower() if isinstance(error, str) else _error_text(error)
 	if "salary structure" not in message:
 		return False
 	return any(
@@ -2054,14 +2169,32 @@ def create_salary_slips_for_employees(employees, args, publish_progress=True):
 		salary_slips_exist_for = get_existing_salary_slips(employees, args)
 		count = 0
 		skipped = []
+		skipped_period = []
 
 		employees = list(set(employees) - set(salary_slips_exist_for))
+		joining_dates = _joining_dates_for(employees)
+		use_employee_frequency = bool(getattr(frappe.flags, "payroll_use_employee_frequency", False))
+		employee_frequency = None
+		if use_employee_frequency:
+			from hrms.payroll.auto_payroll import payroll_frequency_for_employee
+
+			employee_frequency = payroll_frequency_for_employee
 		for emp in employees:
+			joined_after = joined_after_pay_period(joining_dates.get(emp), args.get("end_date"))
+			allow_late_joining = joined_after and employee_force_included(args.get("payroll_entry"), emp)
+			if joined_after and not allow_late_joining:
+				skipped_period.append(emp)
+				continue
+			frequency = args.get("payroll_frequency")
+			if employee_frequency:
+				frequency = (
+					employee_frequency(emp, args.get("start_date"), args.get("end_date")) or frequency
+				)
 			slip_args = {
 				"doctype": "Salary Slip",
 				"employee": emp,
 				"salary_slip_based_on_timesheet": args.get("salary_slip_based_on_timesheet"),
-				"payroll_frequency": args.get("payroll_frequency"),
+				"payroll_frequency": frequency,
 				"start_date": args.get("start_date"),
 				"end_date": args.get("end_date"),
 				"company": args.get("company"),
@@ -2074,16 +2207,24 @@ def create_salary_slips_for_employees(employees, args, publish_progress=True):
 				"currency": args.get("currency"),
 			}
 			frappe.db.savepoint("before_salary_slip")
+			previous_late_flag = getattr(frappe.flags, "ignore_joining_after_period", False)
+			if allow_late_joining:
+				frappe.flags.ignore_joining_after_period = True
 			try:
 				frappe.get_doc(slip_args).insert()
 			except Exception as e:
 				frappe.db.rollback(save_point="before_salary_slip")
-				if _is_missing_salary_structure_error(e):
+				if _is_missing_salary_structure_error(e) or _is_outside_payroll_period_error(e):
 					if frappe.message_log:
 						frappe.message_log.pop()
-					skipped.append(emp)
+					if _is_outside_payroll_period_error(e):
+						skipped_period.append(emp)
+					else:
+						skipped.append(emp)
 					continue
 				raise
+			finally:
+				frappe.flags.ignore_joining_after_period = previous_late_flag
 
 			count += 1
 			if publish_progress and employees:
@@ -2092,7 +2233,16 @@ def create_salary_slips_for_employees(employees, args, publish_progress=True):
 					title=_("Creating Salary Slips..."),
 				)
 
-		skip_message = _skipped_salary_structure_message(skipped) if skipped else ""
+		skip_parts = []
+		if skipped:
+			skip_parts.append(_skipped_salary_structure_message(skipped))
+		if skipped_period:
+			skip_parts.append(
+				_("Skipped {0}. They joined after this pay period or left before it.").format(
+					comma_and(_employee_skip_labels(skipped_period))
+				)
+			)
+		skip_message = " ".join(skip_parts)
 		payroll_entry.db_set(
 			{
 				"status": "Submitted",
@@ -2103,6 +2253,14 @@ def create_salary_slips_for_employees(employees, args, publish_progress=True):
 
 		if skipped:
 			_notify_skipped_salary_structures(payroll_entry, skipped)
+		if skipped_period:
+			frappe.msgprint(
+				_("Skipped {0}. They joined after this pay period or left before it.").format(
+					comma_and([frappe.bold(label) for label in _employee_skip_labels(skipped_period)])
+				),
+				title=_("Outside Pay Period"),
+				indicator="orange",
+			)
 
 		if salary_slips_exist_for:
 			frappe.msgprint(
@@ -2247,7 +2405,9 @@ def _link_row_is_field(row, fieldname: str) -> bool:
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def payroll_client_query(doctype, txt, searchfield, start, page_len, filters):
+def payroll_client_query(
+	doctype: str, txt: str, searchfield: str, start: int, page_len: int, filters: dict
+):
 	"""Optional client filter. Leave blank to include every agent."""
 	start = cint(start)
 	page_len = cint(page_len)
@@ -2452,6 +2612,7 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 	slips = _get_excel_salary_slips(entry)
 	working_by_employee = _working_hours_by_employee(entry)
 	overtime_by_employee = _overtime_hours_by_employee(entry)
+	ordinary_overtime_by_employee = _ordinary_overtime_hours_by_employee(entry)
 	holiday_hours_by_employee = _holiday_hours_by_employee(entry)
 	holiday_pay_by_employee = _holiday_pay_by_employee(entry)
 	bonus_by_slip = _bonus_by_salary_slip([row.name for row in slips])
@@ -2473,7 +2634,6 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 			slip.total_working_hours,
 			working_by_employee,
 			overtime_by_employee,
-			prefer_attendance=not flt(slip.hour_rate),
 		)
 		hourly_rate = _excel_hourly_rate(slip, rate_by_employee.get(slip.employee))
 		holiday_pay = flt(holiday_pay_by_employee.get(slip.employee))
@@ -2488,10 +2648,15 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 			bonus,
 			employee=slip.employee,
 			holiday_hours=holiday_hours,
+			payable_regular_hours=regular_hours
+			+ max(overtime_hours - flt(ordinary_overtime_by_employee.get(slip.employee)), 0),
+			payable_overtime_hours=ordinary_overtime_by_employee.get(slip.employee),
 		)
-		ee_period, er_period = _slip_social_amounts(slip)
+		ee_period, er_period, wage_band, insurable, income_tax = _excel_statutory(
+			entry, slip.employee, gross_pay, slip
+		)
 		ee_ytd, er_ytd = ytd_social_by_employee.get(slip.employee) or (ee_period, er_period)
-		net_pay = _excel_net_pay(slip, gross_pay)
+		net_pay = _excel_net_pay(slip, gross_pay, income_tax=income_tax, employee_ss=ee_period)
 		rows.append(
 			{
 				"employee": slip.employee,
@@ -2504,9 +2669,9 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 				"hourly_rate": hourly_rate,
 				"bonus": bonus,
 				"gross_pay": gross_pay,
-				"income_tax_wh": _slip_income_tax(slip),
-				"wage_band": slip.ss_wage_band or "",
-				"weekly_insurable_earnings": flt(slip.ss_insurable_earnings),
+				"income_tax_wh": income_tax,
+				"wage_band": wage_band or slip.ss_wage_band or "",
+				"weekly_insurable_earnings": insurable if insurable else flt(slip.ss_insurable_earnings),
 				"employee_social_security": ee_ytd,
 				"employer_social_security": er_ytd,
 				"pay_period_ee_social": ee_period,
@@ -2520,13 +2685,11 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 		if emp.employee in seen:
 			continue
 		agent_name = _payroll_agent_name(emp.employee, emp.employee_name, names_by_id)
-		ee_ytd, er_ytd = ytd_social_by_employee.get(emp.employee) or (0.0, 0.0)
 		overtime_hours, regular_hours = _excel_hours_for_employee(
 			emp.employee,
 			0,
 			working_by_employee,
 			overtime_by_employee,
-			prefer_attendance=True,
 		)
 		hourly_rate = flt(rate_by_employee.get(emp.employee))
 		holiday_pay = flt(holiday_pay_by_employee.get(emp.employee))
@@ -2540,7 +2703,14 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 			0,
 			employee=emp.employee,
 			holiday_hours=holiday_hours,
+			payable_regular_hours=regular_hours
+			+ max(overtime_hours - flt(ordinary_overtime_by_employee.get(emp.employee)), 0),
+			payable_overtime_hours=ordinary_overtime_by_employee.get(emp.employee),
 		)
+		ee_period, er_period, wage_band, insurable, income_tax = _excel_statutory(
+			entry, emp.employee, gross_pay
+		)
+		ee_ytd, er_ytd = ytd_social_by_employee.get(emp.employee) or (ee_period, er_period)
 		rows.append(
 			{
 				"employee": emp.employee,
@@ -2553,14 +2723,14 @@ def get_payroll_excel_data(name: str | None = None) -> dict:
 				"hourly_rate": hourly_rate,
 				"bonus": 0,
 				"gross_pay": gross_pay,
-				"income_tax_wh": 0,
-				"wage_band": "",
-				"weekly_insurable_earnings": 0,
+				"income_tax_wh": income_tax,
+				"wage_band": wage_band,
+				"weekly_insurable_earnings": insurable,
 				"employee_social_security": ee_ytd,
 				"employer_social_security": er_ytd,
-				"pay_period_ee_social": 0,
-				"pay_period_er_social": 0,
-				"net_pay": gross_pay,
+				"pay_period_ee_social": ee_period,
+				"pay_period_er_social": er_period,
+				"net_pay": _excel_net_pay(None, gross_pay, income_tax=income_tax, employee_ss=ee_period),
 			}
 		)
 
@@ -2597,7 +2767,7 @@ def save_payroll_excel_cell(
 	name: str | None = None,
 	employee: str | None = None,
 	field: str | None = None,
-	value=None,
+	value: str | int | float | None = None,
 ) -> dict:
 	"""Persist one editable spreadsheet cell to the agent's draft salary slip."""
 	name = name or frappe.form_dict.get("name")
@@ -2997,16 +3167,38 @@ def _excel_hours_for_employee(
 	slip_total_hours,
 	working_by_employee: dict[str, float],
 	overtime_by_employee: dict[str, float],
-	prefer_attendance: bool = False,
+	prefer_attendance: bool = True,
 ) -> tuple[float, float]:
-	"""Return (overtime_hours, regular_hours) for the spreadsheet row."""
+	"""Return (overtime_hours, regular_hours) for the spreadsheet row.
+
+	Attendance is the source of truth, including an approved-hours cut. A typed
+	week total of 37 replaces a slip that still says 40.
+	"""
+	from hrms.hr.doctype.overtime_slip.overtime_slip import (
+		DEFAULT_OVERTIME_THRESHOLD_HOURS,
+		get_employee_overtime_threshold,
+	)
+
 	overtime_hours = flt(overtime_by_employee.get(employee))
 	attendance_hours = flt(working_by_employee.get(employee))
-	if prefer_attendance:
-		total_hours = attendance_hours or flt(slip_total_hours)
+	slip_hours = flt(slip_total_hours)
+	if prefer_attendance and attendance_hours:
+		total_hours = attendance_hours
+	elif prefer_attendance:
+		total_hours = slip_hours
 	else:
-		total_hours = flt(slip_total_hours) or attendance_hours
-	regular_hours = max(total_hours - overtime_hours, 0.0) if total_hours else 0.0
+		total_hours = slip_hours or attendance_hours
+	threshold = (
+		flt(get_employee_overtime_threshold(employee)) if employee else DEFAULT_OVERTIME_THRESHOLD_HOURS
+	)
+	if total_hours <= threshold:
+		return 0.0, total_hours
+	overtime_hours = min(overtime_hours, max(total_hours - threshold, 0.0))
+	regular_hours = max(total_hours - overtime_hours, 0.0)
+	if overtime_hours and regular_hours < threshold:
+		shift = min(overtime_hours, threshold - regular_hours)
+		regular_hours += shift
+		overtime_hours -= shift
 	return overtime_hours, regular_hours
 
 
@@ -3046,6 +3238,8 @@ def _excel_gross_pay(
 	bonus,
 	employee: str | None = None,
 	holiday_hours: float = 0,
+	payable_regular_hours: float | None = None,
+	payable_overtime_hours: float | None = None,
 ) -> float:
 	from hrms.payroll.hourly_gross import (
 		compute_hourly_gross_pay,
@@ -3068,8 +3262,12 @@ def _excel_gross_pay(
 		# Holiday hours are already in regular hours; only add holiday premium / unworked statutory pay.
 		holiday_extra = flt(holiday_pay) - flt(holiday_hours) * flt(hourly_rate)
 		return compute_hourly_gross_pay(
-			regular_hours=regular_hours,
-			overtime_hours=overtime_hours,
+			regular_hours=(
+				regular_hours if payable_regular_hours is None else payable_regular_hours
+			),
+			overtime_hours=(
+				overtime_hours if payable_overtime_hours is None else payable_overtime_hours
+			),
 			hourly_rate=hourly_rate,
 			holiday_pay=max(holiday_extra, 0),
 			bonus=bonus,
@@ -3077,83 +3275,199 @@ def _excel_gross_pay(
 	return flt(getattr(slip, "gross_pay", 0) if slip else 0)
 
 
-def _excel_net_pay(slip, gross_pay) -> float:
-	if not slip:
-		return flt(gross_pay)
-	deductions = flt(getattr(slip, "total_deduction", 0))
-	if not deductions and flt(slip.gross_pay):
-		deductions = flt(slip.gross_pay) - flt(slip.net_pay)
-	return flt(flt(gross_pay) - deductions, 2)
+def _excel_net_pay(slip, gross_pay, income_tax=None, employee_ss=None) -> float:
+	"""Net is always gross minus employee deductions; never copy gross as net."""
+	gross = flt(gross_pay)
+	if gross <= 0:
+		return 0.0
+
+	tax = flt(income_tax) if income_tax is not None else (_slip_income_tax(slip) if slip else 0.0)
+	ss_amount = flt(employee_ss)
+	if employee_ss is None and slip:
+		ss_amount = flt(getattr(slip, "ss_employee_amount", 0))
+
+	other = 0.0
+	loans = 0.0
+	if slip:
+		loans = flt(slip.get("total_loan_repayment")) if hasattr(slip, "get") else flt(
+			getattr(slip, "total_loan_repayment", 0)
+		)
+		slip_deductions = flt(getattr(slip, "total_deduction", 0))
+		other = max(
+			slip_deductions - flt(getattr(slip, "ss_employee_amount", 0)) - _slip_income_tax(slip),
+			0.0,
+		)
+
+	return flt(gross - tax - ss_amount - other - loans, 2)
+
+
+def _excel_statutory(entry, employee: str, gross_pay, slip=None) -> tuple[float, float, str, float, float]:
+	"""Employee/employer SS, wage band, insurable earnings, and income tax for the spreadsheet gross."""
+	from hrms.payroll.social_security import calculate_contribution, get_active_contribution_table
+
+	gross = flt(gross_pay)
+	frequency = getattr(entry, "payroll_frequency", None) or (getattr(slip, "payroll_frequency", None) if slip else None)
+	start_date = getattr(entry, "start_date", None)
+	end_date = getattr(entry, "end_date", None)
+	company = getattr(entry, "company", None)
+
+	table = get_active_contribution_table(company, end_date or start_date)
+	bands = table.bands if table else None
+	injury_employee = flt(table.injury_only_employee_amount) if table else 0.0
+	injury_employer = flt(table.injury_only_employer_amount) if table else 2.60
+
+	emp_fields = ["date_of_birth"]
+	meta = frappe.get_meta("Employee")
+	if meta.has_field("receiving_ss_benefit"):
+		emp_fields.append("receiving_ss_benefit")
+	emp = frappe.db.get_value("Employee", employee, emp_fields, as_dict=True) or {}
+
+	contribution = calculate_contribution(
+		gross_pay=gross,
+		payroll_frequency=frequency or "Fortnightly",
+		start_date=start_date,
+		end_date=end_date,
+		date_of_birth=emp.get("date_of_birth"),
+		receiving_ss_benefit=bool(emp.get("receiving_ss_benefit")),
+		bands=bands,
+		injury_only_employee_amount=injury_employee,
+		injury_only_employer_amount=injury_employer,
+	)
+	ee_ss = flt(contribution.get("employee_amount"))
+	er_ss = flt(contribution.get("employer_amount"))
+	wage_band = contribution.get("wage_band") or ""
+	insurable = flt(contribution.get("insurable_earnings"))
+
+	tax = _slip_income_tax(slip) if slip else 0.0
+	if not tax and gross > 0:
+		tax = _period_income_tax(
+			employee,
+			end_date or start_date,
+			gross,
+			frequency or "Fortnightly",
+			start_date,
+			end_date,
+		)
+
+	return ee_ss, er_ss, wage_band, insurable, tax
+
+
+def _period_income_tax(employee, on_date, gross_pay, frequency, start_date, end_date) -> float:
+	from hrms.payroll.daily_pay import get_assignment
+	from hrms.payroll.social_security import contribution_weeks, weekly_earnings_from_gross
+
+	weekly = weekly_earnings_from_gross(gross_pay, frequency)
+	if weekly <= 0:
+		return 0.0
+
+	weekly_tax = 0.0
+	assignment = get_assignment(employee, on_date)
+	slab_name = assignment.income_tax_slab if assignment else None
+	if slab_name:
+		from hrms.payroll.doctype.income_tax_slab.income_tax_slab import calculate_tax_by_tax_slab
+
+		tax_slab = frappe.get_cached_doc("Income Tax Slab", slab_name)
+		annual_tax, _other = calculate_tax_by_tax_slab(weekly * 52.0, tax_slab)
+		weekly_tax = flt(flt(annual_tax) / 52.0, 2)
+	if not weekly_tax:
+		weekly_tax = _belize_weekly_tax(weekly)
+	weeks = contribution_weeks(frequency, start_date, end_date)
+	return flt(weekly_tax * weeks, 2)
+
+
+def _belize_weekly_tax(weekly_pay: float) -> float:
+	"""PAYE for a week of earnings when the agent has no assigned tax slab."""
+	if flt(weekly_pay) <= 0:
+		return 0.0
+	from hrms.regional.belize.utils import calculate_tax_by_tax_slab
+
+	annual_tax, _other = calculate_tax_by_tax_slab(
+		flt(weekly_pay) * 52.0,
+		frappe._dict(tax_relief_limit=None),
+	)
+	return flt(flt(annual_tax) / 52.0, 2)
+
+
+def _scaled_period_attendance(entry, fields: list[str]) -> list:
+	from hrms.payroll.daily_pay import apply_approved_week_hours
+
+	rows = _period_attendance(entry, fields, include_draft=True)
+	grouped: dict[str, list] = {}
+	for row in rows:
+		if row.get("employee"):
+			grouped.setdefault(row.employee, []).append(row)
+	for employee, emp_rows in grouped.items():
+		apply_approved_week_hours(employee, emp_rows)
+	return rows
 
 
 def _holiday_hours_by_employee(entry) -> dict[str, float]:
 	from hrms.payroll.daily_pay import ensure_working_hours_from_times, get_public_holiday_pay_context
 
 	hours: dict[str, float] = {}
-	fields = ["employee", "attendance_date", "working_hours", "status"]
+	fields = ["name", "employee", "attendance_date", "working_hours", "status", "daily_pay"]
 	if frappe.db.has_column("Attendance", "in_time"):
 		fields += ["in_time", "out_time"]
-	for row in _period_attendance(entry, fields, include_draft=True):
-		if (row.get("status") or "") == "Absent":
-			continue
+	for row in _scaled_period_attendance(entry, fields):
 		if not get_public_holiday_pay_context(row.employee, row.attendance_date):
 			continue
 		worked = flt(row.working_hours) or flt(ensure_working_hours_from_times(row))
+		if worked <= 0 and flt(row.get("daily_pay")) > 0 and not row.get("_week_override"):
+			worked = 8.0
 		hours[row.employee] = hours.get(row.employee, 0) + worked
 	return hours
 
 
 def _working_hours_by_employee(entry) -> dict[str, float]:
 	"""Attendance hours per agent for the pay period (draft or submitted)."""
-	from hrms.payroll.daily_pay import ensure_working_hours_from_times
+	from hrms.payroll.daily_pay import ensure_working_hours_from_times, get_public_holiday_pay_context
 
 	hours: dict[str, float] = {}
-	fields = ["employee", "working_hours", "status"]
+	fields = ["name", "employee", "attendance_date", "working_hours", "status", "daily_pay"]
 	if frappe.db.has_column("Attendance", "in_time"):
 		fields += ["in_time", "out_time"]
-	for row in _period_attendance(entry, fields, include_draft=True):
-		if (row.get("status") or "") == "Absent":
+	for row in _scaled_period_attendance(entry, fields):
+		is_holiday = bool(get_public_holiday_pay_context(row.employee, row.attendance_date))
+		if (row.get("status") or "") == "Absent" and not is_holiday:
 			continue
 		worked = flt(row.working_hours) or flt(ensure_working_hours_from_times(row))
+		if is_holiday and worked <= 0 and flt(row.get("daily_pay")) > 0 and not row.get("_week_override"):
+			worked = 8.0
 		hours[row.employee] = hours.get(row.employee, 0) + worked
 	return hours
 
 
 def _overtime_hours_by_employee(entry) -> dict[str, float]:
-	"""Overtime hours per agent, preferring Overtime Slip detail rows over attendance."""
-	hours: dict[str, float] = {}
-	slips = frappe.get_all(
-		"Overtime Slip",
-		filters={"payroll_entry": entry.name, "docstatus": ("<", 2)},
-		fields=["name", "employee", "total_overtime_duration"],
-	)
+	"""Total threshold overtime per agent, including holiday hours above the threshold."""
+	return _threshold_overtime_hours_by_employee(entry, "total_overtime_duration")
 
-	if slips:
-		employee_by_slip = {row.name: row.employee for row in slips}
-		details = frappe.get_all(
-			"Overtime Details",
-			filters={"parent": ("in", list(employee_by_slip))},
-			fields=["parent", "overtime_duration"],
+
+def _ordinary_overtime_hours_by_employee(entry) -> dict[str, float]:
+	"""Ordinary OT eligible for the global OT multiplier (holiday premium is separate)."""
+	return _threshold_overtime_hours_by_employee(entry, "ordinary_overtime_duration")
+
+
+def _threshold_overtime_hours_by_employee(entry, result_field: str) -> dict[str, float]:
+	from hrms.hr.doctype.overtime_slip.overtime_slip import get_pay_period_overtime
+
+	employees = {row.employee for row in (entry.employees or []) if row.employee}
+	if not employees:
+		employees = set(
+			frappe.get_all(
+				"Attendance",
+				filters={
+					"attendance_date": ("between", [entry.start_date, entry.end_date]),
+					"docstatus": ("<", 2),
+				},
+				pluck="employee",
+			)
 		)
-		if details:
-			for detail in details:
-				employee = employee_by_slip.get(detail.parent)
-				if employee:
-					hours[employee] = hours.get(employee, 0) + flt(detail.overtime_duration)
-			return hours
-
-		for slip in slips:
-			hours[slip.employee] = hours.get(slip.employee, 0) + flt(slip.total_overtime_duration)
-		return hours
-
-	ot_field = (
-		["employee", "actual_overtime_duration"]
-		if frappe.db.has_column("Attendance", "actual_overtime_duration")
-		else ["employee"]
-	)
-	for row in _period_attendance(entry, ot_field, include_draft=True):
-		hours[row.employee] = hours.get(row.employee, 0) + flt(row.get("actual_overtime_duration"))
-	return hours
+	return {
+		employee: flt(
+			get_pay_period_overtime(employee, entry.start_date, entry.end_date)[result_field]
+		)
+		for employee in employees
+	}
 
 
 def _holiday_pay_by_employee(entry) -> dict[str, float]:

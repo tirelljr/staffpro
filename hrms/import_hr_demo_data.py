@@ -72,6 +72,8 @@ SHIFT_NAME = "Day Shift"
 SALARY_STRUCTURE = "Staff Pro Weekly"
 BASIC_COMPONENT = HOURLY_BASIC_COMPONENT
 LEAVE_OPEN_PAY_PERIODS = 1
+DEMO_PAYROLL_FREQUENCY = "Fortnightly"
+DEMO_PAYROLL_WORKING_DAYS = 10
 
 HOUR_RATES = {
 	"HR Manager": 24.0,
@@ -135,6 +137,18 @@ CLIENT_ASSIGNMENTS = {
 	"isabella.morales@staffpro.local": "Caribbean Collections",
 	"luis.herrera@staffpro.local": "Caribbean Collections",
 }
+
+# Extra hours past the 80h pay-period threshold. Blank threshold → HR Settings default (80).
+DEMO_OT_PROFILES = {
+	"carlos.mendoza@staffpro.local": {"extra_hours": 8, "work_holiday": True},
+	"sofia.reyes@staffpro.local": {"extra_hours": 8, "work_holiday": True},
+	"james.rivera@staffpro.local": {"extra_hours": 8, "work_holiday": True},
+	"miguel.torres@staffpro.local": {"extra_hours": 8, "work_holiday": False},
+}
+
+STANDARD_DAY_PUNCHES = [("08:00:00", "IN"), ("12:00:00", "OUT"), ("13:00:00", "IN"), ("17:00:00", "OUT")]
+OVERTIME_DAY_PUNCHES = [("08:00:00", "IN"), ("12:00:00", "OUT"), ("13:00:00", "IN"), ("19:00:00", "OUT")]
+HOLIDAY_WORK_PUNCHES = [("09:00:00", "IN"), ("17:00:00", "OUT")]
 
 # Paid-to bank on each demo employee (Belize banks + unique account numbers).
 DEMO_BANK_ACCOUNTS = {
@@ -202,34 +216,20 @@ def run(company=None):
 
 
 def clear(company=None):
+	from hrms.hr.employee_cleanup import delete_demo_employees
+
 	company = company or _get_company()
-	frappe.only_for("System Manager")
+	result = delete_demo_employees(company)
 
-	for doctype in (
-		"Employee Checkin",
-		"Attendance",
-		"Leave Application",
-		"Leave Allocation",
-		"Job Applicant",
-		"Job Opening",
-		"Employee",
-	):
-		names = frappe.get_all(doctype, pluck="name")
-		if frappe.get_meta(doctype).has_field("company"):
-			names = frappe.get_all(doctype, filters={"company": company}, pluck="name")
-		for name in names:
-			if doctype == "Employee" and frappe.db.get_value("Employee", name, "company_email") not in {
-				e["email"] for e in EMPLOYEES
-			}:
-				continue
-			frappe.delete_doc(doctype, name, force=True, ignore_permissions=True)
-
-	for email in [e["email"] for e in EMPLOYEES]:
-		if frappe.db.exists("User", email):
-			frappe.delete_doc("User", email, force=True, ignore_permissions=True)
+	for doctype in ("Job Applicant", "Job Opening"):
+		if not frappe.db.exists("DocType", doctype):
+			continue
+		filters = {"company": company} if frappe.get_meta(doctype).has_field("company") else {}
+		for name in frappe.get_all(doctype, filters=filters, pluck="name"):
+			_force_delete_doc(doctype, name)
 
 	frappe.db.commit()
-	print(f"Cleared HR demo data for {company}.")
+	print(f"Cleared HR demo data for {company}: removed {result.get('count', 0)} agents.")
 
 
 PAYROLL_RUN_DOCTYPES = (
@@ -246,10 +246,47 @@ PAYROLL_RUN_DOCTYPES = (
 )
 
 
+def reseed_payroll(company=None):
+	"""Drop old payroll runs and rebuild them from the current overtime rules."""
+	company = company or _get_company()
+	clear_payroll(company)
+	was_importing = frappe.flags.in_import
+	frappe.flags.in_import = True
+	frappe.flags.skip_payroll_enqueue = True
+	try:
+		employee_map = _demo_employee_map(company)
+		if not employee_map:
+			print("No demo employees found. Run import_hr_demo_data.run() first.")
+			return
+		_configure_demo_payroll_settings(company)
+		try:
+			_ensure_salary_structure(company, employee_map)
+		except Exception:
+			frappe.log_error(title="Demo salary structure failed")
+		ot_demo = seed_overtime_and_holiday_demo(company, ensure_payroll_entry=False)
+		payroll = _seed_demo_payroll(company, list(employee_map.values()))
+		try:
+			invoices = _seed_demo_invoices(company, _create_demo_clients(company))
+		except Exception:
+			frappe.log_error(title="Demo invoice seed failed")
+			invoices = 0
+		_prepare_run_payroll_window(company)
+		if ot_demo is None:
+			ot_demo = {}
+		ot_demo["payroll_entry"] = _ensure_open_payroll_entry(company)
+		if not frappe.flags.in_test:
+			frappe.db.commit()
+		status(company)
+		return {"payroll": payroll, "invoices": invoices, "ot_demo": ot_demo}
+	finally:
+		frappe.flags.in_import = was_importing
+
+
 def clear_payroll(company=None):
 	"""Remove payroll run documents so a fresh payroll can be tested."""
 	company = company or _get_company()
-	frappe.only_for("System Manager")
+	if not frappe.flags.in_patch:
+		frappe.only_for("System Manager")
 
 	deleted = {}
 	for doctype in PAYROLL_RUN_DOCTYPES:
@@ -1083,7 +1120,402 @@ def _set_default_company(company):
 	frappe.db.set_default("company", company)
 
 
+def seed_overtime_and_holiday_demo(company=None, ensure_payroll_entry=True):
+	"""Clock hours that cross the pay-period OT threshold (80h / 10 working days)."""
+	from hrms.hr.belize_holidays import add_belize_holidays_to_list
+	from hrms.hr.doctype.overtime_slip.overtime_slip import get_pay_period_overtime
+	from hrms.hr.staff_pro_holiday_list import DEFAULT_HOLIDAY_LIST
+	from hrms.payroll.daily_pay import (
+		calculate_holiday_daily_pay,
+		get_hour_rate,
+		get_public_holiday_pay_context,
+	)
+
+	company = company or _get_company()
+	if not company:
+		print("No company found. Cannot seed overtime demo.")
+		return {"employees": 0}
+
+	_ensure_holiday_list(company)
+	if frappe.db.exists("Holiday List", DEFAULT_HOLIDAY_LIST):
+		add_belize_holidays_to_list(DEFAULT_HOLIDAY_LIST)
+		holiday_meta = frappe.get_meta("Holiday List")
+		holiday_values = {}
+		if holiday_meta.has_field("pay_time_and_a_half"):
+			holiday_values["pay_time_and_a_half"] = 1
+		if holiday_meta.has_field("pay_double_time"):
+			holiday_values["pay_double_time"] = 0
+		if holiday_values:
+			frappe.db.set_value(
+				"Holiday List", DEFAULT_HOLIDAY_LIST, holiday_values, update_modified=False
+			)
+
+	hr_meta = frappe.get_meta("HR Settings")
+	hr_values = {}
+	if hr_meta.has_field("overtime_threshold_hours"):
+		hr_values["overtime_threshold_hours"] = 90
+	if hr_meta.has_field("overtime_pay_multiplier"):
+		hr_values["overtime_pay_multiplier"] = 1.5
+	if hr_values:
+		frappe.db.set_single_value("HR Settings", hr_values, update_modified=False)
+
+	employee_map = _demo_employee_map(company)
+	_apply_employee_bpo_fields(company, employee_map)
+
+	today = getdate()
+	holiday_date = _st_georges_caye_day(today.year) or getdate(f"{today.year}-09-10")
+	periods = _pay_period_bounds(as_of=today, completed_only=False)
+	open_period = _open_pay_period()
+	holiday_period = _pay_period_containing(holiday_date)
+	summaries = []
+	painted_from = periods[0][0] if periods else today
+
+	for email, employee in employee_map.items():
+		profile = DEMO_OT_PROFILES.get(email) or {"extra_hours": 0, "work_holiday": False}
+		for start, end in periods:
+			days = _weekdays_between(start, min(end, today))
+			ot_days = _ot_extra_days(
+				days, holiday_date, extra_hours=profile.get("extra_hours")
+			)
+			for day in days:
+				try:
+					if day == holiday_date:
+						if profile["work_holiday"]:
+							_upsert_ot_demo_day(employee, company, day, 8, HOLIDAY_WORK_PUNCHES)
+						else:
+							_upsert_ot_demo_day(
+								employee, company, day, 0, punches=None, unworked_holiday=True
+							)
+						continue
+					if day in ot_days:
+						_upsert_ot_demo_day(employee, company, day, 10, OVERTIME_DAY_PUNCHES)
+					else:
+						_upsert_ot_demo_day(employee, company, day, 8, STANDARD_DAY_PUNCHES)
+				except Exception:
+					frappe.log_error(title=f"OT demo day failed {email} {day}")
+
+	_submit_open_attendance(company, painted_from, today)
+
+	for email, profile in DEMO_OT_PROFILES.items():
+		employee = employee_map.get(email)
+		if not employee:
+			continue
+		period_start, period_end = open_period or holiday_period or (painted_from, today)
+		result = get_pay_period_overtime(employee, period_start, period_end)
+		holiday_period_ot = (
+			get_pay_period_overtime(employee, holiday_period[0], holiday_period[1])
+			if holiday_period
+			else result
+		)
+		rate = flt(get_hour_rate(employee, period_end) or DEMO_HOUR_RATE, 2)
+		holiday_pay = 0.0
+		holiday_ctx = get_public_holiday_pay_context(employee, holiday_date)
+		if holiday_ctx and holiday_date <= today:
+			hours = 8 if profile["work_holiday"] else 0
+			holiday_pay = calculate_holiday_daily_pay(rate, hours, holiday_ctx["premium_multiplier"])
+		name = frappe.db.get_value("Employee", employee, "employee_name") or email
+		summaries.append(
+			{
+				"employee": employee,
+				"name": name,
+				"threshold": result["threshold_hours"],
+				"period": f"{period_start} to {period_end}",
+				"ordinary_ot": result["ordinary_overtime_duration"],
+				"holiday_ot": holiday_period_ot["holiday_overtime_duration"],
+				"holiday_pay": holiday_pay,
+				"rate": rate,
+			}
+		)
+		_upsert_overtime_slip(employee, company, period_start, period_end)
+		if holiday_period and holiday_period != open_period:
+			_upsert_overtime_slip(employee, company, holiday_period[0], holiday_period[1])
+		print(
+			f"OT demo {name}: threshold {result['threshold_hours']}h, "
+			f"ordinary OT {result['ordinary_overtime_duration']} ({period_start}–{period_end}), "
+			f"holiday OT {holiday_period_ot['holiday_overtime_duration']}, "
+			f"holiday pay ${flt(holiday_pay, 2)}"
+		)
+
+	payroll_entry = None
+	holiday_payroll = None
+	if ensure_payroll_entry:
+		payroll_entry = _ensure_open_payroll_entry(company)
+		if holiday_period and holiday_period != open_period:
+			holiday_payroll = _ensure_payroll_entry_for(company, holiday_period[0], holiday_period[1])
+	if not frappe.flags.in_test:
+		frappe.db.commit()
+	return {
+		"employees": len(summaries),
+		"holiday_date": str(holiday_date),
+		"open_period": [str(open_period[0]), str(open_period[1])] if open_period else None,
+		"payroll_entry": payroll_entry,
+		"holiday_payroll_entry": holiday_payroll,
+		"summaries": summaries,
+	}
+
+
+def _st_georges_caye_day(year: int):
+	from hrms.hr.belize_holidays import get_belize_holidays
+
+	for row in get_belize_holidays(year):
+		if "Caye" in (row.get("description") or ""):
+			return getdate(row["holiday_date"])
+	return None
+
+
+def _weekdays_between(start, end):
+	days = []
+	day = getdate(start)
+	end = getdate(end)
+	while day <= end:
+		if day.weekday() < 5:
+			days.append(day)
+		day = add_days(day, 1)
+	return days
+
+
+def _ot_extra_days(weekdays, holiday_date, extra_hours=0, threshold=None, highlight_weeks=None):
+	"""10-hour days that add extra_hours past a full 8h schedule (OT only after 80h)."""
+	_ = (threshold, highlight_weeks)
+	extra = []
+	needed = flt(extra_hours)
+	if needed <= 0:
+		return extra
+	for day in reversed(list(weekdays)):
+		if day == holiday_date:
+			continue
+		extra.append(day)
+		needed -= 2
+		if needed <= 0:
+			break
+	extra.reverse()
+	return extra
+
+
+def _open_pay_period():
+	periods = _pay_period_bounds(completed_only=True)
+	if not periods:
+		return None
+	return periods[-1]
+
+
+def _open_payroll_week():
+	return _open_pay_period()
+
+
+def _week_bounds_for(day):
+	return _pay_period_containing(day)
+
+
+def _pay_period_containing(day):
+	if not day:
+		return None
+	day = getdate(day)
+	for start, end in _pay_period_bounds(as_of=add_days(day, 21), completed_only=False):
+		if start <= day <= end:
+			return start, end
+	return None
+
+
+def _upsert_ot_demo_day(employee, company, day, hours, punches=None, unworked_holiday=False):
+	from datetime import datetime
+
+	from frappe.utils import get_time
+
+	from hrms.payroll.daily_pay import apply_daily_pay_to_doc, get_hour_rate, resync_attendance_from_day_logs
+
+	day = getdate(day)
+	start = f"{day} 00:00:00"
+	end = f"{day} 23:59:59"
+	existing = frappe.db.get_value(
+		"Attendance",
+		{"employee": employee, "attendance_date": day, "docstatus": ("<", 2)},
+		["name", "docstatus", "status"],
+		as_dict=True,
+	)
+	if existing and existing.status == "On Leave":
+		return False
+
+	can_rebuild = not (existing and cint(existing.docstatus) == 1)
+	if can_rebuild:
+		for name in frappe.get_all(
+			"Employee Checkin",
+			filters={"employee": employee, "time": ["between", [start, end]]},
+			pluck="name",
+		):
+			frappe.delete_doc("Employee Checkin", name, force=True, ignore_permissions=True)
+
+	if punches and can_rebuild and not unworked_holiday:
+		for clock, log_type in punches:
+			when = datetime.combine(day, get_time(clock))
+			log = frappe.get_doc(
+				{
+					"doctype": "Employee Checkin",
+					"employee": employee,
+					"time": when,
+					"log_type": log_type,
+					"device_id": "demo-device",
+					"skip_auto_attendance": 1,
+				}
+			)
+			log.flags.ignore_geolocation = True
+			log.insert(ignore_permissions=True)
+		resync_attendance_from_day_logs(
+			employee, day, attendance_name=existing.name if existing else None
+		)
+
+	attendance_name = frappe.db.get_value(
+		"Attendance",
+		{"employee": employee, "attendance_date": day, "docstatus": ("<", 2)},
+		"name",
+	)
+	if not attendance_name:
+		doc = frappe.get_doc(
+			{
+				"doctype": "Attendance",
+				"employee": employee,
+				"company": company,
+				"attendance_date": day,
+				"status": "Present",
+				"working_hours": 0 if unworked_holiday else hours,
+			}
+		)
+		doc.flags.ignore_permissions = True
+		doc.insert()
+		attendance_name = doc.name
+
+	doc = frappe.get_doc("Attendance", attendance_name)
+	if unworked_holiday:
+		doc.status = "Present"
+		doc.working_hours = 0
+		doc.in_time = None
+		doc.out_time = None
+	else:
+		doc.status = "Present"
+		doc.working_hours = hours
+		if punches:
+			doc.in_time = datetime.combine(day, get_time(punches[0][0]))
+			doc.out_time = datetime.combine(day, get_time(punches[-1][0]))
+	apply_daily_pay_to_doc(doc)
+	if not flt(doc.hour_rate):
+		doc.hour_rate = get_hour_rate(employee, day) or DEMO_HOUR_RATE
+		apply_daily_pay_to_doc(doc)
+	values = {
+		key: getattr(doc, key, None)
+		for key in (
+			"status",
+			"working_hours",
+			"in_time",
+			"out_time",
+			"hour_rate",
+			"daily_pay",
+			"ss_deduction",
+			"tax_deduction",
+			"net_daily_pay",
+		)
+		if frappe.db.has_column("Attendance", key)
+	}
+	frappe.db.set_value("Attendance", attendance_name, values, update_modified=False)
+	return True
+
+
+def _upsert_overtime_slip(employee, company, start_date, end_date):
+	from hrms.hr.doctype.overtime_slip.overtime_slip import get_pay_period_overtime
+
+	result = get_pay_period_overtime(employee, start_date, end_date)
+	if flt(result.get("total_overtime_duration")) <= 0:
+		return None
+
+	existing = frappe.db.get_value(
+		"Overtime Slip",
+		{
+			"employee": employee,
+			"start_date": start_date,
+			"end_date": end_date,
+			"docstatus": ("<", 2),
+		},
+		"name",
+	)
+	details = [
+		{
+			"reference_document": row["reference_document"],
+			"date": row["date"],
+			"overtime_duration": row["overtime_duration"],
+		}
+		for row in result["allocations"]
+	]
+	if existing:
+		slip = frappe.get_doc("Overtime Slip", existing)
+		slip.overtime_details = []
+		for row in details:
+			slip.append("overtime_details", row)
+		slip.total_overtime_duration = result["total_overtime_duration"]
+		slip.save(ignore_permissions=True)
+		return slip.name
+
+	slip = frappe.get_doc(
+		{
+			"doctype": "Overtime Slip",
+			"employee": employee,
+			"company": company,
+			"posting_date": end_date,
+			"start_date": start_date,
+			"end_date": end_date,
+			"overtime_details": details,
+			"total_overtime_duration": result["total_overtime_duration"],
+		}
+	)
+	slip.flags.ignore_permissions = True
+	try:
+		slip.insert()
+		return slip.name
+	except Exception:
+		frappe.log_error(title="OT demo slip insert failed")
+		return None
+
+
+def _ensure_open_payroll_entry(company):
+	period = _open_pay_period()
+	if not period:
+		return None
+	return _ensure_payroll_entry_for(company, period[0], period[1])
+
+
+def _ensure_open_week_payroll_entry(company):
+	return _ensure_open_payroll_entry(company)
+
+
+def _ensure_payroll_entry_for(company, start_date, end_date):
+	from hrms.payroll.auto_payroll import build_payroll_entry
+
+	existing = frappe.db.get_value(
+		"Payroll Entry",
+		{
+			"company": company,
+			"start_date": start_date,
+			"end_date": end_date,
+			"docstatus": ("<", 2),
+		},
+		"name",
+	)
+	if existing:
+		return existing
+	settings = frappe.get_single("Payroll Settings")
+	try:
+		entry = build_payroll_entry(settings, company, start_date, end_date, DEMO_PAYROLL_FREQUENCY)
+		entry.flags.ignore_mandatory = True
+		entry.flags.ignore_permissions = True
+		entry.insert()
+		entry.fill_employee_details(raise_if_empty=False)
+		entry.save(ignore_permissions=True)
+		return entry.name
+	except Exception:
+		frappe.log_error(title="OT demo payroll entry failed")
+		return None
+
+
 def seed_connected_bpo_demo(company=None):
+
 	"""Fill attendance, payroll, SS, clients, invoices, and dashboard metrics."""
 	from hrms.payroll.social_security import (
 		ensure_employee_ss_fields,
@@ -1123,6 +1555,7 @@ def seed_connected_bpo_demo(company=None):
 		history = seed_floor_history(company, list(employee_map.values()))
 		exceptions = _stamp_attendance_exceptions(company, list(employee_map.values()))
 		submitted = _submit_open_attendance(company, history["from_date"], history["to_date"])
+		ot_demo = seed_overtime_and_holiday_demo(company, ensure_payroll_entry=False)
 		try:
 			payroll = _seed_demo_payroll(company, list(employee_map.values()))
 		except Exception:
@@ -1135,13 +1568,17 @@ def seed_connected_bpo_demo(company=None):
 			frappe.log_error(title="Demo invoice seed failed")
 			invoices = 0
 		_prepare_run_payroll_window(company)
+		if ot_demo is None:
+			ot_demo = {}
+		ot_demo["payroll_entry"] = _ensure_open_payroll_entry(company)
 		if not frappe.flags.in_test:
 			frappe.db.commit()
 		print(
 			"Connected BPO demo: "
 			f"{history['created']} clock days, {submitted} attendance submitted, "
 			f"{exceptions['absent']} absent, {exceptions['late']} late, {exceptions['early']} early, "
-			f"{payroll['slips']} salary slips, {invoices} client invoices."
+			f"{payroll['slips']} salary slips, {invoices} client invoices, "
+			f"{(ot_demo or {}).get('employees', 0)} OT-threshold agents."
 		)
 		return {
 			"employees": len(employee_map),
@@ -1154,6 +1591,7 @@ def seed_connected_bpo_demo(company=None):
 			"payroll_entries": payroll["entries"],
 			"invoices": invoices,
 			"customers": customers,
+			"ot_demo": ot_demo,
 		}
 	finally:
 		frappe.flags.in_import = was_importing
@@ -1198,8 +1636,10 @@ def _apply_employee_bpo_fields(company, employee_map):
 			values["billing_currency"] = "USD"
 		if meta.has_field("default_shift"):
 			values["default_shift"] = SHIFT_NAME
-		if meta.has_field("holiday_list") and not frappe.db.get_value("Employee", employee, "holiday_list"):
+		if meta.has_field("holiday_list"):
 			values["holiday_list"] = "Staff Pro Holiday List"
+		if meta.has_field("overtime_threshold_hours"):
+			values["overtime_threshold_hours"] = 90
 		if values:
 			frappe.db.set_value("Employee", employee, values, update_modified=False)
 	_apply_employee_bank_fields(employee_map)
@@ -1356,6 +1796,7 @@ def _get_or_create_weekly_structure(company, currency):
 		"name",
 	)
 	if existing:
+		_sync_salary_structure_frequency(existing)
 		return existing
 
 	if frappe.db.exists("Salary Structure", SALARY_STRUCTURE):
@@ -1374,12 +1815,13 @@ def _get_or_create_weekly_structure(company, currency):
 				)
 			doc.company = company
 			doc.currency = currency
-			doc.payroll_frequency = "Weekly"
+			doc.payroll_frequency = DEMO_PAYROLL_FREQUENCY
 			doc.hour_rate = DEMO_HOUR_RATE
 			doc.salary_slip_based_on_timesheet = 0
 			doc.is_active = "Yes"
 			doc.save(ignore_permissions=True)
 			doc.submit()
+		_sync_salary_structure_frequency(doc.name)
 		return doc.name
 
 	doc = frappe.get_doc(
@@ -1388,7 +1830,7 @@ def _get_or_create_weekly_structure(company, currency):
 			"name": SALARY_STRUCTURE,
 			"company": company,
 			"currency": currency,
-			"payroll_frequency": "Weekly",
+			"payroll_frequency": DEMO_PAYROLL_FREQUENCY,
 			"is_active": "Yes",
 			"hour_rate": DEMO_HOUR_RATE,
 			"salary_slip_based_on_timesheet": 0,
@@ -1408,6 +1850,19 @@ def _get_or_create_weekly_structure(company, currency):
 	return doc.name
 
 
+def _sync_salary_structure_frequency(name):
+	if not name:
+		return
+	if frappe.db.get_value("Salary Structure", name, "payroll_frequency") != DEMO_PAYROLL_FREQUENCY:
+		frappe.db.set_value(
+			"Salary Structure",
+			name,
+			"payroll_frequency",
+			DEMO_PAYROLL_FREQUENCY,
+			update_modified=False,
+		)
+
+
 def _assign_structure_if_missing(company, employee, structure, currency):
 	if frappe.db.exists(
 		"Salary Structure Assignment",
@@ -1423,7 +1878,7 @@ def _assign_structure_if_missing(company, employee, structure, currency):
 		assignment.company = company
 		assignment.currency = currency
 		assignment.from_date = joining
-		assignment.base = flt(hour_rate * 40, 2)
+		assignment.base = flt(hour_rate * DEMO_PAYROLL_WORKING_DAYS * 8, 2)
 		assignment.flags.ignore_permissions = True
 		assignment.insert()
 		assignment.submit()
@@ -1444,13 +1899,13 @@ def _configure_demo_payroll_settings(company):
 		"automatic_payroll_submit_slips": 1,
 		"automatic_payroll_company": company,
 		"automatic_payroll_weekly_days": 5,
-		"automatic_payroll_fortnightly_days": 0,
+		"automatic_payroll_fortnightly_days": DEMO_PAYROLL_WORKING_DAYS,
 		"automatic_payroll_monthly_days": 0,
-		"automatic_payroll_frequency": "Weekly",
+		"automatic_payroll_frequency": DEMO_PAYROLL_FREQUENCY,
 		"automatic_payroll_cycle_start": cycle_start,
 		"enable_automatic_client_invoice": 1,
 		"automatic_invoice_weekly_days": 5,
-		"automatic_invoice_fortnightly_days": 0,
+		"automatic_invoice_fortnightly_days": DEMO_PAYROLL_WORKING_DAYS,
 		"automatic_invoice_monthly_days": 0,
 	}
 	meta = frappe.get_meta("Payroll Settings")
@@ -1647,16 +2102,27 @@ def _stamp_attendance_exceptions(company, employees) -> dict:
 	return {"late": late, "early": early, "absent": absent}
 
 
-def _completed_week_bounds(as_of=None):
+def _pay_period_bounds(as_of=None, completed_only=True):
+	from hrms.payroll.auto_payroll import add_working_days
+
 	as_of = getdate(as_of or nowdate())
-	this_week = getdate(get_first_day_of_week(as_of))
-	weeks = []
 	start = getdate(_demo_cycle_start())
-	while start < this_week:
-		end = add_days(start, 4)
-		weeks.append((start, end))
-		start = add_days(start, 7)
-	return weeks
+	periods = []
+	for _ in range(40):
+		end = add_working_days(start, DEMO_PAYROLL_WORKING_DAYS)
+		if completed_only and end >= as_of:
+			break
+		if not completed_only and start > as_of:
+			break
+		periods.append((start, end))
+		start = add_days(end, 1)
+		if completed_only and start >= as_of:
+			break
+	return periods
+
+
+def _completed_week_bounds(as_of=None):
+	return _pay_period_bounds(as_of=as_of, completed_only=True)
 
 
 def _seed_demo_payroll(company, employees) -> dict:
@@ -1693,7 +2159,7 @@ def _seed_demo_payroll(company, employees) -> dict:
 							start_date,
 							end_date,
 							existing=entry,
-							frequency="Weekly",
+							frequency=DEMO_PAYROLL_FREQUENCY,
 							customer=customer,
 						)
 				else:
@@ -1702,7 +2168,7 @@ def _seed_demo_payroll(company, employees) -> dict:
 						company,
 						start_date,
 						end_date,
-						frequency="Weekly",
+						frequency=DEMO_PAYROLL_FREQUENCY,
 						customer=customer,
 					)
 				entries += 1
@@ -1732,7 +2198,7 @@ def _create_week_salary_slips(company, employees, start_date, end_date):
 			slip.employee = employee
 			slip.company = company
 			slip.salary_structure = SALARY_STRUCTURE
-			slip.payroll_frequency = "Weekly"
+			slip.payroll_frequency = DEMO_PAYROLL_FREQUENCY
 			slip.start_date = start_date
 			slip.end_date = end_date
 			slip.posting_date = end_date
@@ -1801,7 +2267,7 @@ def _seed_demo_invoices(company, customers) -> int:
 					start_date,
 					end_date,
 					frappe.get_doc("Client Invoice", existing) if existing else None,
-					frequency="Weekly",
+					frequency=DEMO_PAYROLL_FREQUENCY,
 				)
 			except Exception:
 				frappe.log_error(title="Demo client invoice failed")
@@ -1834,7 +2300,7 @@ def _prepare_run_payroll_window(company):
 
 	settings = frappe.get_single("Payroll Settings")
 	try:
-		entry = build_payroll_entry(settings, company, start_date, end_date, "Weekly")
+		entry = build_payroll_entry(settings, company, start_date, end_date, DEMO_PAYROLL_FREQUENCY)
 		entry.flags.ignore_mandatory = True
 		entry.flags.ignore_permissions = True
 		entry.insert()

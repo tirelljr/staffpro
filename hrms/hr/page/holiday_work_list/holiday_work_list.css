@@ -40,6 +40,116 @@ body.staff-pro-alive .page-container[data-page-route="holiday-work-list"] .page-
 	margin: 0;
 }
 
+.sp-hwl-page .sp-hwl-detail .sp-dash-panel__head {
+	align-items: flex-start;
+	flex-wrap: wrap;
+}
+
+.sp-hwl-detail-heading {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+	min-width: 0;
+	flex: 1;
+}
+
+.sp-hwl-deadline {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.sp-hwl-deadline__label {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--sp-muted, #6b7280);
+}
+
+.sp-hwl-deadline__row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+.sp-hwl-deadline__date,
+.sp-hwl-deadline__hour,
+.sp-hwl-deadline__minute,
+.sp-hwl-deadline__ampm {
+	height: 32px;
+	padding: 0 8px;
+	border: 1px solid var(--sp-card-border, #e5e7eb);
+	border-radius: 8px;
+	background: #fff;
+	color: var(--sp-ink, #111827);
+	font-family: inherit;
+	font-size: 13px;
+}
+
+.sp-hwl-deadline__date {
+	min-width: 138px;
+}
+
+.sp-hwl-deadline__hour,
+.sp-hwl-deadline__minute,
+.sp-hwl-deadline__ampm {
+	min-width: 64px;
+}
+
+.sp-hwl-deadline__sep {
+	font-weight: 700;
+	color: var(--sp-ink, #111827);
+}
+
+.sp-hwl-deadline__date:focus,
+.sp-hwl-deadline__hour:focus,
+.sp-hwl-deadline__minute:focus,
+.sp-hwl-deadline__ampm:focus {
+	outline: 2px solid var(--sp-teal, #16678c);
+	outline-offset: 1px;
+}
+
+.sp-hwl-deadline__date:disabled,
+.sp-hwl-deadline__hour:disabled,
+.sp-hwl-deadline__minute:disabled,
+.sp-hwl-deadline__ampm:disabled {
+	background: #f3f4f6;
+	color: var(--sp-muted, #6b7280);
+}
+
+.sp-hwl-deadline__clear {
+	height: 32px;
+	padding: 0 10px;
+	border: 1px solid var(--sp-card-border, #e5e7eb);
+	border-radius: 8px;
+	background: #fff;
+	color: var(--sp-muted, #6b7280);
+	font-family: inherit;
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.sp-hwl-deadline__clear:hover:not(:disabled),
+.sp-hwl-deadline__clear:focus:not(:disabled) {
+	border-color: var(--sp-teal, #16678c);
+	color: var(--sp-ink, #111827);
+}
+
+.sp-hwl-deadline__clear:disabled {
+	cursor: default;
+	opacity: 0.6;
+}
+
+.sp-hwl-deadline__hint {
+	margin: 0;
+	font-size: 11px;
+	line-height: 1.35;
+	color: var(--sp-muted, #6b7280);
+	max-width: 420px;
+}
+
 .sp-hwl-refresh {
 	height: 32px;
 	padding: 0 14px;
@@ -120,6 +230,10 @@ body.staff-pro-alive .page-container[data-page-route="holiday-work-list"] .page-
 	padding: 4px 0 8px;
 	font-size: 13px;
 	color: var(--sp-ink, #111827);
+}
+
+.sp-hwl-totals__note {
+	color: var(--sp-muted, #6b7280);
 }
 
 .sp-hwl-toggle {

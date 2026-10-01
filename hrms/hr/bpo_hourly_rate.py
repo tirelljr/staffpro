@@ -78,6 +78,9 @@ def preview_hourly_rate_targets(
 	teams: list[str] | str | None = None,
 	company: str | None = None,
 ):
+	from hrms.hr.role_access import require_salary_access
+
+	require_salary_access()
 	targets = find_hourly_rate_targets(
 		source_employee=source_employee,
 		employees=employees,
@@ -107,6 +110,9 @@ def apply_hourly_rate(
 	teams: list[str] | str | None = None,
 	company: str | None = None,
 ):
+	from hrms.hr.role_access import require_salary_access
+
+	require_salary_access()
 	if not frappe.has_permission("Employee", "write"):
 		frappe.throw(_("Not permitted to update agents."), frappe.PermissionError)
 

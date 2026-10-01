@@ -156,6 +156,7 @@ import ListFiltersActionSheet from "@/components/ListFiltersActionSheet.vue"
 import CustomIonModal from "@/components/CustomIonModal.vue"
 import RequestActionSheet from "@/components/RequestActionSheet.vue"
 import { EMPLOYEE_CHECKIN_FIELDS } from "@/data/config/requestSummaryFields"
+import { formatClock } from "@/utils/formatters"
 
 import useWorkflow from "@/composables/workflow"
 import { useListUpdate } from "@/composables/realtime"
@@ -295,7 +296,7 @@ const openRequestModal = async (request) => {
 	selectedRequest.value = request
 	selectedRequest.value.doctype = "Employee Checkin"
 	selectedRequest.value.date = request.time
-	selectedRequest.value.formatted_time = dayjs(request.time).format("HH:mm a")
+	selectedRequest.value.formatted_time = formatClock(request.time)
 	selectedRequest.value.formatted_latitude = `${Number(request.latitude).toFixed(5)}°`
 	selectedRequest.value.formatted_longitude = `${Number(request.longitude).toFixed(5)}°`
 	isRequestModalOpen.value = true

@@ -171,6 +171,50 @@ class TestDailyPay(HRMSTestSuite):
 		single = pair_checkin_logs(logs[:2])
 		self.assertEqual(flt(single["working_hours"]), 3)
 
+	def test_late_start_made_up_after_shift_end_is_full_day(self):
+		from frappe.utils import add_days, getdate
+
+		from hrms.hr.doctype.shift_type.test_shift_type import make_shift_assignment, setup_shift_type
+
+		employee = make_employee("test_late_makeup@example.com", company="_Test Company")
+		shift = setup_shift_type(
+			shift_type="_Test Makeup 645",
+			start_time="06:45:00",
+			end_time="15:45:00",
+			enable_late_entry_marking=1,
+			late_entry_grace_period=10,
+		)
+		start = getdate(nowdate())
+		make_shift_assignment(shift.name, employee, add_days(start, -1), add_days(start, 6))
+
+		made_up = frappe.get_doc("Attendance", add_hours_entry(employee, start, "07:00:00", "16:00:00"))
+		self.assertEqual(flt(made_up.working_hours), 8)
+		self.assertEqual(cint(made_up.late_entry), 1)
+
+		short = frappe.get_doc(
+			"Attendance", add_hours_entry(employee, add_days(start, 1), "07:00:00", "15:45:00")
+		)
+		self.assertEqual(flt(short.working_hours), 7.75)
+		self.assertEqual(cint(short.late_entry), 1)
+
+		on_time = frappe.get_doc(
+			"Attendance", add_hours_entry(employee, add_days(start, 2), "06:45:00", "15:45:00")
+		)
+		self.assertEqual(flt(on_time.working_hours), 8)
+		self.assertEqual(cint(on_time.late_entry), 0)
+
+		stayed = frappe.get_doc(
+			"Attendance", add_hours_entry(employee, add_days(start, 3), "06:45:00", "16:00:00")
+		)
+		self.assertEqual(flt(stayed.working_hours), 8.25)
+		self.assertEqual(cint(stayed.late_entry), 0)
+
+		lunch_day = add_days(start, 4)
+		add_hours_entry(employee, lunch_day, "06:45:00", "11:45:00")
+		punched = frappe.get_doc("Attendance", add_hours_entry(employee, lunch_day, "12:45:00", "15:45:00"))
+		self.assertEqual(flt(punched.working_hours), 8)
+		self.assertEqual(cint(punched.late_entry), 0)
+
 	def test_hours_between_from_in_and_out_clocks(self):
 		from datetime import datetime, timedelta
 
@@ -384,6 +428,110 @@ class TestDailyPay(HRMSTestSuite):
 		doc.pay_double_time = 1
 		with self.assertRaises(frappe.ValidationError):
 			doc.save()
+
+	def test_approved_hours_override_changes_payroll_hours(self):
+		from frappe.utils import add_days, get_first_day_of_week, getdate
+
+		from hrms.hr.doctype.attendance.attendance import (
+			_refresh_draft_salary_slips,
+			get_approved_hours,
+			save_approved_hours,
+		)
+		from hrms.payroll.daily_pay import payroll_hours_for_period, resync_attendance_from_day_logs
+		from hrms.payroll.doctype.payroll_entry.payroll_entry import (
+			_excel_hours_for_employee,
+			_working_hours_by_employee,
+		)
+		from hrms.payroll.doctype.salary_slip.salary_slip import _attendance_hours_for_slip
+		from hrms.payroll.doctype.salary_structure.salary_structure import make_salary_slip
+
+		employee = make_employee("test_approved_hours_edit@example.com", company="_Test Company")
+		structure = make_salary_structure(
+			"Approved Hours Structure",
+			"Weekly",
+			employee=employee,
+			company="_Test Company",
+			from_date=add_days(nowdate(), -14),
+			base=500,
+			other_details={"hour_rate": 12.5},
+		)
+		start = getdate(get_first_day_of_week(nowdate()))
+		names = []
+		for offset in range(5):
+			names.append(add_hours_entry(employee, add_days(start, offset), "09:00:00", "17:00:00"))
+		self.assertEqual(approve_hours_entries(names).get("approved"), names)
+
+		week_end = add_days(start, 6)
+		self.assertEqual(flt(payroll_hours_for_period(employee, start, week_end)), 40)
+		save_approved_hours(weeks=[{"employee": employee, "week_start": str(start), "hours": 37}])
+		self.assertEqual(flt(payroll_hours_for_period(employee, start, week_end)), 37)
+
+		slip_view = frappe._dict(
+			employee=employee,
+			start_date=start,
+			end_date=week_end,
+			total_working_hours=40,
+			hour_rate=12.5,
+		)
+		self.assertEqual(flt(_attendance_hours_for_slip(slip_view)), 37)
+		entry = frappe._dict(
+			start_date=start,
+			end_date=week_end,
+			employees=[frappe._dict(employee=employee)],
+			company="_Test Company",
+		)
+		self.assertEqual(flt(_working_hours_by_employee(entry).get(employee)), 37)
+		overtime, regular = _excel_hours_for_employee(employee, 40, {employee: 37}, {employee: 0})
+		self.assertEqual(flt(regular), 37)
+		self.assertEqual(flt(overtime), 0)
+
+		listed = get_approved_hours(from_date=start, to_date=week_end, employee=employee)
+		self.assertEqual(len(listed["weeks"]), 1)
+		self.assertEqual(flt(listed["weeks"][0]["payroll_hours"]), 37)
+		self.assertTrue(listed["weeks"][0]["override"])
+
+		draft = make_salary_slip(structure.name, employee=employee, posting_date=week_end)
+		draft.start_date = start
+		draft.end_date = week_end
+		draft.total_working_hours = 40
+		draft.flags.ignore_validate = True
+		draft.save(ignore_permissions=True)
+		refreshed = _refresh_draft_salary_slips(employee, start, week_end)
+		self.assertIn(draft.name, refreshed["updated"])
+		draft.reload()
+		self.assertEqual(flt(draft.total_working_hours), 37)
+
+		frappe.db.set_value(
+			"Salary Slip",
+			draft.name,
+			{"docstatus": 1, "total_working_hours": 40},
+			update_modified=False,
+		)
+		submitted = _refresh_draft_salary_slips(employee, start, week_end)
+		self.assertEqual([row["name"] for row in submitted["submitted"]], [draft.name])
+		self.assertEqual(submitted["updated"], [])
+		self.assertEqual(flt(frappe.db.get_value("Salary Slip", draft.name, "total_working_hours")), 40)
+
+		day_sum = flt(
+			sum(flt(frappe.db.get_value("Attendance", name, "working_hours")) for name in names),
+			2,
+		)
+		save_approved_hours(weeks=[{"employee": employee, "week_start": str(start), "hours": day_sum}])
+		self.assertFalse(
+			frappe.db.exists("Approved Week Hours", {"employee": employee, "week_start": start})
+		)
+		self.assertEqual(flt(payroll_hours_for_period(employee, start, week_end)), day_sum)
+
+		save_approved_hours(days=[{"name": names[0], "hours": 5}])
+		doc = frappe.get_doc("Attendance", names[0])
+		self.assertEqual(flt(doc.working_hours), 5)
+		self.assertTrue(cint(doc.manual_hours))
+		self.assertEqual(flt(doc.daily_pay), flt(flt(doc.hour_rate) * 5, 2))
+		resync_attendance_from_day_logs(employee, doc.attendance_date, names[0])
+		doc.reload()
+		self.assertEqual(flt(doc.working_hours), 5)
+		self.assertEqual(flt(doc.daily_pay), flt(flt(doc.hour_rate) * 5, 2))
+		self.assertEqual(flt(payroll_hours_for_period(employee, start, week_end)), 37)
 
 
 def cint_hours_paid(doc):

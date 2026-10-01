@@ -1,0 +1,49 @@
+{
+ "app": "hrms",
+ "creation": "2026-09-29 23:00:09.360703",
+ "docstatus": 0,
+ "doctype": "Sidebar",
+ "header_icon": "folder",
+ "idx": 0,
+ "items": [
+  {
+   "added": 0,
+   "child": 0,
+   "collapsible": 1,
+   "hidden": 0,
+   "icon": "folder",
+   "indent": 0,
+   "is_default_module": 0,
+   "keep_closed": 0,
+   "label": "Filesystem",
+   "link_to": "agent-filesystem",
+   "link_type": "Page",
+   "open_in_new_tab": 0,
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "added": 0,
+   "child": 0,
+   "collapsible": 1,
+   "hidden": 0,
+   "icon": "file-text",
+   "indent": 0,
+   "is_default_module": 0,
+   "keep_closed": 0,
+   "label": "TD4 Forms",
+   "link_to": "TD4 Form",
+   "link_type": "DocType",
+   "open_in_new_tab": 0,
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-09-30 02:26:07.955042",
+ "modified_by": "Administrator",
+ "module": "HR",
+ "name": "Filesystem",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "Filesystem"
+}

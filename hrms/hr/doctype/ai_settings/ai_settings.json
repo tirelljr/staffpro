@@ -1,0 +1,99 @@
+{
+ "actions": [],
+ "creation": "2026-09-20 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "provider_section",
+  "deepseek_api_key",
+  "model",
+  "api_base",
+  "advanced_section",
+  "temperature",
+  "max_tool_rounds"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "description": "Allow HR users to use the Staff Pro AI assistant.",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enable Ask AI"
+  },
+  {
+   "fieldname": "provider_section",
+   "fieldtype": "Section Break",
+   "label": "DeepSeek"
+  },
+  {
+   "description": "Stored encrypted. If blank, deepseek_api_key from site_config.json is used.",
+   "fieldname": "deepseek_api_key",
+   "fieldtype": "Password",
+   "label": "DeepSeek API Key"
+  },
+  {
+   "default": "deepseek-chat",
+   "description": "Tool calling requires deepseek-chat.",
+   "fieldname": "model",
+   "fieldtype": "Data",
+   "label": "Model",
+   "reqd": 1
+  },
+  {
+   "default": "https://api.deepseek.com",
+   "fieldname": "api_base",
+   "fieldtype": "Data",
+   "label": "API Base URL",
+   "reqd": 1
+  },
+  {
+   "fieldname": "advanced_section",
+   "fieldtype": "Section Break",
+   "label": "Advanced"
+  },
+  {
+   "default": "0",
+   "fieldname": "temperature",
+   "fieldtype": "Float",
+   "label": "Temperature",
+   "precision": "2"
+  },
+  {
+   "default": "6",
+   "fieldname": "max_tool_rounds",
+   "fieldtype": "Int",
+   "label": "Maximum Tool Rounds"
+  }
+ ],
+ "in_create": 0,
+ "issingle": 1,
+ "show_name_in_global_search": 0,
+ "links": [],
+ "modified": "2026-09-20 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "HR",
+ "name": "AI Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "HR Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

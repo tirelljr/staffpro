@@ -28,16 +28,17 @@
 						{{ holiday.formatted_holiday_date }}
 					</div>
 				</div>
-				<div class="pl-8">
+				<div class="pl-8 flex flex-col gap-1">
 					<Switch
-						v-if="holiday.can_toggle"
+						v-if="holiday.is_work_day"
 						size="sm"
 						:label="holiday.will_work ? __('Working') : __('Not Working')"
 						:model-value="!!holiday.will_work"
-						:disabled="!!holiday.saving"
+						:disabled="!!holiday.saving || !holiday.can_toggle"
+						:description="holidayDeadlineLabel(holiday)"
 						@update:model-value="(value) => setWorking(holiday, value)"
 					/>
-					<div v-else-if="!holiday.is_work_day" class="text-sm text-gray-500">
+					<div v-else class="text-sm text-gray-500">
 						{{ __("Weekly off") }}
 					</div>
 				</div>
@@ -80,13 +81,14 @@
 							{{ holiday.formatted_holiday_date }}
 						</div>
 					</div>
-					<div class="pl-8" v-if="holiday.can_toggle || !holiday.is_work_day">
+					<div class="pl-8">
 						<Switch
-							v-if="holiday.can_toggle"
+							v-if="holiday.is_work_day"
 							size="sm"
 							:label="holiday.will_work ? __('Working') : __('Not Working')"
 							:model-value="!!holiday.will_work"
-							:disabled="!!holiday.saving"
+							:disabled="!!holiday.saving || !holiday.can_toggle"
+							:description="holidayDeadlineLabel(holiday)"
 							@update:model-value="(value) => setWorking(holiday, value)"
 						/>
 						<div v-else class="text-sm text-gray-500">
@@ -136,7 +138,7 @@ const election = createResource({
 })
 
 async function setWorking(holiday, willWork) {
-	if (holiday.saving) {
+	if (holiday.saving || !holiday.can_toggle) {
 		return
 	}
 	const previous = holiday.will_work
@@ -148,10 +150,29 @@ async function setWorking(holiday, willWork) {
 			holiday_date: holiday.holiday_date,
 			will_work: willWork ? 1 : 0,
 		})
+		holiday.responded = true
+		holiday.assumed_working = false
 	} catch {
 		holiday.will_work = previous
 	} finally {
 		holiday.saving = false
 	}
+}
+
+function holidayDeadlineLabel(holiday) {
+	if (!holiday?.is_work_day) {
+		return ""
+	}
+	if (holiday.deadline_passed) {
+		return holiday.will_work
+			? __("Deadline passed. You are counted as working.")
+			: __("Deadline passed. You chose not to work.")
+	}
+	if (holiday.response_deadline) {
+		return __("Choose Not Working by {0} or you will be counted as working.", [
+			dayjs(holiday.response_deadline).format("ddd, D MMM h:mm A"),
+		])
+	}
+	return ""
 }
 </script>

@@ -2,7 +2,7 @@
 # For license information, please see license.txt
 
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 import frappe
 from frappe import _
@@ -38,7 +38,6 @@ class EmployeeCheckin(Document):
 		log_type: DF.Literal["", "IN", "OUT"]
 		longitude: DF.Float
 		offshift: DF.Check
-		overtime_type: DF.Link | None
 		shift: DF.Link | None
 		shift_actual_end: DF.Datetime | None
 		shift_actual_start: DF.Datetime | None
@@ -49,10 +48,13 @@ class EmployeeCheckin(Document):
 	# end: auto-generated types
 
 	def before_validate(self):
-		self.time = get_datetime(self.time).replace(microsecond=0)
+		from hrms.hr.timezone import stamp_live_checkin_time
+
+		stamp_live_checkin_time(self)
 
 	def validate(self):
 		validate_active_employee(self.employee)
+		self.validate_floor_worker_clockin()
 		self.validate_duplicate_log()
 		self.validate_time_change()
 		self.fetch_shift()
@@ -118,7 +120,6 @@ class EmployeeCheckin(Document):
 			self.shift_actual_end = shift_actual_timings.actual_end
 			self.shift_start = shift_actual_timings.start_datetime
 			self.shift_end = shift_actual_timings.end_datetime
-			self.overtime_type = shift_actual_timings.overtime_type or None
 
 	def validate_distance_from_shift_location(self):
 		if self.flags.get("ignore_geolocation"):
@@ -158,6 +159,14 @@ class EmployeeCheckin(Document):
 				_("You must be within {0} meters of your shift location to check in.").format(checkin_radius),
 				exc=CheckinRadiusExceededError,
 			)
+
+	def validate_floor_worker_clockin(self):
+		if cint(self.skip_auto_attendance) or self.flags.get("ignore_floor_worker_clock_block"):
+			return
+		from hrms.hr.floor_workers import is_floor_worker
+
+		if is_floor_worker(self.employee):
+			frappe.throw(_("Floor workers do not clock in. Hours are added automatically."))
 
 	def validate_office_clockin_ip(self):
 		if self.flags.get("ignore_ip_restriction"):
@@ -251,7 +260,6 @@ def mark_attendance_and_link_log(
 	in_time: datetime | None = None,
 	out_time: datetime | None = None,
 	shift: str | None = None,
-	overtime_type: str | None = None,
 ) -> Document | None:
 	"""Creates an attendance and links the attendance to the Employee Checkin.
 	Note: If attendance is already present for the given date, the logs are marked as skipped and no exception is thrown.
@@ -284,7 +292,6 @@ def mark_attendance_and_link_log(
 			early_exit=early_exit,
 			in_time=in_time,
 			out_time=out_time,
-			overtime_type=overtime_type,
 		)
 
 		if attendance_status == "Absent":
@@ -310,7 +317,6 @@ def create_or_update_attendance(
 	early_exit=False,
 	in_time=None,
 	out_time=None,
-	overtime_type=None,
 ):
 	"""Creates a new attendance or updates an existing half-day or same-day attendance."""
 	if attendance := get_existing_half_day_attendance(employee, attendance_date):
@@ -388,48 +394,10 @@ def create_or_update_attendance(
 			}
 		)
 
-		# Set overtime data if applicable
-		if overtime_type and attendance_status == "Present":
-			overtime_data = get_overtime_data(shift, working_hours)
-			if overtime_data:
-				attendance.update(
-					{
-						"overtime_type": overtime_type,
-						"standard_working_hours": overtime_data.get("standard_working_hours"),
-						"actual_overtime_duration": overtime_data.get("actual_overtime_duration"),
-					}
-				)
 		attendance.save()
 		attendance.submit()
 
 	return attendance
-
-
-def get_overtime_data(shift_name, working_hours):
-	overtime_data = {}
-
-	shift_type_details = frappe.db.get_value(
-		doctype="Shift Type",
-		filters={"name": shift_name},
-		fieldname=["allow_overtime", "start_time", "end_time"],
-		as_dict=True,
-	)
-
-	if not shift_type_details or not shift_type_details.allow_overtime:
-		return overtime_data
-
-	standard_working_hours = calculate_time_difference(
-		shift_type_details.start_time, shift_type_details.end_time
-	)
-
-	if working_hours > standard_working_hours:
-		actual_overtime_duration = working_hours - standard_working_hours
-		overtime_data = {
-			"standard_working_hours": standard_working_hours,
-			"actual_overtime_duration": actual_overtime_duration,
-		}
-
-	return overtime_data
 
 
 def get_existing_half_day_attendance(employee, attendance_date):
@@ -558,11 +526,3 @@ def update_attendance_in_checkins(log_names: list, attendance_id: str):
 		.set("attendance", attendance_id)
 		.where(EmployeeCheckin.name.isin(log_names))
 	).run()
-
-
-def calculate_time_difference(start_time, end_time):
-	if end_time < start_time:
-		end_time += timedelta(days=1)
-	time_difference = abs(start_time - end_time)
-
-	return round(time_difference.total_seconds() / 3600, 2)

@@ -6,7 +6,9 @@ export const employeeResource = createResource({
 	cache: "hrms:employee",
 	onError(error) {
 		if (error && error.exc_type === "AuthenticationError") {
-			router.push("/login")
+			// Avoid fighting an in-flight kiosk portal login (session cookie not ready yet).
+			if (window.location.pathname.includes("/login")) return
+			router.push({ name: "Login" })
 		}
 	},
 })

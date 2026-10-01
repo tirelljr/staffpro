@@ -12,6 +12,13 @@ from erpnext.setup.doctype.employee.employee import Employee
 
 
 class EmployeeMaster(Employee):
+	def validate(self):
+		apply_default_approvers(self)
+		super().validate()
+		from hrms.hr.floor_workers import apply_employee_floor_worker_rules
+
+		apply_employee_floor_worker_rules(self)
+
 	def autoname(self):
 		naming_method = frappe.db.get_single_value("HR Settings", "emp_created_by")
 		if not naming_method:
@@ -26,6 +33,33 @@ class EmployeeMaster(Employee):
 				self.name = self.employee_name
 
 		self.employee = self.name
+
+	def before_delete(self):
+		self._unlink_blocking_records()
+		self.flags.ignore_links = True
+
+	def on_trash(self):
+		self._unlink_blocking_records()
+		parent_on_trash = getattr(super(), "on_trash", None)
+		if parent_on_trash:
+			parent_on_trash()
+
+	def delete(self, ignore_permissions=False, force=False, *, delete_permanently=False):
+		self._unlink_blocking_records()
+		self.flags.ignore_links = True
+		return super().delete(
+			ignore_permissions=ignore_permissions,
+			force=True,
+			delete_permanently=delete_permanently,
+		)
+
+	def _unlink_blocking_records(self):
+		if self.flags.get("employee_unlinked") or not self.name:
+			return
+		self.flags.employee_unlinked = True
+		from hrms.hr.employee_cleanup import unlink_employee_records
+
+		unlink_employee_records(self.name, skip_permission=True)
 
 
 def validate_onboarding_process(doc, method=None):
@@ -85,6 +119,59 @@ def update_job_applicant_and_offer(doc, method=None):
 			msg += "<br>" + _("You may add additional details, if any, and submit the offer.")
 
 		frappe.msgprint(msg)
+
+
+@frappe.whitelist()
+def get_default_hr_approver() -> str | None:
+	"""Enabled user who should approve leave and shift requests by default.
+
+	Prefers an active employee whose designation is HR Manager. Otherwise uses
+	the first enabled user with the HR Manager role.
+	"""
+	designated = frappe.get_all(
+		"Employee",
+		filters={"status": "Active", "designation": "HR Manager", "user_id": ["is", "set"]},
+		pluck="user_id",
+		order_by="creation asc",
+	)
+	for user in designated:
+		if _is_usable_approver(user):
+			return user
+
+	candidates = frappe.get_all(
+		"Has Role",
+		filters={"role": "HR Manager", "parenttype": "User"},
+		pluck="parent",
+	)
+	enabled = sorted({user for user in candidates if _is_usable_approver(user)})
+	if enabled:
+		return enabled[0]
+
+	# Sites that have not created a separate HR user still grant the role to Administrator.
+	if frappe.db.exists(
+		"Has Role", {"parent": "Administrator", "parenttype": "User", "role": "HR Manager"}
+	) and frappe.db.get_value("User", "Administrator", "enabled"):
+		return "Administrator"
+	return None
+
+
+def _is_usable_approver(user: str) -> bool:
+	if not user or user in ("Administrator", "Guest"):
+		return False
+	return bool(frappe.db.get_value("User", user, "enabled"))
+
+
+def apply_default_approvers(doc, method=None):
+	"""Fill a blank leave or shift approver with the HR manager."""
+	if doc.get("leave_approver") and doc.get("shift_request_approver"):
+		return
+	approver = get_default_hr_approver()
+	if not approver:
+		return
+	if not doc.get("leave_approver"):
+		doc.leave_approver = approver
+	if not doc.get("shift_request_approver"):
+		doc.shift_request_approver = approver
 
 
 def update_approver_role(doc, method=None):
@@ -226,6 +313,158 @@ def resolve_user_from_login(login: str | None) -> str | None:
 	return rows[0][0] if rows else None
 
 
+LOCAL_LOGIN_DOMAIN = "users.staffpro.local"
+
+
+def local_login_email(username: str) -> str:
+	return f"{username.lower()}@{LOCAL_LOGIN_DOMAIN}"
+
+
+def prepare_user_login(doc, method=None):
+	"""New desk users are created from a username. The User id stays an internal address."""
+	if not doc.is_new() or doc.name in {"Administrator", "Guest"}:
+		return
+
+	email = (doc.email or "").strip()
+	username = (doc.username or "").strip()
+	if email and "@" not in email:
+		login = clean_username(email)
+		doc.username = login
+		doc.email = local_login_email(login)
+		doc.send_welcome_email = 0
+		return
+
+	if not username or "@" in username:
+		return
+	if email and not email.lower().endswith(f"@{LOCAL_LOGIN_DOMAIN}"):
+		return
+
+	login = clean_username(username)
+	doc.username = login
+	doc.email = local_login_email(login)
+	doc.send_welcome_email = 0
+
+
+def _selected_role_names(roles) -> list[str]:
+	if isinstance(roles, str):
+		roles = frappe.parse_json(roles)
+	names = []
+	for row in roles or []:
+		if isinstance(row, dict):
+			role = row.get("role") or row.get("name")
+		else:
+			role = row
+		role = (role or "").strip()
+		if role and role not in names:
+			names.append(role)
+	return names
+
+
+def _can_assign_user_roles() -> bool:
+	permlevel = frappe.get_meta("User").get_field("roles").permlevel or 0
+	user_roles = set(frappe.get_roles())
+	for perm in frappe.get_meta("User").permissions:
+		if perm.role in user_roles and cint(perm.permlevel) == permlevel and cint(perm.write):
+			return True
+	return False
+
+
+@frappe.whitelist()
+def create_user_login(
+	username: str,
+	first_name: str | None = None,
+	roles: str | list | None = None,
+	last_name: str | None = None,
+	new_password: str | None = None,
+) -> dict:
+	"""Create a desk user from a username, password, and Role records."""
+	frappe.has_permission("User", "create", throw=True)
+	login = clean_username(username)
+	if frappe.db.exists("User", {"username": login}) or frappe.db.exists("User", local_login_email(login)):
+		frappe.throw(_("Username {0} is already taken.").format(frappe.bold(login)))
+
+	chosen = _selected_role_names(roles)
+	missing = [role for role in chosen if not frappe.db.exists("Role", role)]
+	if missing:
+		frappe.throw(_("Role {0} was not found.").format(frappe.bold(missing[0])))
+	if chosen and not _can_assign_user_roles():
+		frappe.throw(_("You do not have permission to assign roles."), frappe.PermissionError)
+
+	password = _checked_password(new_password)
+	user = frappe.get_doc(
+		{
+			"doctype": "User",
+			"email": local_login_email(login),
+			"username": login,
+			"first_name": (first_name or login).strip(),
+			"last_name": (last_name or "").strip(),
+			"send_welcome_email": 0,
+			"enabled": 1,
+			"user_type": "System User",
+			"roles": [{"doctype": "Has Role", "role": role} for role in chosen],
+		}
+	)
+	user.flags.ignore_password_policy = True
+	user.insert()
+	_store_login_password(user.name, password)
+	return user.as_dict()
+
+
+@frappe.whitelist()
+def get_user_password(user: str) -> dict:
+	"""Return the saved login password for an admin. Empty until a password is set here or the user signs in."""
+	login = _password_target(user)
+	frappe.has_permission("User", "read", login, throw=True)
+	_require_password_admin()
+	from hrms.overrides.employee_profile import read_viewable_password
+
+	return {"password": read_viewable_password(login), "user": login}
+
+
+@frappe.whitelist()
+def set_user_password(user: str, new_password: str, logout_all_sessions: int = 0) -> dict:
+	"""Set a desk user's login password without emailing a reset link."""
+	login = _password_target(user)
+	frappe.has_permission("User", "write", login, throw=True)
+	_require_password_admin()
+	password = _checked_password(new_password)
+	_store_login_password(login, password, logout_all_sessions=cint(logout_all_sessions))
+	return {"ok": True, "user": login}
+
+
+def _password_target(user: str) -> str:
+	login = (user or "").strip()
+	if login in {"", "Administrator", "Guest"} or not frappe.db.exists("User", login):
+		frappe.throw(_("User {0} was not found.").format(frappe.bold(login or _("Unknown"))))
+	return login
+
+
+def _require_password_admin() -> None:
+	from hrms.overrides.employee_profile import PASSWORD_ROLES
+
+	if not set(frappe.get_roles()).intersection(PASSWORD_ROLES):
+		frappe.throw(_("Not permitted to change this password."), frappe.PermissionError)
+
+
+def _checked_password(new_password: str | None) -> str:
+	password = new_password or ""
+	if len(password) < 8:
+		frappe.throw(_("Password must be at least 8 characters."))
+	return password
+
+
+def _store_login_password(user: str, password: str, logout_all_sessions: int = 0) -> None:
+	from frappe.utils import today
+	from frappe.utils.password import update_password
+
+	from hrms.overrides.employee_profile import remember_viewable_password
+
+	update_password(user, password, logout_all_sessions=cint(logout_all_sessions))
+	remember_viewable_password(user, password)
+	if frappe.get_meta("User").has_field("last_password_reset_date"):
+		frappe.db.set_value("User", user, "last_password_reset_date", today(), update_modified=False)
+
+
 def clean_username(value: str | None) -> str:
 	typed = (value or "").strip()
 	if not typed:
@@ -260,10 +499,14 @@ def _ensure_username(user_name: str, employee) -> None:
 def _create_user_for_employee(employee, login: str) -> str:
 	user_email = (employee.company_email or employee.personal_email or "").strip()
 	if not user_email:
-		user_email = f"{login.lower()}@users.staffpro.local"
+		user_email = local_login_email(login)
 	existing = frappe.db.get_value("User", {"email": user_email}, "name")
 	if existing:
 		_apply_username_to_user(existing, login)
+		from hrms.hr.bpo_user_permissions import is_agent_account
+
+		if is_agent_account(existing):
+			frappe.db.set_value("User", existing, "user_type", "Website User", update_modified=False)
 		return existing
 
 	user = frappe.get_doc(
@@ -275,11 +518,16 @@ def _create_user_for_employee(employee, login: str) -> str:
 			"username": login,
 			"send_welcome_email": 0,
 			"enabled": 1,
+			"user_type": "Website User",
 		}
 	)
 	user.flags.ignore_permissions = True
 	user.insert()
-	user.add_roles("Employee")
+	roles = ["Employee"]
+	if frappe.db.exists("Role", "Employee Self Service"):
+		roles.append("Employee Self Service")
+	user.add_roles(*roles)
+	frappe.db.set_value("User", user.name, "user_type", "Website User", update_modified=False)
 	return user.name
 
 
@@ -368,7 +616,14 @@ def set_employee_username(employee: str, username: str) -> dict:
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def user_username_query(doctype, txt, searchfield, start, page_len, filters):
+def user_username_query(
+	doctype: str,
+	txt: str,
+	searchfield: str,
+	start: int,
+	page_len: int,
+	filters: str | dict | None = None,
+):
 	"""Link search that prefers username over email."""
 	txt = f"%{txt or ''}%"
 	return frappe.db.sql(
@@ -377,7 +632,7 @@ def user_username_query(doctype, txt, searchfield, start, page_len, filters):
 		from `tabUser`
 		where enabled = 1
 			and name not in ('Guest', 'Administrator')
-			and user_type = 'System User'
+			and user_type in ('System User', 'Website User')
 			and (
 				name like %(txt)s
 				or ifnull(username, '') like %(txt)s
@@ -411,6 +666,27 @@ def create_employee_username_user(employee: str, username: str | None = None, em
 	sync_employee_username(emp)
 	emp.db_set("user_id", emp.user_id)
 	return {"user": emp.user_id, "username": _login_username(emp.user_id) or login, "created": True}
+
+
+def ensure_td4_request_for_account(doc, method=None):
+	"""Open a TD4 request when an agent gets a portal login, so sign-in can prompt them."""
+	if not doc or not getattr(doc, "name", None):
+		return
+	if getattr(doc, "status", None) != "Active":
+		return
+	user_id = (getattr(doc, "user_id", None) or "").strip()
+	if not user_id or user_id in ("Guest", "Administrator"):
+		return
+	if not frappe.db.table_exists("TD4 Form"):
+		return
+	try:
+		from hrms.hr.doctype.td4_form.td4_form import create_requested, has_submitted, pending_name
+
+		if has_submitted(doc.name) or pending_name(doc.name):
+			return
+		create_requested(doc.name, notify=False)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "TD4 request for new agent")
 
 
 @frappe.whitelist()

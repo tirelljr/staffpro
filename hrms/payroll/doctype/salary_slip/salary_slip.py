@@ -443,6 +443,16 @@ class SalarySlip(TransactionBase):
 		self.paid_from_bank_account = bank_account
 		self.paid_from_bank = bank_label_for_account(bank_account)
 
+	def allows_joining_after_period(self) -> bool:
+		"""Payroll can force-add an agent whose company join date is after this pay period."""
+		if getattr(frappe.flags, "ignore_joining_after_period", False):
+			return True
+		if not self.payroll_entry or not self.employee:
+			return False
+		from hrms.payroll.doctype.payroll_entry.payroll_entry import employee_force_included
+
+		return employee_force_included(self.payroll_entry, self.employee)
+
 	def validate_dates(self):
 		self.validate_from_to_dates("start_date", "end_date")
 
@@ -451,7 +461,7 @@ class SalarySlip(TransactionBase):
 				_("Please set the Date Of Joining for employee {0}").format(frappe.bold(self.employee_name))
 			)
 
-		if date_diff(self.end_date, self.joining_date) < 0:
+		if date_diff(self.end_date, self.joining_date) < 0 and not self.allows_joining_after_period():
 			frappe.throw(_("Cannot create Salary Slip for Employee joining after Payroll Period"))
 
 		if self.relieving_date and date_diff(self.relieving_date, self.start_date) < 0:
@@ -2790,42 +2800,42 @@ def get_lwp_or_ppl_for_date_range(employee, start_date, end_date):
 
 
 def _attendance_hours_for_slip(slip) -> float:
-	from hrms.payroll.daily_pay import ensure_working_hours_from_times
+	from hrms.payroll.daily_pay import payroll_hours_for_period
 
-	hours = 0.0
-	for row in _slip_period_attendance(slip, ["working_hours", "status", "in_time", "out_time"]):
-		if (row.get("status") or "") == "Absent":
-			continue
-		hours += flt(row.working_hours) or flt(ensure_working_hours_from_times(row))
-	return flt(hours)
+	return payroll_hours_for_period(slip.employee, slip.start_date, slip.end_date)
 
 
 def _hourly_inputs_for_slip(slip) -> tuple[float, float, float, float]:
-	from hrms.payroll.daily_pay import ensure_working_hours_from_times, get_public_holiday_pay_context
+	from hrms.hr.doctype.overtime_slip.overtime_slip import get_pay_period_overtime
+	from hrms.payroll.daily_pay import (
+		apply_approved_week_hours,
+		ensure_working_hours_from_times,
+		get_public_holiday_pay_context,
+	)
 
-	overtime_hours = 0.0
+	overtime_result = get_pay_period_overtime(slip.employee, slip.start_date, slip.end_date)
+	overtime_hours = flt(overtime_result["ordinary_overtime_duration"])
 	holiday_hours = 0.0
 	holiday_pay = 0.0
 	total_hours = 0.0
-	fields = ["working_hours", "status", "attendance_date", "daily_pay"]
+	fields = ["name", "working_hours", "status", "attendance_date", "daily_pay"]
 	if frappe.db.has_column("Attendance", "in_time"):
 		fields += ["in_time", "out_time"]
-	if frappe.db.has_column("Attendance", "actual_overtime_duration"):
-		fields.append("actual_overtime_duration")
 
-	for row in _slip_period_attendance(slip, fields):
-		if (row.get("status") or "") == "Absent":
+	rows = _slip_period_attendance(slip, fields)
+	apply_approved_week_hours(slip.employee, rows)
+	for row in rows:
+		holiday_ctx = get_public_holiday_pay_context(slip.employee, row.attendance_date)
+		if (row.get("status") or "") == "Absent" and not holiday_ctx:
 			continue
 		worked = flt(row.working_hours) or flt(ensure_working_hours_from_times(row))
-		overtime = flt(row.get("actual_overtime_duration"))
+		if holiday_ctx and worked <= 0 and flt(row.get("daily_pay")) > 0 and not row.get("_week_override"):
+			worked = 8.0
 		total_hours += worked
-		overtime_hours += overtime
-		if get_public_holiday_pay_context(slip.employee, row.attendance_date):
+		if holiday_ctx:
 			holiday_hours += worked
 			holiday_pay += flt(row.get("daily_pay")) or flt(flt(slip.hour_rate) * worked, 2)
 
-	if flt(slip.total_working_hours):
-		total_hours = flt(slip.total_working_hours)
 	regular_hours = max(total_hours - overtime_hours - holiday_hours, 0.0)
 	bonus = _earning_amount_on_slip(slip, category="Bonus")
 	holiday_on_slip = _earning_amount_on_slip(slip, match="holiday")
