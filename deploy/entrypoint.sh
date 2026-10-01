@@ -133,10 +133,9 @@ create_or_migrate_site() {
 }
 
 refresh_desk_assets() {
-	# bench build during the Docker image build has no Redis; assets.json may be stale.
-	echo "Refreshing desk assets (Redis is available at runtime)..."
-	yarn --cwd apps/hrms build || true
-	bench build --app hrms || true
+	# Assets are built in the image. A second yarn/bench build here OOMs the
+	# 2 GB Render instance once gunicorn is already running.
+	echo "Refreshing desk cache..."
 	bench --site "$SITE_NAME" execute "frappe.get_attr('hrms.branding.repair_desk_ltr_bundles')()" || true
 	bench --site "$SITE_NAME" execute "frappe.get_attr('hrms.branding.apply_branding')()" || true
 	bench --site "$SITE_NAME" clear-cache || true
