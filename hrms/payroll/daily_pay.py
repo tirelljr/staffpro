@@ -340,10 +340,13 @@ def ensure_paid_holiday_attendance(
 		return []
 
 	employees = _employees_for_holiday_ensure(employee, department)
+	service_dates = _employee_service_dates(employees)
 	created = []
 	for emp in employees:
-		day = from_date
-		while day <= to_date:
+		day, last = employment_window(emp, from_date, to_date, service_dates)
+		if not day:
+			continue
+		while day <= last:
 			ctx = get_public_holiday_pay_context(emp, day)
 			if not ctx:
 				day = add_days(day, 1)
@@ -366,7 +369,13 @@ def ensure_paid_holiday_attendance(
 					"hours_paid": 0,
 				}
 			)
-			doc.insert(ignore_permissions=True)
+			try:
+				doc.insert(ignore_permissions=True)
+			except frappe.ValidationError:
+				# One invalid day must not abort payroll/hours for everyone.
+				frappe.clear_messages()
+				day = add_days(day, 1)
+				continue
 			created.append(doc.name)
 			day = add_days(day, 1)
 	return created
@@ -379,6 +388,77 @@ def _employees_for_holiday_ensure(employee: str | None, department: str | None) 
 	if department:
 		filters["department"] = department
 	return frappe.get_all("Employee", filters=filters, pluck="name", order_by="name asc")
+
+
+def _employee_service_dates(employees: list[str]) -> dict:
+	employees = [name for name in (employees or []) if name]
+	if not employees:
+		return {}
+	rows = frappe.get_all(
+		"Employee",
+		filters={"name": ("in", employees)},
+		fields=["name", "date_of_joining", "relieving_date"],
+		ignore_permissions=True,
+	)
+	return {row.name: row for row in rows}
+
+
+def employment_window(employee: str, start_date, end_date, service_dates: dict | None = None):
+	"""Clamp a date range to the days the agent was employed. None, None if none."""
+	if not employee or not start_date or not end_date:
+		return None, None
+	start_date = getdate(start_date)
+	end_date = getdate(end_date)
+	info = (service_dates or {}).get(employee)
+	if info is None:
+		info = (
+			frappe.db.get_value(
+				"Employee",
+				employee,
+				["date_of_joining", "relieving_date"],
+				as_dict=True,
+			)
+			or {}
+		)
+	joining = info.get("date_of_joining")
+	relieving = info.get("relieving_date")
+	if joining:
+		joining = getdate(joining)
+		if start_date < joining:
+			start_date = joining
+	if relieving:
+		relieving = getdate(relieving)
+		if end_date > relieving:
+			end_date = relieving
+	if start_date > end_date:
+		return None, None
+	return start_date, end_date
+
+
+def _employee_employed_on(employee: str, day, service_dates: dict | None = None) -> bool:
+	"""False when the day is before the agent joined or after they left."""
+	start, _end = employment_window(employee, day, day, service_dates)
+	return bool(start)
+
+
+def filter_attendance_to_employment(rows: list) -> list:
+	"""Drop attendance rows from before joining or after relieving."""
+	if not rows:
+		return rows
+	employees = []
+	for row in rows:
+		emp = row.get("employee") if isinstance(row, dict) else getattr(row, "employee", None)
+		if emp:
+			employees.append(emp)
+	service = _employee_service_dates(employees)
+	kept = []
+	for row in rows:
+		emp = row.get("employee") if isinstance(row, dict) else getattr(row, "employee", None)
+		day = row.get("attendance_date") if isinstance(row, dict) else getattr(row, "attendance_date", None)
+		if emp and day and not _employee_employed_on(emp, day, service):
+			continue
+		kept.append(row)
+	return kept
 
 
 def allocate_week_deductions(employee: str, on_date, overlay: dict | None = None) -> None:
@@ -836,18 +916,23 @@ def payroll_hours_for_period(employee: str, start_date, end_date) -> float:
 	"""Hours payroll should pay between two dates, honoring week overrides and manual days."""
 	if not employee or not start_date or not end_date:
 		return 0.0
-	fields = ["name", "attendance_date", "working_hours", "status", "daily_pay"]
+	start_date, end_date = employment_window(employee, start_date, end_date)
+	if not start_date:
+		return 0.0
+	fields = ["name", "employee", "attendance_date", "working_hours", "status", "daily_pay"]
 	if frappe.db.has_column("Attendance", "in_time"):
 		fields.extend(["in_time", "out_time"])
-	rows = frappe.get_all(
-		"Attendance",
-		filters={
-			"employee": employee,
-			"attendance_date": ["between", [getdate(start_date), getdate(end_date)]],
-			"docstatus": ["<", 2],
-		},
-		fields=fields,
-		order_by="attendance_date asc, name asc",
+	rows = filter_attendance_to_employment(
+		frappe.get_all(
+			"Attendance",
+			filters={
+				"employee": employee,
+				"attendance_date": ["between", [start_date, end_date]],
+				"docstatus": ["<", 2],
+			},
+			fields=fields,
+			order_by="attendance_date asc, name asc",
+		)
 	)
 	apply_approved_week_hours(employee, rows)
 	total = 0.0
@@ -861,6 +946,8 @@ def payroll_hours_for_period(employee: str, start_date, end_date) -> float:
 def resync_attendance_from_day_logs(employee: str, day, attendance_name: str | None = None) -> str | None:
 	"""Recompute Attendance times/hours from the day's checkins (completed pair sum)."""
 	day = getdate(day)
+	if not _employee_employed_on(employee, day):
+		return attendance_name
 	logs = get_day_checkins(employee, day)
 	result = pair_checkin_logs(logs)
 	existing = attendance_name or frappe.db.get_value(

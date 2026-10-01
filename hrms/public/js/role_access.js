@@ -319,14 +319,21 @@
 	}
 
 	function hide_role_chrome(frm) {
-		["home_page", "restrict_to_domain", "two_factor_auth"].forEach((fieldname) => {
-			if (frm.fields_dict?.[fieldname]) frm.set_df_property(fieldname, "hidden", 1);
-		});
+		if (frm._staffProHidingRoleChrome) return;
+		frm._staffProHidingRoleChrome = true;
+		try {
+			["home_page", "restrict_to_domain", "two_factor_auth"].forEach((fieldname) => {
+				const field = frm.fields_dict?.[fieldname];
+				if (field && !field.df?.hidden) frm.set_df_property(fieldname, "hidden", 1);
+			});
+		} finally {
+			frm._staffProHidingRoleChrome = false;
+		}
 		const hidden = new Set(["Documents", "Reports", "Pages", "Workspaces"]);
 		const $page = $(frm.page?.wrapper || frm.$wrapper);
 		$page.find("#form-tabs li, #form-tabs .nav-item").each(function () {
 			const label = ($(this).text() || "").replace(/\s+/g, " ").trim();
-			if (hidden.has(label)) $(this).hide();
+			if (hidden.has(label) && this.style.display !== "none") $(this).hide();
 		});
 		$page.find(".inner-group-button").each(function () {
 			const text = ($(this).find("button").first().text() || "").replace(/\s+/g, " ").trim();

@@ -408,6 +408,78 @@ class TestDailyPay(HRMSTestSuite):
 		doc.pay_double_time = 1
 		self.assertRaises(frappe.ValidationError, doc.save)
 
+	def test_ensure_paid_holiday_skips_before_joining(self):
+		from frappe.utils import get_year_ending, get_year_start, getdate
+
+		from hrms.hr.doctype.holiday_list_assignment.test_holiday_list_assignment import (
+			create_holiday_list_assignment,
+		)
+		from hrms.hr.doctype.overtime_slip.overtime_slip import get_pay_period_overtime
+		from hrms.payroll.daily_pay import _employee_employed_on, employment_window, ensure_paid_holiday_attendance
+		from hrms.payroll.doctype.salary_slip.test_salary_slip import make_holiday_list
+
+		holiday_date = getdate("2026-09-21")
+		joining_date = getdate("2026-09-30")
+		self.assertFalse(
+			_employee_employed_on(
+				"late-joiner",
+				holiday_date,
+				{"late-joiner": frappe._dict(date_of_joining=joining_date, relieving_date=None)},
+			)
+		)
+		self.assertTrue(
+			_employee_employed_on(
+				"late-joiner",
+				joining_date,
+				{"late-joiner": frappe._dict(date_of_joining=joining_date, relieving_date=None)},
+			)
+		)
+		self.assertEqual(
+			employment_window(
+				"late-joiner",
+				holiday_date,
+				joining_date,
+				{"late-joiner": frappe._dict(date_of_joining=joining_date, relieving_date=None)},
+			),
+			(joining_date, joining_date),
+		)
+
+		list_name = make_holiday_list(
+			"Holiday Skip Before Joining List",
+			from_date=get_year_start(holiday_date),
+			to_date=get_year_ending(holiday_date),
+			add_weekly_offs=False,
+		)
+		doc = frappe.get_doc("Holiday List", list_name)
+		if not any(getdate(h.holiday_date) == holiday_date and not cint(h.weekly_off) for h in doc.holidays):
+			doc.append(
+				"holidays",
+				{"holiday_date": holiday_date, "description": "Independence Day", "weekly_off": 0},
+			)
+			doc.save()
+
+		employee = make_employee(
+			"test_holiday_skip_join@example.com",
+			company="_Test Company",
+			date_of_joining=joining_date,
+		)
+		frappe.db.set_value("Employee", employee, "date_of_joining", joining_date, update_modified=False)
+		create_holiday_list_assignment("Employee", employee, list_name)
+
+		created = ensure_paid_holiday_attendance(holiday_date, holiday_date, employee=employee)
+		self.assertEqual(created, [])
+		self.assertFalse(
+			frappe.db.exists(
+				"Attendance",
+				{"employee": employee, "attendance_date": holiday_date, "docstatus": ("<", 2)},
+			)
+		)
+
+		overtime = get_pay_period_overtime(employee, holiday_date, joining_date)
+		self.assertEqual(overtime["start_date"], joining_date)
+		self.assertEqual(flt(overtime["total_overtime_duration"]), 0)
+		self.assertEqual(flt(overtime["total_hours"]), 0)
+
 	def test_holiday_list_toggles_mutually_exclusive_validate(self):
 		from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 		from frappe.utils import get_year_ending, get_year_start, getdate

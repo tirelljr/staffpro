@@ -1963,6 +1963,83 @@ class TestPayrollEntry(HRMSTestSuite):
 		self.assertGreater(flt(agent_row["pay_period_ee_social"]), 0)
 		self.assertLess(flt(agent_row["net_pay"]), flt(agent_row["gross_pay"]))
 
+	def test_payroll_excel_skips_attendance_before_joining(self):
+		from frappe.utils import cint
+
+		from hrms.hr.doctype.holiday_list_assignment.test_holiday_list_assignment import (
+			create_holiday_list_assignment,
+		)
+		from hrms.payroll.doctype.payroll_entry.payroll_entry import get_payroll_excel_data
+		from hrms.payroll.doctype.salary_slip.test_salary_slip import make_holiday_list
+
+		holiday_date = getdate("2026-09-21")
+		joining_date = getdate("2026-09-30")
+		end_date = getdate("2026-10-04")
+		company = frappe.get_doc("Company", "_Test Company")
+		employee = make_employee(
+			"payroll.excel.latejoin@example.com",
+			company=company.name,
+			date_of_joining=joining_date,
+		)
+		frappe.db.set_value("Employee", employee, "date_of_joining", joining_date, update_modified=False)
+		frappe.db.set_value("Employee", employee, "ctc", 10)
+
+		list_name = make_holiday_list(
+			"Payroll Excel Late Join Holidays",
+			from_date=holiday_date,
+			to_date=end_date,
+			add_weekly_offs=False,
+		)
+		holiday_list = frappe.get_doc("Holiday List", list_name)
+		if not any(
+			getdate(h.holiday_date) == holiday_date and not cint(h.weekly_off) for h in holiday_list.holidays
+		):
+			holiday_list.append(
+				"holidays",
+				{"holiday_date": holiday_date, "description": "Independence Day", "weekly_off": 0},
+			)
+			holiday_list.save()
+		create_holiday_list_assignment("Employee", employee, list_name)
+
+		worked = frappe.get_doc(
+			{
+				"doctype": "Attendance",
+				"employee": employee,
+				"company": company.name,
+				"attendance_date": joining_date,
+				"status": "Present",
+				"working_hours": 8,
+			}
+		)
+		worked.flags.ignore_validate = True
+		worked.insert()
+
+		payroll_entry = frappe.new_doc("Payroll Entry")
+		payroll_entry.company = company.name
+		payroll_entry.start_date = holiday_date
+		payroll_entry.end_date = end_date
+		payroll_entry.payroll_frequency = "Fortnightly"
+		payroll_entry.currency = company.default_currency
+		payroll_entry.exchange_rate = 1
+		payroll_entry.cost_center = "Main - _TC"
+		payroll_entry.payment_account = get_payment_account()
+		payroll_entry.append(
+			"employees",
+			{"employee": employee, "employee_name": frappe.db.get_value("Employee", employee, "employee_name")},
+		)
+		payroll_entry.insert()
+
+		payload = get_payroll_excel_data(payroll_entry.name)
+		agent_row = next(row for row in payload["rows"] if row["employee"] == employee)
+		self.assertEqual(flt(agent_row["regular_hours"]), 8)
+		self.assertEqual(flt(agent_row["holiday_pay"]), 0)
+		self.assertFalse(
+			frappe.db.exists(
+				"Attendance",
+				{"employee": employee, "attendance_date": holiday_date, "docstatus": ("<", 2)},
+			)
+		)
+
 	def test_split_full_name_into_first_and_last(self):
 		from hrms.payroll.doctype.payroll_entry.payroll_entry import _split_full_name
 

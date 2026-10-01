@@ -3465,12 +3465,16 @@ def _threshold_overtime_hours_by_employee(entry, result_field: str) -> dict[str,
 				pluck="employee",
 			)
 		)
-	return {
-		employee: flt(
-			get_pay_period_overtime(employee, entry.start_date, entry.end_date)[result_field]
-		)
-		for employee in employees
-	}
+	hours: dict[str, float] = {}
+	for employee in employees:
+		try:
+			hours[employee] = flt(
+				get_pay_period_overtime(employee, entry.start_date, entry.end_date)[result_field]
+			)
+		except frappe.ValidationError:
+			# Skip one agent (e.g. holiday attendance before joining) instead of failing the sheet.
+			frappe.clear_messages()
+	return hours
 
 
 def _holiday_pay_by_employee(entry) -> dict[str, float]:
@@ -3502,7 +3506,11 @@ def _period_attendance(entry, fields: list[str], include_draft: bool = False) ->
 	elif entry.company:
 		filters["company"] = entry.company
 
-	return frappe.get_all("Attendance", filters=filters, fields=fields)
+	from hrms.payroll.daily_pay import filter_attendance_to_employment
+
+	if "employee" not in fields:
+		fields = ["employee", *fields]
+	return filter_attendance_to_employment(frappe.get_all("Attendance", filters=filters, fields=fields))
 
 
 def _bonus_by_salary_slip(slip_names: list[str]) -> dict[str, float]:

@@ -62,31 +62,52 @@ def get_pay_period_overtime(
 	"""Hours past the pay-period threshold (90 hours by default)."""
 	from hrms.payroll.daily_pay import (
 		apply_approved_week_hours,
+		employment_window,
 		ensure_paid_holiday_attendance,
 		ensure_working_hours_from_times,
+		filter_attendance_to_employment,
 		get_public_holiday_pay_context,
 	)
 
-	start_date = getdate(start_date)
-	end_date = getdate(end_date)
-	if ensure_holidays:
-		ensure_paid_holiday_attendance(start_date, end_date, employee=employee)
+	orig_start = getdate(start_date)
+	orig_end = getdate(end_date)
+	start_date, end_date = employment_window(employee, orig_start, orig_end)
+	if not start_date:
+		return {
+			"employee": employee,
+			"start_date": orig_start,
+			"end_date": orig_end,
+			"threshold_hours": get_employee_overtime_threshold(employee),
+			"total_hours": 0.0,
+			"total_overtime_duration": 0.0,
+			"ordinary_overtime_duration": 0.0,
+			"holiday_overtime_duration": 0.0,
+			"allocations": [],
+		}
 
-	fields = ["name", "attendance_date", "working_hours", "status"]
+	if ensure_holidays:
+		try:
+			ensure_paid_holiday_attendance(start_date, end_date, employee=employee)
+		except frappe.ValidationError:
+			frappe.clear_messages()
+
+	fields = ["name", "employee", "attendance_date", "working_hours", "status"]
 	attendance_meta = frappe.get_meta("Attendance")
 	for fieldname in ("in_time", "out_time", "daily_pay"):
 		if attendance_meta.has_field(fieldname):
 			fields.append(fieldname)
 
-	rows = frappe.get_all(
-		"Attendance",
-		filters={
-			"employee": employee,
-			"attendance_date": ("between", [start_date, end_date]),
-			"docstatus": ("<", 2),
-		},
-		fields=fields,
-		order_by="attendance_date asc, creation asc, name asc",
+	rows = filter_attendance_to_employment(
+		frappe.get_all(
+			"Attendance",
+			filters={
+				"employee": employee,
+				"attendance_date": ("between", [start_date, end_date]),
+				"docstatus": ("<", 2),
+			},
+			fields=fields,
+			order_by="attendance_date asc, creation asc, name asc",
+		)
 	)
 	apply_approved_week_hours(employee, rows)
 

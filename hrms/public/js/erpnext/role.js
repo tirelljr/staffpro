@@ -51,26 +51,37 @@ function label_role_users_tab(frm) {
 	const intro = __(
 		"Users attached to this role get all of its permissions and access. Add or remove people here.",
 	);
-	let $intro = $tab.find(".staff-pro-role-users-intro");
+	let $intro = $tab.children(".staff-pro-role-users-intro");
+	if ($intro.length && $intro.text() === intro) return;
 	if (!$intro.length) {
-		const $body = $tab.find(".section-body").first();
-		$intro = $('<p class="staff-pro-role-users-intro text-muted">');
-		if ($body.length) {
-			$body.prepend($intro);
-		} else {
-			$tab.prepend($intro);
-		}
+		$intro = $('<p class="staff-pro-role-users-intro text-muted">').prependTo($tab);
 	}
 	$intro.text(intro);
 }
 
 function watch_role_users_tab(frm) {
-	label_role_users_tab(frm);
 	const body = $(frm.page?.wrapper || frm.$wrapper).find(".form-page").get(0);
-	if (!body || body._staffProRoleUsers) return;
+	if (!body) {
+		label_role_users_tab(frm);
+		return;
+	}
+	if (body._staffProRoleUsers) {
+		label_role_users_tab(frm);
+		return;
+	}
 	body._staffProRoleUsers = true;
-	new MutationObserver(() => label_role_users_tab(frm)).observe(body, {
-		childList: true,
-		subtree: true,
+	const observer = new MutationObserver(() => {
+		// Writing the intro mutates this same tree. Disconnect first or the
+		// callback retriggers itself and the role form never finishes opening.
+		observer.disconnect();
+		try {
+			label_role_users_tab(frm);
+		} finally {
+			if (body.isConnected) {
+				observer.observe(body, { childList: true, subtree: true });
+			}
+		}
 	});
+	label_role_users_tab(frm);
+	observer.observe(body, { childList: true, subtree: true });
 }

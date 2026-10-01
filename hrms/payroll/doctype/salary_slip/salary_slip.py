@@ -2842,17 +2842,24 @@ def _hourly_inputs_for_slip(slip) -> tuple[float, float, float, float]:
 def _slip_period_attendance(slip, fields: list[str]) -> list[dict]:
 	if not slip.employee or not slip.start_date or not slip.end_date:
 		return []
+	from hrms.payroll.daily_pay import employment_window, filter_attendance_to_employment
+
+	start_date, end_date = employment_window(slip.employee, slip.start_date, slip.end_date)
+	if not start_date:
+		return []
 	available = ["name", "employee"] + [
 		field for field in fields if field == "name" or frappe.db.has_column("Attendance", field)
 	]
-	return frappe.get_all(
-		"Attendance",
-		filters={
-			"employee": slip.employee,
-			"attendance_date": ("between", [slip.start_date, slip.end_date]),
-			"docstatus": ("<", 2),
-		},
-		fields=available,
+	return filter_attendance_to_employment(
+		frappe.get_all(
+			"Attendance",
+			filters={
+				"employee": slip.employee,
+				"attendance_date": ("between", [start_date, end_date]),
+				"docstatus": ("<", 2),
+			},
+			fields=available,
+		)
 	)
 
 
