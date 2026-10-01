@@ -146,7 +146,6 @@ trap 'kill $(jobs -p) 2>/dev/null; wait' SIGTERM SIGINT
 
 start_nginx
 create_or_migrate_site
-refresh_desk_assets
 
 GUNICORN_BIND="127.0.0.1:8000"
 if ! command -v nginx >/dev/null 2>&1; then
@@ -170,6 +169,7 @@ bench worker --queue short,default,long &
 bench schedule &
 
 echo "Staff Pro is running on port ${PORT}"
+refresh_desk_assets || true
 # Gunicorn --preload can take a while; do not treat "not in ps yet" as a crash.
 set +e
 for _ in $(seq 1 90); do

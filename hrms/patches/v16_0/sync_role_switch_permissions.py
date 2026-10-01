@@ -3,12 +3,11 @@
 
 import frappe
 
-from hrms.hr.role_access import ensure_role_access_fields, sync_all_role_switch_permissions
+from hrms.hr.role_access import _ensure_role_switch_columns
 
 
 def execute():
-	# Leave the migrate transaction before any Role ALTER / Custom Field writes.
+	# Only add missing columns. Full Custom Field + permission grants run on
+	# boot. Doing that here holds MariaDB locks and leaves Render on 502.
 	frappe.db.commit()
-	ensure_role_access_fields()
-	frappe.db.commit()
-	sync_all_role_switch_permissions()
+	_ensure_role_switch_columns()

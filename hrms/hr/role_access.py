@@ -678,6 +678,9 @@ def ensure_role_access_fields():
 	"""Add the hidden switches on Role and hide desk fields this app does not use."""
 	if not frappe.db.exists("DocType", "Role"):
 		return
+	if getattr(frappe.flags, "in_migrate", False):
+		_ensure_role_switch_columns()
+		return
 	if frappe.cache.get_value(_READY_CACHE) and fields_ready():
 		return
 
@@ -1413,6 +1416,8 @@ def sync_role_switch_permissions(role_name: str | None) -> None:
 
 
 def sync_all_role_switch_permissions() -> None:
+	if getattr(frappe.flags, "in_migrate", False):
+		return
 	if not frappe.db.exists("DocType", "Role"):
 		return
 	ensure_role_access_fields()
