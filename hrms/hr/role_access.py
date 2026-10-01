@@ -664,6 +664,16 @@ def fields_ready() -> bool:
 	return all(meta.has_field(name) for name in FLAG_NAMES)
 
 
+def _ensure_role_switch_columns():
+	"""Add Role switch columns with DDL so migrate is not stuck in a transaction."""
+	if not frappe.db.table_exists("Role"):
+		return
+	for name in FLAG_NAMES:
+		if frappe.db.has_column("Role", name):
+			continue
+		frappe.db.sql_ddl(f"alter table `tabRole` add column `{name}` int(1) not null default 1")
+
+
 def ensure_role_access_fields():
 	"""Add the hidden switches on Role and hide desk fields this app does not use."""
 	if not frappe.db.exists("DocType", "Role"):
@@ -683,6 +693,7 @@ def ensure_role_access_fields():
 		previous = frappe.flags.ignore_permissions
 		frappe.flags.ignore_permissions = True
 		try:
+			_ensure_role_switch_columns()
 			create_custom_fields(
 				{
 					"Role": [
@@ -1410,6 +1421,7 @@ def sync_all_role_switch_permissions() -> None:
 		if role in SKIP_SWITCH_GRANT_ROLES:
 			continue
 		sync_role_switch_permissions(role)
+		frappe.db.commit()
 	frappe.clear_cache()
 
 
