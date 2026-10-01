@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+export PYTHONUNBUFFERED=1
+
 BENCH=/home/frappe/frappe-bench
 cd "$BENCH"
 
@@ -122,6 +124,9 @@ create_or_migrate_site() {
 		if [ -n "${RENDER_EXTERNAL_HOSTNAME:-}" ]; then
 			bench --site "$SITE_NAME" set-config host_name "https://${RENDER_EXTERNAL_HOSTNAME}" || true
 		fi
+		# Drop leftover DDL outside Frappe first. Sync dies with ImplicitCommitError
+		# if Expense Claim.vehicle_log is still present (progress bar freezes ~60%).
+		"$BENCH/env/bin/python" "$BENCH/apps/hrms/deploy/drop_blocked_columns.py" "$SITE_NAME" || true
 		bench --site "$SITE_NAME" migrate
 		bench --site "$SITE_NAME" clear-cache || true
 	fi

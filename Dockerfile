@@ -62,6 +62,7 @@ RUN chmod 755 /opt/staffpro/entrypoint.sh
 USER frappe
 
 ENV PORT=10000
+ENV PYTHONUNBUFFERED=1
 EXPOSE 10000
 
 ENTRYPOINT ["/opt/staffpro/entrypoint.sh"]
