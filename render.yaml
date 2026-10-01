@@ -68,7 +68,7 @@ services:
       - key: ADMIN_PASSWORD
         sync: false
       - key: GUNICORN_WORKERS
-        value: "2"
+        value: "1"
       - key: GUNICORN_THREADS
         value: "4"
       - key: GUNICORN_TIMEOUT

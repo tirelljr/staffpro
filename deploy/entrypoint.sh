@@ -16,6 +16,13 @@ SITE_NAME="${SITE_NAME:-${RENDER_EXTERNAL_HOSTNAME:-staffpro.localhost}}"
 export FRAPPE_SITE_NAME_HEADER="${FRAPPE_SITE_NAME_HEADER:-$SITE_NAME}"
 export PORT
 
+GUNICORN_HOST="127.0.0.1"
+GUNICORN_PORT="8000"
+if ! command -v nginx >/dev/null 2>&1; then
+	GUNICORN_HOST="0.0.0.0"
+	GUNICORN_PORT="$PORT"
+fi
+
 wait_for_tcp() {
 	local host="$1"
 	local port="$2"
@@ -33,6 +40,18 @@ while time.time() < deadline:
         time.sleep(3)
 print(f"Timed out waiting for {label} at {host}:{port}", file=sys.stderr)
 raise SystemExit(1)
+PY
+}
+
+port_open() {
+	python3 - "$1" "$2" <<'PY'
+import socket, sys
+host, port = sys.argv[1], int(sys.argv[2])
+try:
+    with socket.create_connection((host, port), timeout=1):
+        raise SystemExit(0)
+except OSError:
+    raise SystemExit(1)
 PY
 }
 
@@ -118,73 +137,91 @@ create_or_migrate_site() {
 		bench --site "$SITE_NAME" execute "frappe.get_attr('hrms.branding.apply_branding')()" || true
 		bench --site "$SITE_NAME" execute "frappe.get_attr('hrms.boot.prepare_staff_pro_first_login')()" || true
 		bench --site "$SITE_NAME" clear-cache || true
+		echo "${RENDER_GIT_COMMIT:-unknown}" > "sites/${SITE_NAME}/.staffpro_migrated_commit"
 		echo "Site ${SITE_NAME} is ready. Sign in as Matt Chavez, Micheal Graylord, or Myra Chavez (password: admin)."
-	else
-		echo "Migrating site ${SITE_NAME}..."
-		if [ -n "${RENDER_EXTERNAL_HOSTNAME:-}" ]; then
-			bench --site "$SITE_NAME" set-config host_name "https://${RENDER_EXTERNAL_HOSTNAME}" || true
-		fi
-		# Drop leftover DDL outside Frappe first. Sync dies with ImplicitCommitError
-		# if Expense Claim.vehicle_log is still present (progress bar freezes ~60%).
-		"$BENCH/env/bin/python" "$BENCH/apps/hrms/deploy/drop_blocked_columns.py" "$SITE_NAME" || true
-		bench --site "$SITE_NAME" migrate
-		bench --site "$SITE_NAME" clear-cache || true
+		return
 	fi
+
+	if [ -n "${RENDER_EXTERNAL_HOSTNAME:-}" ]; then
+		bench --site "$SITE_NAME" set-config host_name "https://${RENDER_EXTERNAL_HOSTNAME}" || true
+	fi
+
+	local build_id="${RENDER_GIT_COMMIT:-unknown}"
+	local stamp="sites/${SITE_NAME}/.staffpro_migrated_commit"
+	if [ "${STAFFPRO_FORCE_MIGRATE:-}" != "1" ] && [ -f "$stamp" ] && [ "$(cat "$stamp")" = "$build_id" ]; then
+		echo "Skipping migrate; site already on ${build_id}"
+		return
+	fi
+
+	echo "Migrating site ${SITE_NAME}..."
+	# Drop leftover DDL outside Frappe first. Sync dies with ImplicitCommitError
+	# if Expense Claim.vehicle_log is still present (progress bar freezes ~60%).
+	"$BENCH/env/bin/python" "$BENCH/apps/hrms/deploy/drop_blocked_columns.py" "$SITE_NAME" || true
+	bench --site "$SITE_NAME" migrate
+	bench --site "$SITE_NAME" clear-cache || true
+	echo "$build_id" > "$stamp"
 }
 
-refresh_desk_assets() {
-	# Assets are built in the image. A second yarn/bench build here OOMs the
-	# 2 GB Render instance once gunicorn is already running.
-	echo "Refreshing desk cache..."
-	bench --site "$SITE_NAME" execute "frappe.get_attr('hrms.branding.repair_desk_ltr_bundles')()" || true
-	bench --site "$SITE_NAME" execute "frappe.get_attr('hrms.branding.apply_branding')()" || true
-	bench --site "$SITE_NAME" clear-cache || true
+start_gunicorn() {
+	echo "Starting gunicorn on ${GUNICORN_HOST}:${GUNICORN_PORT}..."
+	"$BENCH/env/bin/gunicorn" \
+		--chdir="$BENCH/sites" \
+		--bind="${GUNICORN_HOST}:${GUNICORN_PORT}" \
+		--threads="${GUNICORN_THREADS:-4}" \
+		--workers="${GUNICORN_WORKERS:-1}" \
+		--worker-class=gthread \
+		--worker-tmp-dir=/dev/shm \
+		--timeout="${GUNICORN_TIMEOUT:-120}" \
+		frappe.app:application &
+}
+
+gunicorn_ready() {
+	port_open "$GUNICORN_HOST" "$GUNICORN_PORT"
+}
+
+wait_for_gunicorn() {
+	local seconds="${1:-180}"
+	local elapsed=0
+	while [ "$elapsed" -lt "$seconds" ]; do
+		if gunicorn_ready; then
+			echo "Gunicorn is accepting connections"
+			return 0
+		fi
+		sleep 2
+		elapsed=$((elapsed + 2))
+	done
+	return 1
 }
 
 trap 'kill $(jobs -p) 2>/dev/null; wait' SIGTERM SIGINT
 
 start_nginx
 create_or_migrate_site
-
-GUNICORN_BIND="127.0.0.1:8000"
-if ! command -v nginx >/dev/null 2>&1; then
-	GUNICORN_BIND="0.0.0.0:${PORT}"
-fi
-
-"$BENCH/env/bin/gunicorn" \
-	--chdir="$BENCH/sites" \
-	--bind="$GUNICORN_BIND" \
-	--threads="${GUNICORN_THREADS:-4}" \
-	--workers="${GUNICORN_WORKERS:-2}" \
-	--worker-class=gthread \
-	--worker-tmp-dir=/dev/shm \
-	--timeout="${GUNICORN_TIMEOUT:-120}" \
-	--preload \
-	frappe.app:application &
-
+start_gunicorn
 start_realtime_service
+
+if ! wait_for_gunicorn 180; then
+	echo "Gunicorn did not accept connections; retrying once..." >&2
+	pkill -f '[g]unicorn' || true
+	sleep 2
+	start_gunicorn
+	wait_for_gunicorn 180 || echo "Gunicorn still starting; keeping the container up" >&2
+fi
 
 bench worker --queue short,default,long &
 bench schedule &
 
 echo "Staff Pro is running on port ${PORT}"
-refresh_desk_assets || true
-# Gunicorn --preload can take a while; do not treat "not in ps yet" as a crash.
+
 set +e
-for _ in $(seq 1 90); do
-	if pgrep -f "frappe.app:application" >/dev/null 2>&1; then
-		break
-	fi
-	sleep 2
-done
-if ! pgrep -f "frappe.app:application" >/dev/null 2>&1; then
-	echo "Gunicorn failed to start within 3 minutes" >&2
-	exit 1
-fi
 while true; do
-	sleep 30
-	if ! pgrep -f "frappe.app:application" >/dev/null 2>&1; then
-		echo "Gunicorn stopped; exiting container" >&2
-		exit 1
+	sleep 15
+	if gunicorn_ready; then
+		continue
 	fi
+	echo "Gunicorn is not accepting connections; restarting it" >&2
+	pkill -f '[g]unicorn' || true
+	sleep 2
+	start_gunicorn
+	wait_for_gunicorn 120 || true
 done
