@@ -177,7 +177,7 @@ hrms.patches.v16_0.remove_two_factor_auth #2026-09-30-remove-two-factor
 hrms.patches.v16_0.add_staff_pro_user_desk_restrictions #2026-09-30-desk-restrictions
 hrms.patches.v16_0.ensure_hr_assistant_desk_access #2026-09-30-hr-assistant
 hrms.patches.v16_0.provision_staff_pro_hr_assistant_users #2026-09-30-zeeprez
-hrms.patches.v16_0.strip_missing_travel_fleet_links #2026-09-30-vehicle-log
+hrms.patches.v16_0.strip_missing_travel_fleet_links #2026-10-01-vehicle-log-ddl
 hrms.patches.v16_0.fix_vacation_one_year_accrual #2026-09-30-vacation
 hrms.patches.v16_0.remove_simplified_time_off_links #2026-09-30-time-off-nav
 hrms.patches.v16_0.remove_unused_desk_chrome #2026-09-30-hide-unused-chrome

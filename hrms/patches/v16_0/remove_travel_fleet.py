@@ -56,7 +56,7 @@ def strip_missing_travel_fleet_links():
 	_delete_where("Custom Field", {"dt": "Expense Claim", "fieldname": "vehicle_log"})
 	_delete_where("Property Setter", {"doc_type": "Expense Claim", "field_name": "vehicle_log"})
 	if frappe.db.table_exists("Expense Claim") and frappe.db.has_column("Expense Claim", "vehicle_log"):
-		frappe.db.sql("alter table `tabExpense Claim` drop column `vehicle_log`")
+		frappe.db.sql_ddl("alter table `tabExpense Claim` drop column `vehicle_log`")
 	frappe.clear_cache(doctype="Expense Claim")
 
 
